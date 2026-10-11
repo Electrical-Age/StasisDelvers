@@ -47,6 +47,24 @@ public final class FieldData extends SavedData {
         return f;
     }
 
+    /** Replace field `id` (radius, failing, collapse changes); no-op if it's gone. */
+    public void update(ServerLevel level, int id, java.util.function.UnaryOperator<Field> change) {
+        for (int i = 0; i < fields.size(); i++) {
+            if (fields.get(i).id() == id) {
+                Field f = change.apply(fields.get(i));
+                if (!f.equals(fields.get(i))) {
+                    fields.set(i, f);
+                    changed(level);
+                }
+                return;
+            }
+        }
+    }
+
+    public java.util.Optional<Field> get(int id) {
+        return fields.stream().filter(f -> f.id() == id).findFirst();
+    }
+
     public boolean remove(ServerLevel level, int id) {
         boolean removed = fields.removeIf(f -> f.id() == id);
         if (removed) changed(level);

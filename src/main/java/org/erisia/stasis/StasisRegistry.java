@@ -69,6 +69,22 @@ public final class StasisRegistry {
             .build());
     }
 
+    static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(StasisDelvers.MODID);
+    static final DeferredRegister<net.minecraft.world.level.block.entity.BlockEntityType<?>> BLOCK_ENTITIES =
+        DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, StasisDelvers.MODID);
+
+    public static final net.neoforged.neoforge.registries.DeferredBlock<TowerBlock> TOWER = BLOCKS.registerBlock("stasis_tower",
+        TowerBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.METAL).strength(5f, 6f)
+            .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.METAL));
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> TOWER_SEGMENT =
+        BLOCKS.registerSimpleBlock("stasis_tower_segment", p -> p.mapColor(net.minecraft.world.level.material.MapColor.METAL)
+            .strength(5f, 6f).requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.METAL));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TOWER_ITEM = ITEMS.registerSimpleBlockItem(TOWER);
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TOWER_SEGMENT_ITEM = ITEMS.registerSimpleBlockItem(TOWER_SEGMENT);
+
+    public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TowerBlockEntity>> TOWER_ENTITY =
+        BLOCK_ENTITIES.register("stasis_tower", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TowerBlockEntity::new, TOWER.get()));
+
     static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE, StasisDelvers.MODID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<Statue>> STATUE = ENTITY_TYPES.register("statue",
@@ -83,6 +99,11 @@ public final class StasisRegistry {
     static void register(IEventBus modBus) {
         ENTITY_TYPES.register(modBus);
         ITEMS.register(modBus);
+        BLOCKS.register(modBus);
+        BLOCK_ENTITIES.register(modBus);
+        modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->
+            e.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, TOWER_ENTITY.get(), (be, side) -> be.energy()));
+        modBus.addListener(Tickets::register);
         TABS.register(modBus);
     }
 }

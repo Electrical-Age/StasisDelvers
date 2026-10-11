@@ -10,5 +10,7 @@
   "item.stasisdelvers.stasis_helmet": "Stasis-Proof E-Coal Helmet",
   "item.stasisdelvers.stasis_chestplate": "Stasis-Proof E-Coal Chestplate",
   "item.stasisdelvers.stasis_leggings": "Stasis-Proof E-Coal Leggings",
-  "item.stasisdelvers.stasis_boots": "Stasis-Proof E-Coal Boots"
+  "item.stasisdelvers.stasis_boots": "Stasis-Proof E-Coal Boots",
+  "block.stasisdelvers.stasis_tower": "Stasis Tower",
+  "block.stasisdelvers.stasis_tower_segment": "Stasis Tower Segment"
 }

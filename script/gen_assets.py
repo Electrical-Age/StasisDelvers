@@ -68,4 +68,34 @@ for suit, colors in SUITS.items():
     layer(colors, os.path.join(ROOT, 'textures', 'entity', 'equipment', 'humanoid_leggings', suit + '.png'))
     write_json(f'equipment/{suit}.json', {'layers': {'humanoid': [{'texture': f'stasisdelvers:{suit}'}],
                                                      'humanoid_leggings': [{'texture': f'stasisdelvers:{suit}'}]}})
+
+# tower blocks: a dark metal casing with a cyan core line (base) and plain ribbed segments
+def block_tex(path, core):
+    rng = random.Random(path)
+    im = Image.new('RGBA', (16, 16))
+    for y in range(16):
+        for x in range(16):
+            k = rng.uniform(0.85, 1.1)
+            c = (70, 74, 82)
+            if x in (0, 15) or y in (0, 15):
+                c = (120, 104, 70)
+            if core and 6 <= x <= 9:
+                c = (90, 210, 230) if y % 4 else (60, 140, 160)
+            if not core and y % 4 == 0:
+                c = (52, 55, 62)
+            im.putpixel((x, y), tuple(min(255, int(v * k)) for v in c) + (255,))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    im.save(path)
+
+
+for name, core in (('stasis_tower', True), ('stasis_tower_segment', False)):
+    block_tex(os.path.join(ROOT, 'textures', 'block', name + '.png'), core)
+    write_json(f'models/block/{name}.json', {'parent': 'minecraft:block/cube_all', 'textures': {'all': f'stasisdelvers:block/{name}'}})
+    write_json(f'blockstates/{name}.json', {'variants': {'': {'model': f'stasisdelvers:block/{name}'}}})
+    write_json(f'items/{name}.json', {'model': {'type': 'minecraft:model', 'model': f'stasisdelvers:block/{name}'}})
+    data = os.path.join(os.path.dirname(__file__), '..', 'src', 'main', 'resources', 'data', 'stasisdelvers', 'loot_table', 'blocks')
+    os.makedirs(data, exist_ok=True)
+    with open(os.path.join(data, name + '.json'), 'w') as f:
+        json.dump({'type': 'minecraft:block', 'pools': [{'rolls': 1, 'conditions': [{'condition': 'minecraft:survives_explosion'}],
+                   'entries': [{'type': 'minecraft:item', 'name': f'stasisdelvers:{name}'}]}]}, f, indent=2)
 print('ok')

@@ -101,6 +101,23 @@ public final class Stasis {
         return inSpawn(level, cx, cz) || index(level).columns.containsKey(chunkKey);
     }
 
+    /**
+     * Block entities that tick even in stopped land: tower bases (or no tower could ever start), and EA's energy
+     * exporters in a tower's chunk (they feed it).
+     */
+    public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
+        var be = level.getBlockEntity(pos);
+        if (be instanceof TowerBlockEntity) return true;
+        return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && towerInChunk(level, pos);
+    }
+
+    /** Is there a tower base in this position's chunk? */
+    public static boolean towerInChunk(ServerLevel level, BlockPos pos) {
+        var chunk = level.getChunkAt(pos);
+        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity) return true;
+        return false;
+    }
+
     /** Is this entity frozen? Players never are here (they freeze into statues: T2); unbound types never are. */
     public static boolean isFrozen(Entity e) {
         if (!(e.level() instanceof ServerLevel level) || e instanceof net.minecraft.world.entity.player.Player) return false;

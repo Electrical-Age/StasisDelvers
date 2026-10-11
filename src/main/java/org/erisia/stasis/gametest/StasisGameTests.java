@@ -57,9 +57,14 @@ public final class StasisGameTests {
         Runnable build(GameTestHelper h, Checks c);
     }
 
-    record Spec(int ticks, Case body, boolean field) {
+    /** isolated: runs in a batch of its own (towers make big fields that would reach the neighbouring tests). */
+    record Spec(int ticks, Case body, boolean field, boolean isolated) {
         Spec(int ticks, Case body) {
-            this(ticks, body, true);
+            this(ticks, body, true, false);
+        }
+
+        Spec(int ticks, Case body, boolean field) {
+            this(ticks, body, field, false);
         }
     }
 
@@ -229,6 +234,53 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // towers: height sets the radius; half a store starts the field; an empty store collapses it over 15 s
+        CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 3);
+            var store = t.energy();
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(20) * 0.4 * 4 / 3), tx);
+                tx.commit();
+            }
+            h.runAfterDelay(3, () -> c.check("40% charged: still off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name()));
+            h.runAfterDelay(4, () -> {
+                try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(20) * 0.2 * 4 / 3), tx);
+                    tx.commit();
+                }
+            });
+            return () -> {
+                c.check("three segments: radius 20", t.radius() == 20.0, "r " + t.radius());
+                c.check("over half charged: running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name()
+                    + " stored " + t.storedJ() + " of " + t.storeMaxJ() + " J, ticks " + t.ticks + ", same BE " + (h.getLevel().getBlockEntity(h.absolutePos(new BlockPos(3, 1, 4))) == t));
+                var fields = FieldData.get(h.getLevel()).fields();
+                c.check("its field is up, r 20", fields.stream().anyMatch(f -> f.radius() == 20.0
+                    && f.containsPoint(h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).x, h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).y, h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).z)), fields.toString());
+                c.check("time runs next to the tower", Stasis.isRunning(h.getLevel(), h.absolutePos(new BlockPos(6, 1, 4))));
+                t.setRemoved();   // breaking the tower takes its field down
+                c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 20.0));
+            };
+        }, false, true));
+        CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(8) * 0.6 * 4 / 3), tx);
+                tx.commit();
+            }
+            h.runAfterDelay(5, () -> {
+                c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                t.testDrawFactor = 1e6;   // empty the store in a tick
+            });
+            h.runAfterDelay(160, () -> {
+                c.check("halfway through the collapse", t.state() == org.erisia.stasis.TowerBlockEntity.State.COLLAPSING, t.state().name());
+                var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.radius() == 8.0).findFirst();
+                c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.3 && f.get().collapse() < 0.7, f.toString());
+            });
+            return () -> {
+                c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());
+                c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 8.0));
+            };
+        }, false, true));
         // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
         // so it moves) dropped onto each; outside the field both fluids are stopped
         CASES.put("stopped_fluids_are_solid", new Spec(5, (h, c) -> {
@@ -265,6 +317,12 @@ public final class StasisGameTests {
                 pig.discard();
             };
         }));
+    }
+
+    static org.erisia.stasis.TowerBlockEntity tower(GameTestHelper h, BlockPos base, int segments) {
+        for (int i = 1; i <= segments; i++) h.setBlock(base.above(i), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());
+        h.setBlock(base, org.erisia.stasis.StasisRegistry.TOWER.get());
+        return (org.erisia.stasis.TowerBlockEntity) h.getLevel().getBlockEntity(h.absolutePos(base));
     }
 
     /** A survival-mode player placed at a local position (the vanilla mock player is in creative). */
@@ -385,9 +443,12 @@ public final class StasisGameTests {
             Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "default"), new TestEnvironmentDefinition.AllOf(List.of()));
         for (var e : CASES.entrySet()) {
             Identifier id = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, e.getKey());
+            // a test environment of its own puts an isolated test in a batch of its own
+            Holder<TestEnvironmentDefinition<?>> testEnv = !e.getValue().isolated() ? env : event.registerEnvironment(
+                Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "alone_" + e.getKey()), new TestEnvironmentDefinition.AllOf(List.of()));
             ResourceKey<Consumer<GameTestHelper>> fn = ResourceKey.create(Registries.TEST_FUNCTION, id);
             event.registerTest(id, new FunctionGameTestInstance(fn,
-                new TestData<>(env, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "floor_16x6x8"), e.getValue().ticks() + 40, 0, true)));
+                new TestData<>(testEnv, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "floor_16x6x8"), e.getValue().ticks() + 40, 0, true)));
         }
     }
 }

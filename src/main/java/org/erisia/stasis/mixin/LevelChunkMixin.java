@@ -21,6 +21,7 @@ public abstract class LevelChunkMixin {
 
     @Inject(method = "isTicking", at = @At("RETURN"), cancellable = true)
     private void stasis$isTicking(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        if (cir.getReturnValueZ() && level instanceof ServerLevel sl && !Stasis.isRunning(sl, pos)) cir.setReturnValue(false);
+        if (cir.getReturnValueZ() && level instanceof ServerLevel sl && !Stasis.isRunning(sl, pos)
+            && !Stasis.exemptBlockEntity(sl, pos)) cir.setReturnValue(false);
     }
 }

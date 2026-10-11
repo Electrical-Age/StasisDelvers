@@ -20,7 +20,8 @@ public final class StasisNet {
 
     static final StreamCodec<RegistryFriendlyByteBuf, Field> FIELD = StreamCodec.composite(
         ByteBufCodecs.VAR_INT, Field::id, ByteBufCodecs.DOUBLE, Field::x, ByteBufCodecs.DOUBLE, Field::y,
-        ByteBufCodecs.DOUBLE, Field::z, ByteBufCodecs.DOUBLE, Field::radius, Field::new);
+        ByteBufCodecs.DOUBLE, Field::z, ByteBufCodecs.DOUBLE, Field::radius, ByteBufCodecs.DOUBLE, Field::failing,
+        ByteBufCodecs.DOUBLE, Field::collapse, Field::new);
 
     public record Fields(List<Field> fields) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));
