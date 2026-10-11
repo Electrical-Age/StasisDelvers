@@ -36,6 +36,21 @@ final class StasisCommands {
                     c.getSource().sendSuccess(() -> Component.literal(ok ? "Removed field " + id : "No field " + id), true);
                     return ok ? 1 : 0;
                 })))
+                // test hooks for the visuals: set a field's shield failure or collapse by hand
+                .then(Commands.literal("failing").then(Commands.argument("id", IntegerArgumentType.integer(1))
+                    .then(Commands.argument("value", DoubleArgumentType.doubleArg(0, 1)).executes(c -> {
+                        ServerLevel level = c.getSource().getLevel();
+                        double v = DoubleArgumentType.getDouble(c, "value");
+                        FieldData.get(level).update(level, IntegerArgumentType.getInteger(c, "id"), f -> f.withFailing(v));
+                        return 1;
+                    }))))
+                .then(Commands.literal("collapse").then(Commands.argument("id", IntegerArgumentType.integer(1))
+                    .then(Commands.argument("value", DoubleArgumentType.doubleArg(0, 1)).executes(c -> {
+                        ServerLevel level = c.getSource().getLevel();
+                        double v = DoubleArgumentType.getDouble(c, "value");
+                        FieldData.get(level).update(level, IntegerArgumentType.getInteger(c, "id"), f -> f.withCollapse(v));
+                        return 1;
+                    }))))
                 .then(Commands.literal("clear").executes(c -> {
                     ServerLevel level = c.getSource().getLevel();
                     int n = FieldData.get(level).clear(level);
