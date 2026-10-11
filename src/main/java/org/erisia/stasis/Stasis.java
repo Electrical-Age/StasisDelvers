@@ -118,6 +118,14 @@ public final class Stasis {
         return false;
     }
 
+    /** As towerInChunk, but never loads a chunk: an unloaded chunk counts as having no tower. */
+    public static boolean towerInChunkIfLoaded(ServerLevel level, BlockPos pos) {
+        var chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
+        if (chunk == null) return false;
+        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity) return true;
+        return false;
+    }
+
     /** Is this entity frozen? Players never are here (they freeze into statues: T2); unbound types never are. */
     public static boolean isFrozen(Entity e) {
         if (!(e.level() instanceof ServerLevel level) || e instanceof net.minecraft.world.entity.player.Player) return false;

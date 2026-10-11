@@ -281,6 +281,46 @@ public final class StasisGameTests {
                 c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 8.0));
             };
         }, false, true));
+        // Electrical Age: nodes in stopped land leave the simulation; inside a field they run; cables and batteries in
+        // a tower's chunk run even outside its field
+        CASES.put("ea_nodes_stop_outside", new Spec(30, (h, c) -> {
+            var inSrc = eaSix(h, new BlockPos(3, 1, 4), 0 + (3 << 6));           // Electrical Source, inside the field
+            var outSrc = eaSix(h, new BlockPos(12, 1, 4), 0 + (3 << 6));         // outside
+            var outCable = eaSix(h, new BlockPos(12, 1, 2), 4 + (32 << 6));      // Low Voltage Cable, outside
+            ServerLevel level = h.getLevel();
+            h.runAfterDelay(10, () -> {
+                org.erisia.stasis.NodeFreezer.pass();
+                c.check("inside: the source runs", !org.erisia.stasis.NodeFreezer.isFrozen(inSrc.sixNode)
+                    && inSrc.electricalLoadList.get(0).getSubSystem() != null);
+                c.check("outside: the source is out of the simulation", org.erisia.stasis.NodeFreezer.isFrozen(outSrc.sixNode)
+                    && outSrc.electricalLoadList.get(0).getSubSystem() == null);
+                c.check("outside: the cable too", org.erisia.stasis.NodeFreezer.isFrozen(outCable.sixNode));
+                // time comes back: a field over the outside source puts it back
+                Vec3 p = h.absoluteVec(new Vec3(12.5, 1.5, 4.5));
+                Field f = FieldData.get(level).add(level, p.x, p.y, p.z, 3.0);
+                c.cleanup.add(() -> FieldData.get(level).remove(level, f.id()));
+                org.erisia.stasis.NodeFreezer.pass();
+            });
+            return () -> c.check("a field arrived: the source runs again", !org.erisia.stasis.NodeFreezer.isFrozen(outSrc.sixNode)
+                && outSrc.electricalLoadList.get(0).getSubSystem() != null);
+        }, true, true));
+        CASES.put("ea_tower_chunk_keeps_cables", new Spec(30, (h, c) -> {
+            tower(h, new BlockPos(12, 1, 6), 0);                                   // unpowered: no field
+            var cable = eaSix(h, new BlockPos(12, 1, 4), 4 + (32 << 6));
+            var src = eaSix(h, new BlockPos(11, 1, 4), 0 + (3 << 6));
+            boolean sameChunk = (h.absolutePos(new BlockPos(12, 1, 6)).getX() >> 4) == (h.absolutePos(new BlockPos(11, 1, 4)).getX() >> 4)
+                && (h.absolutePos(new BlockPos(12, 1, 6)).getZ() >> 4) == (h.absolutePos(new BlockPos(11, 1, 4)).getZ() >> 4)
+                && (h.absolutePos(new BlockPos(12, 1, 6)).getZ() >> 4) == (h.absolutePos(new BlockPos(12, 1, 4)).getZ() >> 4);
+            return () -> {
+                org.erisia.stasis.NodeFreezer.pass();
+                if (!sameChunk) {
+                    c.check("(tower and devices fell in different chunks: skipped)", true);
+                    return;
+                }
+                c.check("in a tower's chunk the cable runs", !org.erisia.stasis.NodeFreezer.isFrozen(cable.sixNode));
+                c.check("a source is machinery: stopped", org.erisia.stasis.NodeFreezer.isFrozen(src.sixNode));
+            };
+        }, false, true));
         // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
         // so it moves) dropped onto each; outside the field both fluids are stopped
         CASES.put("stopped_fluids_are_solid", new Spec(5, (h, c) -> {
@@ -317,6 +357,18 @@ public final class StasisGameTests {
                 pig.discard();
             };
         }));
+    }
+
+    /** Place an EA six-node device (1.12 id) on the floor at a local position, as a player would. */
+    static mods.eln.node.six.SixNodeElement eaSix(GameTestHelper h, BlockPos local, int damage) {
+        mods.eln.node.six.SixNodeDescriptor d = mods.eln.Eln.sixNodeItem.getDescriptor(damage);
+        ServerLevel level = h.getLevel();
+        BlockPos p = h.absolutePos(local);
+        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        if (!((mods.eln.node.six.SixNodeItem) d.parentItem).placeAt(d.newItemStack(), player, level, p, mods.eln.misc.Direction.YN))
+            throw new IllegalStateException("placing " + d.name + " failed");
+        var node = (mods.eln.node.six.SixNode) mods.eln.node.NodeManager.instance.getNodeFromCoordonate(new mods.eln.misc.Coordonate(p, level));
+        return node.getElement(mods.eln.misc.Direction.YN);
     }
 
     static org.erisia.stasis.TowerBlockEntity tower(GameTestHelper h, BlockPos base, int segments) {
