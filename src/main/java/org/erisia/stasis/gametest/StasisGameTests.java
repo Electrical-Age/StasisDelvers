@@ -188,6 +188,47 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // suits: a full charged set keeps its wearer going (and draws power); part of a set, or no charge, doesn't
+        CASES.put("delver_suit_protects", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            return () -> {
+                double e = ((org.erisia.stasis.DelverSuitItem) p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).getItem())
+                    .getEnergy(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
+                c.check("suited: no freezing", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                c.check("the suit drew power (10 W per piece)", e < 40000 && e > 40000 - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
+                c.check("suited in stopped land: Mining Fatigue I", p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
+                remove(h, p);
+            };
+        }));
+        CASES.put("partial_suit_freezes", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), null);
+            return () -> {
+                c.check("three pieces of four: the player froze", !p.isAlive());
+                remove(h, p);
+            };
+        }));
+        CASES.put("empty_suit_freezes", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            return () -> {
+                c.check("an uncharged suit: the player froze", !p.isAlive());
+                remove(h, p);
+            };
+        }));
+        CASES.put("stasis_armor_protects", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.STASIS_HELMET.get(), org.erisia.stasis.StasisRegistry.STASIS_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.STASIS_LEGS.get(), org.erisia.stasis.StasisRegistry.STASIS_BOOTS.get());
+            return () -> {
+                c.check("stasis-proof E-Coal: no freezing", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                remove(h, p);
+            };
+        }));
         // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
         // so it moves) dropped onto each; outside the field both fluids are stopped
         CASES.put("stopped_fluids_are_solid", new Spec(5, (h, c) -> {
@@ -243,6 +284,21 @@ public final class StasisGameTests {
             if (p.isAlive() && !p.isRemoved()) Freezing.tick(p);
         });
         return p;
+    }
+
+    /** Put suit pieces on (null: leave the slot empty), charged full or empty. */
+    static void wear(ServerPlayer p, boolean charged, net.minecraft.world.item.Item head, net.minecraft.world.item.Item chest,
+                     net.minecraft.world.item.Item legs, net.minecraft.world.item.Item feet) {
+        net.minecraft.world.item.Item[] items = {head, chest, legs, feet};
+        net.minecraft.world.entity.EquipmentSlot[] slots = {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+            net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET};
+        for (int i = 0; i < 4; i++) {
+            if (items[i] == null) continue;
+            ItemStack st = new ItemStack(items[i]);
+            var b = (mods.eln.item.electricalinterface.IItemEnergyBattery) items[i];
+            b.setEnergy(st, charged ? b.getEnergyMax(st) : 0);
+            p.setItemSlot(slots[i], st);
+        }
     }
 
     static void remove(GameTestHelper h, ServerPlayer p) {

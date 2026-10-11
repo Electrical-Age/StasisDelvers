@@ -32,6 +32,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, Freezing::grace);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerChangedDimensionEvent.class, Freezing::grace);
         NeoForge.EVENT_BUS.addListener(Freezing::logout);
+        NeoForge.EVENT_BUS.addListener(Freezing::onBreakSpeed);
         org.erisia.stasis.gametest.StasisGameTests.register(modBus);
     }
 }

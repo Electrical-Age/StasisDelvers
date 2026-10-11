@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "stasisdelvers:delver"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "stasisdelvers:delver"
+      }
+    ]
+  }
+}

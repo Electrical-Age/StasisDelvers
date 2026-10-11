@@ -55,8 +55,15 @@ public final class Freezing {
         s.counted++;
         boolean stopped = p.isAlive() && !Stasis.isRunning(level, p.blockPosition());
         boolean grace = level.getGameTime() < s.graceUntil;
-        if (stopped && !grace && !isProtected(p)) s.ticks++;
+        boolean suited = false;
+        if (stopped && !grace && !(suited = isProtected(p))) s.ticks++;
         else s.ticks = Math.max(0, s.ticks - 3);
+        // a suited player digs slowly in stopped land (Mining Fatigue I; the EA mining drill ignores it: onBreakSpeed)
+        if (stopped && suited && !p.isCreative() && !p.isSpectator()) {
+            var fatigue = p.getEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE);
+            if (fatigue == null || fatigue.getDuration() < 20)
+                p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MINING_FATIGUE, 40, 0, true, true));
+        }
         int max = StasisConfig.freezeTicks;
         float progress = Math.min(1f, s.ticks / (float) max);
         AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
@@ -70,6 +77,16 @@ public final class Freezing {
             StasisNet.sendFreeze(p, progress);
         }
         if (s.ticks >= max) freeze(level, p, s);
+    }
+
+    /** The EA mining drill digs at full speed in stopped land: undo Mining Fatigue I's x0.3 there. */
+    static void onBreakSpeed(net.neoforged.neoforge.event.entity.player.PlayerEvent.BreakSpeed e) {
+        var p = e.getEntity();
+        if (!(p.getMainHandItem().getItem() instanceof mods.eln.generic.IDescriptorItem di)
+            || !(di.getEaDescriptor() instanceof mods.eln.item.electricalitem.ElectricalPickaxe)) return;
+        var fatigue = p.getEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE);
+        if (fatigue != null && fatigue.getAmplifier() == 0 && !Stasis.isRunning(p.level(), p.blockPosition()))
+            e.setNewSpeed(e.getNewSpeed() / 0.3f);
     }
 
     /** Leave a statue with the player's inventory and experience, and kill the player. */
