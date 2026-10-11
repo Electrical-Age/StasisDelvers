@@ -31,6 +31,8 @@ neoForge {
             type = "gameTestServer"
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             systemProperty 'stasisdelvers.noSpawnArea', 'true'
+            // only this mod's tests (Electrical Age's own tests are registered too, and can't run in stopped time)
+            programArguments.addAll '--tests', project.mod_id + ':*'
         }
         configureEach {
             logLevel = org.slf4j.event.Level.INFO
@@ -43,6 +45,18 @@ neoForge {
         }
     }
 }
+
+// Electrical Age 26.x (github Electrical-Age/ElectricalAge, branch ports/26.3): built locally. Compiled against,
+// and copied into run/mods so the dev runs load it as a real mod jar (with its jarJar'd Kotlin and commons-math).
+def elnJar = file(project.findProperty('eln_jar') ?: '/var/lib/mclab/agent/eln/port26/build/libs/eln-26.3-0.1.0-port.jar')
+dependencies {
+    compileOnly files(elnJar)
+}
+def copyEln = tasks.register('copyElnToRun', Copy) {
+    from elnJar
+    into file('run/mods')
+}
+tasks.matching { it.name.startsWith('run') }.configureEach { dependsOn copyEln }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
