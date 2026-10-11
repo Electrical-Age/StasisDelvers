@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "org.erisia.stasis.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ServerLevelMixin",
+    "LevelChunkMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
