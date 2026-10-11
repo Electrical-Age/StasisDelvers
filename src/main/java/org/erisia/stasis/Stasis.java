@@ -79,6 +79,16 @@ public final class Stasis {
         return Math.abs(cx - (p.getX() >> 4)) <= r && Math.abs(cz - (p.getZ() >> 4)) <= r;
     }
 
+    /** The spawn area's block bounds {minX, minZ, maxX, maxZ}, or null if this level has none. */
+    public static int[] spawnArea(Level level) {
+        int r = StasisConfig.spawnRadius;
+        if (r < 0) return null;
+        LevelData.RespawnData spawn = level.getRespawnData();
+        if (spawn.dimension() != level.dimension()) return null;
+        int cx = spawn.pos().getX() >> 4, cz = spawn.pos().getZ() >> 4;
+        return new int[]{(cx - r) << 4, (cz - r) << 4, ((cx + r) << 4) + 15, ((cz + r) << 4) + 15};
+    }
+
     /** Does time run in the whole block at (x, y, z)? */
     public static boolean isRunning(Level level, int x, int y, int z) {
         if (!stops(level)) return true;
