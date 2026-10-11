@@ -51,7 +51,7 @@ public class Statue extends Entity {
         s.snapTo(player.getX(), player.getY(), player.getZ(), player.getYRot(), 0f);
         s.owner = player.getUUID();
         s.ownerName = player.getName().getString();
-        s.setCustomName(Component.translatable("stasisdelvers.statue.owner", s.ownerName));
+        s.setCustomName(Component.literal(s.ownerName));   // just the name (Baughn: creepier)
         s.setCustomNameVisible(true);
         s.syncOwner();
         var inv = player.getInventory();
