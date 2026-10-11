@@ -1,0 +1,115 @@
+package org.erisia.stasis;
+
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Players in stopped land without a working suit start to freeze: a warning that builds up over
+ * {@link StasisConfig#freezeTicks} ticks (enough to put a suit on), walking slows, and at the end they become a
+ * {@link Statue} holding their things and wake at their bed. Never right after login, respawn or a dimension change
+ * (a grace period), and never in creative or spectator mode. Ticks are counted, not wall time, so lag can't skip the
+ * warning.
+ */
+public final class Freezing {
+    private Freezing() {
+    }
+
+    static final Identifier SLOW = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "freezing");
+
+    private static final class State {
+        int ticks;
+        int counted;
+        long graceUntil;
+        float sent;
+    }
+
+    private static final Map<UUID, State> STATES = new HashMap<>();
+
+    private static State state(ServerPlayer p) {
+        return STATES.computeIfAbsent(p.getUUID(), u -> new State());
+    }
+
+    /** Can this player stand in stopped land? Creative/spectator, or a charged suit (Suits, T2b). */
+    static boolean isProtected(ServerPlayer p) {
+        return p.isCreative() || p.isSpectator() || Suits.protect(p);
+    }
+
+    static void tick(PlayerTickEvent.Post e) {
+        if (e.getEntity() instanceof ServerPlayer p) tick(p);
+    }
+
+    /** One tick of a player's freezing (public for tests, whose mock players get no tick events). */
+    public static void tick(ServerPlayer p) {
+        if (!(p.level() instanceof ServerLevel level)) return;
+        State s = state(p);
+        s.counted++;
+        boolean stopped = p.isAlive() && !Stasis.isRunning(level, p.blockPosition());
+        boolean grace = level.getGameTime() < s.graceUntil;
+        if (stopped && !grace && !isProtected(p)) s.ticks++;
+        else s.ticks = Math.max(0, s.ticks - 3);
+        int max = StasisConfig.freezeTicks;
+        float progress = Math.min(1f, s.ticks / (float) max);
+        AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            if (progress > 0) speed.addOrUpdateTransientModifier(
+                new AttributeModifier(SLOW, -0.85 * progress, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+            else speed.removeModifier(SLOW);
+        }
+        if (Math.abs(progress - s.sent) >= 0.01f || (progress == 0f && s.sent != 0f)) {
+            s.sent = progress;
+            StasisNet.sendFreeze(p, progress);
+        }
+        if (s.ticks >= max) freeze(level, p, s);
+    }
+
+    /** Leave a statue with the player's inventory and experience, and kill the player. */
+    static void freeze(ServerLevel level, ServerPlayer p, State s) {
+        Statue statue = Statue.of(level, p);
+        level.addFreshEntity(statue);
+        s.ticks = 0;
+        AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) speed.removeModifier(SLOW);
+        StasisDelvers.LOG.info("{} froze in time at {} ({} stacks, {} xp in the statue)", p.getName().getString(),
+            p.blockPosition().toShortString(), statue.items().size(), statue.xp());
+        p.hurtServer(level, level.damageSources().source(StasisRegistry.FROZEN_IN_TIME), Float.MAX_VALUE);
+    }
+
+    /** A fresh start in a new place: no freezing for a while. */
+    static void grace(PlayerEvent e) {
+        if (e.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level) {
+            State s = state(p);
+            s.ticks = 0;
+            s.graceUntil = level.getGameTime() + StasisConfig.graceTicks;
+            StasisNet.sendFields(p);
+        }
+    }
+
+    static void logout(PlayerEvent.PlayerLoggedOutEvent e) {
+        STATES.remove(e.getEntity().getUUID());
+    }
+
+    /** For tests: end the player's grace period now. */
+    public static void endGrace(ServerPlayer p) {
+        state(p).graceUntil = 0;
+    }
+
+    /** For tests: how many ticks were counted for this player (do tick events reach it?). */
+    public static int counted(ServerPlayer p) {
+        return state(p).counted;
+    }
+
+    /** For tests: the player's current freeze ticks. */
+    public static int ticks(ServerPlayer p) {
+        return state(p).ticks;
+    }
+}

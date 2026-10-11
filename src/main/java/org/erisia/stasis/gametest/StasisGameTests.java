@@ -23,6 +23,10 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.erisia.stasis.Field;
+import org.erisia.stasis.Freezing;
+import org.erisia.stasis.Statue;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.AABB;
 import org.erisia.stasis.FieldData;
 import org.erisia.stasis.Stasis;
 import org.erisia.stasis.StasisDelvers;
@@ -148,6 +152,42 @@ public final class StasisGameTests {
                     && h.getBlockState(new BlockPos(12, 2, 4)).isAir(), out.toString());
             };
         }));
+        // players: outside without a suit they freeze into a statue holding their things
+        CASES.put("player_freezes_outside", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            p.getInventory().add(new ItemStack(Items.DIAMOND, 7));
+            p.giveExperiencePoints(50);
+            return () -> {
+                var statues = h.getLevel().getEntitiesOfClass(Statue.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(2));
+                c.check("the player died", !p.isAlive(), "alive " + p.isAlive());
+                c.check("one statue stands where the player froze", statues.size() == 1, statues.toString());
+                if (statues.size() == 1) {
+                    Statue s = statues.get(0);
+                    c.check("the statue holds the diamonds", s.items().stream().anyMatch(i -> i.is(Items.DIAMOND) && i.getCount() == 7), s.items().toString());
+                    c.check("the statue holds the experience", s.xp() == 50, "xp " + s.xp());
+                    c.check("the statue belongs to the player", s.owner().equals(p.getUUID()));
+                    s.crumble(h.getLevel());
+                    var drops = h.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(2));
+                    c.check("crumbling gives the diamonds back", drops.stream().anyMatch(d -> d.getItem().is(Items.DIAMOND)), drops.toString());
+                    drops.forEach(Entity::discard);
+                }
+                remove(h, p);
+            };
+        }));
+        CASES.put("player_safe_inside", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            return () -> {
+                c.check("inside the field the player is fine", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                remove(h, p);
+            };
+        }));
+        CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
+            return () -> {
+                c.check("just logged in: no freezing yet", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                remove(h, p);
+            };
+        }));
         // endermen, the dragon and the warden ignore stasis
         CASES.put("enderman_unbound", new Spec(20, (h, c) -> {
             // with AI on: a mob without AI doesn't fall at all, stopped or not
@@ -161,6 +201,29 @@ public final class StasisGameTests {
                 pig.discard();
             };
         }));
+    }
+
+    /** A survival-mode player placed at a local position (the vanilla mock player is in creative). */
+    static ServerPlayer survivalPlayer(GameTestHelper h, Vec3 local, boolean endGrace) {
+        var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(
+            new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "stasis-test"), false);
+        ServerPlayer p = new ServerPlayer(h.getLevel().getServer(), h.getLevel(), cookie.gameProfile(), cookie.clientInformation());
+        var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
+        new io.netty.channel.embedded.EmbeddedChannel(connection);
+        h.getLevel().getServer().getPlayerList().placeNewPlayer(connection, p, cookie);
+        p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        Vec3 a = h.absoluteVec(local);
+        p.teleportTo(a.x, a.y, a.z);
+        if (endGrace) Freezing.endGrace(p);
+        // the mock player's connection isn't ticked by the server, so no PlayerTickEvent: drive its freezing here
+        h.onEachTick(() -> {
+            if (p.isAlive() && !p.isRemoved()) Freezing.tick(p);
+        });
+        return p;
+    }
+
+    static void remove(GameTestHelper h, ServerPlayer p) {
+        h.getLevel().getServer().getPlayerList().remove(p);
     }
 
     static ItemEntity item(GameTestHelper h, Vec3 local) {

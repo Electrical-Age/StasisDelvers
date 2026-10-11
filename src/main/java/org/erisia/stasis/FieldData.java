@@ -63,5 +63,6 @@ public final class FieldData extends SavedData {
     private void changed(ServerLevel level) {
         setDirty();
         Stasis.invalidate(level);
+        StasisNet.sendFields(level);
     }
 }

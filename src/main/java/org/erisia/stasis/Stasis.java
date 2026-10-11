@@ -9,6 +9,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelData;
 
 import java.util.ArrayList;
@@ -19,7 +20,8 @@ import java.util.WeakHashMap;
 /**
  * The rule: where does time run? Everywhere in dimensions not in the config's stopped list; in stopped dimensions
  * only in the spawn area and inside fields (whole blocks). Lookups go through a per-level index of which fields touch
- * which chunk column, rebuilt when the fields change.
+ * which chunk column, rebuilt when the fields change. Works on both sides: the server reads FieldData, the client the
+ * fields the server sent it (ClientFields), so collisions with stopped water agree on both.
  */
 public final class Stasis {
     private Stasis() {
@@ -35,18 +37,23 @@ public final class Stasis {
         final Long2ObjectOpenHashMap<Field[]> columns = new Long2ObjectOpenHashMap<>();
     }
 
-    private static final Map<ServerLevel, Index> INDEX = new WeakHashMap<>();
+    private static final Map<Level, Index> INDEX = new WeakHashMap<>();
 
-    static synchronized void invalidate(ServerLevel level) {
+    public static synchronized void invalidate(Level level) {
         INDEX.remove(level);
     }
 
-    private static synchronized Index index(ServerLevel level) {
+    /** The fields of a level: saved data on the server, the last sync on the client. */
+    public static List<Field> fields(Level level) {
+        return level instanceof ServerLevel sl ? FieldData.get(sl).fields() : ClientFields.fields();
+    }
+
+    private static synchronized Index index(Level level) {
         Index idx = INDEX.get(level);
         if (idx == null) {
             idx = new Index();
             Long2ObjectOpenHashMap<List<Field>> lists = new Long2ObjectOpenHashMap<>();
-            for (Field f : FieldData.get(level).fields()) {
+            for (Field f : fields(level)) {
                 int x0 = (int) Math.floor(f.x() - f.radius()) >> 4, x1 = (int) Math.floor(f.x() + f.radius()) >> 4;
                 int z0 = (int) Math.floor(f.z() - f.radius()) >> 4, z1 = (int) Math.floor(f.z() + f.radius()) >> 4;
                 for (int cx = x0; cx <= x1; cx++)
@@ -59,11 +66,11 @@ public final class Stasis {
     }
 
     /** Is time stopped anywhere in this level (enabled, and the dimension is a stopped one)? */
-    public static boolean stops(ServerLevel level) {
+    public static boolean stops(Level level) {
         return StasisConfig.enabled && StasisConfig.stopped.contains(level.dimension());
     }
 
-    private static boolean inSpawn(ServerLevel level, int cx, int cz) {
+    private static boolean inSpawn(Level level, int cx, int cz) {
         int r = StasisConfig.spawnRadius;
         if (r < 0) return false;
         LevelData.RespawnData spawn = level.getRespawnData();
@@ -73,7 +80,7 @@ public final class Stasis {
     }
 
     /** Does time run in the whole block at (x, y, z)? */
-    public static boolean isRunning(ServerLevel level, int x, int y, int z) {
+    public static boolean isRunning(Level level, int x, int y, int z) {
         if (!stops(level)) return true;
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz)) return true;
@@ -83,12 +90,12 @@ public final class Stasis {
         return false;
     }
 
-    public static boolean isRunning(ServerLevel level, BlockPos pos) {
+    public static boolean isRunning(Level level, BlockPos pos) {
         return isRunning(level, pos.getX(), pos.getY(), pos.getZ());
     }
 
     /** Could time run anywhere in this chunk column? False means the whole column is stopped. */
-    public static boolean mayRunInColumn(ServerLevel level, long chunkKey) {
+    public static boolean mayRunInColumn(Level level, long chunkKey) {
         if (!stops(level)) return true;
         int cx = ChunkPos.getX(chunkKey), cz = ChunkPos.getZ(chunkKey);
         return inSpawn(level, cx, cz) || index(level).columns.containsKey(chunkKey);

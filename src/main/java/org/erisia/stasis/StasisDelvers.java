@@ -7,6 +7,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +25,13 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelUnload);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> StasisCommands.register(e.getDispatcher()));
+        StasisRegistry.register(modBus);
+        StasisNet.register(modBus);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post.class, Freezing::tick);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, Freezing::grace);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, Freezing::grace);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerChangedDimensionEvent.class, Freezing::grace);
+        NeoForge.EVENT_BUS.addListener(Freezing::logout);
         org.erisia.stasis.gametest.StasisGameTests.register(modBus);
     }
 }
