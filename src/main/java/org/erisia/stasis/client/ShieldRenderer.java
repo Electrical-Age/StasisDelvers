@@ -61,8 +61,8 @@ final class ShieldRenderer {
         double backFactor = (facing < 0) != camInside ? 0.5 : 1.0;
         double fillA = (0.015 + 0.06 * fres) * backFactor * (1 - gone);
         double rimA = (0.10 + 0.20 * wave) * backFactor * (1 - gone);
-        float tr = (float) lerp(0.62, 1.0, Math.min(0.7, fail * 1.5)), tg = (float) lerp(0.84, 0.62, Math.min(0.7, fail * 1.5)),
-            tb = (float) lerp(1.0, 0.35, Math.min(0.7, fail * 1.5));
+        double warm = Math.min(1.0, fail * 2.0);   // amber shows early in a failure
+        float tr = (float) lerp(0.62, 1.0, warm), tg = (float) lerp(0.84, 0.55, warm), tb = (float) lerp(1.0, 0.2, warm);
         float bright = (float) (0.8 + 0.4 * wave);
         int fill = argb(fillA, tr * bright, tg * bright, tb * bright);
         int rim = argb(rimA, tr * bright, tg * bright, tb * bright);
