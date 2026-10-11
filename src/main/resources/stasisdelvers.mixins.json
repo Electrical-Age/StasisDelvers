@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ServerLevelMixin",
-    "LevelChunkMixin"
+    "LevelChunkMixin",
+    "LiquidBlockMixin",
+    "BlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -188,6 +188,29 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
+        // so it moves) dropped onto each; outside the field both fluids are stopped
+        CASES.put("stopped_fluids_are_solid", new Spec(5, (h, c) -> {
+            h.setBlock(new BlockPos(12, 1, 2), Blocks.WATER);
+            h.setBlock(new BlockPos(12, 1, 6), Blocks.LAVA);
+            h.setBlock(new BlockPos(3, 1, 2), Blocks.WATER);
+            var pig = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.PIG, new Vec3(12.5, 2.0, 6.5));
+            return () -> {
+                ServerLevel level = h.getLevel();
+                var ctx = net.minecraft.world.phys.shapes.CollisionContext.of(pig);
+                BlockPos water = h.absolutePos(new BlockPos(12, 1, 2)), lava = h.absolutePos(new BlockPos(12, 1, 6));
+                BlockPos waterIn = h.absolutePos(new BlockPos(3, 1, 2));
+                var full = net.minecraft.world.phys.shapes.Shapes.block();
+                c.check("stopped water is solid to entities", level.getBlockState(water).getCollisionShape(level, water, ctx).equals(full));
+                c.check("stopped lava is solid to entities", level.getBlockState(lava).getCollisionShape(level, lava, ctx).equals(full));
+                c.check("running water isn't", level.getBlockState(waterIn).getCollisionShape(level, waterIn, ctx).isEmpty());
+                float before = pig.getHealth();
+                level.getBlockState(lava).getBlock().stepOn(level, lava, level.getBlockState(lava), pig);
+                c.check("standing on stopped lava hurts like magma", pig.getHealth() < before, before + " -> " + pig.getHealth());
+                c.check("and doesn't set it on fire", !pig.isOnFire());
+                pig.discard();
+            };
+        }));
         // endermen, the dragon and the warden ignore stasis
         CASES.put("enderman_unbound", new Spec(20, (h, c) -> {
             // with AI on: a mob without AI doesn't fall at all, stopped or not
