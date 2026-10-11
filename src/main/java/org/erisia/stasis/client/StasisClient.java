@@ -3,7 +3,6 @@ package org.erisia.stasis.client;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.FrameGraphSetupEvent;
@@ -17,7 +16,6 @@ import org.erisia.stasis.StasisRegistry;
 public final class StasisClient {
     public StasisClient(IEventBus modBus) {
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
-        modBus.addListener(FMLClientSetupEvent.class, e -> e.enqueueWork(StasisPost::init));
         NeoForge.EVENT_BUS.addListener(SubmitCustomGeometryEvent.class, ShieldRenderer::submit);
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, StasisPost::frame);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);

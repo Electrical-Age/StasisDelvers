@@ -30,6 +30,7 @@ final class StasisPost {
     static final Identifier DATA = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/fielddata.png");
     static DynamicTexture texture;
 
+    /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
         texture = new DynamicTexture(() -> "stasisdelvers field data", 128, 1, true);
         Minecraft.getInstance().getTextureManager().register(DATA, texture);
@@ -39,7 +40,8 @@ final class StasisPost {
         var mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         List<Identifier> effects = mc.player.getActivePostEffects();
-        boolean want = Stasis.stops(mc.level);
+        // only once the data texture exists: the chain binds it when it loads
+        boolean want = texture != null && Stasis.stops(mc.level);
         if (want != effects.contains(EFFECT)) {
             List<Identifier> l = new ArrayList<>(effects);
             if (want) l.add(EFFECT);
@@ -50,7 +52,8 @@ final class StasisPost {
 
     static void frame(FrameGraphSetupEvent e) {
         var mc = Minecraft.getInstance();
-        if (texture == null || mc.level == null) return;
+        if (mc.level == null) return;
+        if (texture == null) init();
         var camState = e.getCameraState();
         float[] d = new float[128];
         Matrix4f vp = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix).invert();
