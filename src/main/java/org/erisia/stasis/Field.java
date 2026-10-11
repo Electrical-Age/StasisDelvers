@@ -11,7 +11,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * after the tower's store ran out, the share of the field that has stopped again; outer blocks go first on average,
  * in noise patches, and at 1 nothing is left.
  */
-public record Field(int id, double x, double y, double z, double radius, double failing, double collapse) {
+public record Field(int id, double x, double y, double z, double radius, double failing, double collapse, boolean column) {
     public static final Codec<Field> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.INT.fieldOf("id").forGetter(Field::id),
         Codec.DOUBLE.fieldOf("x").forGetter(Field::x),
@@ -19,29 +19,35 @@ public record Field(int id, double x, double y, double z, double radius, double 
         Codec.DOUBLE.fieldOf("z").forGetter(Field::z),
         Codec.DOUBLE.fieldOf("radius").forGetter(Field::radius),
         Codec.DOUBLE.optionalFieldOf("failing", 0.0).forGetter(Field::failing),
-        Codec.DOUBLE.optionalFieldOf("collapse", 0.0).forGetter(Field::collapse)
+        Codec.DOUBLE.optionalFieldOf("collapse", 0.0).forGetter(Field::collapse),
+        Codec.BOOL.optionalFieldOf("column", false).forGetter(Field::column)
     ).apply(i, Field::new));
 
     public Field(int id, double x, double y, double z, double radius) {
-        this(id, x, y, z, radius, 0, 0);
+        this(id, x, y, z, radius, 0, 0, false);
+    }
+
+    /** column: a vertical cylinder from the bottom of the world to the top (λ-Nero's test variant). */
+    public Field(int id, double x, double y, double z, double radius, boolean column) {
+        this(id, x, y, z, radius, 0, 0, column);
     }
 
     public Field withRadius(double r) {
-        return new Field(id, x, y, z, r, failing, collapse);
+        return new Field(id, x, y, z, r, failing, collapse, column);
     }
 
     public Field withFailing(double f) {
-        return new Field(id, x, y, z, radius, f, collapse);
+        return new Field(id, x, y, z, radius, f, collapse, column);
     }
 
     public Field withCollapse(double c) {
-        return new Field(id, x, y, z, radius, failing, c);
+        return new Field(id, x, y, z, radius, failing, c, column);
     }
 
     /** True if the whole block at (bx, by, bz) lies inside the sphere (and hasn't stopped in a collapse). */
     public boolean containsBlock(int bx, int by, int bz) {
         double dx = (bx + 0.5 >= x ? bx + 1 : bx) - x;
-        double dy = (by + 0.5 >= y ? by + 1 : by) - y;
+        double dy = column ? 0 : (by + 0.5 >= y ? by + 1 : by) - y;
         double dz = (bz + 0.5 >= z ? bz + 1 : bz) - z;
         double d2 = dx * dx + dy * dy + dz * dz;
         if (d2 > radius * radius) return false;
@@ -50,7 +56,7 @@ public record Field(int id, double x, double y, double z, double radius, double 
 
     /** True if the point is inside the sphere (entities: their feet). */
     public boolean containsPoint(double px, double py, double pz) {
-        double dx = px - x, dy = py - y, dz = pz - z;
+        double dx = px - x, dy = column ? 0 : py - y, dz = pz - z;
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 

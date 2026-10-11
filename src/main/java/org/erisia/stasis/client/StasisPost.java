@@ -68,6 +68,7 @@ final class StasisPost {
         d[21] = (float) (cam.z - fz);
         d[22] = Stasis.stops(mc.level) ? 1 : 0;
         d[23] = StasisNet.clientFreeze;
+        d[29] = (float) ((mc.level.getGameTime() % 24000L) / 20.0);
         int[] spawn = Stasis.spawnArea(mc.level);
         if (spawn != null) {
             d[25] = spawn[0];
@@ -80,14 +81,15 @@ final class StasisPost {
         }
         int n = 0;
         for (Field f : ClientFields.fields()) {
-            if (n == 16) break;
-            int o = 32 + 6 * n++;
+            if (n == 13) break;
+            int o = 32 + 7 * n++;
             d[o] = (float) (f.x() - fx);
             d[o + 1] = (float) (f.y() - fy);
             d[o + 2] = (float) (f.z() - fz);
             d[o + 3] = (float) f.radius();
             d[o + 4] = (float) f.collapse();
             d[o + 5] = (float) f.failing();
+            d[o + 6] = f.column() ? 1 : 0;
         }
         d[24] = n;
         var img = texture.getPixels();

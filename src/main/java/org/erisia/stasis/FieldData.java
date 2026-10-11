@@ -41,7 +41,11 @@ public final class FieldData extends SavedData {
     }
 
     public Field add(ServerLevel level, double x, double y, double z, double radius) {
-        Field f = new Field(nextId++, x, y, z, radius);
+        return add(level, x, y, z, radius, false);
+    }
+
+    public Field add(ServerLevel level, double x, double y, double z, double radius, boolean column) {
+        Field f = new Field(nextId++, x, y, z, radius, column);
         fields.add(f);
         changed(level);
         return f;

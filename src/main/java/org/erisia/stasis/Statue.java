@@ -30,6 +30,12 @@ import java.util.UUID;
  * get everything back; the statue then crumbles.
  */
 public class Statue extends Entity {
+    /** Synced for the client's model: whose skin to show. */
+    static final net.minecraft.network.syncher.EntityDataAccessor<String> OWNER_ID =
+        SynchedEntityData.defineId(Statue.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+    static final net.minecraft.network.syncher.EntityDataAccessor<String> OWNER_NAME =
+        SynchedEntityData.defineId(Statue.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+
     private UUID owner = UUID.randomUUID();
     private String ownerName = "";
     private NonNullList<ItemStack> items = NonNullList.create();
@@ -47,6 +53,7 @@ public class Statue extends Entity {
         s.ownerName = player.getName().getString();
         s.setCustomName(Component.translatable("stasisdelvers.statue.owner", s.ownerName));
         s.setCustomNameVisible(true);
+        s.syncOwner();
         var inv = player.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) {
             ItemStack st = inv.removeItemNoUpdate(i);
@@ -73,6 +80,22 @@ public class Statue extends Entity {
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder b) {
+        b.define(OWNER_ID, "");
+        b.define(OWNER_NAME, "");
+    }
+
+    private void syncOwner() {
+        entityData.set(OWNER_ID, owner.toString());
+        entityData.set(OWNER_NAME, ownerName);
+    }
+
+    /** Client: the owner's id and name (for the skin). */
+    public String syncedOwnerId() {
+        return entityData.get(OWNER_ID);
+    }
+
+    public String syncedOwnerName() {
+        return entityData.get(OWNER_NAME);
     }
 
     @Override
@@ -132,6 +155,7 @@ public class Statue extends Entity {
         items = NonNullList.create();
         list.ifPresent(items::addAll);
         xp = in.getIntOr("xp", 0);
+        syncOwner();
     }
 
     @Override

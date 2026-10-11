@@ -77,6 +77,9 @@ public final class StasisGameTests {
             c.check("block cut by the boundary (centre inside, far corner outside) is outside",
                 f.containsPoint(7.5, 2.5, 4.5) && !f.containsBlock(7, 2, 4));
             c.check("block well outside", !f.containsBlock(12, 2, 4));
+            Field col = new Field(0, 3.5, 2.5, 4.5, R, true);
+            c.check("column field: far above and below the centre is inside", col.containsBlock(3, 300, 4) && col.containsBlock(3, -60, 4));
+            c.check("column field: outside its radius is outside", !col.containsBlock(12, 2, 4));
             ServerLevel level = h.getLevel();
             BlockPos out = h.absolutePos(new BlockPos(12, 2, 4));
             c.check("outside the field time is stopped here", !Stasis.isRunning(level, out));

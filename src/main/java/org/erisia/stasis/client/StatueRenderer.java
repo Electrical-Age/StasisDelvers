@@ -1,7 +1,9 @@
 package org.erisia.stasis.client;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -10,14 +12,27 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.player.PlayerSkin;
 import org.erisia.stasis.Statue;
-import org.erisia.stasis.StasisDelvers;
 
-/** A frozen player: the player model in stone grey, facing the way they faced. */
-public class StatueRenderer extends EntityRenderer<Statue, HumanoidRenderState> {
-    static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/entity/statue.png");
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Supplier;
+
+/**
+ * A frozen player: the player model in the player's own skin, facing the way they faced. It stands in stopped land,
+ * so the stasis post effect shows it nearly grey (Baughn: a greyscale version of the player's texture).
+ */
+public class StatueRenderer extends EntityRenderer<Statue, StatueRenderer.State> {
+    public static class State extends HumanoidRenderState {
+        Identifier skin = DefaultPlayerSkin.getDefaultTexture();
+    }
+
     private final HumanoidModel<HumanoidRenderState> model;
+    private static final Map<UUID, Supplier<PlayerSkin>> SKINS = new HashMap<>();
 
     public StatueRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -25,24 +40,40 @@ public class StatueRenderer extends EntityRenderer<Statue, HumanoidRenderState> 
     }
 
     @Override
-    public HumanoidRenderState createRenderState() {
-        return new HumanoidRenderState();
+    public State createRenderState() {
+        return new State();
+    }
+
+    static Identifier skin(Statue s) {
+        UUID id;
+        try {
+            id = UUID.fromString(s.syncedOwnerId());
+        } catch (IllegalArgumentException e) {
+            return DefaultPlayerSkin.getDefaultTexture();
+        }
+        var info = Minecraft.getInstance().getConnection() == null ? null : Minecraft.getInstance().getConnection().getPlayerInfo(id);
+        if (info != null) return info.getSkin().body().texturePath();
+        String name = s.syncedOwnerName().isEmpty() ? "statue" : s.syncedOwnerName();
+        Supplier<PlayerSkin> lookup = SKINS.computeIfAbsent(id,
+            u -> Minecraft.getInstance().getSkinManager().createLookup(new GameProfile(u, name), false));
+        return lookup.get().body().texturePath();
     }
 
     @Override
-    public void extractRenderState(Statue statue, HumanoidRenderState state, float partialTicks) {
+    public void extractRenderState(Statue statue, State state, float partialTicks) {
         super.extractRenderState(statue, state, partialTicks);
         state.bodyRot = statue.getYRot();
         state.yRot = 0;
+        state.skin = skin(statue);
     }
 
     @Override
-    public void submit(HumanoidRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
+    public void submit(State state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
         poseStack.pushPose();
         poseStack.rotate(Axis.YP.rotationDegrees(180.0F - state.bodyRot));
         poseStack.scale(-1.0F, -1.0F, 1.0F);
         poseStack.translate(0.0F, -1.501F, 0.0F);
-        collector.submitModel(model, state, poseStack, TEXTURE, state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);
+        collector.submitModel(model, state, poseStack, state.skin, state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);
         poseStack.popPose();
         super.submit(state, poseStack, collector, camera);
     }

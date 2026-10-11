@@ -17,18 +17,22 @@ final class StasisCommands {
     private StasisCommands() {
     }
 
+    static int addField(com.mojang.brigadier.context.CommandContext<CommandSourceStack> c, boolean column)
+        throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        BlockPos p = BlockPosArgument.getLoadedBlockPos(c, "pos");
+        double r = DoubleArgumentType.getDouble(c, "radius");
+        ServerLevel level = c.getSource().getLevel();
+        Field f = FieldData.get(level).add(level, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, r, column);
+        c.getSource().sendSuccess(() -> Component.literal("Field " + f.id() + (column ? " (column)" : "") + " at " + p.toShortString() + ", r " + r), true);
+        return f.id();
+    }
+
     static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("stasis").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
             .then(Commands.literal("field")
                 .then(Commands.literal("add").then(Commands.argument("pos", BlockPosArgument.blockPos())
-                    .then(Commands.argument("radius", DoubleArgumentType.doubleArg(0.5, 512)).executes(c -> {
-                        BlockPos p = BlockPosArgument.getLoadedBlockPos(c, "pos");
-                        double r = DoubleArgumentType.getDouble(c, "radius");
-                        ServerLevel level = c.getSource().getLevel();
-                        Field f = FieldData.get(level).add(level, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, r);
-                        c.getSource().sendSuccess(() -> Component.literal("Field " + f.id() + " at " + p.toShortString() + ", r " + r), true);
-                        return f.id();
-                    }))))
+                    .then(Commands.argument("radius", DoubleArgumentType.doubleArg(0.5, 512)).executes(c -> addField(c, false))
+                        .then(Commands.literal("column").executes(c -> addField(c, true))))))
                 .then(Commands.literal("remove").then(Commands.argument("id", IntegerArgumentType.integer(1)).executes(c -> {
                     ServerLevel level = c.getSource().getLevel();
                     int id = IntegerArgumentType.getInteger(c, "id");

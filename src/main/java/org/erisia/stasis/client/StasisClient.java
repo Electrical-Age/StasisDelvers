@@ -16,7 +16,8 @@ import org.erisia.stasis.StasisRegistry;
 public final class StasisClient {
     public StasisClient(IEventBus modBus) {
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
-        NeoForge.EVENT_BUS.addListener(SubmitCustomGeometryEvent.class, ShieldRenderer::submit);
+        // the shield is drawn by the post effect now (so the desaturation can't grey it); ShieldRenderer is kept for
+        // a possible later geometry version (falling cells)
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, StasisPost::frame);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);
     }
