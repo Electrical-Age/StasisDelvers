@@ -60,7 +60,7 @@ class SlowTest {
         int N = Integer.getInteger("towergen.random", 60);
         List<String> fails = new ArrayList<>();
         Map<String, Integer> tiers = new TreeMap<>(), boomTiers = new TreeMap<>();
-        int pass = 0, runs = 0, over = 0;
+        int pass = 0, runs = 0, over = 0, refused = 0;
         double maxMs = 0;
         for (int i = 0; i < N; i++) {
             Layout l = LayoutGen.random(rng);
@@ -83,14 +83,17 @@ class SlowTest {
                     System.out.printf("RANDOM %3d q%.1f H%3d booms %2d: util %.3f slack %+.4f vol %.1f->%.1f rounds %d conv %d %.0f ms tiers %s%n",
                             i, q, l.H(), l.booms().size(), r.analysis.maxUtil, r.analysis.minSlack, r.info.volRaw, r.info.vol,
                             r.info.rounds, r.info.converted, r.msStatics() + r.msPass(), shortTiers(r.bayTiers));
+                } catch (RefusedException ex) {       // stay rule / failed boom design: refused, not a failure
+                    refused++;
+                    System.out.printf("RANDOM %3d q%.1f H%3d booms %2d: refused %s%n", i, q, l.H(), l.booms().size(), ex.refusal.reason());
                 } catch (RuntimeException ex) {
                     fails.add(ex + " for " + l + " q" + q);
                     ex.printStackTrace(System.out);
                 }
             }
         }
-        System.out.printf("RANDOM SUMMARY: %d runs, %d pass util<=1 and taut, %d over (H>40 only allowed), exceptions/H<=40 failures %d; max %.0f ms%n  bay tiers %s%n  boom tiers %s%n",
-                runs, pass, over, fails.size(), maxMs, tiers, boomTiers);
+        System.out.printf("RANDOM SUMMARY: %d runs, %d pass util<=1 and taut, %d over (H>40 only allowed), %d refused, exceptions/H<=40 failures %d; max %.0f ms%n  bay tiers %s%n  boom tiers %s%n",
+                runs, pass, over, refused, fails.size(), maxMs, tiers, boomTiers);
         assertTrue(fails.isEmpty(), String.join("\n", fails));
     }
 

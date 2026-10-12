@@ -317,7 +317,8 @@ worker.onmessage = (e) => {
     } else {
       T.errors.push(m.error);
       showErrors([...jsonErrs, m.error], []);
-      setStatus('build failed (showing the last good tower)');
+      setStatus(String(m.error).startsWith('REFUSED') ? 'refused: the game would not build this layout (showing the last good tower)'
+                                                      : 'build failed (showing the last good tower)');
       console.log('[towerweb] error: ' + m.error);
     }
     pump();
@@ -413,7 +414,7 @@ const ENUMS = { xPanels: ['keep', 'single', 'auto'], stayCap: ['same', 'any', 'n
 const RANGES = {
   maxStaysPerBoom: [0, 30], minStaysPerBoom: [0, 4], maxCablesPerBay: [0, 16],
   backstayMinBoom: [2, 100], backstayDistFactor: [0.1, 2], backstayDistCap: [2, 64], backstayMinTension: [0, 5],
-  backstaySecondPair: [5, 1000, 'log'],
+  backstaySecondPair: [5, 1000, 'log'], stayRise: [0.2, 2], stayMinRatio: [0, 1], stayMinRise: [0, 8],
   pretensionFactor: [0, 5], pretensionMargin: [1, 2], raiseIters: [0, 200], maxRounds: [1, 100], utilLimit: [0.5, 1.5],
   emitterWeight: [0.3, 30, 'log'], emitterWind: [0.05, 5, 'log'], windDrag: [0.003, 0.3, 'log'], torsion: [0.04, 4, 'log'],
   density: [0.1, 10, 'log'], extraWidthSteps: [0, 12],
@@ -422,7 +423,7 @@ const RANGES = {
   hubScale: [1, 2], hubAdd: [0, 0.5], hubMaxExtendFrac: [0, 0.49], crossOffsetFrac: [0, 1], crossMinAngle: [0, 45],
 };
 const SECTION_NAMES = [
-  ['wire reduction', 'Wires'], ['back-stays', 'Back-stays'], ['pretension', 'Pass'], ['loads', 'Loads'],
+  ['wire reduction', 'Wires'], ['back-stays', 'Back-stays'], ['boom stays', 'Stays'], ['pretension', 'Pass'], ['loads', 'Loads'],
   ['member catalogue', 'Catalogue'], ['solid struts', 'Struts, pole, cables'], ['laced', 'Lacing'],
   ['joints (hubs)', 'Joints'], ['footings', 'Footings, deadmen, core, emitters'], ['colours', 'Colours'], ['viewer', 'Viewer'],
 ];

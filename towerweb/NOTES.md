@@ -83,6 +83,17 @@ worker message handler, so the status stayed at "building…" and an old error s
   `LibraryBinTest` checks every field bit for bit, plus mesh hashes from both libraries. `Library.header` is now kept.
   `:towergen:libraryBin` writes `build/libbin/p3a_library.bin.gz`.
 
+## Stay rule, refusals, joints (2026-10-13)
+- Refusals: a layout the stay rule refuses (or a failed boom design) comes back as `{"error": "REFUSED (the game
+  would not build this): ...", "refusal": {reason, message}}`; the status says "refused". An over-catalogue tower
+  is drawn but `stats.refusal` is set and shown as a red REFUSED line (was a warning).
+- solver.json section "Stays": `stayCap` dropdown (same / any / none), `stayRise`, `stayMinRatio`, `stayMinRise`.
+- Random uses `LayoutGen.randomBuildable` (never stay-refused; an over-catalogue random tower can still show up).
+- Mesh: watertight hubs and crossing offsets (towergen NOTES); new triangle counts q1: 1050 / 12024 / 17456 /
+  55096 / 45718 / 109664 / 92184 (H16 / H24b / H40 / H40r3 / H40b4 / H64max / H100), identical to the JVM.
+- Test: `/tmp/twtest/stays.py` (presets, stacked-boom refusal, stayCap none / bogus, over-catalogue, random),
+  sliders.py, repro.py; screenshot `screenshot-stays.png`. Not deployed.
+
 ## Numbers (tsugumi, headless Chromium 1243 via playwright, SwiftShader WebGL, localhost)
 - Library: JSON 32.4 MB raw / 7.8 MB gz takes 4.65 s to parse in V8 (node, TeaVM code) vs 0.47 s on the JVM.
   TGLB1 is 6.6 MB raw / 2.0 MB gz: fetch 10 ms + gunzip 19 ms + parse 145 ms in the browser (JVM 20 ms).

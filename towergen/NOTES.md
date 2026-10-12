@@ -94,6 +94,51 @@ Known limits:
   lengthening chords), not done.
 - Over-limit reduced towers cost several passes (each up to 60 rounds when it diverges).
 
+## Stay rule and refusals (2026-10-13)
+- **Rule** (`Spine.anchorLevels`, mirrored in p3alib.anchor_levels): a boom's stays anchor at the old preferred ring
+  level (first ring >= yb + max(BAY, `stayRise` 0.7 x L), else H) unless that is above the **next boom level above
+  in the same direction**; then at the highest ring level at or below that boom. Same direction only (`stayCap`
+  "same", default): stays run from the boom up to its own mast face, so only a boom above on the same face can be
+  crossed; perpendicular / opposite booms leave from other faces (checked geometrically for the E-y8 / S-y14 case
+  of H40b4: the stay passes 2+ blocks outside the S boom's root corner). `"any"` (next boom above in any direction)
+  is available but refuses H40b4 and 32% of random layouts; `"none"` is the P3a rule.
+- **Refusal**: if the capped rise < max(`stayMinRise` 2, `stayMinRatio` 0.35 x L) (0.35 = RHO_LADDER[0], the
+  flattest stay the boom library is solved for, ~19 deg), `build` throws `RefusedException` (Refusal.Reason
+  STAY_RISE, message names the boom, the capping boom, the rise and a max length). Layout-only, so
+  `TowerGen.check(layout, sp)` gives the same answer before building. 17% of random layouts (`LayoutGen`, mostly
+  booms stacked 1-4 blocks apart on one face) are refused; `LayoutGen.randomBuildable` redraws (web Random button).
+- `NO_BOOM_DESIGN`: a boom key whose offline solve failed (header `boom_failed`, now [9, 1, 6, 6]: L45 at rho 0.5,
+  repair gave up, util 1.12, reactions 12x its neighbours) is refused instead of approximated by the nearest entry.
+- `OVER_CATALOGUE`: `Result.refusal` (was a warning) when util > utilLimit after all fallbacks; the tower is kept
+  for previews. The game must not build if `refusal != null` or a `RefusedException` was thrown.
+- SolverParams: `stayCap`, `stayRise`, `stayMinRatio`, `stayMinRise` (spine group; defaults from the library header
+  constants STAY_*).
+- Library: +22 booms, +90 plain, +90 seam bays (p3acov booms/bays/seams on the 400 training layouts under the
+  rule; 73 of them are refused and skipped) -> 7747 entries (214 booms), 8.05 MB gz JSON, TGLB1 2.05 MB gz.
+- Goldens: only H40r3 changes (y10 booms anchor at y20 instead of y24; boom key [6, 1, 6, 6]); the other 12 runs
+  are byte-identical. The pre-rule goldens are kept (`p3a_goldens_p3arule.json.gz`) and must still match stage by
+  stage under stayCap "none" (`GoldenTest.oldStayRuleMatchesP3aGoldens`). `StayRuleTest`: caps, refusals, check(),
+  failed boom keys, random refusal rate.
+- Random (slowTest, 400 x 2 q, seed 7): 645 pass, 19 over the catalogue (now refused), 136 refused by the stay rule
+  (was 769 pass / 31 over); no exceptions.
+
+## Mesh: watertight joints, crossing offsets (2026-10-13)
+- Every node with >= 2 member ends gets a hub: a cube oriented like the widest member, half-size the smallest that
+  contains every member's end face (incl. its crossing offset), x `hubScale` + `hubAdd`. Each member is trimmed to
+  the largest extension whose end face is still inside the hub (end caps omitted), so joints are closed for any
+  angle / width; a straight leg through a node is flush (no step, no coplanar overlap). Pole, anchor and ground
+  nodes included. Laced members: canonical section frame, chords taper into the hub at ends, continuing laced legs
+  pair chords and splice them in chord-sized cubes, mitred bends; lacing follows the drawn chords.
+- Crossings: strut / cable pairs that share no node, cross inside both members at >= `crossMinAngle` and are closer
+  than `crossOffsetFrac` x (w1 + w2) along d1 x d2 are pushed apart to that distance (thin member moves more);
+  sweep over y-sorted boxes, deterministic order. Removes the coplanar X z-fighting.
+- VisualParams: removed knuckle*; added hubScale 1, hubAdd 0, hubMaxExtendFrac 0.45, hubMemberColour false,
+  crossOffsetFrac 0.3, crossMinAngle 10. Triangles q1: H16 1344 -> 1050, H24b 13464 -> 12024, H40 19512 -> 17456,
+  H40r3 62736 -> 55096, H40b4 49740 -> 45718, H64max 116568 -> 109664, H100 100056 -> 92184; mesh time +0.2-0.8 ms.
+- Renders: `renders/contact_fix_a215.png` (before | after, 7 layouts), `contact_fix_joints_H40r3.png`,
+  `contact_fix_joints_H40b4.png` (boom joint `bjoint`, leg joint `ljoint`, close / legs), `mesh_crossing_test.png`;
+  single shots in renders/before, renders/after (git-ignored).
+
 ## Golden results (p3a_goldens.json.gz, 14 runs)
 - Stage by stage, all 14 match exactly: rings, boom keys, back-stays (T, n, D), bay keys (seam form) and rotations,
   lookup tiers (seam_exact / plain_exact for the top bay, booms exact), low-q variant choice, stitched topology
@@ -137,10 +182,16 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
 - Boom reactions in the library are rounded to 4 decimals; no golden key changed because of it.
 
 ## Known issues
-- Tall towers with long booms exceed the member catalogue (as in Python): 400 random layouts x 2 q (seed 7): 769 /
+- (Superseded: over-catalogue towers are now refused, see "Stay rule and refusals".) Tall towers with long booms exceed the member catalogue (as in Python): 400 random layouts x 2 q (seed 7): 769 /
   800 pass, 31 have util 1.02-3.2, all with H >= 64 and long booms; no exceptions, no mechanisms. The game needs a
   policy for these (reject / "simplify" hint / bigger laced ladder).
-- Meshes are heavy: H64max is ~117k triangles (lacing dominates). LOD (skip lacing at distance) is needed in the mod.
+- The stay rule only anchors at ring levels (every 4 blocks), so booms stacked 1-3 blocks apart on one face are
+  refused even when short; hanging the lower boom from the upper one (or anchors between rings) would accept them.
+- LP-infeasible boom solves are not cached, so they are not in `boom_failed` (only repair-gave-up ones are).
+- Joint look: section changes on laced legs show as chord-width splice cubes; big hubs where a laced boom truss
+  tapers into a solid chord; hubs of braces sit inside laced legs; hubs read as a dark band in colKnuckle on solid
+  legs (`hubMemberColour` / colKnuckle tune it); ground hubs reach h below ground.
+- Meshes are heavy: H64max is ~110k triangles (lacing dominates). LOD (skip lacing at distance) is needed in the mod.
 - The library is 7.8 MB gz in the jar. `LibraryBin` (TGLB1, lossless, 2.0 MB gz, reads in 20 ms) exists for towerweb;
   the mod could load it too (`LibraryBin.read`), but it doesn't yet.
 - The interactive window was tested only under Xvfb + Mesa llvmpipe (renders, `--snap` hook); mouse, keys and the
