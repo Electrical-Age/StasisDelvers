@@ -195,8 +195,18 @@ public final class Main {
     static void info(List<String> pos, Map<String, String> opt) throws IOException {
         Layout layout = Layout.read(Path.of(pos.get(0)));
         double q = Double.parseDouble(opt.getOrDefault("q", "1.0"));
-        TowerGen.Result r = gen(opt).build(layout, q);
+        TowerGen g = gen(opt);
+        TowerGen.Result r0 = g.stitchOnly(layout, q);
         System.out.println("layout " + layout + (layout.violations().isEmpty() ? "" : "  RULE VIOLATIONS " + layout.violations()));
+        TowerGen.Result r;
+        try {
+            r = g.build(layout, q);
+        } catch (RuntimeException ex) {
+            for (var s : r0.spine.specs)
+                System.out.printf("  bay y%3d-%3d r%d %-14s kk%d key %s%n", s.y0, s.y1, s.r, s.tier, s.kk, java.util.Arrays.toString(s.seamKey));
+            System.out.println("  runtime pass failed: " + ex);
+            return;
+        }
         for (var s : r.spine.specs)
             System.out.printf("  bay y%3d-%3d r%d %-14s kk%d key %s%n", s.y0, s.y1, s.r, s.tier, s.kk, java.util.Arrays.toString(s.seamKey));
         for (var b : r.spine.booms)

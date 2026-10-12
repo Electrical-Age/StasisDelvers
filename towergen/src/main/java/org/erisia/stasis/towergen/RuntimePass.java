@@ -124,7 +124,7 @@ public final class RuntimePass {
             for (int j = 0; j < nf; j++) Kf[ri + j] /= si * sc[j];
             dmax = Math.max(dmax, Kf[ri + i]); dmin = Math.min(dmin, Kf[ri + i]);
         }
-        if (nf > 0 && dmin <= 1e-9 * dmax) return null;
+        if (nf > 0 && dmin <= 1e-9 * dmax) { lastMechanism = "zero stiffness DOF"; return null; }
         // profile of the lower triangle (nodes are numbered bay by bay, so K is nearly banded)
         int[] first = new int[nf], last = new int[nf];
         for (int i = 0; i < nf; i++) {
@@ -135,8 +135,14 @@ public final class RuntimePass {
         for (int i = 0; i < nf; i++) last[i] = i;
         for (int k = 0; k < nf; k++) for (int i = first[k]; i < k; i++) if (last[i] < k) last[i] = k;
         this.first = first; this.last = last;
-        if (!Dense.choleskyProfile(Kf, nf, first)) return null;
-        for (int i = 0; i < nf; i++) if (Math.abs(Kf[i * nf + i]) < 1e-6) return null;
+        int bad = Dense.choleskyProfileAt(Kf, nf, first);
+        if (bad < 0) for (int i = 0; i < nf; i++) if (Math.abs(Kf[i * nf + i]) < 1e-6) { bad = i; break; }
+        if (bad >= 0) {
+            int nd = -1;
+            for (int i = 0; i < n; i++) if (dof[i] >= 0 && dof[i] <= bad && bad < dof[i] + 3) nd = i;
+            lastMechanism = "pivot at node " + nd + (nd >= 0 ? " " + Arrays.toString(t.node(nd)) : "");
+            return null;
+        }
         // loads
         double[][] F = new double[K][nf];
         for (int k = 0; k < K; k++) {
@@ -269,6 +275,8 @@ public final class RuntimePass {
     }
 
     private int[] first, last;
+    /** Where the last singular analysis failed (diagnostics). */
+    public String lastMechanism = "";
 
     private double[] solve(double[] Lf, double[] sc, int nf, double[] f) {
         double[] x = new double[nf];
@@ -446,7 +454,7 @@ public final class RuntimePass {
         for (int it = 0; it < maxRounds; it++) {
             rounds = it + 1;
             Analysis an = analyze(t);
-            if (an == null) throw new MechanismException("taut stiffness singular (mechanism) in round " + rounds);
+            if (an == null) throw new MechanismException("taut stiffness singular (mechanism) in round " + rounds + ": " + lastMechanism);
             int[] r = resizePass(t, an);
             conv += r[1]; bumps += r[0];
             if (r[0] == 0) break;

@@ -10,8 +10,9 @@ import java.util.List;
  * bay that the entry lacks:
  * <ul>
  *   <li>lattice bays: the leg segment spanning the root height is split at the root corner, and the new node is
- *   braced with minimum-section struts to the bracketing nodes of the two face-adjacent legs (so it is stiff in
- *   both faces of its corner; the two root nodes of one boom get a strut between them);</li>
+ *   braced with minimum-section struts to the bracketing nodes of the two face-adjacent legs (face diagonals, so it
+ *   is stiff in both faces of its corner; a node at the same height on the adjacent leg, e.g. the other root node of
+ *   the boom, gets a ring strut as well);</li>
  *   <li>pole bays: the pole segment spanning the root height is split (the pole bending springs hold the node).</li>
  * </ul>
  * The runtime pass then sizes the new struts. Only q1 geometry is used (the jittered low-q nodes are off the legs).
@@ -103,7 +104,12 @@ final class Patch {
                 for (int q = 0; q < ch.size(); q++) {
                     int c = ch.get(q);
                     double yc = nodes.get(c)[1];
-                    if (Math.abs(yc - y) < 1e-6) { brace(mem, pre, nn, c); break; }
+                    if (Math.abs(yc - y) < 1e-6) {          // same height (often the other new root node):
+                        brace(mem, pre, nn, c);              // a ring strut plus the face diagonals, else the new
+                        if (q > 0) brace(mem, pre, nn, ch.get(q - 1));            // ring could twist
+                        if (q + 1 < ch.size()) brace(mem, pre, nn, ch.get(q + 1));
+                        break;
+                    }
                     if (q + 1 < ch.size() && yc < y && nodes.get(ch.get(q + 1))[1] > y) {
                         brace(mem, pre, nn, c);
                         brace(mem, pre, nn, ch.get(q + 1));

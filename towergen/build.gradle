@@ -37,5 +37,7 @@ tasks.register('slowTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform { includeTags 'slow' }
     maxHeapSize = '2g'
+    systemProperty 'towergen.random', System.getProperty('towergen.random', '60')
+    systemProperty 'towergen.seed', System.getProperty('towergen.seed', '20261012')
     testLogging { events 'failed', 'passed'; exceptionFormat 'full'; showStandardStreams = true }
 }

@@ -56,7 +56,7 @@ class SlowTest {
     @Test
     void randomLayouts() {
         TowerGen g = new TowerGen(Library.shared());
-        Random rng = new Random(20261012);
+        Random rng = new Random(Long.getLong("towergen.seed", 20261012L));
         int N = Integer.getInteger("towergen.random", 60);
         List<String> fails = new ArrayList<>();
         Map<String, Integer> tiers = new TreeMap<>(), boomTiers = new TreeMap<>();

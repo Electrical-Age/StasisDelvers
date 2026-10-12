@@ -74,12 +74,15 @@ public final class Dense {
      * summation order: the inner products use 4 partial sums). first[i] = first
      * non-zero column of row i (lower triangle). On return the upper triangle holds L^T within the profile.
      */
-    public static boolean choleskyProfile(double[] a, int n, int[] first) {
+    public static boolean choleskyProfile(double[] a, int n, int[] first) { return choleskyProfileAt(a, n, first) < 0; }
+
+    /** As {@link #choleskyProfile}; returns -1 on success, else the row of the first non-positive pivot. */
+    public static int choleskyProfileAt(double[] a, int n, int[] first) {
         for (int j = 0; j < n; j++) {
             int rj = j * n, fj = first[j];
             double d = a[rj + j];
             for (int k = fj; k < j; k++) d -= a[rj + k] * a[rj + k];
-            if (!(d > 0)) return false;
+            if (!(d > 0)) return j;
             double ljj = Math.sqrt(d);
             a[rj + j] = ljj;
             double inv = 1.0 / ljj;
@@ -100,7 +103,7 @@ public final class Dense {
             }
         }
         for (int i = 0; i < n; i++) for (int k = i + 1; k < n; k++) a[i * n + k] = first[k] <= i ? a[k * n + i] : 0.0;
-        return true;
+        return -1;
     }
 
     /** Solve with a profile factor; last[i] = largest row k with first[k] <= i. */
