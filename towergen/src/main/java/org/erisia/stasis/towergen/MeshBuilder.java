@@ -398,7 +398,15 @@ public final class MeshBuilder {
         }
         hb.h = h;
         hb.z = w.sd;
-        hb.part = vp.hubMemberColour() ? w.part : Part.KNUCKLE;
+        // a pure pass-through (only collinear members, e.g. a leg with just cables attached) is a piece of that
+        // member, not a joint; so is a hub on the pole (its brass collar marks the joint)
+        boolean through = true, pole = false;
+        for (End en : hb.ends) {
+            if (en.part == Part.POLE) pole = true;
+            if (!en.cable && Math.abs(V.dot(en.d, w.sd)) < 0.9986) through = false;
+        }
+        through |= pole;
+        hb.part = vp.hubMemberColour() || through ? w.part : Part.KNUCKLE;
     }
 
     private static void drawHub(Mesh mesh, Hub hb) {

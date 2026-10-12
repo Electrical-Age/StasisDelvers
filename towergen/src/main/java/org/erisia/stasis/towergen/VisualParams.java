@@ -37,8 +37,10 @@ public record VisualParams(
                                      // with the widest member (a leg reads straight through), below 1 counts as 1
         double hubAdd,               // added to the hub half-size (blocks); > 0 shows a collar on straight legs
         double hubMaxExtendFrac,     // members end at the hub face, but are shortened by at most this x their length
+                                     // (at most 0.49)
         boolean hubMemberColour,     // node hubs take the widest member's part (rust / steel / pole) instead of colKnuckle
-                                     // (the chord splices where laced members continue always take the chord's)
+                                     // (hubs on the pole, hubs where members only run straight through and the chord
+                                     // splices where laced members continue always take the member's)
         double crossOffsetFrac,      // crossing members closer than frac x (sum of drawn widths) are pushed apart to it
                                      // (no coplanar faces at X-braces / crossing cables: no z-fighting); 0 = off
         double crossMinAngle,        // degrees; crossings flatter than this (nearly parallel members) are not offset
