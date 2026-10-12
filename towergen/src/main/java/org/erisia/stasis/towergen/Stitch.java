@@ -1,8 +1,6 @@
 package org.erisia.stasis.towergen;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,11 +53,9 @@ public final class Stitch {
 
     /** p2lib.module_threshold. */
     public static double moduleThreshold(double qLow, int seed, String tag) {
-        try {
-            byte[] h = MessageDigest.getInstance("SHA-1").digest((seed + ":" + tag).getBytes(StandardCharsets.UTF_8));
-            long v = ((h[0] & 0xffL) << 24) | ((h[1] & 0xffL) << 16) | ((h[2] & 0xffL) << 8) | (h[3] & 0xffL);
-            return qLow + (1 - qLow) * (v / (double) 0xffffffffL) + 1e-6;
-        } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        byte[] h = Portable.sha1((seed + ":" + tag).getBytes(StandardCharsets.UTF_8));
+        long v = ((h[0] & 0xffL) << 24) | ((h[1] & 0xffL) << 16) | ((h[2] & 0xffL) << 8) | (h[3] & 0xffL);
+        return qLow + (1 - qLow) * (v / (double) 0xffffffffL) + 1e-6;
     }
 
     private Library.Variant variant(Library.Entry e, double q, int seed, String tag, List<String> vl) {

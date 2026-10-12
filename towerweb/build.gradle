@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'org.teavm' version '0.16.0'
+}
+
+group = 'org.erisia.stasis'
+version = '0.1.0'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':towergen')
+    implementation teavm.libs.jsoApis
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+teavm {
+    js {
+        mainClass = 'org.erisia.stasis.towerweb.TowerWeb'
+        moduleType = org.teavm.gradle.api.JSModuleType.ES2015
+        targetFileName = 'towergen.js'
+        addedToWebApp = false
+        obfuscated = true
+        optimization = org.teavm.gradle.api.OptimizationLevel.AGGRESSIVE
+    }
+}

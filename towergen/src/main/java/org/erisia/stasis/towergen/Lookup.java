@@ -56,7 +56,7 @@ public final class Lookup {
         for (Library.Entry c : lib.booms.values()) {
             int d = boomDist(key, 0, c.key.k(), 0);
             if (d == Integer.MIN_VALUE) continue;
-            if (best == null || d < bestD || (d == bestD && Arrays.compare(c.key.k(), best.key.k()) < 0)) { best = c; bestD = d; }
+            if (best == null || d < bestD || (d == bestD && Portable.compare(c.key.k(), best.key.k()) < 0)) { best = c; bestD = d; }
         }
         if (best == null) throw new NoEntryException("no boom entry for key " + Arrays.toString(key));
         info.tier = "near";
@@ -102,7 +102,7 @@ public final class Lookup {
             if (o == null) return true;
             if (d != o.d) return d < o.d;
             if (kk != o.kk) return kk < o.kk;
-            return Arrays.compare(key, o.key) < 0;
+            return Portable.compare(key, o.key) < 0;
         }
     }
 
@@ -224,7 +224,7 @@ public final class Lookup {
                         int bd = bayDist(ab, c, 0);
                         if (bd != Integer.MIN_VALUE) d = bd;
                     }
-                    if (bestE == null || d < bestD || (d == bestD && Arrays.compare(k, bestE.key.k()) < 0)) {
+                    if (bestE == null || d < bestD || (d == bestD && Portable.compare(k, bestE.key.k()) < 0)) {
                         bestD = d; bestE = c0;
                     }
                 }

@@ -684,7 +684,7 @@ public final class Spine {
         int bestR = 0;
         for (int r = 0; r < 4; r++) {
             int[] cand = canonForm(roots, mga, r);
-            if (best == null || Arrays.compare(cand, best) < 0) { best = cand; bestR = r; }
+            if (best == null || Portable.compare(cand, best) < 0) { best = cand; bestR = r; }
         }
         return bestR;
     }
@@ -708,7 +708,7 @@ public final class Spine {
             y[1] = Math.floorMod(x[1] + q, 4);
             rr.add(y);
         }
-        rr.sort(Arrays::compare);
+        rr.sort(Portable::compare);
         return rr;
     }
 
