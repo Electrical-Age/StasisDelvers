@@ -37,6 +37,21 @@ class GoldenTest {
         }));
     }
 
+    /**
+     * The P3a goldens from before the stay rule (p3a_goldens_p3arule.json.gz; only H40r3 differs from the current
+     * ones) still match stage by stage under stayCap "none": the old entries are kept in the library and the port of
+     * the old rule is unchanged.
+     */
+    @TestFactory
+    Stream<DynamicTest> oldStayRuleMatchesP3aGoldens() throws Exception {
+        SolverParams none = SolverParams.fromJson(Json.parse("{\"stayCap\": \"none\"}"), gen.c);
+        return Goldens.load("/p3a_goldens_p3arule.json.gz").stream().map(g -> DynamicTest.dynamicTest(Goldens.name(g), () -> {
+            TowerGen.Result r = gen.build(Goldens.layout(g), Json.num(g.get("q")), none);
+            List<String> err = Goldens.compareStitch(g, r);
+            assertTrue(err.isEmpty(), Goldens.name(g) + " (stayCap none):\n  " + String.join("\n  ", err));
+        }));
+    }
+
     @TestFactory
     Stream<DynamicTest> runtimePassInvariants() {
         return goldens.stream().map(g -> DynamicTest.dynamicTest(Goldens.name(g), () -> {

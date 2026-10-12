@@ -86,7 +86,8 @@ public final class Interactive {
                         layoutPath.getFileName(), qq, r.analysis == null ? "mechanism" : String.format("%.3f", r.analysis.maxUtil),
                         r.info.vol, wc.cables(), wc.stays(), wc.backstays(), r.msStatics() + r.msReduce(), r.msPass(), m.tris,
                         l.violations().isEmpty() ? "" : " | RULES: " + l.violations(),
-                        r.warnings.isEmpty() ? "" : " | " + r.warnings.size() + " warnings");
+                        (r.warnings.isEmpty() ? "" : " | " + r.warnings.size() + " warnings")
+                                + (r.refusal == null ? "" : " | REFUSED " + r.refusal.reason()));
                 for (String w : r.warnings) System.err.println("warning: " + w);
                 pending.set(new Built(m, vp, title, m.bounds(), r));
             } catch (Exception e) {

@@ -12,8 +12,10 @@ import java.util.zip.GZIPInputStream;
 
 /** p3a_goldens.json.gz (14 runs: 7 layouts x q 1 / 0.3) and the comparisons used by the golden tests. */
 final class Goldens {
-    static List<Map<String, Object>> load() throws IOException {
-        try (InputStream in = Goldens.class.getResourceAsStream("/p3a_goldens.json.gz")) {
+    static List<Map<String, Object>> load() throws IOException { return load("/p3a_goldens.json.gz"); }
+
+    static List<Map<String, Object>> load(String res) throws IOException {
+        try (InputStream in = Goldens.class.getResourceAsStream(res)) {
             Object o = Json.parse(new InputStreamReader(new GZIPInputStream(in), StandardCharsets.UTF_8));
             List<Map<String, Object>> out = new ArrayList<>();
             for (Object g : Json.arr(o)) out.add(Json.obj(g));

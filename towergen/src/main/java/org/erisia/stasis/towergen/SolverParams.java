@@ -35,6 +35,17 @@ public record SolverParams(
         double backstayDistCap,      // ... capped at this (blocks) (D_CAP)
         double backstayMinTension,   // back-stays whose tension comes out below this are dropped (BS_T_MIN)
         double backstaySecondPair,   // above this tension a second wire pair is added one ring higher (BS_CAP)
+        // --- boom stays (spine statics: these change the boom keys, so which library entries are picked)
+        String stayCap,              // where a boom's stays may anchor on the mast: "same" = at or below the next boom
+                                     // level above in the same direction (the only booms its stays could cross);
+                                     // "any" = at or below the next boom level above in any direction; "none" = no
+                                     // cap (the old rule: stays may pass through booms above). A layout whose stays
+                                     // can't get stayMinRise / stayMinRatio under the cap is refused (STAY_RISE)
+        double stayRise,             // preferred stay anchor height above the boom = this x boom length (at least one
+                                     // bay; rounded up to the next ring level, then capped by stayCap)
+        double stayMinRatio,         // refuse if the capped anchor rise is below this x boom length (0.35 = the
+                                     // flattest stay angle the boom library is solved for, about 19 degrees)
+        double stayMinRise,          // ... or below this many blocks
         // --- pretension and the sizing loop (runtime pass)
         double pretensionFactor,     // cable pretension = recorded library pretension x this, then raised as needed
         double pretensionMargin,     // raise target = this x the largest compression a cable would see (PRE_MARGIN)
@@ -52,10 +63,16 @@ public record SolverParams(
                                      // 3.31 blocks), so over-catalogue towers can try bigger members
 ) {
     public static final List<String> X_PANELS = List.of("keep", "single", "auto");
+    public static final List<String> STAY_CAPS = Consts.STAY_CAP_NAMES;
 
     public SolverParams {
         if (xPanels == null || !X_PANELS.contains(xPanels))
             throw new IllegalArgumentException("xPanels: expected \"keep\", \"single\" or \"auto\", got \"" + xPanels + "\"");
+        if (stayCap == null || !STAY_CAPS.contains(stayCap))
+            throw new IllegalArgumentException("stayCap: expected \"same\", \"any\" or \"none\", got \"" + stayCap + "\"");
+        if (!(stayRise > 0 && stayRise <= 10)) throw new IllegalArgumentException("stayRise: expected 0..10");
+        if (!(stayMinRatio >= 0 && stayMinRatio <= 10)) throw new IllegalArgumentException("stayMinRatio: expected 0..10");
+        if (!(stayMinRise >= 0 && stayMinRise <= 100)) throw new IllegalArgumentException("stayMinRise: expected 0..100");
         if (maxStaysPerBoom < 0) throw new IllegalArgumentException("maxStaysPerBoom: expected >= 0");
         if (minStaysPerBoom < 0) throw new IllegalArgumentException("minStaysPerBoom: expected >= 0");
         if (maxCablesPerBay < 0) throw new IllegalArgumentException("maxCablesPerBay: expected >= 0");
@@ -73,6 +90,7 @@ public record SolverParams(
     public static SolverParams defaults(Consts c) {
         return new SolverParams(0, 2, "keep", 0,
                 true, c.BS_MIN_L, c.D_FRAC, c.D_CAP, c.BS_T_MIN, c.BS_CAP,
+                Consts.STAY_CAP_NAMES.get(c.STAY_CAP), c.STAY_RISE, c.STAY_MIN_RATIO, c.STAY_MIN_RISE,
                 1.5, c.PRE_MARGIN, 60, 30, 1.0,
                 c.EMIT_W, c.EMIT_WIND0, c.CD0, c.TORQ0, c.RHO,
                 0);
@@ -81,7 +99,8 @@ public record SolverParams(
     /** A copy with other wire-reduction keys. */
     public SolverParams withWires(int maxStays, String x, int maxCables) {
         return new SolverParams(maxStays, minStaysPerBoom, x, maxCables, backstays, backstayMinBoom, backstayDistFactor,
-                backstayDistCap, backstayMinTension, backstaySecondPair, pretensionFactor, pretensionMargin, raiseIters,
+                backstayDistCap, backstayMinTension, backstaySecondPair, stayCap, stayRise, stayMinRatio, stayMinRise,
+                pretensionFactor, pretensionMargin, raiseIters,
                 maxRounds, utilLimit, emitterWeight, emitterWind, windDrag, torsion, density, extraWidthSteps);
     }
 

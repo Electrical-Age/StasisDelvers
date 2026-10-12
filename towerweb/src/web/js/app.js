@@ -305,7 +305,7 @@ worker.onmessage = (e) => {
       // status and errors first, so a display problem below cannot leave a stale "building…" or error behind
       if (jsonErrs.length) { showErrors(jsonErrs, []); setStatus('not rebuilt: fix the JSON (showing the last good tower)'); }
       else {
-        showErrors([], st.warnings || []);
+        showErrors(st.refusal ? ['REFUSED (the game would not build this): ' + st.refusal.message] : [], st.warnings || []);
         setStatus(statusNote + `built in ${fmt(ms.total)} ms (generator ${fmt(gen)} ms, mesh ${fmt(ms.mesh)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
       }
       try { showMesh(m); showStats(st); } catch (err) {
@@ -408,7 +408,7 @@ $('zip').addEventListener('click', () => {
 // ------------------------------------------------------------------ slider controls (generated from the key docs)
 // Both views edit the same JSON text: a control change rewrites the key in the editor (one key per line), an editor
 // change re-reads every control. Keys missing from the JSON show their default.
-const ENUMS = { xPanels: ['keep', 'single', 'auto'] };
+const ENUMS = { xPanels: ['keep', 'single', 'auto'], stayCap: ['same', 'any', 'none'] };
 // [min, max, 'log'?] where the default-derived range does not fit (documented valid ranges, angles, loads)
 const RANGES = {
   maxStaysPerBoom: [0, 30], minStaysPerBoom: [0, 4], maxCablesPerBay: [0, 16],

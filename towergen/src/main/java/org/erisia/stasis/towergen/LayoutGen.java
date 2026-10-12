@@ -30,4 +30,16 @@ public final class LayoutGen {
         booms.sort((a, b) -> a.y() != b.y() ? Integer.compare(a.y(), b.y()) : Integer.compare(a.dir(), b.dir()));
         return new Layout(H, booms);
     }
+
+    /** {@link #random} redrawn until the stay rule (Spine.anchorLevels under c) accepts it (at most 1000 draws). */
+    public static Layout randomBuildable(Random rng, Consts c) {
+        Layout l = random(rng);
+        for (int i = 0; i < 1000; i++) {
+            List<Refusal> r = new ArrayList<>();
+            Spine.anchorLevels(l, c, r);
+            if (r.isEmpty()) return l;
+            l = random(rng);
+        }
+        return l;
+    }
 }

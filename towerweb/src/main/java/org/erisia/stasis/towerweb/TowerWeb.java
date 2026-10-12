@@ -14,6 +14,7 @@ import org.erisia.stasis.towergen.LayoutGen;
 import org.erisia.stasis.towergen.Library;
 import org.erisia.stasis.towergen.LibraryBin;
 import org.erisia.stasis.towergen.Mesh;
+import org.erisia.stasis.towergen.RefusedException;
 import org.erisia.stasis.towergen.SolverParams;
 import org.erisia.stasis.towergen.WireReduction;
 import org.erisia.stasis.towergen.MeshBuilder;
@@ -101,6 +102,14 @@ public final class TowerWeb {
             long t2 = System.nanoTime();
             last = mesh;
             return stats(r, mesh, vp, warnings, (t1 - t0) / 1e6, (t2 - t1) / 1e6);
+        } catch (RefusedException e) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("error", "REFUSED (the game would not build this): " + e.refusal.message());
+            Map<String, Object> rf = new LinkedHashMap<>();
+            rf.put("reason", e.refusal.reason().name());
+            rf.put("message", e.refusal.message());
+            m.put("refusal", rf);
+            return Json.write(m);
         } catch (Throwable t) {
             return err("generator: " + msg(t));
         }
@@ -120,7 +129,8 @@ public final class TowerWeb {
     /** A random layout by the game rules (LayoutGen, the generator's own distribution). */
     @JSExport
     public static String randomLayout(double seed) {
-        Layout l = LayoutGen.random(new Random((long) seed));
+        Random rng = new Random((long) seed);
+        Layout l = gen != null ? LayoutGen.randomBuildable(rng, gen.c) : LayoutGen.random(rng);   // no stay refusals
         return prettyLayout(l);
     }
 
@@ -215,8 +225,12 @@ public final class TowerWeb {
         m.put("ms", tm);
         warnings.addAll(r.warnings);
         if (r.analysis == null) warnings.add("the structure is a mechanism (singular stiffness); drawn without force colours");
-        else if (util > r.c.UTIL_LIMIT + 1e-3 && r.solver == null)
-            warnings.add(String.format("over the member catalogue: max utilisation %.2f > 1 (tall tower with long booms; the game would need to reject or simplify it)", util));
+        if (r.refusal != null) {
+            Map<String, Object> rf = new LinkedHashMap<>();
+            rf.put("reason", r.refusal.reason().name());
+            rf.put("message", r.refusal.message());
+            m.put("refusal", rf);
+        }
         for (String s : r.bayTiers)
             if (s.startsWith("ring_near") || s.equals("patch")) { warnings.add("some bays use last-resort library tiers (" + s + ")"); break; }
         m.put("warnings", new ArrayList<Object>(warnings));

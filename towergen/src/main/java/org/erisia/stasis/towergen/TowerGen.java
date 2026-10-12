@@ -47,6 +47,9 @@ public final class TowerGen {
         public long tReduceNs;
         /** Solver warnings (wire reduction, stabilisation, fallbacks). */
         public List<String> warnings = new ArrayList<>();
+        /** Non-null: the tower was built but the game must refuse it (over the member catalogue); the tower is kept
+         *  for previews. Layouts refused before building throw {@link RefusedException} instead. */
+        public Refusal refusal;
 
         public double msReduce() { return tReduceNs / 1e6; }
 
@@ -72,18 +75,38 @@ public final class TowerGen {
         return r;
     }
 
+    /** Throws {@link RefusedException} (STAY_RISE) if the layout's stays can't be anchored (see {@link #check}). */
     public Result build(Layout layout, double q) {
         Result r = stitchOnly(layout, q);
         RuntimePass.Analysis[] fa = new RuntimePass.Analysis[1];
         r.tower = pass.run(r.raw, r.info, fa);
         r.analysis = fa[0];
         r.reduced = r.raw;
+        refuseOverCatalogue(r, c);
         return r;
     }
 
     /**
+     * Refusals known before building (the stay rule, {@link Spine#anchorLevels}; cheap, no statics), one per refused
+     * boom; empty = buildable as far as the layout goes (the built tower can still be refused: {@link Result#refusal}).
+     * sp may be null (library defaults). Game rule violations ({@link Layout#violations}) are checked separately.
+     */
+    public List<Refusal> check(Layout layout, SolverParams sp) {
+        List<Refusal> out = new ArrayList<>();
+        Spine.anchorLevels(layout, sp == null ? c : c.forSpine(sp), out);
+        return out;
+    }
+
+    private static void refuseOverCatalogue(Result r, Consts cp) {
+        if (r.analysis != null && r.analysis.maxUtil > cp.UTIL_LIMIT + 1e-3)
+            r.refusal = new Refusal(Refusal.Reason.OVER_CATALOGUE, String.format("over the member catalogue: max "
+                    + "utilisation %.3f > %.3f (too tall for its booms: lower the tower or shorten the long booms)",
+                    r.analysis.maxUtil, cp.UTIL_LIMIT));
+    }
+
+    /**
      * Build with solver parameters (null = {@link #build(Layout, double)}; the defaults give the same tower). Never
-     * throws for a mechanism: falls back to the unreduced tower, else returns the stitched tower without an analysis,
+     * throws for a mechanism (throws {@link RefusedException} for a refused layout, as the plain build): falls back to the unreduced tower, else returns the stitched tower without an analysis,
      * with a warning in {@link Result#warnings}.
      */
     public Result build(Layout layout, double q, SolverParams sp) {
@@ -155,8 +178,7 @@ public final class TowerGen {
             }
             r.info.tPassNs = tPass;
         }
-        if (r.analysis != null && r.analysis.maxUtil > cp.UTIL_LIMIT + 1e-3)
-            r.warnings.add(String.format("over the member catalogue: max utilisation %.3f > %.3f (tall tower with long booms: try extraWidthSteps in solver.json; the game would need to reject or simplify it)", r.analysis.maxUtil, cp.UTIL_LIMIT));
+        refuseOverCatalogue(r, cp);
         return r;
     }
 

@@ -100,6 +100,51 @@ public final class Spine {
         return (1 - t) * s[i] + t * s[i + 1];
     }
 
+    /**
+     * Stay anchor ring level per boom (the stay rule). Preferred: the first ring level at least
+     * max(BAY, STAY_RISE x L) above the boom, else H (the P3a rule). Cap (STAY_CAP): the stays must anchor at or
+     * below the next boom level above in the same direction ("same": the only booms a boom's stays can cross; a
+     * perpendicular or opposite boom leaves the mast from another face) or in any direction ("any"); if the
+     * preferred level is above the cap, the highest ring level at or below the cap is used. A boom whose capped rise
+     * is below max(STAY_MIN_RISE, STAY_MIN_RATIO x L) is refused (one {@link Refusal} per boom in refusals; the
+     * level is still returned). Depends only on the layout (ring levels are levels(H)), so the game can check a
+     * layout before building it.
+     */
+    public static int[] anchorLevels(Layout layout, Consts c, List<Refusal> refusals) {
+        int H = layout.H();
+        int[] ys = levels(H);
+        List<Layout.Boom> booms = layout.booms();
+        int[] out = new int[booms.size()];
+        for (int bi = 0; bi < booms.size(); bi++) {
+            Layout.Boom b = booms.get(bi);
+            int yb = b.y(), L = b.length();
+            int ya = H;
+            for (int y : ys) if (y >= yb + Math.max(c.BAY, c.STAY_RISE * L) - 1e-9) { ya = y; break; }
+            int cap = H;
+            Layout.Boom capBy = null;
+            if (c.STAY_CAP != Consts.STAY_CAP_NONE)
+                for (Layout.Boom o : booms)
+                    if (o.y() > yb && o.y() < cap && (c.STAY_CAP == Consts.STAY_CAP_ANY || o.dir() == b.dir())) { cap = o.y(); capBy = o; }
+            if (ya > cap) {
+                ya = ys[0];
+                for (int y : ys) if (y <= cap) ya = y;
+            }
+            out[bi] = ya;
+            double need = Math.max(c.STAY_MIN_RISE, c.STAY_MIN_RATIO * L);
+            if (refusals != null && ya - yb < need - 1e-9) {
+                int maxL = c.STAY_MIN_RATIO > 0 ? (int) Math.floor((ya - yb) / c.STAY_MIN_RATIO + 1e-9) : 0;
+                String m = String.format("boom %c y%d L%d: its stays need an anchor at least %.1f blocks above it, but "
+                        + "they must anchor at or below the boom at y%d (%c), so the highest mast ring level they can use "
+                        + "is y%d (rise %d)", b.dirChar(), yb, L, need, capBy != null ? capBy.y() : H,
+                        capBy != null ? capBy.dirChar() : '-', ya, ya - yb);
+                m += ya - yb >= c.STAY_MIN_RISE && maxL >= 2 ? String.format("; shorten it to at most %d or move the booms apart", maxL)
+                        : "; move the booms apart";
+                refusals.add(new Refusal(Refusal.Reason.STAY_RISE, m));
+            }
+        }
+        return out;
+    }
+
     public static int q4(double x) { return (int) Math.floor(4 * x + 0.5 + 1e-9); }
 
     double legForce(double M, double N, double s) { return s > 0 ? 0.354 * M / s + N / 4 : 1e9; }
@@ -250,7 +295,7 @@ public final class Spine {
 
     private record BoomGeo(double[] tip, double[][] roots, double[][] anchors, int ya) {}
 
-    private BoomGeo boomNodes(int[] ys, double[] s, int H, int yb, int dir, int L) {
+    private BoomGeo boomNodes(int[] ys, double[] s, int H, int yb, int dir, int L, int ya) {
         int dx = S1DIR[dir][0], dz = S1DIR[dir][1];
         double[] dv = {dx, 0, dz}, pv = {-dz, 0, dx};
         double[] tip = {L * dx, yb, L * dz};
@@ -259,8 +304,6 @@ public final class Spine {
         int k = 0;
         for (int sg : new int[]{1, -1})
             roots[k++] = new double[]{sr * dv[0] + sg * sr * pv[0], yb, sr * dv[2] + sg * sr * pv[2]};
-        int ya = H;
-        for (int y : ys) if (y >= yb + Math.max(c.BAY, 0.7 * L) - 1e-9) { ya = y; break; }
         double sa = s[Arrays.binarySearch(ys, ya)];
         double[][] anchors;
         if (sa > 0) {
@@ -340,13 +383,13 @@ public final class Spine {
 
     /** spine.point_loads: per case the top emitter plus the boom root / anchor reactions (P1 min-norm estimate). */
     @SuppressWarnings("unchecked")
-    private List<Load>[] pointLoads1(int H, List<Layout.Boom> booms, int[] ys, double[] s, int[] yaOut) {
+    private List<Load>[] pointLoads1(int H, List<Layout.Boom> booms, int[] ys, double[] s, int[] ya) {
         List<BoomGeo> geos = new ArrayList<>();
         List<double[]> areas = new ArrayList<>();
         for (int bi = 0; bi < booms.size(); bi++) {
             Layout.Boom b = booms.get(bi);
-            BoomGeo g = boomNodes(ys, s, H, b.y(), b.dir(), b.length());
-            geos.add(g); areas.add(sizeBoom(g)); yaOut[bi] = g.ya;
+            BoomGeo g = boomNodes(ys, s, H, b.y(), b.dir(), b.length(), ya[bi]);
+            geos.add(g); areas.add(sizeBoom(g));
         }
         List<Load>[] out = new List[c.K];
         for (int k = 0; k < c.K; k++) {
@@ -368,11 +411,9 @@ public final class Spine {
     }
 
     // ------------------------------------------------------------------ boom keys / world loads
-    /** p3alib.boom_key_int -> (key, ya). */
-    int[] boomKey(int[] ys, double[] s, int H, int yb, int Lb, int[] yaOut) {
+    /** p3alib.boom_key_int (ya from {@link #anchorLevels}). */
+    int[] boomKey(int[] ys, double[] s, int H, int yb, int Lb, int ya) {
         double sr = ringSAt(ys, s, yb);
-        int ya = H;
-        for (int y : ys) if (y >= yb + Math.max(c.BAY, 0.7 * Lb) - 1e-9) { ya = y; break; }
         double sa = s[Arrays.binarySearch(ys, ya)];
         int li = 0;
         while (li < c.L_LADDER.length && c.L_LADDER[li] < Lb - 1e-9) li++;
@@ -380,7 +421,6 @@ public final class Spine {
         double ratio = (ya - yb) / (double) Lb;
         int ri = 0;
         for (int i = 0; i < c.RHO_LADDER.length; i++) if (c.RHO_LADDER[i] <= ratio + 1e-9) ri = i;
-        yaOut[0] = ya;
         return new int[]{li, ri, q4(sr), q4(sa)};
     }
 
@@ -574,11 +614,18 @@ public final class Spine {
         int H = layout.H();
         List<Layout.Boom> booms = layout.booms();
         int[] ys0 = levels(H);
+        List<Refusal> refusals = new ArrayList<>();
+        int[] yaAll = anchorLevels(layout, c, refusals);
+        if (!refusals.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Refusal f : refusals) sb.append(sb.length() > 0 ? "; " : "").append(f.message());
+            throw new RefusedException(new Refusal(Refusal.Reason.STAY_RISE, sb.toString()));
+        }
         double[] tmp = new double[ys0.length];
         Arrays.fill(tmp, 1.5);
         List<Load>[] loads1;
         if (!booms.isEmpty()) {
-            int[] ya1 = new int[booms.size()];
+            int[] ya1 = yaAll;
             loads1 = pointLoads1(H, booms, ys0, tmp, ya1);
             List<List<double[][]>> grav = new ArrayList<>();
             for (int bi = 0; bi < booms.size(); bi++) {
@@ -599,10 +646,9 @@ public final class Spine {
         int[] yaArr = new int[booms.size()];
         for (int bi = 0; bi < booms.size(); bi++) {
             Layout.Boom b = booms.get(bi);
-            int[] yaO = new int[1];
-            int[] key = boomKey(ys, rings, H, b.y(), b.length(), yaO);
+            int[] key = boomKey(ys, rings, H, b.y(), b.length(), yaAll[bi]);
             BoomInfo bo = new BoomInfo();
-            bo.yb = b.y(); bo.dir = b.dir(); bo.L = b.length(); bo.ya = yaO[0]; bo.ikey = key;
+            bo.yb = b.y(); bo.dir = b.dir(); bo.L = b.length(); bo.ya = yaAll[bi]; bo.ikey = key;
             bo.sr = ringSAt(ys, rings, b.y()); bo.sa = rings[Arrays.binarySearch(ys, bo.ya)];
             bo.entry = resolver.resolve(key, bo);
             List<Load>[] bl = boomLoadsWorld(bo.entry, bi, bo.yb, bo.dir, bo.sr, bo.ya, bo.sa);

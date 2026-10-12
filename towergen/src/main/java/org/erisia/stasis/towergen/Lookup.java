@@ -51,6 +51,11 @@ public final class Lookup {
     public Library.Entry boom(int[] key, Spine.BoomInfo info) {
         Library.Entry e = lib.booms.get(new Library.Key(key));
         if (e != null) { info.tier = "exact"; return e; }
+        if (lib.c.BOOM_FAILED.contains(Arrays.toString(key)))
+            throw new RefusedException(new Refusal(Refusal.Reason.NO_BOOM_DESIGN, String.format(
+                    "boom %c y%d L%d: no valid boom design with its stays anchored at y%d (library key %s failed to solve); "
+                    + "change the boom length or its height, or the booms above it", "ESWN".charAt(info.dir), info.yb,
+                    info.L, info.ya, Arrays.toString(key))));
         Library.Entry best = null;
         int bestD = 0;
         for (Library.Entry c : lib.booms.values()) {

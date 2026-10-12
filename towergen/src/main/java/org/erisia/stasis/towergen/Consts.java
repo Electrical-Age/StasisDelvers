@@ -14,6 +14,14 @@ public final class Consts {
             SIG_CAB, SIG_T, SIG_C0, L0, E, Q_LOW, TAUT_PRE_MAX, LACE_W, CH_MAX, R_REF;
     /** Overridable by SolverParams (forSpine / forPass): loads, back-stay constants, pretension margin. */
     public double EMIT_W, EMIT_WIND0, RHO, CD0, BS_MIN_L, D_CAP, D_FRAC, BS_T_MIN, BS_CAP, PRE_MARGIN;
+    /** Stay anchor rule (Spine.anchorLevel): cap mode (STAY_CAP_*), preferred rise (x L), refusal floor (x L, blocks).
+     *  Library header constants STAY_CAP / STAY_RISE / STAY_MIN_RATIO / STAY_MIN_RISE; these defaults if absent. */
+    public int STAY_CAP = STAY_CAP_SAME;
+    public double STAY_RISE = 0.7, STAY_MIN_RATIO = 0.35, STAY_MIN_RISE = 2.0;
+    /** Boom keys (Arrays.toString) whose library solve failed (header "boom_failed"): refused, never a fallback. */
+    public java.util.Set<String> BOOM_FAILED = new java.util.HashSet<>();
+    public static final int STAY_CAP_NONE = 0, STAY_CAP_SAME = 1, STAY_CAP_ANY = 2;
+    public static final java.util.List<String> STAY_CAP_NAMES = java.util.List.of("none", "same", "any");
     /** Not in the header: fem.TORQ0 (torsion load at an emitter off the axis). */
     public double TORQ0 = 0.4;
     /** Runtime only (SolverParams): back-stays on, sizing utilisation limit, raise iterations, resize rounds. */
@@ -43,6 +51,8 @@ public final class Consts {
         D_FRAC = o.D_FRAC; BS_T_MIN = o.BS_T_MIN; BS_CAP = o.BS_CAP; PRE_MARGIN = o.PRE_MARGIN; TORQ0 = o.TORQ0;
         BACKSTAYS = o.BACKSTAYS; UTIL_LIMIT = o.UTIL_LIMIT; RAISE_ITS = o.RAISE_ITS; MAX_ROUNDS = o.MAX_ROUNDS;
         FIXF = o.FIXF;
+        BOOM_FAILED = o.BOOM_FAILED;
+        STAY_CAP = o.STAY_CAP; STAY_RISE = o.STAY_RISE; STAY_MIN_RATIO = o.STAY_MIN_RATIO; STAY_MIN_RISE = o.STAY_MIN_RISE;
         N_FLOOR = o.N_FLOOR; N_R = o.N_R; V_FLOOR = o.V_FLOOR; V_R = o.V_R; MG_FLOOR = o.MG_FLOOR; MG_R = o.MG_R;
         T_FLOOR = o.T_FLOOR; T_R = o.T_R; BELOW = o.BELOW; CLASS_TOL = o.CLASS_TOL; CEIL_EPS = o.CEIL_EPS;
         DEMAND_EPS = o.DEMAND_EPS; caseWind = o.caseWind; caseTors = o.caseTors; caseName = o.caseName; K = o.K;
@@ -52,9 +62,13 @@ public final class Consts {
     /** Constants for the spine statics under p (back-stay keys only); this instance if nothing differs. */
     public Consts forSpine(SolverParams p) {
         if (p.backstays() == BACKSTAYS && p.backstayMinBoom() == BS_MIN_L && p.backstayDistFactor() == D_FRAC
-                && p.backstayDistCap() == D_CAP && p.backstayMinTension() == BS_T_MIN && p.backstaySecondPair() == BS_CAP)
+                && p.backstayDistCap() == D_CAP && p.backstayMinTension() == BS_T_MIN && p.backstaySecondPair() == BS_CAP
+                && STAY_CAP_NAMES.indexOf(p.stayCap()) == STAY_CAP && p.stayRise() == STAY_RISE
+                && p.stayMinRatio() == STAY_MIN_RATIO && p.stayMinRise() == STAY_MIN_RISE)
             return this;
         Consts c = new Consts(this);
+        c.STAY_CAP = STAY_CAP_NAMES.indexOf(p.stayCap()); c.STAY_RISE = p.stayRise();
+        c.STAY_MIN_RATIO = p.stayMinRatio(); c.STAY_MIN_RISE = p.stayMinRise();
         c.BACKSTAYS = p.backstays(); c.BS_MIN_L = p.backstayMinBoom(); c.D_FRAC = p.backstayDistFactor();
         c.D_CAP = p.backstayDistCap(); c.BS_T_MIN = p.backstayMinTension(); c.BS_CAP = p.backstaySecondPair();
         return c;
@@ -102,6 +116,16 @@ public final class Consts {
         SIG_CAB = g(c, "SIG_CAB"); SIG_T = g(c, "SIG_T"); SIG_C0 = g(c, "SIG_C0"); L0 = g(c, "L0"); E = g(c, "E");
         BS_MIN_L = g(c, "BS_MIN_L"); D_CAP = g(c, "D_CAP"); D_FRAC = g(c, "D_FRAC"); BS_T_MIN = g(c, "BS_T_MIN");
         BS_CAP = g(c, "BS_CAP"); Q_LOW = g(c, "Q_LOW"); PRE_MARGIN = g(c, "PRE_MARGIN");
+        if (h.get("boom_failed") != null)
+            for (Object k : Json.arr(h.get("boom_failed"))) BOOM_FAILED.add(java.util.Arrays.toString(Json.iarr(k)));
+        if (c.get("STAY_CAP") != null) {
+            Object sc = c.get("STAY_CAP");
+            STAY_CAP = sc instanceof String str ? STAY_CAP_NAMES.indexOf(str) : Json.inum(sc);
+            if (STAY_CAP < 0) throw new IllegalArgumentException("library header: bad STAY_CAP " + sc);
+        }
+        if (c.get("STAY_RISE") != null) STAY_RISE = g(c, "STAY_RISE");
+        if (c.get("STAY_MIN_RATIO") != null) STAY_MIN_RATIO = g(c, "STAY_MIN_RATIO");
+        if (c.get("STAY_MIN_RISE") != null) STAY_MIN_RISE = g(c, "STAY_MIN_RISE");
         TAUT_PRE_MAX = g(c, "TAUT_PRE_MAX"); LACE_W = g(c, "LACE_W"); CH_MAX = g(c, "CH_MAX"); R_REF = g(c, "R_REF");
         Map<String, Object> l = Json.obj(h.get("ladders"));
         double[] a;

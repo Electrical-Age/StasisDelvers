@@ -234,6 +234,7 @@ public final class Main {
         System.out.println("  wires: " + WireReduction.Counts.of(r.tower) + (r.reduced != r.raw || r.reduction != null
                 ? "  (stitched: " + WireReduction.Counts.of(r.raw) + "; reduction " + String.format("%.1f", r.msReduce()) + " ms)" : ""));
         for (String w : r.warnings) System.out.println("  warning: " + w);
+        if (r.refusal != null) System.out.println("  REFUSED " + r.refusal);
     }
 
     static void contact(List<String> pos, Map<String, String> opt) throws IOException {
