@@ -60,8 +60,8 @@ class MeshTest {
         VisualParams d = VisualParams.defaults();
         VisualParams r = VisualParams.fromJson(Json.parse(Json.writePretty(d.toJson())));
         assertEquals(Json.write(d.toJson()), Json.write(r.toJson()));
-        VisualParams p = VisualParams.fromJson(Json.parse("{\"knuckleScale\": 2.0, \"colRust\": [1, 0, 0]}"));
-        assertEquals(2.0, p.knuckleScale());
+        VisualParams p = VisualParams.fromJson(Json.parse("{\"hubScale\": 2.0, \"colRust\": [1, 0, 0]}"));
+        assertEquals(2.0, p.hubScale());
         assertEquals(1.0, p.colRust()[0]);
         assertEquals(d.lacingWidthFrac(), p.lacingWidthFrac());
     }

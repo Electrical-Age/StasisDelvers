@@ -31,13 +31,17 @@ public record VisualParams(
         double lacedEndTaper,        // fraction of the length over which the chords converge at a free end (not at a
                                      // node where a collinear member continues, e.g. along a leg)
         double lacedEndFrac,         // chord offset at the very end, as a fraction of the full offset
-        // --- tapered joints (knuckles)
-        double knuckleScale,         // node block size = scale * (largest connected drawn width) + add
-        double knuckleAdd,
-        double knuckleMaxRatio,      // node block at most this x the second-largest connected width (taper, not blob)
-        boolean knuckleStubs,        // tapered stubs from the node block into each strut
-        double knuckleTaperLength,   // stub length = this * node size
-        double knuckleTaperStart,    // stub start width = this * node size (it tapers to the member width)
+        // --- joints (hubs) and crossings
+        double hubScale,             // joint hub (a cube at every node with 2+ members, oriented to the widest one, every
+                                     // member end sealed inside it) = scale x the smallest closed size + add; 1 = flush
+                                     // with the widest member (a leg reads straight through), below 1 counts as 1
+        double hubAdd,               // added to the hub half-size (blocks); > 0 shows a collar on straight legs
+        double hubMaxExtendFrac,     // members end at the hub face, but are shortened by at most this x their length
+        boolean hubMemberColour,     // node hubs take the widest member's part (rust / steel / pole) instead of colKnuckle
+                                     // (the chord splices where laced members continue always take the chord's)
+        double crossOffsetFrac,      // crossing members closer than frac x (sum of drawn widths) are pushed apart to it
+                                     // (no coplanar faces at X-braces / crossing cables: no z-fighting); 0 = off
+        double crossMinAngle,        // degrees; crossings flatter than this (nearly parallel members) are not offset
         double poleCollarScale,      // pole collar width = scale * pole width + add (brass)
         double poleCollarAdd,
         double poleCollarHeight,
@@ -103,7 +107,7 @@ public record VisualParams(
         return new VisualParams(
                 0.05, 0.30, 0.06, 1.0, 0.09,
                 0.4, 0.035, 1.3, 1.0, 2, 14, 0.15, 0.2,
-                1.05, 0.02, 1.3, true, 1.2, 0.9, 1.4, 0.04, 0.24,
+                1.0, 0.0, 0.45, false, 0.3, 10.0, 1.4, 0.04, 0.24,
                 1.6, 0.5, 0.30, 1.0, 0.65, 0.18, 0.40, 1.0, true, 3.0, 0.9,
                 c(0.40, 0.22, 0.13), c(0.48, 0.47, 0.45), c(0.30, 0.20, 0.14), c(0.55, 0.52, 0.47),
                 c(0.16, 0.15, 0.14), c(0.86, 0.84, 0.76), c(0.70, 0.66, 0.58), c(0.86, 0.84, 0.78),
