@@ -9,6 +9,8 @@ public final class Sections {
 
     public Sections(Consts c) { this.c = c; }
 
+    public Consts consts() { return c; }
+
     private static int clip(int i, int n) { return Math.max(0, Math.min(i, n - 1)); }
 
     /** Drawn outer width. */

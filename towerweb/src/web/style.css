@@ -55,3 +55,5 @@ button.small { padding: 1px 6px; font-size: 11px; }
   #view { height: 60vh; flex: none; }
   #panel { width: 100%; max-width: none; border-left: 0; }
 }
+a.small { font-size: 11px; color: #8ab4f8; margin-right: 4px; }
+#stats .dim { color: #999; font-size: 11px; }

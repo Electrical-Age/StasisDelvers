@@ -1,5 +1,5 @@
 // Web Worker: owns the TeaVM-compiled generator (towergen.js) and the module library.
-// Messages in:  {type: 'init'} | {type: 'build', id, layout, q, visual} | {type: 'random', id, seed}
+// Messages in:  {type: 'init'} | {type: 'build', id, layout, q, visual, solver} | {type: 'random', id, seed}
 // Messages out: {type: 'ready', ...timings} | {type: 'built', id, stats, positions, normals, groups} |
 //               {type: 'error', id, error} | {type: 'random', id, layout}
 import * as tg from './towergen.js';
@@ -57,7 +57,7 @@ onmessage = (e) => {
     } else if (m.type === 'build') {
       if (!ready) { postMessage({ type: 'error', id: m.id, error: 'library not loaded yet' }); return; }
       const t0 = performance.now();
-      const stats = JSON.parse(tg.build(m.layout, m.q, m.visual));
+      const stats = JSON.parse(tg.build(m.layout, m.q, m.visual, m.solver || ''));
       if (stats.error) { postMessage({ type: 'error', id: m.id, error: stats.error }); return; }
       const t1 = performance.now();
       const { P, N, groups } = pack(tg.positions(), tg.normals(), tg.parts());

@@ -5,14 +5,21 @@ import java.util.Map;
 
 /** Ladders, reference curve, constants and load cases from the library header (p3aexport.header()). */
 public final class Consts {
-    public final double[] WEXT, CAB_W, CAB_A, BS_W, WIDTHS, AREAS, RHO_LADDER, S_LADDER;
+    public final double[] CAB_W, CAB_A, BS_W, WIDTHS, AREAS, RHO_LADDER, S_LADDER;
+    /** Strut / laced outer width ladder (SolverParams.extraWidthSteps may extend it). */
+    public double[] WEXT;
     public final int[] L_LADDER, DEPTH_LADDER;
     public final double[] refD, refN, refV, refM;
-    public final double BAY, S_CORE, W_LEG_TARGET, MID_F, M_POLE_MAX, POLE_A, W_POLE_MIN, EMIT_W, EMIT_WIND0, RHO, CD0,
-            SIG_CAB, SIG_T, SIG_C0, L0, E, BS_MIN_L, D_CAP, D_FRAC, BS_T_MIN, BS_CAP, Q_LOW, PRE_MARGIN, TAUT_PRE_MAX,
-            LACE_W, CH_MAX, R_REF;
+    public final double BAY, S_CORE, W_LEG_TARGET, MID_F, M_POLE_MAX, POLE_A, W_POLE_MIN,
+            SIG_CAB, SIG_T, SIG_C0, L0, E, Q_LOW, TAUT_PRE_MAX, LACE_W, CH_MAX, R_REF;
+    /** Overridable by SolverParams (forSpine / forPass): loads, back-stay constants, pretension margin. */
+    public double EMIT_W, EMIT_WIND0, RHO, CD0, BS_MIN_L, D_CAP, D_FRAC, BS_T_MIN, BS_CAP, PRE_MARGIN;
     /** Not in the header: fem.TORQ0 (torsion load at an emitter off the axis). */
-    public final double TORQ0 = 0.4;
+    public double TORQ0 = 0.4;
+    /** Runtime only (SolverParams): back-stays on, sizing utilisation limit, raise iterations, resize rounds. */
+    public boolean BACKSTAYS = true;
+    public double UTIL_LIMIT = 1.0;
+    public int RAISE_ITS = 60, MAX_ROUNDS = 30;
     /** Ladder floors / ratios (N, V, Mg, T) and class tolerances. */
     public final double N_FLOOR, N_R, V_FLOOR, V_R, MG_FLOOR, MG_R, T_FLOOR, T_R, BELOW, CLASS_TOL, CEIL_EPS, DEMAND_EPS;
     /** Load cases: wind unit vector (null for gravity / torsion) and torsion sign. */
@@ -23,6 +30,56 @@ public final class Consts {
     public final int I_SOLID_MAX;
     /** f = 1.5 (NOTES-P3a section 5). */
     public double FIXF = 1.5;
+
+    /** Field-by-field copy (TeaVM-safe; no clone). */
+    private Consts(Consts o) {
+        WEXT = o.WEXT; CAB_W = o.CAB_W; CAB_A = o.CAB_A; BS_W = o.BS_W; WIDTHS = o.WIDTHS; AREAS = o.AREAS;
+        RHO_LADDER = o.RHO_LADDER; S_LADDER = o.S_LADDER; L_LADDER = o.L_LADDER; DEPTH_LADDER = o.DEPTH_LADDER;
+        refD = o.refD; refN = o.refN; refV = o.refV; refM = o.refM;
+        BAY = o.BAY; S_CORE = o.S_CORE; W_LEG_TARGET = o.W_LEG_TARGET; MID_F = o.MID_F; M_POLE_MAX = o.M_POLE_MAX;
+        POLE_A = o.POLE_A; W_POLE_MIN = o.W_POLE_MIN; SIG_CAB = o.SIG_CAB; SIG_T = o.SIG_T; SIG_C0 = o.SIG_C0; L0 = o.L0;
+        E = o.E; Q_LOW = o.Q_LOW; TAUT_PRE_MAX = o.TAUT_PRE_MAX; LACE_W = o.LACE_W; CH_MAX = o.CH_MAX; R_REF = o.R_REF;
+        EMIT_W = o.EMIT_W; EMIT_WIND0 = o.EMIT_WIND0; RHO = o.RHO; CD0 = o.CD0; BS_MIN_L = o.BS_MIN_L; D_CAP = o.D_CAP;
+        D_FRAC = o.D_FRAC; BS_T_MIN = o.BS_T_MIN; BS_CAP = o.BS_CAP; PRE_MARGIN = o.PRE_MARGIN; TORQ0 = o.TORQ0;
+        BACKSTAYS = o.BACKSTAYS; UTIL_LIMIT = o.UTIL_LIMIT; RAISE_ITS = o.RAISE_ITS; MAX_ROUNDS = o.MAX_ROUNDS;
+        FIXF = o.FIXF;
+        N_FLOOR = o.N_FLOOR; N_R = o.N_R; V_FLOOR = o.V_FLOOR; V_R = o.V_R; MG_FLOOR = o.MG_FLOOR; MG_R = o.MG_R;
+        T_FLOOR = o.T_FLOOR; T_R = o.T_R; BELOW = o.BELOW; CLASS_TOL = o.CLASS_TOL; CEIL_EPS = o.CEIL_EPS;
+        DEMAND_EPS = o.DEMAND_EPS; caseWind = o.caseWind; caseTors = o.caseTors; caseName = o.caseName; K = o.K;
+        I_SOLID_MAX = o.I_SOLID_MAX;
+    }
+
+    /** Constants for the spine statics under p (back-stay keys only); this instance if nothing differs. */
+    public Consts forSpine(SolverParams p) {
+        if (p.backstays() == BACKSTAYS && p.backstayMinBoom() == BS_MIN_L && p.backstayDistFactor() == D_FRAC
+                && p.backstayDistCap() == D_CAP && p.backstayMinTension() == BS_T_MIN && p.backstaySecondPair() == BS_CAP)
+            return this;
+        Consts c = new Consts(this);
+        c.BACKSTAYS = p.backstays(); c.BS_MIN_L = p.backstayMinBoom(); c.D_FRAC = p.backstayDistFactor();
+        c.D_CAP = p.backstayDistCap(); c.BS_T_MIN = p.backstayMinTension(); c.BS_CAP = p.backstaySecondPair();
+        return c;
+    }
+
+    /** Constants for the runtime pass and the mesh under p (loads, pretension, limits, ladder); this if unchanged. */
+    public Consts forPass(SolverParams p) {
+        if (p.pretensionFactor() == FIXF && p.pretensionMargin() == PRE_MARGIN && p.raiseIters() == RAISE_ITS
+                && p.maxRounds() == MAX_ROUNDS && p.utilLimit() == UTIL_LIMIT && p.emitterWeight() == EMIT_W
+                && p.emitterWind() == EMIT_WIND0 && p.windDrag() == CD0 && p.torsion() == TORQ0 && p.density() == RHO
+                && p.extraWidthSteps() == 0)
+            return this;
+        Consts c = new Consts(this);
+        c.FIXF = p.pretensionFactor(); c.PRE_MARGIN = p.pretensionMargin(); c.RAISE_ITS = p.raiseIters();
+        c.MAX_ROUNDS = p.maxRounds(); c.UTIL_LIMIT = p.utilLimit(); c.EMIT_W = p.emitterWeight();
+        c.EMIT_WIND0 = p.emitterWind(); c.CD0 = p.windDrag(); c.TORQ0 = p.torsion(); c.RHO = p.density();
+        int n = WEXT.length, x = p.extraWidthSteps();
+        if (x > 0) {
+            double[] w = java.util.Arrays.copyOf(WEXT, n + x);
+            double ratio = WEXT[n - 1] / WEXT[n - 2];
+            for (int i = n; i < n + x; i++) w[i] = Math.rint(w[i - 1] * ratio * 1000) / 1000;
+            c.WEXT = w;
+        }
+        return c;
+    }
 
     public Consts(Map<String, Object> h) {
         WEXT = Json.darr(h.get("WEXT"));

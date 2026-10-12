@@ -1,16 +1,16 @@
 # towerweb: towergen in the browser
 
 A static site (https://towers.brage.info) that runs the mod's tower generator client-side: TeaVM compiles
-`towergen` to an ES module that runs in a Web Worker; three.js draws the mesh. There are editors for layout.json and
-visual.json, a q slider, the 7 golden layouts, a random-layout button (`LayoutGen`, the game rules), stats, errors
-and warnings, and a store-only zip download of both JSON files. Edits stay in `localStorage`; nothing goes to a server.
+`towergen` to an ES module that runs in a Web Worker; three.js draws the mesh. There are editors for layout.json,
+visual.json and solver.json, a q slider, the 7 golden layouts, a random-layout button (`LayoutGen`, the game rules), stats, errors
+and warnings, and a store-only zip download of the three JSON files. Edits stay in `localStorage`; nothing goes to a server.
 
 ## Build and deploy
 - `tools/stasis-build.sh :towerweb:dist` -> `towerweb/dist/` (git-ignored). Copy the directory to the web root.
   No server code, no symlinks. Any static server works.
 - `dist` pulls in: `generateJavaScript` (TeaVM 0.16.0, JS target, ES2015 module, obfuscated) -> `js/towergen.js`;
   `:towergen:libraryBin` -> `data/towerlib.bin` (gzipped TGLB1); `genCodec` -> `data/visual-defaults.json`,
-  `data/visual-doc.json`; `towergen/layouts/*.json` -> `layouts/`; `vendor` (three.js 0.186.1, CodeMirror 5.65.21,
+  `data/visual-doc.json`, `data/solver-defaults.json`, `data/solver-doc.json`; `towergen/layouts/*.json` -> `layouts/`; `vendor` (three.js 0.186.1, CodeMirror 5.65.21,
   minified copies fetched once from jsDelivr into `build/vendor`, MIT, licences copied along) -> `vendor/`; `src/web`.
 - The TeaVM tasks only run when asked for. The root `build` compiles towerweb's Java but does not run TeaVM or `dist`.
 - Local test: `cd towerweb/dist && nix-shell -p python3 --run 'python3 -m http.server 8765'`. Module workers need
@@ -18,14 +18,17 @@ and warnings, and a store-only zip download of both JSON files. Edits stay in `l
 
 ## Code
 - `src/main/java/.../TowerWeb.java`: the exported API (`@JSExport`). `loadLibrary(Int8Array)` takes TGLB1 or
-  p3a JSON bytes (uncompressed). `build(layoutJson, q, visualJson)` returns stats JSON: counts, util, volume, tiers,
-  timings, warnings, bounds, part colours and the viewer keys of visual.json. It returns `{"error": ...}` on bad
+  p3a JSON bytes (uncompressed). `build(layoutJson, q, visualJson, solverJson)` returns stats JSON: counts, util,
+  volume, tiers, wires (stitched / final counts of cables, stays, stay cables, back-stays, plus what the reduction
+  did), timings (incl. `reduce`), warnings (unknown solver keys, reduction fallbacks), bounds, part colours and the viewer keys of visual.json. It returns `{"error": ...}` on bad
   JSON, a layout that breaks the game rules (not built), or a generator exception. Then `positions()`
   (Float32Array, 9 per triangle), `normals()` (one per triangle), `parts()` (Int8Array, `VisualParams.Part` ordinal).
   Also `randomLayout(seed)` and `formatLayout(json)`.
 - `src/gen/java/.../GenCodec.java`: runs on the JVM at build time. TeaVM has no record reflection, so
-  `VisualParams.fromJson` can't run in the browser. GenCodec writes `VisualParamsCodec.java` (an explicit constructor
-  call; type errors name the key), the default visual.json, and the key docs. The docs come from the comments in
+  `VisualParams.fromJson` / `SolverParams.fromJson` can't run in the browser. GenCodec writes `VisualParamsCodec.java`
+  and `SolverParamsCodec.java` (explicit constructor calls; type errors name the key; SolverParams' own constructor
+  checks ranges and xPanels), the defaults and the key docs. SolverParams defaults come from the library header, so
+  GenCodec loads the library (0.5 s). The docs come from the comments in
   `VisualParams.java`, plus an `EXTRA` map for the keys that have none. A new record component is picked up
   automatically; give it a comment.
 - `src/web/js/worker.js`: fetches `data/towerlib.bin` and gunzips it with `DecompressionStream`. It sniffs the gzip
@@ -35,6 +38,15 @@ and warnings, and a store-only zip download of both JSON files. Edits stay in `l
   all from visual.json), OrbitControls, CodeMirror editors (falls back to a textarea), debounced rebuild (350 ms),
   at most one build in flight (the latest edit wins), a JSON error line finder, `window.__tw` for tests.
   `js/zip.js`: store-only zip with CRC32.
+
+## solver.json (2026-10-12)
+Third editor (stacked under visual.json) with a reset button and a help link; stored in `localStorage`
+(`towerweb.solver`) and in the zip. The help lists every key, its default and what it does (from solver-doc.json).
+Tested in headless Chromium (playwright, `/tmp/twtest/test.py`; unset `LD_LIBRARY_PATH` first or the nix
+chrome-headless-shell picks up a newer libasound): unknown key -> warning, bad xPanels -> error naming the key,
+maxStaysPerBoom 2 on H40r3 -> 108 -> 80 stays, util 0.969, 138 ms; the zip holds solver.json; reset restores the
+defaults. maxStaysPerBoom 2 + xPanels single on the presets: H16 2 ms, H24b 20, H40 17, H40r3 122, H40b4 83,
+H64max 1263 ms (falls back to stays only), H100 106 ms. Screenshot: `screenshot-solver.png`.
 
 ## towergen changes made for this
 - `Portable.compare` / `Portable.sha1` replace `Arrays.compare(int[], int[])` and `MessageDigest("SHA-1")`, which the

@@ -14,6 +14,8 @@ import org.erisia.stasis.towergen.LayoutGen;
 import org.erisia.stasis.towergen.Library;
 import org.erisia.stasis.towergen.LibraryBin;
 import org.erisia.stasis.towergen.Mesh;
+import org.erisia.stasis.towergen.SolverParams;
+import org.erisia.stasis.towergen.WireReduction;
 import org.erisia.stasis.towergen.MeshBuilder;
 import org.erisia.stasis.towergen.Stitch;
 import org.erisia.stasis.towergen.TowerGen;
@@ -52,7 +54,7 @@ public final class TowerWeb {
 
     /** Builds a tower; the mesh is then available from positions / normals / parts. */
     @JSExport
-    public static String build(String layoutJson, double q, String visualJson) {
+    public static String build(String layoutJson, double q, String visualJson, String solverJson) {
         last = null;
         if (gen == null) return err("library not loaded");
         List<String> warnings = new ArrayList<>();
@@ -73,6 +75,17 @@ public final class TowerWeb {
         } catch (Throwable t) {
             return err("visual: " + msg(t));
         }
+        SolverParams sp;
+        try {
+            Object tree = solverJson == null || solverJson.isBlank() ? null : Json.parse(solverJson);
+            if (tree != null && !(tree instanceof Map)) throw new IllegalArgumentException("expected a JSON object");
+            Map<String, Object> m = tree == null ? Map.of() : Json.obj(tree);
+            List<String> keys = List.of(SolverParamsCodec.KEYS);
+            for (String k : m.keySet()) if (!keys.contains(k)) warnings.add("solver: unknown key \"" + k + "\" (ignored)");
+            sp = SolverParamsCodec.fromJson(m, gen.c);
+        } catch (Throwable t) {
+            return err("solver: " + msg(t));
+        }
         List<String> bad = layout.violations();
         if (!bad.isEmpty()) {
             Map<String, Object> e = new LinkedHashMap<>();
@@ -82,9 +95,9 @@ public final class TowerWeb {
         try {
             q = Math.max(0.3, Math.min(1.0, q));
             long t0 = System.nanoTime();
-            TowerGen.Result r = gen.build(layout, q);
+            TowerGen.Result r = gen.build(layout, q, sp);
             long t1 = System.nanoTime();
-            Mesh mesh = new MeshBuilder(gen.c, vp).build(r);
+            Mesh mesh = new MeshBuilder(r.c, vp).build(r);
             long t2 = System.nanoTime();
             last = mesh;
             return stats(r, mesh, vp, warnings, (t1 - t0) / 1e6, (t2 - t1) / 1e6);
@@ -168,6 +181,20 @@ public final class TowerWeb {
         m.put("laced", (double) laced);
         m.put("cables", (double) cables);
         m.put("backstays", (double) bs);
+        Map<String, Object> wires = new LinkedHashMap<>();
+        wires.put("stitched", counts(WireReduction.Counts.of(r.raw)));
+        wires.put("final", counts(WireReduction.Counts.of(t)));
+        if (r.reduction != null) {
+            Map<String, Object> red = new LinkedHashMap<>();
+            red.put("xSingled", (double) r.reduction.xSingled);
+            red.put("xRestored", (double) r.reduction.xRestored);
+            red.put("bayCablesToStruts", (double) r.reduction.bayConverted);
+            red.put("staysRemoved", (double) r.reduction.staysRemoved);
+            red.put("staysPutBack", (double) r.reduction.staysReadded);
+            red.put("analyses", (double) r.reduction.analyses);
+            wires.put("reduction", red);
+        }
+        m.put("wires", wires);
         m.put("triangles", (double) mesh.tris);
         double util = r.analysis != null ? r.analysis.maxUtil : Double.NaN;
         m.put("util", Double.isNaN(util) ? null : util);
@@ -181,12 +208,14 @@ public final class TowerWeb {
         m.put("tiers", tiers);
         Map<String, Object> tm = new LinkedHashMap<>();
         tm.put("statics", r.msStatics());
+        tm.put("reduce", r.msReduce());
         tm.put("pass", r.msPass());
         tm.put("mesh", msMesh);
         tm.put("total", msGen + msMesh);
         m.put("ms", tm);
+        warnings.addAll(r.warnings);
         if (r.analysis == null) warnings.add("the structure is a mechanism (singular stiffness); drawn without force colours");
-        else if (util > 1.001)
+        else if (util > r.c.UTIL_LIMIT + 1e-3 && r.solver == null)
             warnings.add(String.format("over the member catalogue: max utilisation %.2f > 1 (tall tower with long booms; the game would need to reject or simplify it)", util));
         for (String s : r.bayTiers)
             if (s.startsWith("ring_near") || s.equals("patch")) { warnings.add("some bays use last-resort library tiers (" + s + ")"); break; }
@@ -218,6 +247,15 @@ public final class TowerWeb {
         view.put("groundGrid", vp.groundGrid());
         m.put("view", view);
         return Json.write(m);
+    }
+
+    private static Map<String, Object> counts(WireReduction.Counts c) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("cables", (double) c.cables());
+        m.put("stays", (double) c.stays());
+        m.put("stayCables", (double) c.stayCables());
+        m.put("backstays", (double) c.backstays());
+        return m;
     }
 
     private static List<Object> rgb(double[] a) {

@@ -21,18 +21,22 @@ import org.erisia.stasis.towergen.Mesh;
 import org.erisia.stasis.towergen.MeshBuilder;
 import org.erisia.stasis.towergen.Stitch;
 import org.erisia.stasis.towergen.TowerGen;
+import org.erisia.stasis.towergen.SolverParams;
 import org.erisia.stasis.towergen.VisualParams;
+import org.erisia.stasis.towergen.WireReduction;
 
 /**
  * towerview: standalone tower viewer.
  * <pre>
  *   towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close,wide,legs] [--orbit N]
- *                    [--size 1280x720] [--ss 2] [--params visual.json] [--name TAG] [--lib library.json.gz]
- *   towerview view LAYOUT.json [--q 1.0] [--params visual.json]      interactive window (LWJGL / GLFW)
+ *                    [--size 1280x720] [--ss 2] [--params visual.json] [--solver solver.json] [--name TAG]
+ *                    [--lib library.json.gz]
+ *   towerview view LAYOUT.json [--q 1.0] [--params visual.json] [--solver solver.json]   interactive window
+ *   towerview solver                                                   print the default solver parameters
  *   towerview contact OUT.png [--cols 3] [--width 1920] IMG...         contact sheet
  *   towerview params                                                   print the default visual parameters
- *   towerview info LAYOUT.json [--q 1.0]                               keys, lookup tiers, util, timings
- *   towerview obj LAYOUT.json OUT.obj [--q 1.0] [--params visual.json] Wavefront OBJ export
+ *   towerview info LAYOUT.json [--q 1.0] [--solver solver.json]        keys, lookup tiers, util, wires, timings
+ *   towerview obj LAYOUT.json OUT.obj [--q 1.0] [--params visual.json] [--solver solver.json]  Wavefront OBJ
  * </pre>
  * Layout JSON: {"H": 40, "booms": [[10, "E", 16], ...]}.
  */
@@ -55,11 +59,12 @@ public final class Main {
             }
             case "contact" -> contact(pos, opt);
             case "params" -> System.out.print(Json.writePretty(VisualParams.defaults().toJson()));
+            case "solver" -> System.out.print(Json.writePretty(SolverParams.defaults(gen(opt).c).toJson()));
             case "info" -> info(pos, opt);
             case "obj" -> {
                 TowerGen g = gen(opt);
-                TowerGen.Result r = g.build(Layout.read(Path.of(pos.get(0))), Double.parseDouble(opt.getOrDefault("q", "1.0")));
-                Mesh m = new MeshBuilder(g.c, params(opt)).build(r);
+                TowerGen.Result r = g.build(Layout.read(Path.of(pos.get(0))), Double.parseDouble(opt.getOrDefault("q", "1.0")), solver(g, opt));
+                Mesh m = new MeshBuilder(r.c, params(opt)).build(r);
                 Files.writeString(Path.of(pos.get(1)), m.toObj());
                 System.out.println("wrote " + pos.get(1) + " (" + m.tris + " triangles)");
             }
@@ -69,17 +74,23 @@ public final class Main {
 
     static void usage() {
         System.out.println("""
-                towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close] [--orbit N] [--size 1280x720] [--ss 2] [--params visual.json] [--name TAG]
-                towerview view LAYOUT.json [--q 1.0] [--params visual.json]
+                towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close] [--orbit N] [--size 1280x720] [--ss 2] [--params visual.json] [--solver solver.json] [--name TAG]
+                towerview view LAYOUT.json [--q 1.0] [--params visual.json] [--solver solver.json]
                 towerview contact OUT.png [--cols 3] [--width 1920] IMG...
                 towerview params
-                towerview info LAYOUT.json [--q 1.0]
-                towerview obj LAYOUT.json OUT.obj [--q 1.0]""");
+                towerview solver
+                towerview info LAYOUT.json [--q 1.0] [--solver solver.json]
+                towerview obj LAYOUT.json OUT.obj [--q 1.0] [--solver solver.json]""");
     }
 
     static TowerGen gen(Map<String, String> opt) throws IOException {
         Library lib = opt.containsKey("lib") ? Library.load(Path.of(opt.get("lib"))) : Library.shared();
         return new TowerGen(lib);
+    }
+
+    /** --solver FILE (null = the plain generator). */
+    static SolverParams solver(TowerGen g, Map<String, String> opt) throws IOException {
+        return opt.containsKey("solver") ? SolverParams.load(Path.of(opt.get("solver")), g.c) : null;
     }
 
     static VisualParams params(Map<String, String> opt) throws IOException {
@@ -153,13 +164,14 @@ public final class Main {
         int ss = Integer.parseInt(opt.getOrDefault("ss", "2"));
         VisualParams vp = params(opt);
         TowerGen gen = gen(opt);
-        TowerGen.Result r = gen.build(layout, q);
+        TowerGen.Result r = gen.build(layout, q, solver(gen, opt));
         long m0 = System.nanoTime();
-        Mesh mesh = new MeshBuilder(gen.c, vp).build(r);
+        Mesh mesh = new MeshBuilder(r.c, vp).build(r);
         double msMesh = (System.nanoTime() - m0) / 1e6;
         System.out.printf("%s q%.1f: %d nodes %d members, util %.3f, slack %.4f, vol %.1f -> %.1f, rounds %d; statics %.1f ms, pass %.1f ms, mesh %.1f ms (%d triangles)%n",
                 name, q, r.tower.n, r.tower.m, r.analysis.maxUtil, r.analysis.minSlack, r.info.volRaw, r.info.vol, r.info.rounds,
                 r.msStatics(), r.msPass(), msMesh, mesh.tris);
+        printWires(r);
         String cap = caption(name, r);
         Raster ras = new Raster(W, H, ss, vp);
         Map<String, Raster.Camera> cams = cams(r, vp.fovDeg());
@@ -200,7 +212,7 @@ public final class Main {
         System.out.println("layout " + layout + (layout.violations().isEmpty() ? "" : "  RULE VIOLATIONS " + layout.violations()));
         TowerGen.Result r;
         try {
-            r = g.build(layout, q);
+            r = g.build(layout, q, solver(g, opt));
         } catch (RuntimeException ex) {
             for (var s : r0.spine.specs)
                 System.out.printf("  bay y%3d-%3d r%d %-14s kk%d key %s%n", s.y0, s.y1, s.r, s.tier, s.kk, java.util.Arrays.toString(s.seamKey));
@@ -215,6 +227,13 @@ public final class Main {
         System.out.printf("  util %.4f (raw %.3f) per case %s%n  min taut margin %.4f, vol %.2f -> %.2f, rounds %d, converted %d, leg fixes %d%n  statics+lookup+stitch %.1f ms, runtime pass %.1f ms%n",
                 r.analysis.maxUtil, r.info.rawUtil, java.util.Arrays.toString(r.analysis.utilPerCase), r.analysis.minSlack,
                 r.info.volRaw, r.info.vol, r.info.rounds, r.info.converted, r.info.legFix, r.msStatics(), r.msPass());
+        printWires(r);
+    }
+
+    static void printWires(TowerGen.Result r) {
+        System.out.println("  wires: " + WireReduction.Counts.of(r.tower) + (r.reduced != r.raw || r.reduction != null
+                ? "  (stitched: " + WireReduction.Counts.of(r.raw) + "; reduction " + String.format("%.1f", r.msReduce()) + " ms)" : ""));
+        for (String w : r.warnings) System.out.println("  warning: " + w);
     }
 
     static void contact(List<String> pos, Map<String, String> opt) throws IOException {

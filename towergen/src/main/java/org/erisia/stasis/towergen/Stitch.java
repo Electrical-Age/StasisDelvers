@@ -27,6 +27,8 @@ public final class Stitch {
         public List<int[]> legs = new ArrayList<>();
         public List<String> variants = new ArrayList<>();
         public int ghost;
+        /** Per boom: the stitched node ids of its mast anchor node(s) (where the stays meet the mast). */
+        public int[][] boomAnchors = new int[0][];
 
         public double[] node(int i) { return new double[]{P[3 * i], P[3 * i + 1], P[3 * i + 2]}; }
 
@@ -36,8 +38,34 @@ public final class Stitch {
             t.bi = bi.clone(); t.bj = bj.clone(); t.kind = kind.clone(); t.ws = ws.clone(); t.cs = cs.clone();
             t.pole = pole.clone(); t.floor = floor.clone(); t.ownerType = ownerType.clone(); t.ownerIdx = ownerIdx.clone();
             t.poleChain = poleChain; t.pw = pw.clone(); t.fixed = fixed; t.em = em; t.ground = ground; t.legs = legs;
-            t.variants = variants; t.ghost = ghost;
+            t.variants = variants; t.ghost = ghost; t.boomAnchors = boomAnchors;
             return t;
+        }
+
+        /** A copy holding only the members with keep[b] (same nodes, same order otherwise). */
+        public Tower subset(boolean[] keep) {
+            Tower t = copy();
+            int q = 0;
+            for (int b = 0; b < m; b++) {
+                if (!keep[b]) continue;
+                t.bi[q] = bi[b]; t.bj[q] = bj[b]; t.kind[q] = kind[b]; t.ws[q] = ws[b]; t.cs[q] = cs[b];
+                t.pole[q] = pole[b]; t.floor[q] = floor[b]; t.ownerType[q] = ownerType[b]; t.ownerIdx[q] = ownerIdx[b];
+                q++;
+            }
+            t.m = q;
+            t.bi = Arrays.copyOf(t.bi, q); t.bj = Arrays.copyOf(t.bj, q); t.kind = Arrays.copyOf(t.kind, q);
+            t.ws = Arrays.copyOf(t.ws, q); t.cs = Arrays.copyOf(t.cs, q); t.pole = Arrays.copyOf(t.pole, q);
+            t.floor = Arrays.copyOf(t.floor, q); t.ownerType = Arrays.copyOf(t.ownerType, q);
+            t.ownerIdx = Arrays.copyOf(t.ownerIdx, q);
+            return t;
+        }
+
+        /** True if member b is a stay of its boom (a boom member with one end at the boom's mast anchor). */
+        public boolean isStay(int b) {
+            if (ownerType[b] != 1 || ownerIdx[b] >= boomAnchors.length) return false;
+            boolean a = false, z = false;
+            for (int x : boomAnchors[ownerIdx[b]]) { if (x == bi[b]) a = true; if (x == bj[b]) z = true; }
+            return a != z;
         }
 
         public double length(int b) {
@@ -147,6 +175,7 @@ public final class Stitch {
         List<Integer> em = new ArrayList<>();
         em.add(B.node(new double[]{0, H, 0}));
         List<Integer> ground = new ArrayList<>();
+        int[][] banch = new int[sp.booms.size()][];
         for (int k = 0; k < sp.booms.size(); k++) {
             Spine.BoomInfo bo = sp.booms.get(k);
             Library.Entry be = bo.entry;
@@ -172,6 +201,8 @@ public final class Stitch {
                 }
                 loc[i] = B.node(pw);
             }
+            banch[k] = new int[be.anchors.length];
+            for (int i = 0; i < be.anchors.length; i++) banch[k][i] = loc[be.anchors[i]];
             for (int m = 0; m < v.m(); m++) {
                 bars.add(new int[]{loc[v.mi[m]], loc[v.mj[m]]});
                 state.add(new int[]{v.kind[m], v.ws[m], v.cs[m], 1, k});
@@ -258,6 +289,7 @@ public final class Stitch {
         t.ground = ground.stream().mapToInt(Integer::intValue).toArray();
         t.legs = legs;
         t.variants = vlist;
+        t.boomAnchors = banch;
         return t;
     }
 

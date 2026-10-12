@@ -27,6 +27,8 @@ public final class RuntimePass {
         public int raiseIters, nFree, nCab;
         /** Non-null if the taut stiffness was singular (where). */
         public String mechanism;
+        /** Node at the singular pivot (or the zero-stiffness DOF), -1 if unknown. */
+        public int mechNode = -1;
     }
 
     /** Profile Cholesky factor of the scaled stiffness (per analysis; the pass object holds no per-tower state). */
@@ -42,9 +44,11 @@ public final class RuntimePass {
 
     private final Consts c;
     private final Sections sec;
-    public int maxRounds = 30, raiseIts = 60;
+    public int maxRounds, raiseIts;
 
-    public RuntimePass(Consts c) { this.c = c; this.sec = new Sections(c); }
+    public RuntimePass(Consts c) { this.c = c; this.sec = new Sections(c); maxRounds = c.MAX_ROUNDS; raiseIts = c.RAISE_ITS; }
+
+    public Consts consts() { return c; }
 
     // ------------------------------------------------------------------ analysis (analyze_v, mode fixf)
     /** Analysis, or null if the taut structure is a mechanism. Thread-safe (no shared mutable state). */
@@ -53,11 +57,15 @@ public final class RuntimePass {
         return a.mechanism != null ? null : a;
     }
 
-    private static Analysis mech(String why) {
+    private static Analysis mech(String why, int node) {
         Analysis a = new Analysis();
         a.mechanism = why;
+        a.mechNode = node;
         return a;
     }
+
+    /** Analysis including the mechanism case (mechanism / mechNode set, nothing else filled). */
+    public Analysis analyzeOrMechanism(Stitch.Tower t) { return analyzeFull(t); }
 
     private Analysis analyzeFull(Stitch.Tower t) {
         int n = t.n, m = t.m, K = c.K;
@@ -141,7 +149,13 @@ public final class RuntimePass {
             for (int j = 0; j < nf; j++) Kf[ri + j] /= si * sc[j];
             dmax = Math.max(dmax, Kf[ri + i]); dmin = Math.min(dmin, Kf[ri + i]);
         }
-        if (nf > 0 && dmin <= 1e-9 * dmax) return mech("zero stiffness DOF");
+        if (nf > 0 && dmin <= 1e-9 * dmax) {
+            int bad = 0;
+            for (int i = 0; i < nf; i++) if (Kf[i * nf + i] <= 1e-9 * dmax) { bad = i; break; }
+            int nd = -1;
+            for (int i = 0; i < n; i++) if (dof[i] >= 0 && dof[i] <= bad && bad < dof[i] + 3) nd = i;
+            return mech("zero stiffness DOF at node " + nd, nd);
+        }
         // profile of the lower triangle (nodes are numbered bay by bay, so K is nearly banded)
         int[] first = new int[nf], last = new int[nf];
         for (int i = 0; i < nf; i++) {
@@ -156,7 +170,7 @@ public final class RuntimePass {
         if (bad >= 0) {
             int nd = -1;
             for (int i = 0; i < n; i++) if (dof[i] >= 0 && dof[i] <= bad && bad < dof[i] + 3) nd = i;
-            return mech("pivot at node " + nd + (nd >= 0 ? " " + Arrays.toString(t.node(nd)) : ""));
+            return mech("pivot at node " + nd + (nd >= 0 ? " " + Arrays.toString(t.node(nd)) : ""), nd);
         }
         // loads
         double[][] F = new double[K][nf];
@@ -330,7 +344,7 @@ public final class RuntimePass {
     /** size_member (never shrinks); returns true if (kind, ws, cs) changed. */
     boolean sizeMember(Stitch.Tower t, int i, double Nt, double Nc, double L) {
         int k0 = t.kind[i], w0 = t.ws[i], c0 = t.cs[i];
-        double nt = Nt * 1.04, nc = Nc * 1.04;
+        double nt = Nt * 1.04 / c.UTIL_LIMIT, nc = Nc * 1.04 / c.UTIL_LIMIT;
         if (k0 == 1) {
             int j = firstGE(c.CAB_A, nt / c.SIG_CAB);
             if (j < c.CAB_A.length) t.ws[i] = Math.max(j, w0);
@@ -395,16 +409,16 @@ public final class RuntimePass {
                 nch += sizeMember(t, b, Math.max(an.Nt[b], an.t[b] / c.TAUT_PRE_MAX), 0, an.L[b]) ? 1 : 0;
         }
         for (int b = 0; b < t.m; b++)
-            if (an.util[b] > 1.0) nch += sizeMember(t, b, an.Nt[b], an.Nc[b], an.L[b]) ? 1 : 0;
+            if (an.util[b] > c.UTIL_LIMIT) nch += sizeMember(t, b, an.Nt[b], an.Nc[b], an.L[b]) ? 1 : 0;
         double pkMax = 0;
         for (double v : an.pk) pkMax = Math.max(pkMax, v);
-        if (an.pk.length > 0 && pkMax > 1.0) {
+        if (an.pk.length > 0 && pkMax > c.UTIL_LIMIT) {
             int[] pc = t.poleChain;
             for (int k = 0; k < an.pk.length; k++) {
                 double v = an.pk[k];
-                if (v > 1.0) {
+                if (v > c.UTIL_LIMIT) {
                     int nk = k + 1;
-                    double w = t.pw[nk] * Math.cbrt(v) * 1.03;
+                    double w = t.pw[nk] * Math.cbrt(v / c.UTIL_LIMIT) * 1.03;
                     int i = Consts.searchLeft(c.WIDTHS, w - 1e-9);
                     t.pw[nk] = c.WIDTHS[Math.min(i, c.WIDTHS.length - 1)];
                 }
@@ -504,7 +518,7 @@ public final class RuntimePass {
         if (an.mechanism != null) throw new MechanismException("final analysis singular: " + an.mechanism);
         info.rounds = w[0]; info.converted = w[1]; info.bumps = w[2]; info.legFix = nfix;
         info.vol = volume(t);
-        info.pass = an.maxUtil <= 1.0 + 1e-6 && an.minSlack >= -1e-6;
+        info.pass = an.maxUtil <= c.UTIL_LIMIT + 1e-6 && an.minSlack >= -1e-6;
         info.tPassNs = System.nanoTime() - t0;
         if (finalOut != null) finalOut[0] = an;
         return t;

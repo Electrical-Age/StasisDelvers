@@ -16,7 +16,7 @@ repositories {
 }
 
 sourceSets {
-    gen   // build-time generator (JVM): VisualParamsCodec.java, visual defaults and key docs
+    gen   // build-time generator (JVM): VisualParamsCodec.java, SolverParamsCodec.java, defaults and key docs
 }
 
 def genJava = layout.buildDirectory.dir('generated/sources/codec/java')
@@ -35,12 +35,14 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 def genCodec = tasks.register('genCodec', JavaExec) {
-    description = 'Generates VisualParamsCodec.java and the visual.json defaults / docs'
+    description = 'Generates VisualParamsCodec.java / SolverParamsCodec.java and the visual.json / solver.json defaults and docs'
     classpath = sourceSets.gen.runtimeClasspath
     mainClass = 'org.erisia.stasis.towerweb.GenCodec'
+    maxHeapSize = '2g'
     def src = project(':towergen').file('src/main/java/org/erisia/stasis/towergen/VisualParams.java')
     inputs.files(sourceSets.gen.runtimeClasspath)
     inputs.file(src)
+    inputs.file(project(':towergen').file('src/main/java/org/erisia/stasis/towergen/SolverParams.java'))
     outputs.dir(genJava)
     outputs.dir(genWeb)
     args src.absolutePath, genJava.get().asFile.absolutePath, genWeb.get().asFile.absolutePath

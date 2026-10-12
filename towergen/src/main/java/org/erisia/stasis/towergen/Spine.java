@@ -548,6 +548,7 @@ public final class Spine {
                                             List<List<double[][]>> gravByBoom, int[] ya, List<BsInfo> infos) {
         List<List<Wire>> res = new ArrayList<>();
         for (int i = 0; i < booms.size(); i++) { res.add(new ArrayList<>()); infos.add(null); }
+        if (!c.BACKSTAYS) return res;
         List<BSpec> bspec = new ArrayList<>();
         for (int bi = 0; bi < booms.size(); bi++)
             if (booms.get(bi).length() >= c.BS_MIN_L) bspec.add(new BSpec(bi, booms.get(bi).dir(), ya[bi]));

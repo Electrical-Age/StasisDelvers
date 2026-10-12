@@ -5,7 +5,7 @@ import { makeZip } from './zip.js';
 
 const PRESETS = ['H16', 'H24b', 'H40', 'H40r3', 'H40b4', 'H64max', 'H100'];
 const DEFAULT_PRESET = 'H40r3';
-const LS = { layout: 'towerweb.layout', visual: 'towerweb.visual', q: 'towerweb.q', preset: 'towerweb.preset' };
+const LS = { layout: 'towerweb.layout', visual: 'towerweb.visual', solver: 'towerweb.solver', q: 'towerweb.q', preset: 'towerweb.preset' };
 const $ = (id) => document.getElementById(id);
 
 // exposed for tests / the console
@@ -230,7 +230,7 @@ renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, came
 
 // ------------------------------------------------------------------ state, worker
 const state = { preset: localStorage.getItem(LS.preset) || DEFAULT_PRESET, q: +(localStorage.getItem(LS.q) || 1) };
-const defaults = { layouts: {}, visual: '' };
+const defaults = { layouts: {}, visual: '', solver: '' };
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 let busy = false, pending = null, nextId = 1, timer = null, randomCb = null, statusNote = '';
 
@@ -248,17 +248,20 @@ function scheduleBuild(delay = 350) {
 }
 
 function requestBuild() {
-  const lt = edLayout.get(), vt = edVisual.get();
+  const lt = edLayout.get(), vt = edVisual.get(), st = edSolver.get();
   localStorage.setItem(LS.layout, lt);
   localStorage.setItem(LS.visual, vt);
+  localStorage.setItem(LS.solver, st);
   localStorage.setItem(LS.q, String(state.q));
   localStorage.setItem(LS.preset, state.preset);
   const pl = parseJson(lt, 'layout.json'), pv = vt.trim() ? parseJson(vt, 'visual.json') : { value: {} };
   edLayout.markError(pl.error ? pl.line : null);
+  const ps = st.trim() ? parseJson(st, 'solver.json') : { value: {} };
   edVisual.markError(pv.error ? pv.line : null);
-  const errs = [pl.error, pv.error].filter(Boolean);
+  edSolver.markError(ps.error ? ps.line : null);
+  const errs = [pl.error, pv.error, ps.error].filter(Boolean);
   if (errs.length) { pending = null; showErrors(errs, []); setStatus('not rebuilt: fix the JSON'); return; }
-  pending = { type: 'build', layout: lt, q: state.q, visual: vt };
+  pending = { type: 'build', layout: lt, q: state.q, visual: vt, solver: st };
   pump();
 }
 
@@ -270,7 +273,7 @@ function pump() {
   m.t0 = performance.now();
   inflight = m;
   setStatus('building…');
-  worker.postMessage({ type: m.type, id: m.id, layout: m.layout, q: m.q, visual: m.visual });
+  worker.postMessage({ type: m.type, id: m.id, layout: m.layout, q: m.q, visual: m.visual, solver: m.solver });
 }
 let inflight = null;
 
@@ -294,7 +297,7 @@ worker.onmessage = (e) => {
       showMesh(m);
       showStats(m.stats);
       showErrors([], m.stats.warnings);
-      setStatus(statusNote + `built in ${m.stats.ms.total.toFixed(0)} ms (generator ${(m.stats.ms.statics + m.stats.ms.pass).toFixed(0)} ms, mesh ${m.stats.ms.mesh.toFixed(0)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
+      setStatus(statusNote + `built in ${m.stats.ms.total.toFixed(0)} ms (generator ${(m.stats.ms.statics + m.stats.ms.reduce + m.stats.ms.pass).toFixed(0)} ms, mesh ${m.stats.ms.mesh.toFixed(0)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
       console.log(`[towerweb] built H${m.stats.H} q${m.stats.q}: ${m.stats.triangles} triangles, util ${m.stats.util?.toFixed(3)}, statics ${m.stats.ms.statics.toFixed(1)} ms, pass ${m.stats.ms.pass.toFixed(1)} ms, mesh ${m.stats.ms.mesh.toFixed(1)} ms, round trip ${wall.toFixed(0)} ms`);
     } else {
       T.errors.push(m.error);
@@ -306,6 +309,17 @@ worker.onmessage = (e) => {
   }
 };
 
+// wire counts: final tower, and the stitched (library) tower if different
+function wiresRow(w) {
+  const f = w.final, r = w.stitched;
+  const one = (c) => `${c.cables} cables, ${c.stays} stays (${c.stayCables} cables), ${c.backstays} back-stays`;
+  let h = one(f);
+  if (f.cables !== r.cables || f.stays !== r.stays || f.backstays !== r.backstays) h += `<br><span class="dim">stitched: ${one(r)}</span>`;
+  const x = w.reduction;
+  if (x) h += `<br><span class="dim">reduction: ${x.xSingled} X pairs → 1 strut${x.xRestored ? ` (${x.xRestored} put back)` : ''}, ${x.bayCablesToStruts} bay cables → struts, stays −${x.staysRemoved} +${x.staysPutBack}</span>`;
+  return h;
+}
+
 function fmt(x, d = 0) { return x == null || Number.isNaN(x) ? '–' : x.toFixed(d); }
 function showStats(s) {
   const tiers = Object.entries(s.tiers).map(([k, v]) => `${k} ×${v}`).join(', ');
@@ -315,12 +329,12 @@ function showStats(s) {
     ['Layout', `H ${s.H}, ${s.booms} boom${s.booms === 1 ? '' : 's'}, q ${fmt(s.q, 2)}`],
     ['Nodes / members', `${s.nodes} / ${s.members}`],
     ['Struts', `${s.struts} (${s.laced} laced)`],
-    ['Cables', `${s.cables}${s.backstays ? `, ${s.backstays} back-stays` : ''}`],
+    ['Wires', wiresRow(s.wires)],
     ['Max utilisation', util],
     ['Steel volume', `${fmt(s.volume, 1)} (raw ${fmt(s.volumeRaw, 1)}), ${s.rounds} resize rounds`],
     ['Library tiers', tiers],
     ['Triangles', `${s.triangles}`],
-    ['Time', `statics+lookup+stitch ${fmt(s.ms.statics, 1)} ms, pass ${fmt(s.ms.pass, 1)} ms, mesh ${fmt(s.ms.mesh, 1)} ms`],
+    ['Time', `statics+lookup+stitch ${fmt(s.ms.statics, 1)} ms, ${s.wires.reduction ? `wire reduction ${fmt(s.ms.reduce, 1)} ms, ` : ''}pass ${fmt(s.ms.pass, 1)} ms, mesh ${fmt(s.ms.mesh, 1)} ms`],
   ];
   $('stats').innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('');
 }
@@ -328,6 +342,7 @@ function showStats(s) {
 // ------------------------------------------------------------------ controls
 const edLayout = makeEditor($('edLayout'), () => { statusNote = ''; scheduleBuild(); });
 const edVisual = makeEditor($('edVisual'), () => { statusNote = ''; scheduleBuild(); });
+const edSolver = makeEditor($('edSolver'), () => { statusNote = ''; scheduleBuild(); });
 
 const sel = $('preset');
 for (const p of PRESETS) { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); }
@@ -357,11 +372,14 @@ $('resetLayout').addEventListener('click', () => {
   setPreset(PRESETS.includes(state.preset) ? state.preset : DEFAULT_PRESET); framedKey = null; requestBuild();
 });
 $('resetVisual').addEventListener('click', () => { edVisual.set(defaults.visual); requestBuild(); });
+$('solverHelpLink').addEventListener('click', () => { $('help').open = true; });
+$('resetSolver').addEventListener('click', () => { edSolver.set(defaults.solver); requestBuild(); });
 const q = $('q');
 function setQ(v) { state.q = v; q.value = v; $('qval').textContent = (+v).toFixed(2); }
 q.addEventListener('input', () => { setQ(+q.value); scheduleBuild(150); });
 $('zip').addEventListener('click', () => {
-  const blob = makeZip([{ name: 'layout.json', data: edLayout.get() }, { name: 'visual.json', data: edVisual.get() }]);
+  const blob = makeZip([{ name: 'layout.json', data: edLayout.get() }, { name: 'visual.json', data: edVisual.get() },
+    { name: 'solver.json', data: edSolver.get() }]);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'tower-json.zip';
@@ -371,7 +389,18 @@ $('zip').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ help
 function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
-function helpHtml(doc) {
+function keyTable(doc) {
+  let h = '<table>', sec = null;
+  for (const e of doc) {
+    if (e.section !== sec) { sec = e.section; h += `<tr class="sec"><td colspan="3">${esc(sec)}</td></tr>`; }
+    const def = Array.isArray(e.default) ? `[${e.default.join(', ')}]`
+      : typeof e.default === 'number' ? String(+e.default.toPrecision(6)) : typeof e.default === 'string' ? `"${e.default}"` : String(e.default);
+    h += `<tr><td>${esc(e.key)}</td><td>${esc(def)}</td><td>${esc(e.doc)}</td></tr>`;
+  }
+  return h + '</table>';
+}
+
+function helpHtml(doc, sdoc) {
   let h = `<p><b>layout.json</b>: <code>{"H": 40, "booms": [[10, "E", 16], ...]}</code>.
   <code>H</code> is the mast height above the core (4&ndash;100 blocks). Each boom is
   <code>[y, direction, length]</code>: attachment height <code>y</code> (2&ndash;H&minus;2), direction
@@ -383,14 +412,16 @@ function helpHtml(doc) {
   capacity. Tall towers with long booms can exceed the member catalogue: the stats then show a utilisation above 1.</p>
   <p><b>visual.json</b> sets the mesh proportions and colours (missing keys keep their defaults, sizes in blocks,
   colours <code>[r, g, b]</code> in 0..1). Compression struts are drawn in <code>colRust</code>, tension struts in
-  <code>colSteel</code>. Keys:</p><table>`;
-  let sec = null;
-  for (const e of doc) {
-    if (e.section !== sec) { sec = e.section; h += `<tr class="sec"><td colspan="3">${esc(sec)}</td></tr>`; }
-    const def = Array.isArray(e.default) ? `[${e.default.join(', ')}]` : String(e.default);
-    h += `<tr><td>${esc(e.key)}</td><td>${esc(def)}</td><td>${esc(e.doc)}</td></tr>`;
-  }
-  return h + '</table><p>Source: the Stasis Delvers mod, <code>towergen</code> (pure Java), compiled with TeaVM.</p>';
+  <code>colSteel</code>. Keys:</p>` + keyTable(doc);
+  h += `<p id="solverhelp"><b>solver.json</b> sets the runtime solver: fewer wires (stays on the booms, X cable
+  panels in the mast), the back-stays, the pretension, the sizing loop, the loads of the runtime check and the member
+  catalogue. The library modules stay as solved offline; the runtime pass then re-sizes every member for the changed
+  tower. The defaults are the normal generator. Missing keys keep their defaults. A removal that would let the
+  tower fold is undone member by member, and if the reduced tower cannot be sized within the catalogue the generator
+  falls back to a smaller reduction or none; the warnings say what happened. Booms are flat trusses, so each boom
+  node needs a stay of its own: <code>maxStaysPerBoom</code> below about one per boom node is not reachable. Keys:</p>`
+    + keyTable(sdoc);
+  return h + '<p>Source: the Stasis Delvers mod, <code>towergen</code> (pure Java), compiled with TeaVM.</p>';
 }
 
 // ------------------------------------------------------------------ start
@@ -398,15 +429,17 @@ T.t0 = performance.now();
 worker.postMessage({ type: 'init' });
 (async () => {
   const get = async (u) => { const r = await fetch(u); if (!r.ok) throw new Error(`${u}: HTTP ${r.status}`); return r.text(); };
-  const [vis, doc, ...lays] = await Promise.all([get('data/visual-defaults.json'), get('data/visual-doc.json'),
-    ...PRESETS.map((p) => get(`layouts/${p}.json`))]);
+  const [vis, doc, sol, sdoc, ...lays] = await Promise.all([get('data/visual-defaults.json'), get('data/visual-doc.json'),
+    get('data/solver-defaults.json'), get('data/solver-doc.json'), ...PRESETS.map((p) => get(`layouts/${p}.json`))]);
   defaults.visual = vis;
+  defaults.solver = sol;
   PRESETS.forEach((p, i) => { defaults.layouts[p] = prettyLayout(lays[i]); });
-  $('helptext').innerHTML = helpHtml(JSON.parse(doc));
-  const savedL = localStorage.getItem(LS.layout), savedV = localStorage.getItem(LS.visual);
+  $('helptext').innerHTML = helpHtml(JSON.parse(doc), JSON.parse(sdoc));
+  const savedL = localStorage.getItem(LS.layout), savedV = localStorage.getItem(LS.visual), savedS = localStorage.getItem(LS.solver);
   sel.value = PRESETS.includes(state.preset) ? state.preset : 'custom';
   edLayout.set(savedL ?? defaults.layouts[PRESETS.includes(state.preset) ? state.preset : DEFAULT_PRESET]);
   edVisual.set(savedV ?? defaults.visual);
+  edSolver.set(savedS ?? defaults.solver);
   setQ(state.q);
   clearTimeout(timer);
   requestBuild();

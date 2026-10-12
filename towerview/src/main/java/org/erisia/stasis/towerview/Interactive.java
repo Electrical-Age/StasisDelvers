@@ -17,7 +17,9 @@ import org.erisia.stasis.towergen.Library;
 import org.erisia.stasis.towergen.Mesh;
 import org.erisia.stasis.towergen.MeshBuilder;
 import org.erisia.stasis.towergen.TowerGen;
+import org.erisia.stasis.towergen.SolverParams;
 import org.erisia.stasis.towergen.VisualParams;
+import org.erisia.stasis.towergen.WireReduction;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
@@ -28,18 +30,19 @@ import org.lwjgl.opengl.GL;
  *   <li>left drag: orbit; right drag: move the target up / down; wheel: zoom;</li>
  *   <li>Q / A: q +/- 0.1; 1: q = 1; 3: q = 0.3; R: rebuild now; S: save a PNG with the software renderer;
  *   Esc: quit;</li>
- *   <li>the layout file and the visual parameter file are polled every 0.5 s and rebuilt on change (off the render
+ *   <li>the layout file, the visual parameter file and the solver file (--solver) are polled every 0.5 s and rebuilt on change (off the render
  *   thread).</li>
  * </ul>
  */
 public final class Interactive {
     private final Path layoutPath, paramsPath;
+    private Path solverPath;
     private volatile double q;
     private final TowerGen gen;
     private final AtomicReference<Built> pending = new AtomicReference<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "towergen"); t.setDaemon(true); return t; });
     private volatile boolean building;
-    private long layoutMtime = -1, paramsMtime = -1;
+    private long layoutMtime = -1, paramsMtime = -1, solverMtime = -1;
 
     private record Built(Mesh mesh, VisualParams vp, String title, double[] bounds, TowerGen.Result result) {}
 
@@ -64,6 +67,7 @@ public final class Interactive {
         Library lib = opt.containsKey("lib") ? Library.load(Path.of(opt.get("lib"))) : Library.shared();
         Interactive it = new Interactive(lp, pp, Double.parseDouble(opt.getOrDefault("q", "1.0")), new TowerGen(lib));
         if (opt.containsKey("snap")) it.snap = Path.of(opt.get("snap"));
+        if (opt.containsKey("solver")) it.solverPath = Path.of(opt.get("solver"));
         it.loop();
     }
 
@@ -74,11 +78,16 @@ public final class Interactive {
             try {
                 Layout l = Layout.read(layoutPath);
                 VisualParams vp = VisualParams.load(paramsPath);
-                TowerGen.Result r = gen.build(l, qq);
-                Mesh m = new MeshBuilder(gen.c, vp).build(r);
-                String title = String.format("towerview %s q%.1f | util %.3f vol %.0f | statics %.0f ms pass %.0f ms | %d tris%s",
-                        layoutPath.getFileName(), qq, r.analysis.maxUtil, r.info.vol, r.msStatics(), r.msPass(), m.tris,
-                        l.violations().isEmpty() ? "" : " | RULES: " + l.violations());
+                SolverParams sp = solverPath != null ? SolverParams.load(solverPath, gen.c) : null;
+                TowerGen.Result r = gen.build(l, qq, sp);
+                Mesh m = new MeshBuilder(r.c, vp).build(r);
+                WireReduction.Counts wc = WireReduction.Counts.of(r.tower);
+                String title = String.format("towerview %s q%.1f | util %s vol %.0f | %d cables, %d stays, %d back-stays | statics %.0f ms pass %.0f ms | %d tris%s%s",
+                        layoutPath.getFileName(), qq, r.analysis == null ? "mechanism" : String.format("%.3f", r.analysis.maxUtil),
+                        r.info.vol, wc.cables(), wc.stays(), wc.backstays(), r.msStatics() + r.msReduce(), r.msPass(), m.tris,
+                        l.violations().isEmpty() ? "" : " | RULES: " + l.violations(),
+                        r.warnings.isEmpty() ? "" : " | " + r.warnings.size() + " warnings");
+                for (String w : r.warnings) System.err.println("warning: " + w);
                 pending.set(new Built(m, vp, title, m.bounds(), r));
             } catch (Exception e) {
                 System.err.println("rebuild failed: " + e);
@@ -93,8 +102,9 @@ public final class Interactive {
         try {
             long lm = Files.getLastModifiedTime(layoutPath).toMillis();
             long pm = paramsPath != null && Files.exists(paramsPath) ? Files.getLastModifiedTime(paramsPath).toMillis() : 0;
-            if (lm != layoutMtime || pm != paramsMtime) {
-                layoutMtime = lm; paramsMtime = pm;
+            long sm = solverPath != null && Files.exists(solverPath) ? Files.getLastModifiedTime(solverPath).toMillis() : 0;
+            if (lm != layoutMtime || pm != paramsMtime || sm != solverMtime) {
+                layoutMtime = lm; paramsMtime = pm; solverMtime = sm;
                 rebuild();
             }
         } catch (Exception e) {
