@@ -21,11 +21,11 @@ import java.util.List;
  * frame (the layout is in shaders/post/stasis.fsh). Requested through the player's active post effects while the
  * player is in a dimension where time stops.
  */
-final class StasisPost {
+public final class StasisPost {
     private StasisPost() {
     }
 
-    static final Identifier EFFECT = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "stasis");
+    public static final Identifier EFFECT = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "stasis");
     /** Post chains look textures up at textures/effect/&lt;path&gt;.png. */
     static final Identifier DATA = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/fielddata.png");
     static DynamicTexture texture;

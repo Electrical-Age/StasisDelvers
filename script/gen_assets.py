@@ -57,7 +57,34 @@ def layer(colors, path):
     im.save(path)
 
 
+def glove(colors, path):
+    """First-person glove (client/SuitArm.java), 32x16, box UV: the cuff (4x1x4) at (0, 0), the glove (4x4x4) at
+    (0, 5). Side faces of a box sit in the row below its top/bottom faces; the glove's fingertips are its bottom."""
+    rng = random.Random(path)
+    im = Image.new('RGBA', (32, 16), (0, 0, 0, 0))
+    dark = tuple(int(v * 0.55) for v in colors['base'])
+
+    def px(x, y, c):
+        k = rng.uniform(0.88, 1.1)
+        im.putpixel((x, y), tuple(min(255, int(v * k)) for v in c) + (255,))
+    # cuff: trim band, a glow stud on each side face
+    for y in range(0, 5):
+        for x in range(16):
+            px(x, y, colors['trim'])
+    for x in (1, 6, 9, 14):
+        px(x, 4, colors['glow'])
+    # glove: dark (top/bottom faces in rows 5..8, sides in rows 9..12), a knuckle ridge in the base colour (row 10),
+    # finger seams below it
+    seam = tuple(int(v * 0.4) for v in colors['base'])
+    for y in range(5, 13):
+        for x in range(16):
+            px(x, y, colors['base'] if y == 10 else seam if y > 10 and x % 4 == 0 else dark)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    im.save(path)
+
+
 for suit, colors in SUITS.items():
+    glove(colors, os.path.join(ROOT, 'textures', 'entity', 'glove', suit + '.png'))
     prefix = 'delver' if suit == 'delver' else 'stasis'
     for piece, rows in PIECES.items():
         name = f'{prefix}_{piece}'

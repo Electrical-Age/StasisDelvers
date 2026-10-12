@@ -8,6 +8,9 @@
     "LiquidBlockMixin",
     "BlockMixin"
   ],
+  "client": [
+    "client.GameRendererMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
