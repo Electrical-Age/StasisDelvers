@@ -52,6 +52,7 @@ public final class Spine {
         public Library.Entry entry;
         public String tier;
         public int kk;                   // rotation offset of a near match (added to r)
+        Patch.Result patch;              // last-resort 'patch' tier: patched q1 geometry of the entry
         public int rWorld() { return Math.floorMod(r + kk, 4); }
     }
 

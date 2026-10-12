@@ -50,6 +50,10 @@ public final class Interactive {
     private int vCount;
     private FloatBuffer vbuf, nbuf, cbuf;
 
+    /** Test hook: save the GL framebuffer to this PNG a few frames after the first mesh, then exit. */
+    private Path snap;
+    private int snapFrames = -1;
+
     private Interactive(Path layout, Path params, double q, TowerGen gen) {
         this.layoutPath = layout; this.paramsPath = params; this.q = q; this.gen = gen;
     }
@@ -58,7 +62,9 @@ public final class Interactive {
         Path lp = Path.of(pos.get(0));
         Path pp = opt.containsKey("params") ? Path.of(opt.get("params")) : null;
         Library lib = opt.containsKey("lib") ? Library.load(Path.of(opt.get("lib"))) : Library.shared();
-        new Interactive(lp, pp, Double.parseDouble(opt.getOrDefault("q", "1.0")), new TowerGen(lib)).loop();
+        Interactive it = new Interactive(lp, pp, Double.parseDouble(opt.getOrDefault("q", "1.0")), new TowerGen(lib));
+        if (opt.containsKey("snap")) it.snap = Path.of(opt.get("snap"));
+        it.loop();
     }
 
     private void rebuild() {
@@ -167,11 +173,13 @@ public final class Interactive {
                     }
                     cur = b;
                     upload(b);
+                    if (snap != null && snapFrames < 0) snapFrames = 3;
                 }
             }
             int[] fw = new int[1], fh = new int[1];
             glfwGetFramebufferSize(win, fw, fh);
             draw(fw[0], fh[0]);
+            if (snapFrames > 0 && --snapFrames == 0) { writeSnap(fw[0], fh[0]); glfwSetWindowShouldClose(win, true); }
             glfwSwapBuffers(win);
             glfwPollEvents();
         }
@@ -206,7 +214,7 @@ public final class Interactive {
             double[] g = vp.groundColour();
             glColor3f((float) g[0], (float) g[1], (float) g[2]);
             glBegin(GL_QUADS);
-            glVertex3f(-500, -0.01f, -500); glVertex3f(-500, -0.01f, 500); glVertex3f(500, -0.01f, 500); glVertex3f(500, -0.01f, -500);
+            glVertex3f(-1500, -0.01f, -1500); glVertex3f(-1500, -0.01f, 1500); glVertex3f(1500, -0.01f, 1500); glVertex3f(1500, -0.01f, -1500);
             glEnd();
         }
         if (cur == null || vCount == 0) return;
@@ -254,6 +262,23 @@ public final class Interactive {
     private static double[] norm(double[] a) {
         double l = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
         return new double[]{a[0] / l, a[1] / l, a[2] / l};
+    }
+
+    private void writeSnap(int w, int h) {
+        java.nio.ByteBuffer px = BufferUtils.createByteBuffer(w * h * 4);
+        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        var img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                int i = 4 * ((h - 1 - y) * w + x);
+                img.setRGB(x, y, ((px.get(i) & 255) << 16) | ((px.get(i + 1) & 255) << 8) | (px.get(i + 2) & 255));
+            }
+        try {
+            javax.imageio.ImageIO.write(img, "png", snap.toFile());
+            System.out.println("snap " + snap.toAbsolutePath() + " (" + glGetString(GL_RENDERER) + ")");
+        } catch (Exception e) {
+            System.err.println("snap failed: " + e);
+        }
     }
 
     private void saveShot() {

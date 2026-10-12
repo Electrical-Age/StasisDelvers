@@ -10,7 +10,7 @@ import java.util.Set;
  * Library lookup with the documented fallback order (p3acov.lookup_bay, NOTES-P3a section 6) plus a last-resort tier.
  *
  * <p>Bays: {@code seam_exact -> seam_near -> plain_exact -> plain_near -> plain_near_mid -> plain_super -> ring_near
- * -> ring_near_h -> error}.
+ * -> ring_near_h -> patch -> error}.
  * <ul>
  *   <li>{@code seam_near}: a seam entry with the same own key and the nearest above key (same above rings, mid, h and
  *   root count; distance {@link #bayDist}).</li>
@@ -24,8 +24,9 @@ import java.util.Set;
  *   entry's nodes are then stretched radially from its ring half-widths to the actual ones (x, z scaled by
  *   s_actual(y) / s_entry(y), linear in y between the rings), so its ring corners and leg nodes land on the
  *   neighbouring bays and on the boom roots. {@code ring_near_h}: for bays without booms only, the same with any
- *   bay height (nodes also scaled in y by h / h_entry). The runtime pass then sizes the members. If even that
- *   finds nothing, {@link NoEntryException} (the layout should be simplified at that bay).</li>
+ *   bay height (nodes also scaled in y by h / h_entry). {@code patch}: the closest entry by root pattern with the
+ *   missing boom root nodes patched into its legs or pole and braced ({@link Patch}). The runtime pass then sizes
+ *   the members. {@link NoEntryException} only if the library has no entry with the same pole-ness at all.</li>
  * </ul>
  * Booms: exact, else nearest by {@code 4 u(Lc_i) + 2 |rho_i| + |sr4| + |sa4|} with the same anchor type.
  */
@@ -154,6 +155,55 @@ public final class Lookup {
         return best;
     }
 
+    /** Class part of bayDist (no roots). */
+    static int headDist(int[] n, int[] c, int kk) {
+        int d = 0;
+        for (int i : new int[]{3, 4, 5, 6, 8}) d += under(n[i], c[i], 1);
+        if (n[6] >= 0 && c[6] >= 0) {
+            int a = Math.abs(Math.floorMod(c[7] + 2 * kk, 8) - n[7]);
+            d += Math.min(a, 8 - a);
+        } else if ((n[6] >= 0) != (c[6] >= 0)) d += 2;
+        return d + Math.abs(n[9] - c[9]);
+    }
+
+    /**
+     * Last tier 'patch': the plain entry closest by root pattern (same pole-ness at both rings); the missing root
+     * nodes are patched into its legs / pole (see {@link Patch}). Score: 10 per missing root + 3 per extra root +
+     * 4 per quarter block of ring difference + 3 for a mid difference + 20 per block of bay height difference
+     * (then no root counts as matched) + the class distance.
+     */
+    private Cand patchCand(int[] n) {
+        List<int[]> rn = roots(n);
+        Cand best = null;
+        for (Library.Entry e : lib.plain.values()) {
+            int[] c = e.key.k();
+            if ((c[0] == 0) != (n[0] == 0) || (c[1] == 0) != (n[1] == 0)) continue;
+            List<int[]> rc = roots(c);
+            for (int kk = 0; kk < 4; kk++) {
+                List<int[]> rr = Spine.rotRoots(rc, kk);
+                int covered = 0, bd = 0;
+                if (c[10] == n[10]) {
+                    for (int[] r : rn) {
+                        for (int[] x : rr) {
+                            if (x[0] == r[0] && x[1] == r[1]) {
+                                covered++;
+                                int b = boomDist(r, 2, x, 2);
+                                bd += b == Integer.MIN_VALUE ? 6 : b;
+                                break;
+                            }
+                        }
+                    }
+                }
+                int d = 10 * (rn.size() - covered) + 3 * (rr.size() - covered) + 4 * (Math.abs(c[0] - n[0]) + Math.abs(c[1] - n[1]))
+                        + 3 * Math.abs(c[2] - n[2]) + 20 * Math.abs(c[10] - n[10]) + headDist(n, c, kk) + bd;
+                Cand cd = new Cand(d, kk, c, e);
+                if (cd.better(best)) best = cd;
+                if (rc.isEmpty()) break;
+            }
+        }
+        return best;
+    }
+
     /** Resolves one bay spec: sets spec.entry, spec.tier, spec.kk. */
     public void bay(Spine.BaySpec s, boolean seamMode) {
         int[] n = s.ikey;
@@ -192,6 +242,12 @@ public final class Lookup {
         if (c != null) { s.entry = c.e; s.tier = "ring_near"; s.kk = c.kk; return; }
         c = ringNear(n, true);
         if (c != null) { s.entry = c.e; s.tier = "ring_near_h"; s.kk = c.kk; return; }
+        c = patchCand(n);
+        if (c != null) {
+            s.entry = c.e; s.tier = "patch"; s.kk = c.kk;
+            s.patch = Patch.build(c.e, c.kk, s);
+            return;
+        }
         throw new NoEntryException("bay y " + s.y0 + ".." + s.y1 + " (key " + Arrays.toString(n)
                 + ") has no compatible library entry: simplify the booms at this height");
     }

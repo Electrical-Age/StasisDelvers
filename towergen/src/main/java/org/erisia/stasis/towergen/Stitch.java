@@ -109,7 +109,13 @@ public final class Stitch {
         for (int b = 0; b < sp.specs.size(); b++) {
             Spine.BaySpec spec = sp.specs.get(b);
             Library.Entry ent = spec.entry;
-            Library.Variant v = variant(ent, q, seed, "bay" + spec.y0, vlist);
+            Library.Variant v;
+            int[] epole = ent.pole;
+            int[][] elegs = ent.legs;
+            if (spec.patch != null) {                    // last-resort patch: q1 geometry, already stretched
+                v = spec.patch.v; epole = spec.patch.pole; elegs = spec.patch.legs;
+                vlist.add("q1");
+            } else v = variant(ent, q, seed, "bay" + spec.y0, vlist);
             int r = spec.rWorld();
             boolean str = spec.tier != null && spec.tier.startsWith("ring_near");
             int[] ek = ent.key.k();
@@ -123,15 +129,15 @@ public final class Stitch {
                 pw[1] += spec.y0;
                 loc[i] = B.node(pw);
             }
-            for (int k = 0; k < ent.pole.length; k++) {
-                int pi = ent.pole[k];
+            for (int k = 0; k < epole.length; k++) {
+                int pi = epole[k];
                 if (contains(ent.ghost, pi)) continue;
                 int gi = loc[pi];
                 poleNodes.put(gi, B.pts.get(gi)[1]);
                 double w = k < v.poleW.length ? v.poleW[k] : c.W_POLE_MIN;
                 poleW.put(gi, Math.max(poleW.getOrDefault(gi, 0.0), w));
             }
-            for (int[] ch : ent.legs) {
+            for (int[] ch : elegs) {
                 int[] g = new int[ch.length];
                 for (int i = 0; i < ch.length; i++) g[i] = loc[ch[i]];
                 legs.add(g);
