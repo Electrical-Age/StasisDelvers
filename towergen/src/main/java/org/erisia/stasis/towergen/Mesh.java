@@ -49,7 +49,11 @@ public final class Mesh {
     }
 
     /** Square-section box from p0 to p1 (w wide); a frustum if w1 differs from w0. */
-    public void beam(double[] p0, double[] p1, double w0, double w1, VisualParams.Part p) {
+    public void beam(double[] p0, double[] p1, double w0, double w1, VisualParams.Part p) { beam(p0, p1, w0, w1, p, true, true); }
+
+    /** As {@link #beam(double[], double[], double, double, VisualParams.Part)}; cap0 / cap1 false leave out the end faces
+     *  (ends sealed inside a joint hub: never visible, and coincident with a hub face they would z-fight). */
+    public void beam(double[] p0, double[] p1, double w0, double w1, VisualParams.Part p, boolean cap0, boolean cap1) {
         double[] d = V.sub(p1, p0);
         double L = V.norm(d);
         if (L < 1e-9) return;
@@ -69,8 +73,8 @@ public final class Mesh {
             int k2 = (k + 1) % 4;
             quad(c0[k], c0[k2], c1[k2], c1[k], p);
         }
-        quad(c0[3], c0[2], c0[1], c0[0], p);
-        quad(c1[0], c1[1], c1[2], c1[3], p);
+        if (cap0) quad(c0[3], c0[2], c0[1], c0[0], p);
+        if (cap1) quad(c1[0], c1[1], c1[2], c1[3], p);
     }
 
     public void beam(double[] p0, double[] p1, double w, VisualParams.Part p) { beam(p0, p1, w, w, p); }
