@@ -25,7 +25,12 @@ public final class RuntimePass {
         public double maxUtil, minSlack = Double.POSITIVE_INFINITY, poleUtil;
         public double[] utilPerCase;   // K
         public int raiseIters, nFree, nCab;
+        /** Non-null if the taut stiffness was singular (where). */
+        public String mechanism;
     }
+
+    /** Profile Cholesky factor of the scaled stiffness (per analysis; the pass object holds no per-tower state). */
+    private record Factor(double[] L, double[] sc, int nf, int[] first, int[] last) {}
 
     public static final class Info {
         public int rounds, converted, bumps, legFix;
@@ -42,7 +47,19 @@ public final class RuntimePass {
     public RuntimePass(Consts c) { this.c = c; this.sec = new Sections(c); }
 
     // ------------------------------------------------------------------ analysis (analyze_v, mode fixf)
+    /** Analysis, or null if the taut structure is a mechanism. Thread-safe (no shared mutable state). */
     public Analysis analyze(Stitch.Tower t) {
+        Analysis a = analyzeFull(t);
+        return a.mechanism != null ? null : a;
+    }
+
+    private static Analysis mech(String why) {
+        Analysis a = new Analysis();
+        a.mechanism = why;
+        return a;
+    }
+
+    private Analysis analyzeFull(Stitch.Tower t) {
         int n = t.n, m = t.m, K = c.K;
         double[] P = t.P;
         // free DOFs: used (member end or pole) and not fixed
@@ -124,7 +141,7 @@ public final class RuntimePass {
             for (int j = 0; j < nf; j++) Kf[ri + j] /= si * sc[j];
             dmax = Math.max(dmax, Kf[ri + i]); dmin = Math.min(dmin, Kf[ri + i]);
         }
-        if (nf > 0 && dmin <= 1e-9 * dmax) { lastMechanism = "zero stiffness DOF"; return null; }
+        if (nf > 0 && dmin <= 1e-9 * dmax) return mech("zero stiffness DOF");
         // profile of the lower triangle (nodes are numbered bay by bay, so K is nearly banded)
         int[] first = new int[nf], last = new int[nf];
         for (int i = 0; i < nf; i++) {
@@ -134,14 +151,12 @@ public final class RuntimePass {
         }
         for (int i = 0; i < nf; i++) last[i] = i;
         for (int k = 0; k < nf; k++) for (int i = first[k]; i < k; i++) if (last[i] < k) last[i] = k;
-        this.first = first; this.last = last;
         int bad = Dense.choleskyProfileAt(Kf, nf, first);
         if (bad < 0) for (int i = 0; i < nf; i++) if (Math.abs(Kf[i * nf + i]) < 1e-6) { bad = i; break; }
         if (bad >= 0) {
             int nd = -1;
             for (int i = 0; i < n; i++) if (dof[i] >= 0 && dof[i] <= bad && bad < dof[i] + 3) nd = i;
-            lastMechanism = "pivot at node " + nd + (nd >= 0 ? " " + Arrays.toString(t.node(nd)) : "");
-            return null;
+            return mech("pivot at node " + nd + (nd >= 0 ? " " + Arrays.toString(t.node(nd)) : ""));
         }
         // loads
         double[][] F = new double[K][nf];
@@ -177,7 +192,8 @@ public final class RuntimePass {
             }
         }
         double[][] U = new double[K][];
-        for (int k = 0; k < K; k++) U[k] = solve(Kf, sc, nf, F[k]);
+        Factor fac = new Factor(Kf, sc, nf, first, last);
+        for (int k = 0; k < K; k++) U[k] = solve(fac, F[k]);
         an.dN = new double[K][m];
         for (int k = 0; k < K; k++) for (int b = 0; b < m; b++) an.dN[k][b] = kk[b] * relDisp(U[k], dof, t, ex, b);
         // pretension: recorded floor x f, then raise-only
@@ -197,7 +213,7 @@ public final class RuntimePass {
         double[] tt = new double[m];
         if (ncab > 0) {
             for (int b = 0; b < m; b++) if (an.cab[b]) delta[b] = c.FIXF * t.floor[b] / kk[b];
-            U0 = selfStress(Kf, sc, nf, dof, t, ex, kk, delta, N0);
+            U0 = selfStress(fac, dof, t, ex, kk, delta, N0);
             double[] tgt = new double[m];
             for (int b = 0; b < m; b++) if (an.cab[b]) tgt[b] = c.PRE_MARGIN * an.need[b];
             for (int it = 0; it < raiseIts; it++) {
@@ -208,7 +224,7 @@ public final class RuntimePass {
                 }
                 if (done) break;
                 for (int b = 0; b < m; b++) if (an.cab[b]) delta[b] += 1.5 * Math.max(tgt[b] - N0[b], 0) / kk[b];
-                U0 = selfStress(Kf, sc, nf, dof, t, ex, kk, delta, N0);
+                U0 = selfStress(fac, dof, t, ex, kk, delta, N0);
                 an.raiseIters = it + 1;
             }
             for (int b = 0; b < m; b++) tt[b] = an.cab[b] ? Math.max(tgt[b], 0.0) : 0.0;
@@ -274,22 +290,20 @@ public final class RuntimePass {
         return s;
     }
 
-    private int[] first, last;
-    /** Where the last singular analysis failed (diagnostics). */
-    public String lastMechanism = "";
-
-    private double[] solve(double[] Lf, double[] sc, int nf, double[] f) {
+    private static double[] solve(Factor fc, double[] f) {
+        int nf = fc.nf;
+        double[] sc = fc.sc;
         double[] x = new double[nf];
         for (int i = 0; i < nf; i++) x[i] = f[i] / sc[i];
-        Dense.cholSolveProfile(Lf, nf, first, last, x);
+        Dense.cholSolveProfile(fc.L, nf, fc.first, fc.last, x);
         for (int i = 0; i < nf; i++) x[i] /= sc[i];
         return x;
     }
 
     /** SELF(delta): lack-of-fit forces on the cables, one solve; fills N0, returns U0. */
-    private double[] selfStress(double[] Lf, double[] sc, int nf, int[] dof, Stitch.Tower t, double[] ex, double[] kk,
+    private static double[] selfStress(Factor fc, int[] dof, Stitch.Tower t, double[] ex, double[] kk,
                                 double[] delta, double[] N0) {
-        double[] f0 = new double[nf];
+        double[] f0 = new double[fc.nf];
         for (int b = 0; b < t.m; b++) {
             if (delta[b] == 0) continue;
             double fk = kk[b] * delta[b];
@@ -299,7 +313,7 @@ public final class RuntimePass {
                 if (dj >= 0) f0[dj + a] -= fk * ex[3 * b + a];
             }
         }
-        double[] U0 = solve(Lf, sc, nf, f0);
+        double[] U0 = solve(fc, f0);
         for (int b = 0; b < t.m; b++) N0[b] = kk[b] * (relDisp(U0, dof, t, ex, b) + delta[b]);
         return U0;
     }
@@ -453,8 +467,8 @@ public final class RuntimePass {
         int rounds = 0, conv = 0, bumps = 0;
         for (int it = 0; it < maxRounds; it++) {
             rounds = it + 1;
-            Analysis an = analyze(t);
-            if (an == null) throw new MechanismException("taut stiffness singular (mechanism) in round " + rounds + ": " + lastMechanism);
+            Analysis an = analyzeFull(t);
+            if (an.mechanism != null) throw new MechanismException("taut stiffness singular (mechanism) in round " + rounds + ": " + an.mechanism);
             int[] r = resizePass(t, an);
             conv += r[1]; bumps += r[0];
             if (r[0] == 0) break;
@@ -486,8 +500,8 @@ public final class RuntimePass {
             int[] w2 = widen(t);
             w[0] += w2[0]; w[1] += w2[1]; w[2] += w2[2];
         }
-        Analysis an = analyze(t);
-        if (an == null) throw new MechanismException("final analysis singular");
+        Analysis an = analyzeFull(t);
+        if (an.mechanism != null) throw new MechanismException("final analysis singular: " + an.mechanism);
         info.rounds = w[0]; info.converted = w[1]; info.bumps = w[2]; info.legFix = nfix;
         info.vol = volume(t);
         info.pass = an.maxUtil <= 1.0 + 1e-6 && an.minSlack >= -1e-6;

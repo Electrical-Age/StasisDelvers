@@ -28,6 +28,21 @@ class MeshTest {
     }
 
     @Test
+    void threadSafe() throws Exception {
+        TowerGen g = new TowerGen(Library.shared());
+        MeshBuilder mb = new MeshBuilder(g.c, VisualParams.defaults());
+        List<Layout> ls = List.of(H64MAX, H24B, new Layout(40, List.of()), new Layout(100, List.of()));
+        java.util.Map<String, String> seq = new java.util.HashMap<>();
+        for (Layout l : ls) seq.put(l.toString(), mb.build(g.build(l, 1.0)).hash());
+        var ex = java.util.concurrent.Executors.newFixedThreadPool(8);
+        List<java.util.concurrent.Future<String[]>> fs = new java.util.ArrayList<>();
+        for (int rep = 0; rep < 4; rep++)
+            for (Layout l : ls) fs.add(ex.submit(() -> new String[]{l.toString(), mb.build(g.build(l, 1.0)).hash()}));
+        for (var f : fs) { String[] r = f.get(); assertEquals(seq.get(r[0]), r[1], "concurrent build of " + r[0]); }
+        ex.shutdown();
+    }
+
+    @Test
     void meshHasAllParts() {
         TowerGen g = new TowerGen(Library.shared());
         Mesh m = new MeshBuilder(g.c, VisualParams.defaults()).build(g.build(H64MAX, 1.0));

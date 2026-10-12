@@ -131,7 +131,7 @@ public final class MeshBuilder {
             }
         }
         // back-stay deadmen + turnbuckles
-        for (int g : ground) {
+        for (int g : t.ground) {                  // array order (not hash order): deterministic triangle order
             double[] p = node(P, g);
             double h = vp.deadmanHeight();
             mesh.block(p, p[1] - 0.45 * h, p[1] + 0.55 * h, vp.deadmanSize(), Part.DEADMAN);
