@@ -28,7 +28,8 @@ public record VisualParams(
         double lacingPanelPerWidth,  // lacing panel length = outer width * this
         int lacingPanelsMin,
         int lacingPanelsMax,
-        double lacedEndTaper,        // fraction of the member length over which the chords converge at each end
+        double lacedEndTaper,        // fraction of the length over which the chords converge at a free end (not at a
+                                     // node where a collinear member continues, e.g. along a leg)
         double lacedEndFrac,         // chord offset at the very end, as a fraction of the full offset
         // --- tapered joints (knuckles)
         double knuckleScale,         // node block size = scale * (largest connected drawn width) + add
@@ -101,14 +102,14 @@ public record VisualParams(
     public static VisualParams defaults() {
         return new VisualParams(
                 0.05, 0.30, 0.06, 1.0, 0.09,
-                0.4, 0.035, 1.3, 1.0, 2, 14, 0.10, 0.45,
-                1.15, 0.03, 1.6, true, 1.4, 0.7, 1.4, 0.04, 0.24,
+                0.4, 0.035, 1.3, 1.0, 2, 14, 0.15, 0.2,
+                1.05, 0.02, 1.3, true, 1.2, 0.9, 1.4, 0.04, 0.24,
                 1.6, 0.5, 0.30, 1.0, 0.65, 0.18, 0.40, 1.0, true, 3.0, 0.9,
                 c(0.40, 0.22, 0.13), c(0.48, 0.47, 0.45), c(0.30, 0.20, 0.14), c(0.55, 0.52, 0.47),
                 c(0.16, 0.15, 0.14), c(0.86, 0.84, 0.76), c(0.70, 0.66, 0.58), c(0.86, 0.84, 0.78),
                 c(0.55, 0.90, 1.00), c(0.70, 0.55, 0.25), c(0.35, 0.34, 0.32), c(0.45, 0.44, 0.41),
                 c(0.20, 0.19, 0.18),
-                c(0.36, 0.52, 0.78), c(0.80, 0.84, 0.88), c(0.42, 0.45, 0.36), 215, 48, 0.38, 40, true, 4.0);
+                c(0.36, 0.52, 0.78), c(0.80, 0.84, 0.88), c(0.42, 0.45, 0.36), 215, 48, 0.38, 60, true, 4.0);
     }
 
     private static double[] c(double r, double g, double b) { return new double[]{r, g, b}; }

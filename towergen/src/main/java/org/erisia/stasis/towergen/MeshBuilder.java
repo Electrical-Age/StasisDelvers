@@ -44,6 +44,11 @@ public final class MeshBuilder {
         double[] nb = new double[n];          // largest connected drawn width
         double[] nb2 = new double[n];         // second largest
         double[] endW = new double[t.m];       // drawn width at the member ends (for stubs)
+        // laced ends taper (chords converge to the node) only where the member ends; a leg continuing through the
+        // node in a straight line keeps straight chords
+        List<List<Integer>> at = new ArrayList<>();
+        for (int i = 0; i < n; i++) at.add(new ArrayList<>());
+        for (int b = 0; b < t.m; b++) if (!Sections.isCable(t.kind[b])) { at.get(t.bi[b]).add(b); at.get(t.bj[b]).add(b); }
         for (int b = 0; b < t.m; b++) {
             int i = t.bi[b], j = t.bj[b], k = t.kind[b];
             double[] pi = node(P, i), pj = node(P, j);
@@ -71,7 +76,9 @@ public final class MeshBuilder {
                 ww = Math.max(w, vp.poleMinWidth());
                 mesh.beam(pi, pj, ww, Part.POLE);
             } else if (k == 2) {
-                ww = laced(mesh, pi, pj, w, sec.chord(k, t.ws[b], t.cs[b]), col);
+                double cwb = sec.chord(k, t.ws[b], t.cs[b]);
+                laced(mesh, pi, pj, w, cwb, col, !continues(t, at, b, i), !continues(t, at, b, j));
+                ww = cwb;                       // knuckles size from the chords (p25shots)
             } else {
                 ww = Math.max(w, vp.strutMinWidth());
                 mesh.beam(pi, pj, ww, col);
@@ -101,7 +108,7 @@ public final class MeshBuilder {
         }
         if (vp.knuckleStubs()) {
             for (int b = 0; b < t.m; b++) {
-                if (endW[b] <= 0 || poleSeg.contains(pk(t.bi[b], t.bj[b]))) continue;
+                if (endW[b] <= 0 || t.kind[b] == 2 || poleSeg.contains(pk(t.bi[b], t.bj[b]))) continue;
                 double L = t.length(b);
                 for (int e = 0; e < 2; e++) {
                     int nd = e == 0 ? t.bi[b] : t.bj[b], other = e == 0 ? t.bj[b] : t.bi[b];
@@ -154,12 +161,25 @@ public final class MeshBuilder {
         return mesh;
     }
 
+    /** True if another non-cable member continues member b straight through node nd. */
+    private static boolean continues(Stitch.Tower t, List<List<Integer>> at, int b, int nd) {
+        int o = t.bi[b] == nd ? t.bj[b] : t.bi[b];
+        double[] d = V.unit(V.sub(node(t.P, o), node(t.P, nd)));
+        for (int b2 : at.get(nd)) {
+            if (b2 == b) continue;
+            int o2 = t.bi[b2] == nd ? t.bj[b2] : t.bi[b2];
+            double[] d2 = V.unit(V.sub(node(t.P, o2), node(t.P, nd)));
+            if (V.dot(d, d2) < -0.98) return true;
+        }
+        return false;
+    }
+
     private static long pk(int a, int b) { return ((long) Math.min(a, b) << 32) | Math.max(a, b); }
 
     private static double[] node(double[] P, int i) { return new double[]{P[3 * i], P[3 * i + 1], P[3 * i + 2]}; }
 
     /** Laced member; returns the drawn width at its ends (for the knuckles). */
-    double laced(Mesh mesh, double[] p0, double[] p1, double b, double cw, Part col) {
+    double laced(Mesh mesh, double[] p0, double[] p1, double b, double cw, Part col, boolean tap0, boolean tap1) {
         double[] d = V.sub(p1, p0);
         double L = V.norm(d);
         double[] a = V.mul(d, 1 / L);
@@ -182,7 +202,7 @@ public final class MeshBuilder {
         double endF = vp.lacedEndFrac();
         // offset scale along the member: endF at the ends, 1 in the middle
         java.util.function.DoubleUnaryOperator off = t -> {
-            if (taper <= 0) return 1.0;
+            if (taper <= 0 || (t < 0.5 ? !tap0 : !tap1)) return 1.0;
             double x = Math.min(t, 1 - t) / taper;
             if (x >= 1) return 1.0;
             double s = x * x * (3 - 2 * x);
@@ -190,7 +210,8 @@ public final class MeshBuilder {
         };
         // chords as polylines through the taper breakpoints
         List<Double> ts = new ArrayList<>(List.of(0.0));
-        if (taper > 0) { ts.add(taper / 2); ts.add(taper); ts.add(1 - taper); ts.add(1 - taper / 2); }
+        if (taper > 0 && tap0) { ts.add(taper / 2); ts.add(taper); }
+        if (taper > 0 && tap1) { ts.add(1 - taper); ts.add(1 - taper / 2); }
         ts.add(1.0);
         for (int k = 0; k < nc; k++) {
             for (int q = 0; q + 1 < ts.size(); q++) {

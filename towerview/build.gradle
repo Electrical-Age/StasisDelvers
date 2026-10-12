@@ -1,0 +1,49 @@
+plugins {
+    id 'application'
+}
+
+group = 'org.erisia.stasis'
+version = '0.1.0'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+def lwjglVersion = '3.3.6'
+// natives for the interactive window; the headless renderer never touches LWJGL
+def lwjglNatives = (project.findProperty('lwjglNatives') ?: 'natives-linux')
+
+dependencies {
+    implementation project(':towergen')
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+}
+
+application {
+    mainClass = 'org.erisia.stasis.towerview.Main'
+    applicationDefaultJvmArgs = ['-Xmx2g', '-Djava.awt.headless=true']
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// one runnable jar with everything (java -jar towerview-all.jar ...)
+tasks.register('fatJar', Jar) {
+    group = 'build'
+    description = 'Runnable jar with towergen, the library and LWJGL'
+    archiveClassifier = 'all'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest { attributes 'Main-Class': application.mainClass }
+    from sourceSets.main.output
+    dependsOn configurations.runtimeClasspath
+    from { configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
