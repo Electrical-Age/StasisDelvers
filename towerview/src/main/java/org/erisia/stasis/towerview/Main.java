@@ -149,7 +149,57 @@ public final class Main {
             double rl = Math.toRadians(215);
             out.put("legs", new Raster.Camera(new double[]{9 * Math.cos(rl), ym + 2, 9 * Math.sin(rl)}, new double[]{0, ym + 1, 0}, fov));
         }
+        jointCams(t, H, fov, out);
         return out;
+    }
+
+    /**
+     * Joint close-ups: "bjoint" a few blocks from an inner node of the first boom (about 40% out along it), "ljoint"
+     * a few blocks outside a mast leg node with bracing near 0.3 H.
+     */
+    static void jointCams(Stitch.Tower t, int H, double fov, Map<String, Raster.Camera> out) {
+        int n = t.n;
+        int[] degBay = new int[n], degBoom0 = new int[n];
+        boolean[] boomNode = new boolean[n];
+        for (int b = 0; b < t.m; b++) {
+            if (t.kind[b] == 1 || t.kind[b] == 3) continue;
+            if (t.ownerType[b] == 0) { degBay[t.bi[b]]++; degBay[t.bj[b]]++; }
+            if (t.ownerType[b] == 1) { boomNode[t.bi[b]] = true; boomNode[t.bj[b]] = true; }
+            if (t.ownerType[b] == 1 && t.ownerIdx[b] == 0) { degBoom0[t.bi[b]]++; degBoom0[t.bj[b]]++; }
+        }
+        double rMax = 0, rMast = 0;
+        for (int i = 0; i < n; i++) {
+            double r = Math.hypot(t.P[3 * i], t.P[3 * i + 2]);
+            if (degBoom0[i] > 0) rMax = Math.max(rMax, r);
+            if (degBay[i] > 0) rMast = Math.max(rMast, r);
+        }
+        int bj = -1;
+        double best = 1e30;
+        for (int i = 0; i < n; i++) {
+            if (degBoom0[i] < 3 || degBay[i] > 0) continue;
+            double r = Math.hypot(t.P[3 * i], t.P[3 * i + 2]);
+            double s = Math.abs(r - (rMast + 0.4 * (rMax - rMast)));
+            if (s < best - 1e-9) { best = s; bj = i; }
+        }
+        if (bj >= 0) out.put("bjoint", jointCam(t.node(bj), 3.2, 1.0, 70, fov));
+        int lj = -1;
+        best = 1e30;
+        for (int[] leg : t.legs) {                    // leg node chains: the braced leg node nearest 0.3 H
+            for (int i : leg) {
+                if (i < 0 || i >= n || degBay[i] < 4 || boomNode[i]) continue;
+                double s = Math.abs(t.P[3 * i + 1] - 0.3 * H);
+                if (s < best - 1e-9) { best = s; lj = i; }
+            }
+        }
+        if (lj >= 0) out.put("ljoint", jointCam(t.node(lj), 4.0, 1.2, 20, fov));
+    }
+
+    /** Camera dist blocks from p, deg degrees around from the outward radial direction, up blocks above. */
+    static Raster.Camera jointCam(double[] p, double dist, double up, double deg, double fov) {
+        double a = Math.atan2(p[2], p[0]);
+        if (Math.hypot(p[0], p[2]) < 1e-6) a = 0;
+        double ce = a + Math.toRadians(deg);
+        return new Raster.Camera(new double[]{p[0] + dist * Math.cos(ce), p[1] + up, p[2] + dist * Math.sin(ce)}, p, fov);
     }
 
     static void render(List<String> pos, Map<String, String> opt) throws Exception {
