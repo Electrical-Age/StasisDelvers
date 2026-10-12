@@ -125,7 +125,17 @@ public final class RuntimePass {
             dmax = Math.max(dmax, Kf[ri + i]); dmin = Math.min(dmin, Kf[ri + i]);
         }
         if (nf > 0 && dmin <= 1e-9 * dmax) return null;
-        if (!Dense.cholesky(Kf, nf)) return null;
+        // profile of the lower triangle (nodes are numbered bay by bay, so K is nearly banded)
+        int[] first = new int[nf], last = new int[nf];
+        for (int i = 0; i < nf; i++) {
+            int ri = i * nf, f = i;
+            for (int j = 0; j < i; j++) if (Kf[ri + j] != 0.0) { f = j; break; }
+            first[i] = f;
+        }
+        for (int i = 0; i < nf; i++) last[i] = i;
+        for (int k = 0; k < nf; k++) for (int i = first[k]; i < k; i++) if (last[i] < k) last[i] = k;
+        this.first = first; this.last = last;
+        if (!Dense.choleskyProfile(Kf, nf, first)) return null;
         for (int i = 0; i < nf; i++) if (Math.abs(Kf[i * nf + i]) < 1e-6) return null;
         // loads
         double[][] F = new double[K][nf];
@@ -258,10 +268,12 @@ public final class RuntimePass {
         return s;
     }
 
-    private static double[] solve(double[] Lf, double[] sc, int nf, double[] f) {
+    private int[] first, last;
+
+    private double[] solve(double[] Lf, double[] sc, int nf, double[] f) {
         double[] x = new double[nf];
         for (int i = 0; i < nf; i++) x[i] = f[i] / sc[i];
-        Dense.cholSolve(Lf, nf, x);
+        Dense.cholSolveProfile(Lf, nf, first, last, x);
         for (int i = 0; i < nf; i++) x[i] /= sc[i];
         return x;
     }

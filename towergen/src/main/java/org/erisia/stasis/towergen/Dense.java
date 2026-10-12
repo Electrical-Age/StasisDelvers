@@ -67,4 +67,55 @@ public final class Dense {
             b[i] = s / l[i * n + i];
         }
     }
+
+    /**
+     * Profile (skyline) Cholesky: the same operations as {@link #cholesky} but loops start at the first structurally
+     * non-zero column of each row, so the skipped terms are exact zeros (the same factor up to
+     * summation order: the inner products use 4 partial sums). first[i] = first
+     * non-zero column of row i (lower triangle). On return the upper triangle holds L^T within the profile.
+     */
+    public static boolean choleskyProfile(double[] a, int n, int[] first) {
+        for (int j = 0; j < n; j++) {
+            int rj = j * n, fj = first[j];
+            double d = a[rj + j];
+            for (int k = fj; k < j; k++) d -= a[rj + k] * a[rj + k];
+            if (!(d > 0)) return false;
+            double ljj = Math.sqrt(d);
+            a[rj + j] = ljj;
+            double inv = 1.0 / ljj;
+            for (int i = j + 1; i < n; i++) {
+                int fi = first[i];
+                if (fi > j) continue;                   // L[i][j] stays 0
+                int ri = i * n;
+                double s = a[ri + j];
+                int k0 = Math.max(fi, fj);
+                double s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+                int k = k0;
+                for (; k + 3 < j; k += 4) {
+                    s0 += a[ri + k] * a[rj + k]; s1 += a[ri + k + 1] * a[rj + k + 1];
+                    s2 += a[ri + k + 2] * a[rj + k + 2]; s3 += a[ri + k + 3] * a[rj + k + 3];
+                }
+                for (; k < j; k++) s0 += a[ri + k] * a[rj + k];
+                a[ri + j] = (s - ((s0 + s1) + (s2 + s3))) * inv;
+            }
+        }
+        for (int i = 0; i < n; i++) for (int k = i + 1; k < n; k++) a[i * n + k] = first[k] <= i ? a[k * n + i] : 0.0;
+        return true;
+    }
+
+    /** Solve with a profile factor; last[i] = largest row k with first[k] <= i. */
+    public static void cholSolveProfile(double[] l, int n, int[] first, int[] last, double[] b) {
+        for (int i = 0; i < n; i++) {
+            int ri = i * n;
+            double s = b[i];
+            for (int k = first[i]; k < i; k++) s -= l[ri + k] * b[k];
+            b[i] = s / l[ri + i];
+        }
+        for (int i = n - 1; i >= 0; i--) {
+            double s = b[i];
+            int ri = i * n;
+            for (int k = i + 1; k <= last[i]; k++) s -= l[ri + k] * b[k];
+            b[i] = s / l[ri + i];
+        }
+    }
 }
