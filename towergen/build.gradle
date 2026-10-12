@@ -41,3 +41,16 @@ tasks.register('slowTest', Test) {
     systemProperty 'towergen.seed', System.getProperty('towergen.seed', '20261012')
     testLogging { events 'failed', 'passed'; exceptionFormat 'full'; showStandardStreams = true }
 }
+
+// compact binary library for the browser build (towerweb): build/libbin/p3a_library.bin.gz
+tasks.register('libraryBin', JavaExec) {
+    description = 'Writes the TGLB1 binary library (LibraryBin)'
+    group = 'build'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.erisia.stasis.towergen.LibraryBin'
+    def out = layout.buildDirectory.file('libbin/p3a_library.bin.gz')
+    inputs.files(sourceSets.main.runtimeClasspath)
+    outputs.file(out)
+    args out.get().asFile.absolutePath
+    maxHeapSize = '2g'
+}

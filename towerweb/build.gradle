@@ -3,6 +3,9 @@ plugins {
     id 'org.teavm' version '0.16.0'
 }
 
+// Browser build of towergen (TeaVM -> ES module) and the static site in dist/ (./gradlew :towerweb:dist).
+// Not part of the root `build` (the TeaVM tasks only run when asked for).
+
 group = 'org.erisia.stasis'
 version = '0.1.0'
 
@@ -12,14 +15,37 @@ repositories {
     mavenCentral()
 }
 
+sourceSets {
+    gen   // build-time generator (JVM): VisualParamsCodec.java, visual defaults and key docs
+}
+
+def genJava = layout.buildDirectory.dir('generated/sources/codec/java')
+def genWeb = layout.buildDirectory.dir('generated/web')
+
+sourceSets.main.java.srcDir(genJava)
+
 dependencies {
     implementation project(':towergen')
     implementation teavm.libs.jsoApis
+    genImplementation project(':towergen')
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+def genCodec = tasks.register('genCodec', JavaExec) {
+    description = 'Generates VisualParamsCodec.java and the visual.json defaults / docs'
+    classpath = sourceSets.gen.runtimeClasspath
+    mainClass = 'org.erisia.stasis.towerweb.GenCodec'
+    def src = project(':towergen').file('src/main/java/org/erisia/stasis/towergen/VisualParams.java')
+    inputs.files(sourceSets.gen.runtimeClasspath)
+    inputs.file(src)
+    outputs.dir(genJava)
+    outputs.dir(genWeb)
+    args src.absolutePath, genJava.get().asFile.absolutePath, genWeb.get().asFile.absolutePath
+}
+tasks.named('compileJava') { dependsOn genCodec }
 
 teavm {
     js {
@@ -30,4 +56,49 @@ teavm {
         obfuscated = true
         optimization = org.teavm.gradle.api.OptimizationLevel.AGGRESSIVE
     }
+}
+
+// third-party browser libraries, fetched once into build/vendor (MIT licensed)
+def vendorDir = layout.buildDirectory.dir('vendor')
+def threeV = '0.186.1', cmV = '5.65.21'
+def vendorFiles = [
+    'three/three.module.js'      : "https://cdn.jsdelivr.net/npm/three@${threeV}/build/three.module.min.js",
+    // three.module.min.js imports ./three.core.js
+    'three/three.core.js'        : "https://cdn.jsdelivr.net/npm/three@${threeV}/build/three.core.min.js",
+    'three/OrbitControls.js'     : "https://cdn.jsdelivr.net/npm/three@${threeV}/examples/jsm/controls/OrbitControls.min.js",
+    'three/LICENSE'              : "https://cdn.jsdelivr.net/npm/three@${threeV}/LICENSE",
+    'codemirror/codemirror.js'   : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/lib/codemirror.min.js",
+    'codemirror/codemirror.css'  : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/lib/codemirror.min.css",
+    'codemirror/javascript.js'   : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/mode/javascript/javascript.min.js",
+    'codemirror/matchbrackets.js': "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/addon/edit/matchbrackets.min.js",
+    'codemirror/closebrackets.js': "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/addon/edit/closebrackets.min.js",
+    'codemirror/LICENSE'         : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/LICENSE",
+]
+def vendor = tasks.register('vendor') {
+    description = 'Downloads three.js and CodeMirror 5 for the site'
+    outputs.dir(vendorDir)
+    inputs.property('files', vendorFiles)
+    doLast {
+        vendorFiles.each { rel, url ->
+            def f = vendorDir.get().file(rel).asFile
+            if (!f.exists() || f.length() == 0) {
+                f.parentFile.mkdirs()
+                new URL(url).withInputStream { i -> f.withOutputStream { o -> o << i } }
+                logger.lifecycle("vendor: ${rel} (${f.length()} bytes)")
+            }
+        }
+    }
+}
+
+tasks.register('dist', Sync) {
+    description = 'Static site: towerweb/dist (copy the directory to the web server)'
+    group = 'build'
+    dependsOn 'generateJavaScript', genCodec, vendor, ':towergen:libraryBin'
+    into layout.projectDirectory.dir('dist')
+    from('src/web')
+    from(layout.buildDirectory.dir('generated/teavm/js')) { include 'towergen.js'; into 'js' }
+    from(genWeb) { into 'data' }
+    from(project(':towergen').layout.buildDirectory.file('libbin/p3a_library.bin.gz')) { rename { 'towerlib.bin' }; into 'data' }
+    from(project(':towergen').file('layouts')) { include '*.json'; into 'layouts' }
+    from(vendorDir) { into 'vendor' }
 }

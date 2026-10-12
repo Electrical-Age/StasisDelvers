@@ -61,8 +61,10 @@ public final class Library {
     /** Seam bays by their own (plain) key prefix. */
     public final Map<Key, List<Entry>> seamByOwn = new HashMap<>();
     public long loadMs;
+    /** The library header as read (kept for {@link LibraryBin}). */
+    public Map<String, Object> header;
 
-    private Library(Consts c, List<Entry> entries) {
+    Library(Consts c, List<Entry> entries) {
         this.c = c;
         this.entries = entries;
         for (Entry e : entries) {
@@ -116,11 +118,13 @@ public final class Library {
         Json j = new Json(new InputStreamReader(in, StandardCharsets.UTF_8));
         Consts c = null;
         List<Entry> ents = new ArrayList<>();
+        Map<String, Object> header = null;
         j.beginObject();
         while (j.hasNext()) {
             String name = j.nextName();
             if (name.equals("header")) {
-                c = new Consts(Json.obj(j.readValue()));
+                header = Json.obj(j.readValue());
+                c = new Consts(header);
             } else if (name.equals("entries")) {
                 if (c == null) throw new IOException("header must precede entries");
                 j.beginArray();
@@ -130,6 +134,7 @@ public final class Library {
         }
         j.endObject();
         Library lib = new Library(c, ents);
+        lib.header = header;
         lib.loadMs = (System.nanoTime() - t0) / 1_000_000;
         return lib;
     }
