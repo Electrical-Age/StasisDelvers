@@ -1,0 +1,143 @@
+plugins {
+    id 'java'
+    id 'org.teavm' version '0.16.0'
+}
+
+// Browser build of towergen (TeaVM -> ES module) and the static site in dist/ (./gradlew :towerweb:dist).
+// Not part of the root `build` (the TeaVM tasks only run when asked for).
+
+group = 'org.erisia.stasis'
+version = '0.1.0'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    gen   // build-time generator (JVM): VisualParamsCodec.java, SolverParamsCodec.java, defaults and key docs
+}
+
+def genJava = layout.buildDirectory.dir('generated/sources/codec/java')
+def genWeb = layout.buildDirectory.dir('generated/web')
+
+sourceSets.main.java.srcDir(genJava)
+
+dependencies {
+    implementation project(':towergen')
+    implementation teavm.libs.jsoApis
+    genImplementation project(':towergen')
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+def genCodec = tasks.register('genCodec', JavaExec) {
+    description = 'Generates VisualParamsCodec.java / SolverParamsCodec.java and the visual.json / solver.json defaults and docs'
+    classpath = sourceSets.gen.runtimeClasspath
+    mainClass = 'org.erisia.stasis.towerweb.GenCodec'
+    maxHeapSize = '2g'
+    def src = project(':towergen').file('src/main/java/org/erisia/stasis/towergen/VisualParams.java')
+    inputs.files(sourceSets.gen.runtimeClasspath)
+    inputs.file(src)
+    inputs.file(project(':towergen').file('src/main/java/org/erisia/stasis/towergen/SolverParams.java'))
+    outputs.dir(genJava)
+    outputs.dir(genWeb)
+    args src.absolutePath, genJava.get().asFile.absolutePath, genWeb.get().asFile.absolutePath
+}
+tasks.named('compileJava') { dependsOn genCodec }
+
+teavm {
+    js {
+        mainClass = 'org.erisia.stasis.towerweb.TowerWeb'
+        moduleType = org.teavm.gradle.api.JSModuleType.ES2015
+        targetFileName = 'towergen.js'
+        addedToWebApp = false
+        obfuscated = true
+        optimization = org.teavm.gradle.api.OptimizationLevel.AGGRESSIVE
+    }
+}
+
+// third-party browser libraries, fetched once into build/vendor (MIT licensed)
+def vendorDir = layout.buildDirectory.dir('vendor')
+def threeV = '0.186.1', cmV = '5.65.21'
+def vendorFiles = [
+    'three/three.module.js'      : "https://cdn.jsdelivr.net/npm/three@${threeV}/build/three.module.min.js",
+    // three.module.min.js imports ./three.core.js
+    'three/three.core.js'        : "https://cdn.jsdelivr.net/npm/three@${threeV}/build/three.core.min.js",
+    'three/OrbitControls.js'     : "https://cdn.jsdelivr.net/npm/three@${threeV}/examples/jsm/controls/OrbitControls.min.js",
+    'three/LICENSE'              : "https://cdn.jsdelivr.net/npm/three@${threeV}/LICENSE",
+    'codemirror/codemirror.js'   : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/lib/codemirror.min.js",
+    'codemirror/codemirror.css'  : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/lib/codemirror.min.css",
+    'codemirror/javascript.js'   : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/mode/javascript/javascript.min.js",
+    'codemirror/matchbrackets.js': "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/addon/edit/matchbrackets.min.js",
+    'codemirror/closebrackets.js': "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/addon/edit/closebrackets.min.js",
+    'codemirror/LICENSE'         : "https://cdn.jsdelivr.net/npm/codemirror@${cmV}/LICENSE",
+]
+def vendor = tasks.register('vendor') {
+    description = 'Downloads three.js and CodeMirror 5 for the site'
+    outputs.dir(vendorDir)
+    inputs.property('files', vendorFiles)
+    doLast {
+        vendorFiles.each { rel, url ->
+            def f = vendorDir.get().file(rel).asFile
+            if (!f.exists() || f.length() == 0) {
+                f.parentFile.mkdirs()
+                new URL(url).withInputStream { i -> f.withOutputStream { o -> o << i } }
+                logger.lifecycle("vendor: ${rel} (${f.length()} bytes)")
+            }
+        }
+    }
+}
+
+tasks.register('dist', Sync) {
+    description = 'Static site: towerweb/dist (copy the directory to the web server)'
+    group = 'build'
+    dependsOn 'generateJavaScript', genCodec, vendor, ':towergen:libraryBin'
+    into layout.projectDirectory.dir('dist')
+    from('src/web')
+    from(layout.buildDirectory.dir('generated/teavm/js')) { include 'towergen.js'; into 'js' }
+    from(genWeb) { into 'data' }
+    from(project(':towergen').layout.buildDirectory.file('libbin/p3a_library.bin.gz')) { rename { 'towerlib.bin' }; into 'data' }
+    from(project(':towergen').file('layouts')) { include '*.json'; into 'layouts' }
+    from(vendorDir) { into 'vendor' }
+    // Cache busting: every asset URL gets ?v=<content hash>, so a CDN / browser cache can never mix old and new
+    // files. Leaves first (hashes of the final bytes), then the files that reference them: three.module.js (imports
+    // three.core.js), worker.js, app.js (both get an {path: hash} map in place of /*@ASSETS@*/{}), index.html.
+    doLast {
+        File root = layout.projectDirectory.dir('dist').asFile
+        def hash = { File f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString().substring(0, 12) }
+        def rel = { File f -> root.toPath().relativize(f.toPath()).toString().replace('\\', '/') }
+        def special = ['index.html', 'js/app.js', 'js/worker.js', 'vendor/three/three.module.js']
+        Map<String, String> h = new TreeMap<>()
+        root.eachFileRecurse(groovy.io.FileType.FILES) { f -> if (!(rel(f) in special)) h[rel(f)] = hash(f) }
+        def edit = { String path, Closure<String> c ->
+            File f = new File(root, path)
+            String t0 = f.getText('UTF-8'), t1 = c(t0)
+            f.setText(t1, 'UTF-8')
+            h[path] = hash(f)
+        }
+        def need = { String t, String what -> if (!t.contains(what)) throw new GradleException("cache busting: '${what}' not found"); t }
+        edit('vendor/three/three.module.js') { t -> need(t, './three.core.js').replace('./three.core.js', "./three.core.js?v=${h['vendor/three/three.core.js']}") }
+        def json = { groovy.json.JsonOutput.toJson(new TreeMap(h)) }
+        edit('js/worker.js') { t ->
+            need(need(t, "'./towergen.js'"), '/*@ASSETS@*/{}').replace("'./towergen.js'", "'./towergen.js?v=${h['js/towergen.js']}'").replace('/*@ASSETS@*/{}', json())
+        }
+        edit('js/app.js') { t ->
+            need(need(t, "'./zip.js'"), '/*@ASSETS@*/{}').replace("'./zip.js'", "'./zip.js?v=${h['js/zip.js']}'").replace('/*@ASSETS@*/{}', json())
+        }
+        edit('index.html') { t ->
+            String r = t.replaceAll(/(href|src)="(?!https?:|#|data:)([^"?#]+)"/) { all, attr, p ->
+                if (!h.containsKey(p)) throw new GradleException("cache busting: index.html references unknown ${p}")
+                "${attr}=\"${p}?v=${h[p]}\""
+            }
+            r.replaceAll(/"\.\/(vendor\/[^"?]+)"/) { all, p ->
+                if (!h.containsKey(p)) throw new GradleException("cache busting: import map references unknown ${p}")
+                "\"./${p}?v=${h[p]}\""
+            }
+        }
+        logger.lifecycle("dist: cache-busting hashes for ${h.size()} files")
+    }
+}

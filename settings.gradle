@@ -8,3 +8,6 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 rootProject.name = 'stasisdelvers'
+
+// Tower generator (pure Java, no Minecraft deps) and its standalone viewer (notes/timestop/TOWERLIB-PLAN.md, P3b/P3c)
+include 'towergen', 'towerview', 'towerweb'
