@@ -7,6 +7,9 @@ const PRESETS = ['H16', 'H24b', 'H40', 'H40r3', 'H40b4', 'H64max', 'H100'];
 const DEFAULT_PRESET = 'H40r3';
 const LS = { layout: 'towerweb.layout', visual: 'towerweb.visual', solver: 'towerweb.solver', q: 'towerweb.q', preset: 'towerweb.preset', tab: 'towerweb.tab' };
 const $ = (id) => document.getElementById(id);
+// cache busting: dist's build rewrites the placeholder with {path: content hash}; v(path) appends ?v=hash
+const ASSETS = /*@ASSETS@*/{};
+const v = (p) => (ASSETS[p] ? `${p}?v=${ASSETS[p]}` : p);
 
 // exposed for tests / the console
 const T = window.__tw = { ready: false, builds: 0, last: null, load: null, errors: [] };
@@ -232,7 +235,8 @@ renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, came
 // ------------------------------------------------------------------ state, worker
 const state = { preset: localStorage.getItem(LS.preset) || DEFAULT_PRESET, q: +(localStorage.getItem(LS.q) || 1) };
 const defaults = { layouts: {}, visual: '', solver: '' };
-const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('../' + v('js/worker.js'), import.meta.url), { type: 'module' });
+let jsonErrs = [];
 let busy = false, pending = null, nextId = 1, timer = null, randomCb = null, statusNote = '';
 
 function setStatus(s) { $('status').textContent = s; }
@@ -261,6 +265,7 @@ function requestBuild() {
   edVisual.markError(pv.error ? pv.line : null);
   edSolver.markError(ps.error ? ps.line : null);
   const errs = [pl.error, pv.error, ps.error].filter(Boolean);
+  jsonErrs = errs;
   if (errs.length) { pending = null; showErrors(errs, []); setStatus('not rebuilt: fix the JSON'); return; }
   pending = { type: 'build', layout: lt, q: state.q, visual: vt, solver: st };
   pump();
@@ -295,14 +300,23 @@ worker.onmessage = (e) => {
     const wall = performance.now() - inflight.t0;
     if (m.type === 'built') {
       T.builds++; T.last = m.stats; m.stats.ms.roundTrip = wall;
-      showMesh(m);
-      showStats(m.stats);
-      showErrors([], m.stats.warnings);
-      setStatus(statusNote + `built in ${m.stats.ms.total.toFixed(0)} ms (generator ${(m.stats.ms.statics + m.stats.ms.reduce + m.stats.ms.pass).toFixed(0)} ms, mesh ${m.stats.ms.mesh.toFixed(0)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
-      console.log(`[towerweb] built H${m.stats.H} q${m.stats.q}: ${m.stats.triangles} triangles, util ${m.stats.util?.toFixed(3)}, statics ${m.stats.ms.statics.toFixed(1)} ms, pass ${m.stats.ms.pass.toFixed(1)} ms, mesh ${m.stats.ms.mesh.toFixed(1)} ms, round trip ${wall.toFixed(0)} ms`);
+      const st = m.stats, ms = st.ms;
+      const gen = (ms.statics || 0) + (ms.reduce || 0) + (ms.pass || 0);
+      // status and errors first, so a display problem below cannot leave a stale "building…" or error behind
+      if (jsonErrs.length) { showErrors(jsonErrs, []); setStatus('not rebuilt: fix the JSON (showing the last good tower)'); }
+      else {
+        showErrors([], st.warnings || []);
+        setStatus(statusNote + `built in ${fmt(ms.total)} ms (generator ${fmt(gen)} ms, mesh ${fmt(ms.mesh)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
+      }
+      try { showMesh(m); showStats(st); } catch (err) {
+        T.errors.push('display: ' + err.message);
+        showErrors([`could not display the result (${err.message}); if this persists, reload the page`], st.warnings || []);
+        console.error(err);
+      }
+      console.log(`[towerweb] built H${st.H} q${st.q}: ${st.triangles} triangles, util ${st.util?.toFixed(3)}, generator ${gen.toFixed(1)} ms, mesh ${fmt(ms.mesh, 1)} ms, round trip ${wall.toFixed(0)} ms`);
     } else {
       T.errors.push(m.error);
-      showErrors([m.error], []);
+      showErrors([...jsonErrs, m.error], []);
       setStatus('build failed (showing the last good tower)');
       console.log('[towerweb] error: ' + m.error);
     }
@@ -311,7 +325,8 @@ worker.onmessage = (e) => {
 };
 
 // wire counts: final tower, and the stitched (library) tower if different
-function wiresRow(w) {
+function wiresRow(w, s) {
+  if (!w || !w.final) return `${s.cables} cables${s.backstays ? `, ${s.backstays} back-stays` : ''}`;
   const f = w.final, r = w.stitched;
   const one = (c) => `${c.cables} cables, ${c.stays} stays (${c.stayCables} cables), ${c.backstays} back-stays`;
   let h = one(f);
@@ -330,12 +345,12 @@ function showStats(s) {
     ['Layout', `H ${s.H}, ${s.booms} boom${s.booms === 1 ? '' : 's'}, q ${fmt(s.q, 2)}`],
     ['Nodes / members', `${s.nodes} / ${s.members}`],
     ['Struts', `${s.struts} (${s.laced} laced)`],
-    ['Wires', wiresRow(s.wires)],
+    ['Wires', wiresRow(s.wires, s)],
     ['Max utilisation', util],
     ['Steel volume', `${fmt(s.volume, 1)} (raw ${fmt(s.volumeRaw, 1)}), ${s.rounds} resize rounds`],
     ['Library tiers', tiers],
     ['Triangles', `${s.triangles}`],
-    ['Time', `statics+lookup+stitch ${fmt(s.ms.statics, 1)} ms, ${s.wires.reduction ? `wire reduction ${fmt(s.ms.reduce, 1)} ms, ` : ''}pass ${fmt(s.ms.pass, 1)} ms, mesh ${fmt(s.ms.mesh, 1)} ms`],
+    ['Time', `statics+lookup+stitch ${fmt(s.ms.statics, 1)} ms, ${s.wires && s.wires.reduction ? `wire reduction ${fmt(s.ms.reduce, 1)} ms, ` : ''}pass ${fmt(s.ms.pass, 1)} ms, mesh ${fmt(s.ms.mesh, 1)} ms`],
   ];
   $('stats').innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('');
 }
@@ -572,8 +587,8 @@ T.t0 = performance.now();
 worker.postMessage({ type: 'init' });
 (async () => {
   const get = async (u) => { const r = await fetch(u); if (!r.ok) throw new Error(`${u}: HTTP ${r.status}`); return r.text(); };
-  const [vis, doc, sol, sdoc, ...lays] = await Promise.all([get('data/visual-defaults.json'), get('data/visual-doc.json'),
-    get('data/solver-defaults.json'), get('data/solver-doc.json'), ...PRESETS.map((p) => get(`layouts/${p}.json`))]);
+  const [vis, doc, sol, sdoc, ...lays] = await Promise.all([get(v('data/visual-defaults.json')), get(v('data/visual-doc.json')),
+    get(v('data/solver-defaults.json')), get(v('data/solver-doc.json')), ...PRESETS.map((p) => get(v(`layouts/${p}.json`)))]);
   defaults.visual = vis;
   defaults.solver = sol;
   PRESETS.forEach((p, i) => { defaults.layouts[p] = prettyLayout(lays[i]); });

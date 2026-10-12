@@ -61,6 +61,20 @@ line), and every editor change re-reads all controls (keys absent from the JSON 
 are highlighted). A control change on a JSON with a syntax error is refused with a note. localStorage (plus the
 active tab), reset and the zip work as before. Test: `/tmp/twtest/sliders.py`; screenshot `screenshot-sliders.png`.
 
+## Cache busting (2026-10-12)
+Cloudflare answers every non-HTML asset with `Cache-Control: max-age=14400`, so after a deploy a browser could
+run the new index.html / app.js with a cached older towergen.js (stats without `wires`): showStats threw inside the
+worker message handler, so the status stayed at "building…" and an old error stayed up. Fixes:
+- `dist`'s doLast appends `?v=<sha256 prefix>` to every asset URL: index.html (css, scripts, import map),
+  three.module.js -> three.core.js, worker.js (`./towergen.js`, plus an `{path: hash}` map replacing
+  `/*@ASSETS@*/{}` for the library), app.js (`./zip.js`, the worker URL, data/*.json, layouts). It fails the build if
+  a reference it expects is missing. Unbuilt `src/web` still works (empty map, plain URLs).
+- app.js sets the status and clears the errors before drawing; a display error is reported, never swallowed;
+  missing stats fields are tolerated; JSON syntax errors of the latest edit stay up when an earlier build finishes.
+- Wanted headers (Saya's caddy): `/` and `/index.html`: `Cache-Control: no-cache`; everything requested with `?v=`:
+  `Cache-Control: public, max-age=31536000, immutable` (Cloudflare's default cache key includes the query string).
+  Test with a Cloudflare-like server: `/tmp/twtest/cfserve.py` + `stale.py`.
+
 ## towergen changes made for this
 - `Portable.compare` / `Portable.sha1` replace `Arrays.compare(int[], int[])` and `MessageDigest("SHA-1")`, which the
   TeaVM classlib lacks. The goldens are unchanged.

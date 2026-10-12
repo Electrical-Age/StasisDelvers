@@ -5,10 +5,13 @@
 import * as tg from './towergen.js';
 
 let ready = false;
+// cache busting (see app.js): paths relative to the site root
+const ASSETS = /*@ASSETS@*/{};
+const v = (p) => (ASSETS[p] ? `${p}?v=${ASSETS[p]}` : p);
 
 async function init() {
   const t0 = performance.now();
-  const resp = await fetch('../data/towerlib.bin');
+  const resp = await fetch('../' + v('data/towerlib.bin'));
   if (!resp.ok) throw new Error(`library download failed: HTTP ${resp.status}`);
   let buf = new Uint8Array(await resp.arrayBuffer());
   const t1 = performance.now();

@@ -103,4 +103,41 @@ tasks.register('dist', Sync) {
     from(project(':towergen').layout.buildDirectory.file('libbin/p3a_library.bin.gz')) { rename { 'towerlib.bin' }; into 'data' }
     from(project(':towergen').file('layouts')) { include '*.json'; into 'layouts' }
     from(vendorDir) { into 'vendor' }
+    // Cache busting: every asset URL gets ?v=<content hash>, so a CDN / browser cache can never mix old and new
+    // files. Leaves first (hashes of the final bytes), then the files that reference them: three.module.js (imports
+    // three.core.js), worker.js, app.js (both get an {path: hash} map in place of /*@ASSETS@*/{}), index.html.
+    doLast {
+        File root = layout.projectDirectory.dir('dist').asFile
+        def hash = { File f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString().substring(0, 12) }
+        def rel = { File f -> root.toPath().relativize(f.toPath()).toString().replace('\\', '/') }
+        def special = ['index.html', 'js/app.js', 'js/worker.js', 'vendor/three/three.module.js']
+        Map<String, String> h = new TreeMap<>()
+        root.eachFileRecurse(groovy.io.FileType.FILES) { f -> if (!(rel(f) in special)) h[rel(f)] = hash(f) }
+        def edit = { String path, Closure<String> c ->
+            File f = new File(root, path)
+            String t0 = f.getText('UTF-8'), t1 = c(t0)
+            f.setText(t1, 'UTF-8')
+            h[path] = hash(f)
+        }
+        def need = { String t, String what -> if (!t.contains(what)) throw new GradleException("cache busting: '${what}' not found"); t }
+        edit('vendor/three/three.module.js') { t -> need(t, './three.core.js').replace('./three.core.js', "./three.core.js?v=${h['vendor/three/three.core.js']}") }
+        def json = { groovy.json.JsonOutput.toJson(new TreeMap(h)) }
+        edit('js/worker.js') { t ->
+            need(need(t, "'./towergen.js'"), '/*@ASSETS@*/{}').replace("'./towergen.js'", "'./towergen.js?v=${h['js/towergen.js']}'").replace('/*@ASSETS@*/{}', json())
+        }
+        edit('js/app.js') { t ->
+            need(need(t, "'./zip.js'"), '/*@ASSETS@*/{}').replace("'./zip.js'", "'./zip.js?v=${h['js/zip.js']}'").replace('/*@ASSETS@*/{}', json())
+        }
+        edit('index.html') { t ->
+            String r = t.replaceAll(/(href|src)="(?!https?:|#|data:)([^"?#]+)"/) { all, attr, p ->
+                if (!h.containsKey(p)) throw new GradleException("cache busting: index.html references unknown ${p}")
+                "${attr}=\"${p}?v=${h[p]}\""
+            }
+            r.replaceAll(/"\.\/(vendor\/[^"?]+)"/) { all, p ->
+                if (!h.containsKey(p)) throw new GradleException("cache busting: import map references unknown ${p}")
+                "\"./${p}?v=${h[p]}\""
+            }
+        }
+        logger.lifecycle("dist: cache-busting hashes for ${h.size()} files")
+    }
 }
