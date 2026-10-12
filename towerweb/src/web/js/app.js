@@ -38,15 +38,64 @@ function makeEditor(host, onChange) {
   return { get: () => ta.value, set: (s) => { ta.value = s; }, markError: () => {} };
 }
 
-// JSON.parse with a line number for the error (V8: "position N", Firefox: "line L column C")
+// JSON.parse with a line number for the error (located by a small scanner; browsers' messages differ)
 function parseJson(text, what) {
   try { return { value: JSON.parse(text) }; } catch (e) {
-    let line = null;
-    const mPos = /position (\d+)/.exec(e.message), mLine = /line (\d+)/.exec(e.message);
-    if (mLine) line = +mLine[1] - 1;
-    else if (mPos) line = text.slice(0, +mPos[1]).split('\n').length - 1;
-    return { error: `${what}: ${e.message}`, line };
+    const pos = jsonErrorPos(text);
+    const line = text.slice(0, pos).split('\n').length - 1;
+    return { error: `${what} line ${line + 1}: ${e.message}`, line };
   }
+}
+
+// offset of the first syntax error in a JSON text (strict JSON)
+function jsonErrorPos(t) {
+  let i = 0;
+  const ws = () => { while (i < t.length && ' \t\n\r'.includes(t[i])) i++; };
+  const fail = () => { throw i; };
+  const lit = (w) => { if (t.startsWith(w, i)) i += w.length; else fail(); };
+  function str() {
+    i++;
+    while (i < t.length && t[i] !== '"') {
+      if (t[i] === '\\') { i++; if (t[i] === 'u') { if (!/^[0-9a-fA-F]{4}$/.test(t.substr(i + 1, 4))) fail(); i += 4; } else if (!'"\\/bfnrt'.includes(t[i])) fail(); }
+      else if (t.charCodeAt(i) < 0x20) fail();
+      i++;
+    }
+    if (i >= t.length) fail();
+    i++;
+  }
+  function val() {
+    ws();
+    const c = t[i];
+    if (c === '{') {
+      i++; ws();
+      if (t[i] === '}') { i++; return; }
+      for (;;) {
+        ws(); if (t[i] !== '"') fail(); str(); ws();
+        if (t[i] !== ':') fail(); i++; val(); ws();
+        if (t[i] === ',') { i++; continue; }
+        if (t[i] === '}') { i++; return; }
+        fail();
+      }
+    } else if (c === '[') {
+      i++; ws();
+      if (t[i] === ']') { i++; return; }
+      for (;;) {
+        val(); ws();
+        if (t[i] === ',') { i++; continue; }
+        if (t[i] === ']') { i++; return; }
+        fail();
+      }
+    } else if (c === '"') str();
+    else if (c === 't') lit('true');
+    else if (c === 'f') lit('false');
+    else if (c === 'n') lit('null');
+    else {
+      const m = /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/.exec(t.slice(i, i + 64));
+      if (!m) fail();
+      i += m[0].length;
+    }
+  }
+  try { val(); ws(); if (i < t.length) fail(); return t.length; } catch (p) { if (typeof p === 'number') return Math.min(p, t.length); throw p; }
 }
 
 // ------------------------------------------------------------------ 3D view
@@ -54,7 +103,7 @@ const view = $('view');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 view.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -122,7 +171,7 @@ function applyView(v, radius) {
   if (grid) { scene.remove(grid); grid.geometry.dispose(); grid = null; }
   if (v.drawGround && v.groundGrid > 0) {
     const n = Math.min(400, Math.ceil(radius * 3 / v.groundGrid));
-    const gc = srgb(v.groundColour).multiplyScalar(0.75);
+    const gc = srgb(v.groundColour).multiplyScalar(0.6);
     grid = new THREE.GridHelper(2 * n * v.groundGrid, 2 * n, gc, gc);
     grid.position.y = 0.01;
     grid.material.transparent = true; grid.material.opacity = 0.6;
@@ -161,7 +210,7 @@ function frame(b) {
   if (!b) { if (!T.last) return; b = T.last.bounds; }
   const cx = (b[0] + b[3]) / 2, cy = (b[1] + b[4]) / 2, cz = (b[2] + b[5]) / 2;
   const r = Math.max(4, Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2);
-  const dist = r / Math.sin(camera.fov * Math.PI / 360) * 0.9;
+  const dist = r / Math.sin(camera.fov * Math.PI / 360) * 0.75;
   const az = 215 * Math.PI / 180, el = 18 * Math.PI / 180;
   controls.target.set(cx, cy, cz);
   camera.position.set(cx + dist * Math.cos(el) * Math.cos(az), cy + dist * Math.sin(el), cz + dist * Math.cos(el) * Math.sin(az));

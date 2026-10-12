@@ -21,8 +21,11 @@ mesh. `towergen` has no Minecraft or NeoForge dependency (and no third-party dep
   - `Sections`: member sections (p25fem.props / sig_laced).
   - `Mesh`, `MeshBuilder`, `VisualParams`: triangles with flat normals and a part per triangle (part -> material id:
     rust, steel, cable, porcelain, glow, brass, concrete).
+  - `LibraryBin`: compact lossless binary library (TGLB1; `:towergen:libraryBin`), used by `towerweb`.
+  - `Portable`: `Arrays.compare` / SHA-1 stand-ins (the TeaVM classlib lacks them).
   - `TowerGen`: facade, `new TowerGen(Library.shared()).build(layout, q)`.
 - `towergen/layouts/`: the 7 golden layouts. `towergen/renders/`: headless renders (only the contact sheet is in git).
+- `towerweb/`: the browser build (TeaVM) and static site, see towerweb/NOTES.md.
 - `towerview/`: the viewer (`Main` CLI, `Raster` software renderer, `Interactive` LWJGL window), `shell.nix`, `run.sh`.
 
 ## Running
@@ -84,6 +87,7 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   800 pass, 31 have util 1.02-3.2, all with H >= 64 and long booms; no exceptions, no mechanisms. The game needs a
   policy for these (reject / "simplify" hint / bigger laced ladder).
 - Meshes are heavy: H64max is ~117k triangles (lacing dominates). LOD (skip lacing at distance) is needed in the mod.
-- The library is 7.8 MB gz in the jar; a compact binary export (1/16-block int nodes, no q0.3 duplicates) is not done.
+- The library is 7.8 MB gz in the jar. `LibraryBin` (TGLB1, lossless, 2.0 MB gz, reads in 20 ms) exists for towerweb;
+  the mod could load it too (`LibraryBin.read`), but it doesn't yet.
 - The interactive window was tested only under Xvfb + Mesa llvmpipe (renders, `--snap` hook); mouse, keys and the
   file-reload loop need a desktop (saya).
