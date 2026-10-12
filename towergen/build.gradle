@@ -1,0 +1,41 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'org.erisia.stasis'
+version = '0.1.0'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform {
+        // slow tests (timings, random layouts): ./gradlew :towergen:slowTest
+        excludeTags 'slow'
+    }
+    maxHeapSize = '2g'
+    testLogging { events 'failed'; exceptionFormat 'full'; showStandardStreams = true }
+}
+
+tasks.register('slowTest', Test) {
+    description = 'Timing and random-layout tests'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'slow' }
+    maxHeapSize = '2g'
+    testLogging { events 'failed', 'passed'; exceptionFormat 'full'; showStandardStreams = true }
+}
