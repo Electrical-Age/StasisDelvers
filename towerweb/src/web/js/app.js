@@ -5,7 +5,7 @@ import { makeZip } from './zip.js';
 
 const PRESETS = ['H16', 'H24b', 'H40', 'H40r3', 'H40b4', 'H64max', 'H100'];
 const DEFAULT_PRESET = 'H40r3';
-const LS = { layout: 'towerweb.layout', visual: 'towerweb.visual', solver: 'towerweb.solver', q: 'towerweb.q', preset: 'towerweb.preset' };
+const LS = { layout: 'towerweb.layout', visual: 'towerweb.visual', solver: 'towerweb.solver', q: 'towerweb.q', preset: 'towerweb.preset', tab: 'towerweb.tab' };
 const $ = (id) => document.getElementById(id);
 
 // exposed for tests / the console
@@ -23,6 +23,7 @@ function makeEditor(host, onChange) {
     return {
       get: () => cm.getValue(),
       set: (s) => cm.setValue(s),
+      refresh: () => cm.refresh(),
       markError: (line) => {
         if (errLine !== null) cm.removeLineClass(errLine, 'background', 'cm-errline');
         errLine = line;
@@ -35,7 +36,7 @@ function makeEditor(host, onChange) {
   ta.className = 'plain'; ta.spellcheck = false;
   host.appendChild(ta);
   ta.addEventListener('input', () => onChange());
-  return { get: () => ta.value, set: (s) => { ta.value = s; }, markError: () => {} };
+  return { get: () => ta.value, set: (s) => { ta.value = s; onChange(); }, refresh: () => {}, markError: () => {} };
 }
 
 // JSON.parse with a line number for the error (located by a small scanner; browsers' messages differ)
@@ -341,8 +342,8 @@ function showStats(s) {
 
 // ------------------------------------------------------------------ controls
 const edLayout = makeEditor($('edLayout'), () => { statusNote = ''; scheduleBuild(); });
-const edVisual = makeEditor($('edVisual'), () => { statusNote = ''; scheduleBuild(); });
-const edSolver = makeEditor($('edSolver'), () => { statusNote = ''; scheduleBuild(); });
+const edVisual = makeEditor($('edVisual'), () => { statusNote = ''; syncControls('visual'); scheduleBuild(); });
+const edSolver = makeEditor($('edSolver'), () => { statusNote = ''; syncControls('solver'); scheduleBuild(); });
 
 const sel = $('preset');
 for (const p of PRESETS) { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); }
@@ -372,7 +373,9 @@ $('resetLayout').addEventListener('click', () => {
   setPreset(PRESETS.includes(state.preset) ? state.preset : DEFAULT_PRESET); framedKey = null; requestBuild();
 });
 $('resetVisual').addEventListener('click', () => { edVisual.set(defaults.visual); requestBuild(); });
-$('solverHelpLink').addEventListener('click', () => { $('help').open = true; });
+document.querySelectorAll('.helplink').forEach((a) => a.addEventListener('click', () => { $('help').open = true; }));
+$('resetSolverCtl').addEventListener('click', () => { edSolver.set(defaults.solver); requestBuild(); });
+$('resetVisualCtl').addEventListener('click', () => { edVisual.set(defaults.visual); requestBuild(); });
 $('resetSolver').addEventListener('click', () => { edSolver.set(defaults.solver); requestBuild(); });
 const q = $('q');
 function setQ(v) { state.q = v; q.value = v; $('qval').textContent = (+v).toFixed(2); }
@@ -386,6 +389,146 @@ $('zip').addEventListener('click', () => {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 });
+
+// ------------------------------------------------------------------ slider controls (generated from the key docs)
+// Both views edit the same JSON text: a control change rewrites the key in the editor (one key per line), an editor
+// change re-reads every control. Keys missing from the JSON show their default.
+const ENUMS = { xPanels: ['keep', 'single', 'auto'] };
+// [min, max, 'log'?] where the default-derived range does not fit (documented valid ranges, angles, loads)
+const RANGES = {
+  maxStaysPerBoom: [0, 30], minStaysPerBoom: [0, 4], maxCablesPerBay: [0, 16],
+  backstayMinBoom: [2, 100], backstayDistFactor: [0.1, 2], backstayDistCap: [2, 64], backstayMinTension: [0, 5],
+  backstaySecondPair: [5, 1000, 'log'],
+  pretensionFactor: [0, 5], pretensionMargin: [1, 2], raiseIters: [0, 200], maxRounds: [1, 100], utilLimit: [0.5, 1.5],
+  emitterWeight: [0.3, 30, 'log'], emitterWind: [0.05, 5, 'log'], windDrag: [0.003, 0.3, 'log'], torsion: [0.04, 4, 'log'],
+  density: [0.1, 10, 'log'], extraWidthSteps: [0, 12],
+  sunAzimuth: [0, 360], sunElevation: [0, 90], fovDeg: [15, 110], ambient: [0, 1], lacingPanelsMin: [1, 10],
+  lacingPanelsMax: [2, 40], groundGrid: [0, 16], lacedEndTaper: [0, 0.5], lacedEndFrac: [0, 1], lacingWidthFrac: [0.05, 1],
+};
+const SECTION_NAMES = [
+  ['wire reduction', 'Wires'], ['back-stays', 'Back-stays'], ['pretension', 'Pass'], ['loads', 'Loads'],
+  ['member catalogue', 'Catalogue'], ['solid struts', 'Struts, pole, cables'], ['laced', 'Lacing'],
+  ['tapered joints', 'Joints'], ['footings', 'Footings, deadmen, core, emitters'], ['colours', 'Colours'], ['viewer', 'Viewer'],
+];
+const OPEN_SECTIONS = ['Wires', 'Struts, pole, cables'];
+const paramCtls = { visual: [], solver: [] };
+
+function niceCeil(x) {
+  const e = Math.pow(10, Math.floor(Math.log10(x))), m = x / e;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * e;
+}
+function rangeOf(e) {
+  if (RANGES[e.key]) return RANGES[e.key];
+  const d = +e.default;
+  if (e.type === 'integer') return [0, Math.max(4, Math.ceil(3 * d))];
+  return [0, d > 0 ? niceCeil(3 * d) : 1];
+}
+const round = (x) => +(+x).toPrecision(4);
+const hex = (c) => '#' + c.map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('');
+const unhex = (h) => [1, 3, 5].map((i) => +(parseInt(h.substr(i, 2), 16) / 255).toFixed(3));
+
+// one key per line, values compact
+function stringifyParams(o) {
+  const ks = Object.keys(o);
+  return '{\n' + ks.map((k, i) => `  ${JSON.stringify(k)}: ${JSON.stringify(o[k]).replace(/,/g, ', ')}${i + 1 < ks.length ? ',' : ''}`).join('\n') + '\n}\n';
+}
+
+function editorOf(which) { return which === 'solver' ? edSolver : edVisual; }
+
+function setKey(which, key, value) {
+  const ed = editorOf(which);
+  let o;
+  try { o = ed.get().trim() ? JSON.parse(ed.get()) : {}; } catch (e) { o = null; }
+  const note = $(which === 'solver' ? 'ctlSolver' : 'ctlVisual').querySelector('.ctlnote');
+  if (!o || typeof o !== 'object' || Array.isArray(o)) { note.textContent = `${which}.json has a syntax error: fix it in Advanced: JSON first`; return; }
+  note.textContent = '';
+  o[key] = value;
+  ed.set(stringifyParams(o));            // fires the editor change: rebuild (debounced) and control sync
+}
+
+function buildControls(which, doc) {
+  const host = $(which === 'solver' ? 'ctlSolver' : 'ctlVisual');
+  host.innerHTML = '<div class="ctlnote"></div>';
+  let det = null, sec = null;
+  for (const e of doc) {
+    if (e.section !== sec || !det) {
+      sec = e.section;
+      const name = (SECTION_NAMES.find(([p]) => sec.startsWith(p)) || [null, sec || 'Other'])[1];
+      det = document.createElement('details');
+      det.open = OPEN_SECTIONS.includes(name);
+      det.innerHTML = `<summary>${esc(name)}<span class="full">${esc(sec)}</span></summary>`;
+      host.appendChild(det);
+    }
+    const row = document.createElement('div');
+    row.className = 'ctl';
+    const lab = document.createElement('label');
+    lab.textContent = e.key;
+    lab.title = `${e.key} (default ${Array.isArray(e.default) ? '[' + e.default.join(', ') + ']' : e.default}): ${e.doc}`;
+    row.appendChild(lab);
+    const c = { key: e.key, def: e.default, lab };
+    if (e.type === 'boolean') {
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.addEventListener('change', () => setKey(which, e.key, cb.checked));
+      row.appendChild(cb); row.appendChild(document.createElement('span'));
+      c.set = (v) => { cb.checked = !!v; };
+    } else if (ENUMS[e.key] || e.type === 'string') {
+      const sl = document.createElement('select');
+      for (const o of ENUMS[e.key] || [e.default]) { const op = document.createElement('option'); op.value = op.textContent = o; sl.appendChild(op); }
+      sl.addEventListener('change', () => setKey(which, e.key, sl.value));
+      row.appendChild(sl); row.appendChild(document.createElement('span'));
+      c.set = (v) => { sl.value = v; };
+    } else if (e.type.startsWith('colour')) {
+      const ci = document.createElement('input'); ci.type = 'color';
+      const tx = document.createElement('span'); tx.className = 'note';
+      ci.addEventListener('input', () => setKey(which, e.key, unhex(ci.value)));
+      row.appendChild(ci); row.appendChild(tx);
+      c.set = (v) => { if (Array.isArray(v) && v.length === 3) { ci.value = hex(v); tx.textContent = v.map((x) => (+x).toFixed(2)).join(' '); } };
+    } else {
+      const [lo, hi, scale] = rangeOf(e);
+      const isInt = e.type === 'integer', log = scale === 'log';
+      const sl = document.createElement('input'); sl.type = 'range';
+      const nb = document.createElement('input'); nb.type = 'number'; nb.step = isInt ? '1' : 'any';
+      if (log) { sl.min = 0; sl.max = 1000; sl.step = 1; }
+      else { sl.min = lo; sl.max = hi; sl.step = isInt ? 1 : (hi - lo) / 500; }
+      const toSlider = (v) => log ? 1000 * Math.log(Math.max(v, lo) / lo) / Math.log(hi / lo) : v;
+      const fromSlider = (t) => {
+        if (log) return round(lo * Math.pow(hi / lo, t / 1000));
+        return isInt ? Math.round(t) : round(t);
+      };
+      sl.addEventListener('input', () => { const v = fromSlider(+sl.value); nb.value = v; setKey(which, e.key, v); });
+      nb.addEventListener('change', () => {
+        if (nb.value === '' || Number.isNaN(+nb.value)) return;
+        const v = isInt ? Math.round(+nb.value) : +nb.value;
+        sl.value = toSlider(v); setKey(which, e.key, v);
+      });
+      row.appendChild(sl); row.appendChild(nb);
+      c.set = (v) => { if (typeof v === 'number') { sl.value = toSlider(v); nb.value = isInt ? v : round(v); } };
+    }
+    det.appendChild(row);
+    paramCtls[which].push(c);
+  }
+}
+
+function syncControls(which) {
+  if (!paramCtls[which].length) return;
+  let o;
+  try { o = editorOf(which).get().trim() ? JSON.parse(editorOf(which).get()) : {}; } catch (e) { return; }
+  if (!o || typeof o !== 'object') return;
+  $(which === 'solver' ? 'ctlSolver' : 'ctlVisual').querySelector('.ctlnote').textContent = '';
+  for (const c of paramCtls[which]) {
+    const v = c.key in o ? o[c.key] : c.def;
+    c.set(v);
+    c.lab.classList.toggle('changed', JSON.stringify(v) !== JSON.stringify(c.def));
+  }
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('active', p.id === 'pane-' + name));
+  localStorage.setItem(LS.tab, name);
+  if (name === 'json') { edVisual.refresh(); edSolver.refresh(); }
+}
+document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
 // ------------------------------------------------------------------ help
 function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
@@ -435,11 +578,15 @@ worker.postMessage({ type: 'init' });
   defaults.solver = sol;
   PRESETS.forEach((p, i) => { defaults.layouts[p] = prettyLayout(lays[i]); });
   $('helptext').innerHTML = helpHtml(JSON.parse(doc), JSON.parse(sdoc));
+  buildControls('solver', JSON.parse(sdoc));
+  buildControls('visual', JSON.parse(doc));
+  showTab(localStorage.getItem(LS.tab) || 'solver');
   const savedL = localStorage.getItem(LS.layout), savedV = localStorage.getItem(LS.visual), savedS = localStorage.getItem(LS.solver);
   sel.value = PRESETS.includes(state.preset) ? state.preset : 'custom';
   edLayout.set(savedL ?? defaults.layouts[PRESETS.includes(state.preset) ? state.preset : DEFAULT_PRESET]);
   edVisual.set(savedV ?? defaults.visual);
   edSolver.set(savedS ?? defaults.solver);
+  syncControls('visual'); syncControls('solver');
   setQ(state.q);
   clearTimeout(timer);
   requestBuild();

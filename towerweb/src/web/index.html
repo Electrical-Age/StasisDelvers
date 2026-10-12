@@ -42,10 +42,23 @@
     <div id="errors"></div>
     <div class="edhead"><span>layout.json</span><button id="resetLayout" class="small">reset</button></div>
     <div class="editor" id="edLayout"></div>
-    <div class="edhead"><span>visual.json</span><button id="resetVisual" class="small">reset to defaults</button></div>
-    <div class="editor tall" id="edVisual"></div>
-    <div class="edhead"><span>solver.json</span><span><a href="#solverhelp" class="small" id="solverHelpLink">help</a> <button id="resetSolver" class="small">reset to defaults</button></span></div>
-    <div class="editor" id="edSolver"></div>
+    <div class="tabs">
+      <button class="tab" data-tab="solver">Solver</button><button class="tab" data-tab="visual">Visual</button><button class="tab" data-tab="json">Advanced: JSON</button>
+    </div>
+    <div class="tabpane" id="pane-solver">
+      <div class="panehead"><span>solver.json: wires, back-stays, pass, loads, catalogue <a href="#solverhelp" class="small helplink">help</a></span><button id="resetSolverCtl" class="small">reset to defaults</button></div>
+      <div id="ctlSolver" class="controls"></div>
+    </div>
+    <div class="tabpane" id="pane-visual">
+      <div class="panehead"><span>visual.json: proportions, colours, viewer <a href="#help" class="small helplink">help</a></span><button id="resetVisualCtl" class="small">reset to defaults</button></div>
+      <div id="ctlVisual" class="controls"></div>
+    </div>
+    <div class="tabpane" id="pane-json">
+      <div class="edhead"><span>visual.json</span><button id="resetVisual" class="small">reset to defaults</button></div>
+      <div class="editor tall" id="edVisual"></div>
+      <div class="edhead"><span>solver.json</span><span><a href="#solverhelp" class="small helplink">help</a> <button id="resetSolver" class="small">reset to defaults</button></span></div>
+      <div class="editor" id="edSolver"></div>
+    </div>
     <div class="row buttons">
       <button id="zip">Download zip (layout.json, visual.json, solver.json)</button>
     </div>

@@ -48,6 +48,19 @@ maxStaysPerBoom 2 on H40r3 -> 108 -> 80 stays, util 0.969, 138 ms; the zip holds
 defaults. maxStaysPerBoom 2 + xPanels single on the presets: H16 2 ms, H24b 20, H40 17, H40r3 122, H40b4 83,
 H64max 1263 ms (falls back to stays only), H100 106 ms. Screenshot: `screenshot-solver.png`.
 
+## Sliders (2026-10-12)
+visual.json and solver.json are also edited as controls, in tabs Solver / Visual / Advanced: JSON (the JSON editors).
+The controls are generated in `app.js` from `data/*-doc.json`: numbers get a slider plus a number box, integers step
+1, booleans a checkbox, `xPanels` a dropdown (`ENUMS`), colours a colour picker. Sections are the record's `// ---`
+headers with short names (Wires, Back-stays, Pass, Loads, Catalogue, Struts/pole/cables, Lacing, Joints, Footings,
+Colours, Viewer), collapsible. Ranges: `RANGES` in app.js for documented / meaningful ranges (stay and cable
+counts, utilLimit 0.5-1.5, pretensionFactor 0-5, angles, fov); loads and backstaySecondPair are log sliders over
+default /10 .. x10; everything else 0 .. 3x the default rounded up (ints 0 .. max(4, 3x)). The number box accepts
+values outside the slider range. One source of truth: a control rewrites its key in the editor text (one key per
+line), and every editor change re-reads all controls (keys absent from the JSON show their default; changed keys
+are highlighted). A control change on a JSON with a syntax error is refused with a note. localStorage (plus the
+active tab), reset and the zip work as before. Test: `/tmp/twtest/sliders.py`; screenshot `screenshot-sliders.png`.
+
 ## towergen changes made for this
 - `Portable.compare` / `Portable.sha1` replace `Arrays.compare(int[], int[])` and `MessageDigest("SHA-1")`, which the
   TeaVM classlib lacks. The goldens are unchanged.
