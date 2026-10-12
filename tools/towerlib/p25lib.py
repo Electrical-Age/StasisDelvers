@@ -1,19 +1,15 @@
 """TOWERLIB P2.5: P2's keyed library with pretensioned design (p25fem), laced built-up members and boom back-stays.
 Reuses p2lib's keys, bay / boom problems and seam logic. Cache: p25cache/ (never touches p2cache_v2)."""
 import os
-os.environ['P2CACHE'] = os.environ.get('P2CACHE_P25', 'p25cache')     # p2lib creates its cache dir on import
 import hashlib, json, math, pickle, sys, time
 import numpy as np
-import fem as F
-import spine as S1
-import p2spine as S
-import p2lib as L
-import p25fem as Q
+from . import fem as F
+from . import spine as S1
+from . import p2spine as S
+from . import p2lib as L
+from . import p25fem as Q
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, 'p25cache')
-os.makedirs(CACHE, exist_ok=True)
-assert L.CACHE == CACHE, L.CACHE
+from .paths import CACHE
 TOL = 1e-6
 DIRS = L.DIRS
 rot, rkey, khash = L.rot, L.rkey, L.khash

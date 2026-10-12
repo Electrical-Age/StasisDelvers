@@ -6,8 +6,8 @@ import os, sys
 os.environ["OMP_NUM_THREADS"] = "1"
 import itertools, json, time, pickle
 from collections import Counter, defaultdict
-import p3alib as A
-import p3acov as C
+from . import p3alib as A
+from . import p3acov as C
 MAXR = int(os.environ.get('P3A_MAXR', '3'))
 MIN_SEEN = int(os.environ.get('P3A_MIN_SEEN', '3'))
 

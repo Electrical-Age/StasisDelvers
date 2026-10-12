@@ -10,10 +10,11 @@ os.environ["OMP_NUM_THREADS"] = "1"; os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import copy, glob, json, pickle, time
 import numpy as np
 from multiprocessing import Pool
-import p3alib as A
+from . import p3alib as A
 HERE = os.path.dirname(os.path.abspath(__file__))
+from .paths import OUT
 LAY = json.load(open(os.path.join(HERE, 'p3acov_layouts.json')))
-LOG = open(os.path.join(HERE, 'p3acov.log'), 'a')
+LOG = open(os.path.join(OUT, 'p3acov.log'), 'a')
 
 
 def log(*a):
@@ -246,7 +247,7 @@ def phase_test():
         tiers_seam = [lookup_bay(s, idx, True)[0] for s in specs]
         tiers_plain = [lookup_bay(s, idx, False)[0] for s in specs]
         res.append(dict(i=li, layout=l, boom_tiers=bt, seam_tiers=tiers_seam, plain_tiers=tiers_plain))
-    json.dump(res, open(os.path.join(HERE, 'p3acov_test.json'), 'w'))
+    json.dump(res, open(os.path.join(OUT, 'p3acov_test.json'), 'w'))
     summarize(res)
 
 
@@ -269,10 +270,9 @@ def summarize(res):
 
 
 def phase_validate(N):
-    sys.path.insert(0, HERE)
-    import p3afem as V, p3avar
+    from . import p3afem as V, p3avar
     idx = lib_index()
-    res = json.load(open(os.path.join(HERE, 'p3acov_test.json')))
+    res = json.load(open(os.path.join(OUT, 'p3acov_test.json')))
     cand = [r for r in res if 'error' not in r and (any(t not in ('seam_exact', 'plain_exact') for t in r['seam_tiers']) or any(b != 'exact' for b in r['boom_tiers']))
             and all(t != 'none' for t in r['seam_tiers'])]
     cand.sort(key=lambda r: r['i'])
@@ -302,7 +302,7 @@ def phase_validate(N):
         row['t_lookup'] = t_lookup
         out.append(row)
         log('validate ' + json.dumps({k: v for k, v in row.items() if k not in ('tiers',)}, default=str))
-    json.dump(out, open(os.path.join(HERE, 'p3acov_val.json'), 'w'), default=str)
+    json.dump(out, open(os.path.join(OUT, 'p3acov_val.json'), 'w'), default=str)
     for q in ('q1.0', 'q0.3'):
         log(f'validate {q}: {sum(o[q].get("pass", False) for o in out)}/{len(out)} pass')
 

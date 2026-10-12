@@ -23,8 +23,8 @@ pole forces the pretension causes. Per case N = N0 + dN_k (linear, all cables ac
 import time
 import numpy as np
 import scipy.linalg as sla
-import fem as F
-import p2fem as PF
+from . import fem as F
+from . import p2fem as PF
 
 WEXT = np.round(0.05 * 1.2 ** np.arange(24), 3)        # 0.05 .. 2.76 (laced outer sizes go past 1.92)
 assert np.allclose(WEXT[:21], F.WIDTHS)

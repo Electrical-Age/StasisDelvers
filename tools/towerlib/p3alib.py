@@ -16,18 +16,15 @@ Integer keys (canonical form, reproduced by Java):
      lexicographically; ties -> smallest r.
 """
 import os, sys
-import p25lib as L25
-import p2lib as L
-HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, os.environ.get('P3A_CACHE', 'p3acache'))
-os.makedirs(CACHE, exist_ok=True)
-L25.CACHE = CACHE; L.CACHE = CACHE
+from . import p25lib as L25
+from . import p2lib as L
+from .paths import CACHE        # one solve cache for p2lib / p25lib / p3alib (paths.py)
 import hashlib, json, math, pickle, time
 import numpy as np
-import fem as F
-import spine as S1
-import p2spine as S
-import p25fem as Q
+from . import fem as F
+from . import spine as S1
+from . import p2spine as S
+from . import p25fem as Q
 
 TOL = 1e-6
 DIRS = L.DIRS
@@ -97,7 +94,10 @@ D_FRAC = 0.5                                      # ... and at most this fractio
 BS_T_MIN = 0.3                                    # wires with less design tension are dropped
 BS_CAP = F.SIG_CAB * Q.BS_W[-1] ** 2 / 1.6        # per-wire design tension limit (room for the load change)
 BACKSTAY_MODE = os.environ.get('P3A_BS', 'net')   # 'net' (P3a) or 'per' (P2.5 per-boom, for comparison)
-LAYOUTS = dict(**{k: v for k, v in __import__('p2run').LAYOUTS.items()})
+LAYOUTS = {'H16': dict(H=16, booms=[]), 'H40': dict(H=40, booms=[]), 'H100': dict(H=100, booms=[]),     # was p2run.LAYOUTS
+           'H24b': dict(H=24, booms=[(10, 'E', 8), (18, 'N', 6)]),
+           'H40b4': dict(H=40, booms=[(8, 'E', 20), (14, 'S', 12), (22, 'W', 6), (30, 'N', 10)]),
+           'H64max': dict(H=64, booms=[(24, 'E', 40)])}
 LAYOUTS['H40r3'] = dict(H=40, booms=[(y, d, Lb) for y, Lb in ((10, 16), (20, 10), (30, 6)) for d in 'ENWS'])
 TEST7 = ['H16', 'H40', 'H100', 'H24b', 'H40b4', 'H64max', 'H40r3']
 

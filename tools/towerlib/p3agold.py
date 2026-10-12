@@ -4,12 +4,13 @@ import os, sys
 os.environ["OMP_NUM_THREADS"] = "1"
 import gzip, json, pickle, time
 import numpy as np
-import p3alib as A
-import p2lib as L
-import p25fem as Q
-import p25lib as L25
-import p3avar
+from . import p3alib as A
+from . import p2lib as L
+from . import p25fem as Q
+from . import p25lib as L25
+from . import p3avar
 HERE = os.path.dirname(os.path.abspath(__file__))
+from .paths import OUT
 R4 = lambda a: np.round(np.asarray(a, float), 4).tolist()
 CHOSEN = ('fixf', dict(f=1.5))
 
@@ -43,7 +44,7 @@ def main():
     out = []
     for n in A.TEST7:
         for q in (1.0, 0.3):
-            fn = os.path.join(HERE, f'p3araw_{n}_seam_q{q}.pkl')
+            fn = os.path.join(OUT, f'p3araw_{n}_seam_q{q}.pkl')
             raw = pickle.load(open(fn, 'rb'))
             raw['prob_pw0'] = raw['prob']['pw'].copy()
             t0 = time.perf_counter()
@@ -62,10 +63,10 @@ def main():
                                 backstays=int((fin['st']['kind'] == 3).sum()))
             stt['raw'] = dict(max_util=res['raw_util'] or 0.0)
             stt['bsinfo'] = raw['bsinfo']; stt['booms'] = raw['booms']
-            pickle.dump(stt, open(os.path.join(HERE, f'p3af_{n}_q{q}.pkl'), 'wb'))
+            pickle.dump(stt, open(os.path.join(OUT, f'p3af_{n}_q{q}.pkl'), 'wb'))
     js = json.dumps(out, separators=(',', ':')).encode()
-    open(os.path.join(HERE, 'p3a_goldens.json'), 'wb').write(js)
-    open(os.path.join(HERE, 'p3a_goldens.json.gz'), 'wb').write(gzip.compress(js, 9))
+    open(os.path.join(OUT, 'p3a_goldens.json'), 'wb').write(js)
+    open(os.path.join(OUT, 'p3a_goldens.json.gz'), 'wb').write(gzip.compress(js, 9))
     print('goldens', len(out), len(js), 'bytes')
 
 

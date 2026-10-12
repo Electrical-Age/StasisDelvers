@@ -9,12 +9,10 @@ Kept as close to grow/xbrace/xb.py as possible. Differences:
 - utilisation from the strict tension-only elastic solution (|N|/cap per member, pole kink force / cap).
 """
 import math, os, sys, time
-sys.path.insert(0, '/var/lib/mclab/agent/timestop-proto/grow')
-sys.path.insert(0, '/var/lib/mclab/agent/timestop-proto/grow/ground_structure')
 import numpy as np
 import scipy.sparse as sp
 from scipy.optimize import linprog
-import gs as G
+from . import gsx as G
 
 SIG_T, SIG_C0, L0, E = 300.0, 150.0, 3.0, G.E
 RHO = 1.0

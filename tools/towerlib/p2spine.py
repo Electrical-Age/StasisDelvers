@@ -6,8 +6,8 @@
 """
 import math
 import numpy as np
-import fem as F
-import spine as S1
+from . import fem as F
+from . import spine as S1
 
 BAY = 4
 S_LADDER = (0.0, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0)

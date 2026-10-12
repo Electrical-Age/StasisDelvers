@@ -6,17 +6,14 @@ maps to case 1 + (k - 1 + 2r) mod 8 under r quarter turns. Boom entries are solv
 """
 import hashlib, json, math, os, pickle, sys, time
 import numpy as np
-import fem as F
-import spine as S1
-import p2spine as S
-import p2fem as PF
+from . import fem as F
+from . import spine as S1
+from . import p2spine as S
+from . import p2fem as PF
 
-sys.path.insert(0, '/var/lib/mclab/agent/timestop-proto/grow/ground_structure')
-import gs as G
+from . import gsx as G
+from .paths import CACHE
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, os.environ.get('P2CACHE', 'p2cache_v2'))
-os.makedirs(CACHE, exist_ok=True)
 TOL = 1e-6
 DIRS = {'E': 0, 'S': 1, 'W': 2, 'N': 3}
 L_LADDER = [2, 3, 4, 6, 8, 11, 16, 22, 32, 45, 64, 90, 128]
@@ -495,9 +492,7 @@ def solve_entry(job):
 
 
 def count_x(P, bars, cab):
-    sys.path.insert(0, '/var/lib/mclab/agent/timestop-proto/grow/xbrace')
-    import xb
-    return xb.count_x(P, bars, cab)
+    return G.count_x(P, bars, cab)
 
 
 def cached(keystr):
@@ -650,7 +645,7 @@ def stitch(b, q=1.0, seed=1):
 
 
 def merged_counts(P, bars, cab, width, keep_nodes):
-    import gs as G_
+    G_ = G
     nb = {False: 0, True: 0}
     for cl in (False, True):
         sel = cab == cl

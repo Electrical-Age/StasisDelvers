@@ -3,10 +3,11 @@ import os, sys
 os.environ["OMP_NUM_THREADS"] = "1"; os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import copy, json, pickle, time
 import numpy as np
-import p25lib as L25
-import p25fem as Q
-import p3afem as V
+from . import p25lib as L25
+from . import p25fem as Q
+from . import p3afem as V
 HERE = os.path.dirname(os.path.abspath(__file__))
+from .paths import OUT
 MODES = [('pinv', {}), ('xpair', {}), ('nnls', {}), ('fixf', dict(f=1.0)), ('fixf', dict(f=1.5)), ('fixf', dict(f=0.0))]
 
 
@@ -62,7 +63,7 @@ if __name__ == '__main__':
                 r = dict(mode=mode + ('' if not kw else '_' + '_'.join(f'{k}{v}' for k, v in kw.items())), error=repr(ex)[:300], **{'pass': False})
             res.append(r)
             print(tag, json.dumps({k: v for k, v in r.items() if k != 'util_per_case'}), flush=True)
-        ofn = os.path.join(HERE, f'p3avar_{tag}.json')
+        ofn = os.path.join(OUT, f'p3avar_{tag}.json')
         if os.path.exists(ofn) and os.environ.get('P3A_MODES'):
             old = [r for r in json.load(open(ofn)) if r['mode'] not in {x['mode'] for x in res}]
             res = old + res

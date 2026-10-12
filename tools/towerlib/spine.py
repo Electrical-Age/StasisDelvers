@@ -6,7 +6,7 @@ Interfaces ("rings") every 4 blocks at y = 0, 4, ..., H. Ring half-width s in {0
 """
 import math
 import numpy as np
-import fem as F
+from . import fem as F
 
 DIRS = {'E': (1, 0), 'W': (-1, 0), 'S': (0, 1), 'N': (0, -1)}
 S_LADDER = (0.0, 0.75, 1.0, 1.25, 1.5)

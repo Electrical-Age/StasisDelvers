@@ -2,12 +2,13 @@
 reproduce the keys. python3 p3aexport.py"""
 import glob, gzip, json, os, pickle, time
 import numpy as np
-import p3alib as A
-import p2lib as L
-import p2spine as S
-import p25fem as Q
-import fem as F
+from . import p3alib as A
+from . import p2lib as L
+from . import p2spine as S
+from . import p25fem as Q
+from . import fem as F
 HERE = os.path.dirname(os.path.abspath(__file__))
+from .paths import OUT
 R4 = lambda a: np.round(np.asarray(a, float), 4).tolist()
 
 
@@ -38,6 +39,32 @@ def header():
                        CH_MAX=Q.CH_MAX, R_REF=Q.R_REF, STAY_CAP=A.STAY_CAP, STAY_RISE=A.STAY_RISE,
                        STAY_MIN_RATIO=A.STAY_MIN_RATIO, STAY_MIN_RISE=A.STAY_MIN_RISE),
         cases=[[c[0], None if c[1] is None else list(map(float, c[1])), c[2]] for c in F.CASES])
+
+
+def provenance(n_cache):
+    """Builder git commit, date, solve parameters (header['provenance']; Java ignores it)."""
+    import datetime, platform, subprocess, sys
+    import scipy
+    from . import paths
+
+    def git(*a):
+        try:
+            return subprocess.run(['git', '-C', HERE, *a], capture_output=True, text=True, timeout=10).stdout.strip()
+        except Exception:
+            return ''
+    env = {k: v for k, v in sorted(os.environ.items()) if k.startswith('P3A_')}
+    return dict(
+        builder='stasis tools/towerlib (python -m towerlib)',
+        builder_commit=git('rev-parse', 'HEAD'),
+        builder_dirty=bool(git('status', '--porcelain', '--', '.')),
+        origin='timestop-proto towerlib @ e060c08 (P3a + stay rule); see tools/towerlib/README.md',
+        date=os.environ.get('TOWERLIB_DATE') or datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        cache=os.path.basename(paths.CACHE.rstrip('/')), cache_files=n_cache,
+        params=dict(D_CAP=A.D_CAP, D_FRAC=A.D_FRAC, BACKSTAY_MODE=A.BACKSTAY_MODE, STAY_CAP=A.STAY_CAP,
+                    STAY_RISE=A.STAY_RISE, STAY_MIN_RATIO=A.STAY_MIN_RATIO, STAY_MIN_RISE=A.STAY_MIN_RISE,
+                    rules='entries = union of the solve cache: P3a rule (stay cap none) runs, then stay rule (same)',
+                    env=env),
+        python=platform.python_version(), numpy=np.__version__, scipy=scipy.__version__)
 
 
 def main():
@@ -72,17 +99,18 @@ def main():
             d['q03'] = ser(lo['P'], lo['bars'], lo['st'], lo['pre'], lo['pw'])
         ents.append(d)
     hd = header()
+    hd['provenance'] = provenance(len(glob.glob(os.path.join(A.CACHE, '*.pkl'))))
     hd['boom_failed'] = sorted(failed)               # solved but no valid design: layouts needing these are refused
     hd['boom_failed_doc'] = 'boom keys whose solve failed (LP infeasible or repair gave up); refuse, never fall back'
     lib = dict(header=hd, entries=ents)
     js = json.dumps(lib, separators=(',', ':')).encode()
-    open(os.path.join(HERE, 'p3a_library.json'), 'wb').write(js)
+    open(os.path.join(OUT, 'p3a_library.json'), 'wb').write(js)
     gz = gzip.compress(js, 9)
-    open(os.path.join(HERE, 'p3a_library.json.gz'), 'wb').write(gz)
+    open(os.path.join(OUT, 'p3a_library.json.gz'), 'wb').write(gz)
     st = dict(entries=len(ents), booms=n['boom'], boom_failed=len(failed), bays_plain=n['bay'], bays_seam=n['seam'], with_low_q=low,
               members=nmem, solve_cpu_s=round(cpu, 1), json_bytes=len(js), json_gz_bytes=len(gz),
               export_s=round(time.time() - t0, 1))
-    json.dump(st, open(os.path.join(HERE, 'p3a_libstats.json'), 'w'))
+    json.dump(st, open(os.path.join(OUT, 'p3a_libstats.json'), 'w'))
     print(json.dumps(st))
 
 

@@ -1,8 +1,10 @@
 """Random layouts by the game rules (TOWER-DESIGN.md): H 4..100; 0..12 booms in the 4 cardinal directions at any
 integer height 2..H-2 (above the 2-high core), length 2..(H - yb), at most one boom per (height, direction).
-Weighted to realistic sizes: 75% of towers H <= 40; boom count skewed low; lengths skewed short."""
+Weighted to realistic sizes: 75% of towers H <= 40; boom count skewed low; lengths skewed short.
+Writes OUT/p3acov_layouts.json; the copy next to this file (the training / held-out layouts) is the one used."""
 import json, os, random
 HERE = os.path.dirname(os.path.abspath(__file__))
+from .paths import OUT
 
 
 def layout(rng):
@@ -24,7 +26,7 @@ if __name__ == '__main__':
     rng = random.Random(20261012)
     train = [layout(rng) for _ in range(400)]
     test = [layout(rng) for _ in range(150)]
-    json.dump(dict(train=train, test=test), open(os.path.join(HERE, 'p3acov_layouts.json'), 'w'))
+    json.dump(dict(train=train, test=test), open(os.path.join(OUT, 'p3acov_layouts.json'), 'w'))
     import statistics as st
     for nm, ls in (('train', train), ('test', test)):
         Hs = [l['H'] for l in ls]; nbs = [len(l['booms']) for l in ls]

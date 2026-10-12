@@ -9,7 +9,7 @@
 import time
 import numpy as np
 import scipy.linalg as sla
-import fem as F
+from . import fem as F
 
 TAUT_PRE_MAX = 0.5          # max pretension / cable capacity accepted in a bay design
 

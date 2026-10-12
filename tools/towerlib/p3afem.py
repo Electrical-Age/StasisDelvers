@@ -16,9 +16,9 @@ import time
 import numpy as np
 import scipy.linalg as sla
 from scipy.optimize import nnls as _nnls
-import fem as F
-import p2fem as PF
-import p25fem as Q
+from . import fem as F
+from . import p2fem as PF
+from . import p25fem as Q
 
 PRE_MARGIN = Q.PRE_MARGIN
 STATS = {}
