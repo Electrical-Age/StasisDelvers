@@ -74,3 +74,9 @@ and warnings, and a store-only zip download of both JSON files. Edits stay in `l
 - WASM-GC was not tried; the JS target is already within 2-3x of the JVM.
 - Very large meshes (H64max is 117k triangles) are fine on desktop but heavy on phones. There is no LOD.
 - The ground grid barely shows through the fog at the default colours.
+- `vendor` fetches jsDelivr's on-the-fly minified files without checksums, so a clean rebuild may get different
+  (equivalent) bytes. Pin npm tarballs if that matters.
+- The camera reframes only on a preset/random/reset or a marked change of tower size. Double-click reframes.
+- Needs a 2023+ browser: import maps, module workers, DecompressionStream.
+- Extreme layouts (H100 with four 96-block booms) build in about 1.2 s and come out at util 6.5. They show the
+  over-catalogue warning and still render.

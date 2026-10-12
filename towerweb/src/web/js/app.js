@@ -202,7 +202,7 @@ function showMesh(msg) {
   const b = s.bounds;
   const radius = Math.max(10, Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2);
   applyView(s.view, radius);
-  const key = `${s.H}`;
+  const key = `${s.H}|${Math.round(Math.log2(radius) * 2)}`;   // reframe when the size changes markedly
   if (key !== framedKey) { frame(b); framedKey = key; }
 }
 
@@ -232,7 +232,7 @@ renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, came
 const state = { preset: localStorage.getItem(LS.preset) || DEFAULT_PRESET, q: +(localStorage.getItem(LS.q) || 1) };
 const defaults = { layouts: {}, visual: '' };
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-let busy = false, pending = null, nextId = 1, timer = null, randomCb = null;
+let busy = false, pending = null, nextId = 1, timer = null, randomCb = null, statusNote = '';
 
 function setStatus(s) { $('status').textContent = s; }
 function showErrors(errs, warns) {
@@ -257,7 +257,7 @@ function requestBuild() {
   edLayout.markError(pl.error ? pl.line : null);
   edVisual.markError(pv.error ? pv.line : null);
   const errs = [pl.error, pv.error].filter(Boolean);
-  if (errs.length) { showErrors(errs, []); setStatus('not rebuilt: fix the JSON'); return; }
+  if (errs.length) { pending = null; showErrors(errs, []); setStatus('not rebuilt: fix the JSON'); return; }
   pending = { type: 'build', layout: lt, q: state.q, visual: vt };
   pump();
 }
@@ -294,7 +294,7 @@ worker.onmessage = (e) => {
       showMesh(m);
       showStats(m.stats);
       showErrors([], m.stats.warnings);
-      setStatus(`built in ${m.stats.ms.total.toFixed(0)} ms (generator ${(m.stats.ms.statics + m.stats.ms.pass).toFixed(0)} ms, mesh ${m.stats.ms.mesh.toFixed(0)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
+      setStatus(statusNote + `built in ${m.stats.ms.total.toFixed(0)} ms (generator ${(m.stats.ms.statics + m.stats.ms.pass).toFixed(0)} ms, mesh ${m.stats.ms.mesh.toFixed(0)} ms; ${wall.toFixed(0)} ms incl. worker and upload)`);
       console.log(`[towerweb] built H${m.stats.H} q${m.stats.q}: ${m.stats.triangles} triangles, util ${m.stats.util?.toFixed(3)}, statics ${m.stats.ms.statics.toFixed(1)} ms, pass ${m.stats.ms.pass.toFixed(1)} ms, mesh ${m.stats.ms.mesh.toFixed(1)} ms, round trip ${wall.toFixed(0)} ms`);
     } else {
       T.errors.push(m.error);
@@ -326,8 +326,8 @@ function showStats(s) {
 }
 
 // ------------------------------------------------------------------ controls
-const edLayout = makeEditor($('edLayout'), () => scheduleBuild());
-const edVisual = makeEditor($('edVisual'), () => scheduleBuild());
+const edLayout = makeEditor($('edLayout'), () => { statusNote = ''; scheduleBuild(); });
+const edVisual = makeEditor($('edVisual'), () => { statusNote = ''; scheduleBuild(); });
 
 const sel = $('preset');
 for (const p of PRESETS) { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); }
@@ -348,8 +348,8 @@ $('random').addEventListener('click', () => {
     state.preset = 'custom'; sel.value = 'custom';
     framedKey = null;
     edLayout.set(layout);
+    statusNote = `random layout (seed ${seed}): `;
     clearTimeout(timer); requestBuild();
-    setStatus(`random layout (seed ${seed})`);
   };
   worker.postMessage({ type: 'random', id: 0, seed });
 });
