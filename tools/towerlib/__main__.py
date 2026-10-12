@@ -50,9 +50,9 @@ def full():
     # 2. stay rule (2026-10-13, NOTES-P3a.md section 10): new boom / bay / seam keys of the training layouts
     for ph in ('booms', 'bays', 'seams'):
         step('cov', ph, P3A_STAYCAP='same')
-    # 3. library, goldens (the test layouts again under the rule: only H40r3 has new keys)
-    step('export', P3A_STAYCAP='same')
+    # 3. the test layouts again under the rule (only H40r3 has new keys: +16), then library and goldens
     layouts(seams=('seam',), P3A_STAYCAP='same')
+    step('export', P3A_STAYCAP='same')
     step('gold', P3A_STAYCAP='same')
 
 

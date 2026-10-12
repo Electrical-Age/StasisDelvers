@@ -74,4 +74,10 @@ versions. It survives into TGLB1 (the header is stored as JSON) and is ignored b
 - Fresh cache, `goldens` (7 test layouts, seam, under the stay rule; 135 entries solved in ~40 s): every entry
   byte-identical (as exported JSON) to the shipped library's entry of the same key, and `p3a_goldens.json`
   byte-identical to the shipped goldens.
-- Full rebuild from an empty cache: see the result line below.
+- Full rebuild from an empty cache (`full`, P3A_PROCS=16: 18 min wall; booms 185 + 21, bays 1962 + 86, seams
+  1952 + 85, patterns 1138 + 2151 solved): **7726 of the shipped 7747 entries, every one byte-identical**, the
+  same `boom_failed` list, no entry the shipped library lacks, and byte-identical goldens. The 21 missing entries
+  (11 plain, 10 seam bays) are proto cache files written by earlier code states (12 during the 2026-10-12 19:26
+  test-layout runs, 9 during the 2026-10-13 00:03 stay-rule runs, before the last p3acov edit) whose keys the final
+  code no longer generates for these layouts. They are valid solves; to keep them, export from (or seed the cache
+  with) `timestop-proto/towerlib/p3acache`.
