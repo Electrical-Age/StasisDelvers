@@ -26,6 +26,13 @@ public abstract class LivingEntityMixin {
         return !(self instanceof ServerPlayer p) || PlayerRates.ticksNow(p);
     }
 
+    /** A frozen mob doesn't cry out when hit (Baughn). */
+    @WrapWithCondition(method = "hurtServer", at = @At(value = "INVOKE",
+        target = "Lnet/minecraft/world/entity/LivingEntity;playHurtSound(Lnet/minecraft/world/damagesource/DamageSource;)V"))
+    private boolean stasis$silentWhenFrozen(LivingEntity self, net.minecraft.world.damagesource.DamageSource source) {
+        return !org.erisia.stasis.Stasis.isFrozen(self);
+    }
+
     /** Player.tick adds one to the attack cooldown after this: no net tick in a skipped one. */
     @Inject(method = "tick", at = @At("HEAD"))
     private void stasis$attackCooldownAtFieldRate(CallbackInfo ci) {
