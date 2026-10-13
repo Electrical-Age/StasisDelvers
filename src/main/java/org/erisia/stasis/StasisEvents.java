@@ -80,4 +80,17 @@ final class StasisEvents {
         le.damageCooldownTime = Math.max(0, le.damageCooldownTime - elapsed);
         le.hurtTime = Math.max(0, le.hurtTime - elapsed);
     }
+
+    /** Diagnostics (Baughn: animals in stopped land found dead): log every non-player death there, with its cause. */
+    static void deathLog(net.neoforged.neoforge.event.entity.living.LivingDeathEvent e) {
+        var le = e.getEntity();
+        if (le.level().isClientSide() || le instanceof net.minecraft.world.entity.player.Player) return;
+        if (Stasis.isRunning(le.level(), le.blockPosition())) return;
+        var src = e.getSource();
+        StackTraceElement[] st = Thread.currentThread().getStackTrace();
+        StringBuilder trace = new StringBuilder();
+        for (int k = 2; k < Math.min(st.length, 16); k++) trace.append("\n    at ").append(st[k]);
+        StasisDelvers.LOG.warn("Stopped-land death: {} at {} by {} (direct {}, attacker {}){}", le.getType().getDescriptionId(),
+            le.blockPosition().toShortString(), src.getMsgId(), src.getDirectEntity(), src.getEntity(), trace);
+    }
 }

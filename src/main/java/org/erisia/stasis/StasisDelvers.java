@@ -36,6 +36,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::pickup);
         NeoForge.EVENT_BUS.addListener(StasisEvents::itemJoin);
         NeoForge.EVENT_BUS.addListener(StasisEvents::incomingDamage);
+        NeoForge.EVENT_BUS.addListener(StasisEvents::deathLog);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, LocalTime::tick);
         NeoForge.EVENT_BUS.addListener(LocalTime::watch);
         NeoForge.EVENT_BUS.addListener(SpawnCottage::serverStarted);
