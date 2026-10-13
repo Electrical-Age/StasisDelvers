@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "package": "org.erisia.stasis.mixin.xaero",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinimapSessionMixin",
+    "WorldMapSessionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

@@ -12,6 +12,10 @@ Time stands still outside fields kept running by Electrical Age power.
 [[mixins]]
 config="${mod_id}.mixins.json"
 
+# optional: the stopped-land overlay on Xaero's Minimap / World Map (applies only when they're installed)
+[[mixins]]
+config="${mod_id}.xaero.mixins.json"
+
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"

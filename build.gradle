@@ -11,6 +11,11 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 repositories {
     mavenCentral()
+    // Xaero's Minimap / World Map, compile-only for the optional stopped-land map overlay (compat/xaero)
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
 }
 
 neoForge {
@@ -51,6 +56,8 @@ neoForge {
 def elnJar = file(project.findProperty('eln_jar') ?: '/var/lib/mclab/agent/eln/port26/build/libs/eln-26.3-0.1.0-port.jar')
 dependencies {
     compileOnly files(elnJar)
+    compileOnly 'maven.modrinth:xaeros-minimap:j2Xo3Dhc'   // xaerominimap-neoforge-26.3-26.6.0
+    compileOnly 'maven.modrinth:xaeros-world-map:p5t2Xn8F' // xaeroworldmap-neoforge-26.3-1.47.0
 }
 def copyEln = tasks.register('copyElnToRun', Copy) {
     from elnJar

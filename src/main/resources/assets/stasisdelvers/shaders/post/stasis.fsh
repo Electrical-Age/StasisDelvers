@@ -124,11 +124,12 @@ void main() {
     float warn = data(23);
     float depth = texture(DepthSampler, texCoord).r;
     // 26.3 renders with reversed Z in [0, 1]: the far plane (sky) is 0, and NDC z is the depth value itself
-    if (stops > 0.5 && depth > 0.0) {
+    // the sky (depth 0) takes the camera's place: grey while you stand in stopped land, in colour inside a field (λ-Nero)
+    if (stops > 0.5) {
         mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                         data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
         vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
-        vec3 rel = h.xyz / h.w;                                    // world position minus the camera
+        vec3 rel = depth > 0.0 ? h.xyz / h.w : vec3(0.0);         // world position minus the camera
         vec3 camFrac = vec3(data(19), data(20), data(21));
         vec3 p = rel + camFrac;                                    // world position minus floor(camera)
         vec3 camInt = vec3(data(16), data(17), data(18));

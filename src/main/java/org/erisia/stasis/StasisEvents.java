@@ -12,6 +12,8 @@ final class StasisEvents {
     }
 
     static void entityTick(EntityTickEvent.Pre e) {
+        // a mob killed in stopped land still finishes dying (else it lies there forever at 0 health: Baughn's pigs)
+        if (e.getEntity() instanceof net.minecraft.world.entity.LivingEntity le && le.isDeadOrDying()) return;
         if (Stasis.isFrozen(e.getEntity())) e.setCanceled(true);
     }
 

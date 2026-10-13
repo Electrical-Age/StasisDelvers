@@ -450,6 +450,25 @@ public final class StasisGameTests {
                 if (h.getLevel().getBlockEntity(master) instanceof org.erisia.stasis.TowerBlockEntity t) t.setRemoved();
             };
         }));
+        // Baughn: animals in stopped land were found dead (with loot dropped). They must stay alive, frozen.
+        CASES.put("animals_live_in_stopped_land", new Spec(200, (h, c) -> {
+            var pig = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.PIG, new Vec3(12.5, 1.0, 4.5));
+            var cow = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.COW, new Vec3(13.5, 1.0, 2.5));
+            ServerPlayer p = survivalPlayer(h, new Vec3(10.5, 1, 6.5), false);
+            float hp = pig.getHealth();
+            return () -> {
+                c.check("pig alive, unhurt", pig.isAlive() && pig.getHealth() == hp, "alive " + pig.isAlive() + " hp " + pig.getHealth() + " of " + hp
+                    + " last damage " + pig.getLastDamageSource());
+                c.check("cow alive", cow.isAlive(), "hp " + cow.getHealth() + " last damage " + cow.getLastDamageSource());
+                pig.discard(); cow.discard(); p.discard();
+            };
+        }, false, true));
+        // a mob killed in stopped land finishes dying and goes (it used to lie there at 0 health, frozen mid-death)
+        CASES.put("killed_mob_goes_in_stopped_land", new Spec(60, (h, c) -> {
+            var pig = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.PIG, new Vec3(12.5, 1.0, 4.5));
+            h.runAfterDelay(5, () -> pig.hurtServer(h.getLevel(), h.getLevel().damageSources().generic(), 100f));
+            return () -> c.check("the dead pig is gone", pig.isRemoved(), "removed " + pig.isRemoved() + " hp " + pig.getHealth() + " deathTime " + pig.deathTime);
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();
