@@ -293,3 +293,20 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   the mod could load it too (`LibraryBin.read`), but it doesn't yet.
 - The interactive window was tested only under Xvfb + Mesa llvmpipe (renders, `--snap` hook); mouse, keys and the
   file-reload loop need a desktop (saya).
+
+## Ladder well (2026-10-13, Baughn: option A)
+- No central pole inside the lattice. Lattice bays (sb, st > 0) have no pole nodes. Transition bays (sb > 0,
+  st = 0) carry a pole socket from HB/2 to the apex. The pole bay above clamps into it: its ghost lands on the
+  socket foot. Pole bays are unchanged.
+- No member but the legs enters the plan square |x|, |z| < WELL = 0.62 (shrunk to 0.8 s(y) where the transition
+  faces close in). In the transition bay this applies only below HB/2. tools/towerlib p2lib.well_skip;
+  TOWERLIB_WELL=0 restores the old model.
+- The ladder top is the transition bay's bottom ring. Platforms go at or below it (Baughn).
+- Stitch: poleChain starts with the ghost only if the pole reaches y = 0 (it no longer does), so there's no fake
+  clamp at the socket foot. MeshBuilder skips the ghost only when it's there.
+- Library rebuilt from an empty cache (`full`, 12 procs, ~25 min): 7845 entries (214 booms), boom_failed
+  unchanged [[9, 1, 6, 6]]. Infeasible keys (now refused or looked up as near matches): bays 27, seams 16,
+  patterns 214. Both golden sets regenerated (the main one under the stay rule, p3arule under stayCap none). All
+  14 pass with 0 members in the well below the ladder top. Steel volume changes by -25% to +30%.
+  Random slowTest: 94/120 pass, 2 over, 24 refused, the same as the old library.
+- Solve cache: /var/lib/mclab/agent/scratch/wellfull/cache on tsugumi (7846 pickles).

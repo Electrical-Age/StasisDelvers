@@ -366,8 +366,10 @@ def stitch(b, q=1.0, seed=1):
                             floor=np.array([T])))
     st = {k: np.concatenate([s[k] for s in sts]) for k in sts[0]}
     P = np.array(pts)
-    pole = [ghost] + sorted(pole_nodes, key=lambda i: pole_nodes[i])
-    pw = np.array([F.W_POLE_MIN] + [max(pole_w.get(i, F.W_POLE_MIN), F.W_POLE_MIN) for i in pole[1:]])
+    pole = sorted(pole_nodes, key=lambda i: pole_nodes[i])
+    base = [ghost] if pole and abs(pole_nodes[pole[0]]) < TOL else []   # ghost clamp only for a pole on the ground
+    pole = base + pole
+    pw = np.array([F.W_POLE_MIN] * len(base) + [max(pole_w.get(i, F.W_POLE_MIN), F.W_POLE_MIN) for i in pole[len(base):]])
     fixed = {ghost} | {i for i, p in enumerate(P) if abs(p[1]) < TOL}
     bars = np.array(bars, int)
     area = Q.props(P, bars, st)['area']

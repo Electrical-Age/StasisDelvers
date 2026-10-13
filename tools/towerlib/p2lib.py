@@ -15,6 +15,23 @@ from . import gsx as G
 from .paths import CACHE
 
 TOL = 1e-6
+# Ladder well (Baughn 2026-10-13, option A): no central pole inside the lattice. Lattice bays (sb, st > 0) have no
+# pole at all; transition bays (sb > 0, st = 0) carry only a pole socket from HB/2 to the apex. No member but the
+# legs may enter the plan square |x|, |z| < WELL (lattice: the whole bay; transition: below HB/2).
+WELL = float(os.environ.get('TOWERLIB_WELL', '0.62'))
+
+
+def well_skip(P, ylim, sb, st, hb):
+    """extra_skip for F.candidates: True for pairs whose segment enters the well below ylim. Where the faces close
+    in (a transition bay) the well shrinks to 0.8 of the ring half-width, so face members stay allowed."""
+    def skip(i, j):
+        for t in np.linspace(0.0, 1.0, 21):
+            x = P[i] + t * (P[j] - P[i])
+            w = min(WELL, 0.8 * (sb + (st - sb) * x[1] / hb))
+            if x[1] < ylim - TOL and max(abs(x[0]), abs(x[2])) < w:
+                return True
+        return False
+    return skip
 DIRS = {'E': 0, 'S': 1, 'W': 2, 'N': 3}
 L_LADDER = [2, 3, 4, 6, 8, 11, 16, 22, 32, 45, 64, 90, 128]
 RHO_LADDER = [0.35, 0.5, 0.7, 1.0, 1.4, 2.0, 2.8]
@@ -251,8 +268,9 @@ def mg_vec(key, mgv):
 def distribute(ext, P, ct, pt, pmid_top, st, Fv, Mv):
     """Apply a top-interface resultant (force Fv, moment Mv about the top centre) to the top ring / pole top."""
     if st > 0:
+        ctr = P[ct].mean(axis=0)              # the ring centre (lattice bays have no pole top node)
         for i in ct:
-            x, _, z = P[i] - P[pt]
+            x, _, z = P[i] - ctr
             f = Fv / 4.0
             f = f + np.array([0, Mv[2] * x / (4 * st ** 2) - Mv[0] * z / (4 * st ** 2), 0])
             f = f + Mv[1] / (8 * st ** 2) * np.array([z, 0, -x])
@@ -295,15 +313,21 @@ def bay_problem(spec, boom_entries, above_entry=None):
             fixed.add(len(pts) - 1)
         return len(pts) - 1
     ghost = add([0, -2.0, 0], True)
-    pb = add([0, 0.0, 0], True)
+    HB_ = float(key.get('h', 4))
+    lat = WELL > 0 and sb > 0             # ladder well: no pole below the socket
+    pb = add([0, 0.0, 0], True) if not lat else None
     cb = [add(p, True) for p in corners(sb, 0.0)] if sb > 0 else []
     roots_y = sorted({r[0] for r in key['roots'] if r[0] < 4 - TOL})
     pole_y = sorted({2.0} | set(roots_y))
+    if lat:
+        pole_y = [y for y in pole_y if y >= HB_ / 2 - TOL] if st <= 0 else []
     pmid = [add([0, y, 0]) for y in pole_y]
-    pt = add([0, 4.0, 0])
+    pt = add([0, 4.0, 0]) if not (lat and st > 0) else None
     ct = [add(p) for p in corners(st, 4.0)] if st > 0 else []
     legs = []
     leg_y = sorted(set(roots_y) | ({2.0} if key['mid'] else set()))
+    if lat and st <= 0:                   # the socket foot needs leg nodes to brace against
+        leg_y = sorted(set(leg_y) | {HB_ / 2})
     for k in range(4):
         if sb <= 0:
             break
@@ -312,10 +336,11 @@ def bay_problem(spec, boom_entries, above_entry=None):
         chain = [cb[k]] + [add(a + y / 4.0 * (b - a)) for y in leg_y] + [ct[k] if st > 0 else pt]
         legs.append(chain)
     P = np.array(pts)
-    pole = [ghost, pb] + pmid + [pt]
+    pole = [ghost, pb] + pmid + [pt] if not lat else pmid + ([pt] if pt is not None else [])
     wide = max(sb, st) >= 2.5
     bars, cab, is_pole = F.candidates(P, fixed, pole, {ghost}, rmax_s=9.5 if wide else F.RMAX,
-                                      rmax_c=14.0 if wide else F.RMAX_CAB)
+                                      rmax_c=14.0 if wide else F.RMAX_CAB,
+                                      extra_skip=well_skip(P, HB_ + 1 if st > 0 else HB_ / 2, sb, st, HB_) if lat else None)
     legset = {tuple(sorted((ch[i], ch[i + 1]))) for ch in legs for i in range(len(ch) - 1)}
     have = {(tuple(b), c) for b, c in zip(bars.tolist(), cab)}
     extra = [b for b in legset if (b, False) not in have]
@@ -328,22 +353,27 @@ def bay_problem(spec, boom_entries, above_entry=None):
     n = len(P)
     ext = np.zeros((F.K, n, 3))
     can = canonical_resultants(spec)
-    ptop_mid = pmid[-1] if pmid else pb
+    ptop_mid = pmid[-1] if pmid else (pb if pb is not None else pt)
     if above_entry is not None:
         dr = (spec['above']['r'] - spec['r']) % 4
         R = rot_cases(above_entry['reac'], dr)            # (K, nsup, 3)
         sup = rot(above_entry['P'][above_entry['sup']], dr) + [0, 4.0, 0]
+        agh = set(above_entry.get('ghost', []))
+        used_ = np.ones(len(sup), bool)
         for j, p in enumerate(sup):
             i = None
             for ii, q in enumerate(P):
                 if rkey(q) == rkey(p):
                     i = ii
             if i is None:
+                if above_entry['sup'][j] in agh:      # the ghost of a pole-less bay above: nothing to carry
+                    used_[j] = False
+                    continue
                 raise RuntimeError(f'seam node {p} not in bay')
             ext[:, i] += R[:, j]
         c0 = np.array([0, 4.0, 0])
         for k in range(F.K):
-            Fr = R[k].sum(0); Mr = np.sum(np.cross(sup - c0, R[k]), axis=0)
+            Fr = R[k][used_].sum(0); Mr = np.sum(np.cross(sup[used_] - c0, R[k][used_]), axis=0)
             distribute(ext[k], P, ct, pt, ptop_mid, st, can[k][0] - Fr, can[k][1] - Mr)
     else:
         for k in range(F.K):
@@ -375,7 +405,8 @@ def bay_problem(spec, boom_entries, above_entry=None):
     pwv = np.full(len(pole), F.W_POLE_MIN); pwv[:] = max(pw, F.W_POLE_MIN)
     sym = (not key['roots']) and key['mg'][0] < 0 and (above_entry is None or above_entry.get('sym', False))
     return dict(P=P, fixed=fixed, pole=pole, pw=pwv, bars=bars, cab=cab, mand=mand, amin=amin,
-                ext=ext.reshape(F.K, -1), ghost={ghost}, sym=sym, sup=[ghost, pb] + cb, top=[pt] + ct,
+                ext=ext.reshape(F.K, -1), ghost={ghost}, sym=sym, sup=[ghost] + ([pb] if pb is not None else []) + cb,
+                top=([pt] if pt is not None else []) + ct,
                 legs=legs, em=[], keep=sorted(keepn))
 
 
@@ -616,8 +647,10 @@ def stitch(b, q=1.0, seed=1):
             bars.append((loc[i], loc[j])); cab.append(c); width.append(w); owner.append(('boom', k))
         em.append(loc[be['tip']])
     P = np.array(pts)
-    pole = [ghost] + sorted(pole_nodes, key=lambda i: pole_nodes[i])
-    pw = np.array([F.W_POLE_MIN] + [max(pole_w.get(i, F.W_POLE_MIN), F.W_POLE_MIN) for i in pole[1:]])
+    pole = sorted(pole_nodes, key=lambda i: pole_nodes[i])
+    base = [ghost] if pole and abs(pole_nodes[pole[0]]) < TOL else []   # ghost clamp only for a pole on the ground
+    pole = base + pole
+    pw = np.array([F.W_POLE_MIN] * len(base) + [max(pole_w.get(i, F.W_POLE_MIN), F.W_POLE_MIN) for i in pole[len(base):]])
     fixed = {ghost} | {i for i, p in enumerate(P) if abs(p[1]) < TOL}
     bars = np.array(bars, int); cab = np.array(cab); width = np.array(width)
     seen = {}

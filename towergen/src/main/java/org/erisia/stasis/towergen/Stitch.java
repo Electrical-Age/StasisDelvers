@@ -227,13 +227,15 @@ public final class Stitch {
         for (int i = 0; i < t.n; i++) System.arraycopy(B.pts.get(i), 0, t.P, 3 * i, 3);
         List<Integer> pole = new ArrayList<>(poleNodes.keySet());
         pole.sort((a, b2) -> Double.compare(poleNodes.get(a), poleNodes.get(b2)));
-        t.poleChain = new int[pole.size() + 1];
-        t.pw = new double[pole.size() + 1];
-        t.poleChain[0] = ghost;
-        t.pw[0] = c.W_POLE_MIN;
+        // the ghost clamps the pole's foot only if the pole stands on the ground; with the ladder well the pole
+        // starts at the socket in the transition bay
+        int base = !pole.isEmpty() && Math.abs(poleNodes.get(pole.get(0))) < 1e-6 ? 1 : 0;
+        t.poleChain = new int[pole.size() + base];
+        t.pw = new double[pole.size() + base];
+        if (base == 1) { t.poleChain[0] = ghost; t.pw[0] = c.W_POLE_MIN; }
         for (int i = 0; i < pole.size(); i++) {
-            t.poleChain[i + 1] = pole.get(i);
-            t.pw[i + 1] = Math.max(poleW.getOrDefault(pole.get(i), c.W_POLE_MIN), c.W_POLE_MIN);
+            t.poleChain[i + base] = pole.get(i);
+            t.pw[i + base] = Math.max(poleW.getOrDefault(pole.get(i), c.W_POLE_MIN), c.W_POLE_MIN);
         }
         t.ghost = ghost;
         t.fixed = new boolean[t.n];

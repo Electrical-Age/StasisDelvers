@@ -141,8 +141,9 @@ public final class MeshBuilder {
         double[] P = t.P;
         Set<Long> poleSeg = new HashSet<>();
         Set<Integer> poleNodes = new HashSet<>();
-        for (int i = 1; i < t.poleChain.length; i++) poleNodes.add(t.poleChain[i]);
-        for (int i = 1; i + 1 < t.poleChain.length; i++) poleSeg.add(pk(t.poleChain[i], t.poleChain[i + 1]));
+        int pc0 = t.poleChain.length > 0 && t.poleChain[0] == t.ghost ? 1 : 0;    // skip the ghost clamp, if any
+        for (int i = pc0; i < t.poleChain.length; i++) poleNodes.add(t.poleChain[i]);
+        for (int i = pc0; i + 1 < t.poleChain.length; i++) poleSeg.add(pk(t.poleChain[i], t.poleChain[i + 1]));
         Set<Integer> ground = new HashSet<>();
         for (int g : t.ground) ground.add(g);
 
@@ -386,7 +387,7 @@ public final class MeshBuilder {
         for (Joint hb : chordHubs) if (hb.hull != null) hb.hull.draw(mesh, hb.part);
 
         // pole collars (brass), sized from the pole width
-        for (int q = 2; q + 1 < t.poleChain.length; q++) {
+        for (int q = pc0 + 1; q + 1 < t.poleChain.length; q++) {
             int nd = t.poleChain[q];
             double w = vp.poleCollarScale() * Math.max(t.pw[q], vp.poleMinWidth()) + vp.poleCollarAdd();
             double[] p = node(P, nd);
