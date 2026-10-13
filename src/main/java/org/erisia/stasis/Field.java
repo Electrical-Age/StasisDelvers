@@ -10,8 +10,13 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * failing (0..1): how far the shield has failed while its tower runs short of power (visual only). collapse (0..1):
  * after the tower's store ran out, the share of the field that has stopped again; outer blocks go first on average,
  * in noise patches, and at 1 nothing is left.
+ * <p>
+ * rate (0..1]: how fast time runs inside, as a share of the server's 20 TPS (Stasis.rateAt: where fields overlap the
+ * fastest wins). 1 = full speed (the default, and what fields saved before rates existed load as); towers start their
+ * field at StasisConfig.towerFieldRate.
  */
-public record Field(int id, double x, double y, double z, double radius, double failing, double collapse, boolean column) {
+public record Field(int id, double x, double y, double z, double radius, double failing, double collapse, boolean column,
+                    double rate) {
     public static final Codec<Field> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.INT.fieldOf("id").forGetter(Field::id),
         Codec.DOUBLE.fieldOf("x").forGetter(Field::x),
@@ -20,28 +25,38 @@ public record Field(int id, double x, double y, double z, double radius, double 
         Codec.DOUBLE.fieldOf("radius").forGetter(Field::radius),
         Codec.DOUBLE.optionalFieldOf("failing", 0.0).forGetter(Field::failing),
         Codec.DOUBLE.optionalFieldOf("collapse", 0.0).forGetter(Field::collapse),
-        Codec.BOOL.optionalFieldOf("column", false).forGetter(Field::column)
+        Codec.BOOL.optionalFieldOf("column", false).forGetter(Field::column),
+        Codec.DOUBLE.optionalFieldOf("rate", 1.0).forGetter(Field::rate)
     ).apply(i, Field::new));
 
     public Field(int id, double x, double y, double z, double radius) {
-        this(id, x, y, z, radius, 0, 0, false);
+        this(id, x, y, z, radius, 0, 0, false, 1.0);
     }
 
     /** column: a vertical cylinder from the bottom of the world to the top (λ-Nero's test variant). */
     public Field(int id, double x, double y, double z, double radius, boolean column) {
-        this(id, x, y, z, radius, 0, 0, column);
+        this(id, x, y, z, radius, 0, 0, column, 1.0);
     }
 
     public Field withRadius(double r) {
-        return new Field(id, x, y, z, r, failing, collapse, column);
+        return new Field(id, x, y, z, r, failing, collapse, column, rate);
     }
 
     public Field withFailing(double f) {
-        return new Field(id, x, y, z, radius, f, collapse, column);
+        return new Field(id, x, y, z, radius, f, collapse, column, rate);
     }
 
     public Field withCollapse(double c) {
-        return new Field(id, x, y, z, radius, failing, c, column);
+        return new Field(id, x, y, z, radius, failing, c, column, rate);
+    }
+
+    public Field withRate(double r) {
+        return new Field(id, x, y, z, radius, failing, collapse, column, clampRate(r));
+    }
+
+    /** Field rates live in (0, 1]: a field never stops time (that's the land outside) and never speeds it up. */
+    public static double clampRate(double r) {
+        return Math.max(0.001, Math.min(1.0, r));
     }
 
     /** True if the whole block at (bx, by, bz) lies inside the sphere (and hasn't stopped in a collapse). */

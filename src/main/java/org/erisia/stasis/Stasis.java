@@ -18,8 +18,9 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 /**
- * The rule: where does time run? Everywhere in dimensions not in the config's stopped list; in stopped dimensions
- * only in the spawn area and inside fields (whole blocks). Lookups go through a per-level index of which fields touch
+ * The rule: how fast does time run where? Full speed everywhere in dimensions not in the config's stopped list; in
+ * stopped dimensions full speed in the spawn area, the field's rate inside fields (whole blocks; the fastest of
+ * overlapping fields) and not at all elsewhere ({@link #rateAt}; stopped = rate 0). Lookups go through a per-level index of which fields touch
  * which chunk column, rebuilt when the fields change. Works on both sides: the server reads FieldData, the client the
  * fields the server sent it (ClientFields), so collisions with stopped water agree on both.
  */
@@ -89,19 +90,79 @@ public final class Stasis {
         return new int[]{(cx - r) << 4, (cz - r) << 4, ((cx + r) << 4) + 15, ((cz + r) << 4) + 15};
     }
 
-    /** Does time run in the whole block at (x, y, z)? */
-    public static boolean isRunning(Level level, int x, int y, int z) {
-        if (!stops(level)) return true;
+    /**
+     * The tick rate at the whole block (x, y, z), as a share of the server's rate: 1 where time runs normally
+     * (dimensions that don't stop, the spawn area), 0 in stopped land, and inside fields the rate of the fastest field
+     * that holds the whole block (collapsed blocks don't count). This is the one rule: stopped means rate 0.
+     */
+    public static double rateAt(Level level, int x, int y, int z) {
+        if (!stops(level)) return 1.0;
         int cx = x >> 4, cz = z >> 4;
-        if (inSpawn(level, cx, cz)) return true;
+        if (inSpawn(level, cx, cz)) return 1.0;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
-        if (fs == null) return false;
-        for (Field f : fs) if (f.containsBlock(x, y, z)) return true;
-        return false;
+        if (fs == null) return 0.0;
+        double rate = 0.0;
+        for (Field f : fs) {
+            if (f.rate() > rate && f.containsBlock(x, y, z)) {
+                rate = f.rate();
+                if (rate >= 1.0) break;
+            }
+        }
+        return rate;
+    }
+
+    public static double rateAt(Level level, BlockPos pos) {
+        return rateAt(level, pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    /** Does time run in the whole block at (x, y, z) at all (rate above 0)? */
+    public static boolean isRunning(Level level, int x, int y, int z) {
+        return rateAt(level, x, y, z) > 0.0;
     }
 
     public static boolean isRunning(Level level, BlockPos pos) {
         return isRunning(level, pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    /** Does the block at pos get this game tick (its rate says it runs now)? */
+    public static boolean ticksNow(Level level, BlockPos pos) {
+        return runs(rateAt(level, pos), level.getGameTime());
+    }
+
+    /**
+     * Rates are counted in thousandths so the gate is exact integer arithmetic (a double floor(t * rate) misrounds
+     * once game time gets large). Game tick t runs at rate r iff floor(t r) steps up at t: at 0.5 every other tick,
+     * at 0.6 three ticks in five. Stateless and the same for every block of that rate: overlapping fields, blocks
+     * and scheduled ticks all agree, and a restart doesn't shift anything.
+     */
+    static long milli(double rate) {
+        return Math.max(0, Math.min(1000, Math.round(rate * 1000)));
+    }
+
+    public static boolean runs(double rate, long gameTime) {
+        long m = milli(rate);
+        if (m >= 1000) return true;
+        if (m <= 0) return false;
+        return Math.floorDiv(gameTime * m, 1000) > Math.floorDiv((gameTime - 1) * m, 1000);
+    }
+
+    /**
+     * The game tick a scheduled tick with this delay falls due at: `delay` running ticks after now, so it always lands
+     * on a tick that runs. Rate 1 (or 0, or no delay): now + delay as vanilla (stopped blocks retry each tick through
+     * the tickBlock gate; LevelTicks keeps whole stopped columns waiting).
+     */
+    public static long dueTick(double rate, long now, int delay) {
+        long m = milli(rate);
+        if (m >= 1000 || m <= 0 || delay <= 0) return now + delay;
+        long k = Math.floorDiv(now * m, 1000) + delay;
+        return Math.ceilDiv(k * 1000, m);
+    }
+
+    /** dueTick for a block of this level (ServerLevelMixin.createTick). */
+    public static long dueTick(Level level, BlockPos pos, int delay) {
+        long now = level.getGameTime();
+        if (delay <= 0 || !stops(level)) return now + delay;
+        return dueTick(rateAt(level, pos), now, delay);
     }
 
     /** Could time run anywhere in this chunk column? False means the whole column is stopped. */

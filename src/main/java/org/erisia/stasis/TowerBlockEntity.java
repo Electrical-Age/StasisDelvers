@@ -183,7 +183,8 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     void start(ServerLevel sl) {
-        Field f = FieldData.get(sl).add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, radius());
+        Field f = FieldData.get(sl).add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, radius(), false,
+            StasisConfig.towerFieldRate);
         fieldId = f.id();
         state = State.RUNNING;
         failing = 0;

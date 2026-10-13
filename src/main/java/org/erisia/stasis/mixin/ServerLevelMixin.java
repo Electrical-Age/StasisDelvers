@@ -9,6 +9,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.ticks.ScheduledTick;
+import net.minecraft.world.ticks.TickPriority;
 import org.erisia.stasis.Stasis;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,7 +18,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Where time is stopped: no scheduled block or fluid ticks, no random ticks, no snow or ice. */
+/**
+ * Block time by rate (Stasis.rateAt; stopped = 0): scheduled block and fluid ticks are delayed by the rate and only
+ * run in game ticks their rate runs in; random ticks are skipped in the ticks it skips. Where time is stopped: no
+ * scheduled ticks, no random ticks, no snow or ice.
+ */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
     private ServerLevel self() {
@@ -32,10 +38,28 @@ public abstract class ServerLevelMixin {
         if (cir.getReturnValueZ() && !Stasis.mayRunInColumn(self(), chunkKey)) cir.setReturnValue(false);
     }
 
-    /** In a column a field touches, check the block: a stopped one gets its tick back for the next game tick. */
+    /**
+     * Scheduled ticks fall due `delay` running ticks from now (overrides LevelAccessor's defaults; at rate 1, and in
+     * dimensions that don't stop, exactly vanilla's now + delay).
+     */
+    public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay, TickPriority priority) {
+        ServerLevel l = self();
+        return new ScheduledTick<>(type, pos, Stasis.dueTick(l, pos, tickDelay), priority, l.nextSubTickCount());
+    }
+
+    public <T> ScheduledTick<T> createTick(BlockPos pos, T type, int tickDelay) {
+        ServerLevel l = self();
+        return new ScheduledTick<>(type, pos, Stasis.dueTick(l, pos, tickDelay), l.nextSubTickCount());
+    }
+
+    /**
+     * In a column a field touches, check the block: one that doesn't run this tick (stopped, or a slow field's
+     * skipped tick, e.g. a tick scheduled before the field's rate changed) gets its tick back for its next running
+     * tick (createTick puts delay 1 there; stopped blocks retry every tick).
+     */
     @Inject(method = "tickBlock", at = @At("HEAD"), cancellable = true)
     private void stasis$tickBlock(BlockPos pos, Block type, CallbackInfo ci) {
-        if (!Stasis.isRunning(self(), pos)) {
+        if (!Stasis.ticksNow(self(), pos)) {
             self().scheduleTick(pos, type, 1);
             ci.cancel();
         }
@@ -43,13 +67,13 @@ public abstract class ServerLevelMixin {
 
     @Inject(method = "tickFluid", at = @At("HEAD"), cancellable = true)
     private void stasis$tickFluid(BlockPos pos, Fluid type, CallbackInfo ci) {
-        if (!Stasis.isRunning(self(), pos)) {
+        if (!Stasis.ticksNow(self(), pos)) {
             self().scheduleTick(pos, type, 1);
             ci.cancel();
         }
     }
 
-    /** Random ticks, snow and ice: nothing at all in a wholly stopped column. */
+    /** Random ticks, snow and ice: nothing at all in a wholly stopped column (precipitation isn't rate-scaled). */
     @Inject(method = "tickChunk", at = @At("HEAD"), cancellable = true)
     private void stasis$tickChunk(LevelChunk chunk, int tickSpeed, CallbackInfo ci) {
         if (!Stasis.mayRunInColumn(self(), chunk.getPos().pack())) ci.cancel();
@@ -58,12 +82,12 @@ public abstract class ServerLevelMixin {
     @WrapWithCondition(method = "tickChunk", at = @At(value = "INVOKE",
         target = "Lnet/minecraft/world/level/block/state/BlockState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
     private boolean stasis$randomTickBlock(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        return Stasis.isRunning(level, pos);
+        return Stasis.ticksNow(level, pos);
     }
 
     @WrapWithCondition(method = "tickChunk", at = @At(value = "INVOKE",
         target = "Lnet/minecraft/world/level/material/FluidState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
     private boolean stasis$randomTickFluid(FluidState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        return Stasis.isRunning(level, pos);
+        return Stasis.ticksNow(level, pos);
     }
 }

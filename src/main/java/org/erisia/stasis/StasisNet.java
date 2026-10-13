@@ -21,7 +21,7 @@ public final class StasisNet {
     static final StreamCodec<RegistryFriendlyByteBuf, Field> FIELD = StreamCodec.composite(
         ByteBufCodecs.VAR_INT, Field::id, ByteBufCodecs.DOUBLE, Field::x, ByteBufCodecs.DOUBLE, Field::y,
         ByteBufCodecs.DOUBLE, Field::z, ByteBufCodecs.DOUBLE, Field::radius, ByteBufCodecs.DOUBLE, Field::failing,
-        ByteBufCodecs.DOUBLE, Field::collapse, ByteBufCodecs.BOOL, Field::column, Field::new);
+        ByteBufCodecs.DOUBLE, Field::collapse, ByteBufCodecs.BOOL, Field::column, ByteBufCodecs.DOUBLE, Field::rate, Field::new);
 
     public record Fields(List<Field> fields) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));
@@ -51,7 +51,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("1");
+            var r = e.registrar("2");
             r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> ClientFields.set(p.fields(), ctx.player().level()));
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
         });

@@ -45,13 +45,17 @@ public final class FieldData extends SavedData {
     }
 
     public Field add(ServerLevel level, double x, double y, double z, double radius, boolean column) {
-        Field f = new Field(nextId++, x, y, z, radius, column);
+        return add(level, x, y, z, radius, column, 1.0);
+    }
+
+    public Field add(ServerLevel level, double x, double y, double z, double radius, boolean column, double rate) {
+        Field f = new Field(nextId++, x, y, z, radius, 0, 0, column, Field.clampRate(rate));
         fields.add(f);
         changed(level);
         return f;
     }
 
-    /** Replace field `id` (radius, failing, collapse changes); no-op if it's gone. */
+    /** Replace field `id` (radius, failing, collapse, rate changes); no-op if it's gone. */
     public void update(ServerLevel level, int id, java.util.function.UnaryOperator<Field> change) {
         for (int i = 0; i < fields.size(); i++) {
             if (fields.get(i).id() == id) {

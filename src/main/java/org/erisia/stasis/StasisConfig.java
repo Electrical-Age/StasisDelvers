@@ -24,6 +24,7 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue TOWER_DRAW_K;
     static final ModConfigSpec.DoubleValue TOWER_STORE_C;
     static final ModConfigSpec.IntValue TOWER_MAX_SEGMENTS;
+    static final ModConfigSpec.DoubleValue TOWER_FIELD_RATE;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -43,6 +44,9 @@ public final class StasisConfig {
             .defineInRange("towerStoreC", 1225.0, 1.0, 1e9);
         TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 4 * (segments + 2)).")
             .defineInRange("towerMaxSegments", 30, 0, 254);
+        TOWER_FIELD_RATE = b.comment("Tick rate a tower's field starts at, as a share of 20 TPS (0.6 = 12 TPS). Blocks inside and the",
+                "clients of players inside run at it. Set at tower start; /stasis field rate changes a running field.")
+            .defineInRange("towerFieldRate", 0.6, 0.05, 1.0);
         SPEC = b.build();
     }
 
@@ -55,6 +59,7 @@ public final class StasisConfig {
     static volatile double towerDrawK = 10.0;
     static volatile double towerStoreC = 1225.0;
     static volatile int towerMaxSegments = 30;
+    static volatile double towerFieldRate = 0.6;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -80,5 +85,6 @@ public final class StasisConfig {
         towerDrawK = TOWER_DRAW_K.get();
         towerStoreC = TOWER_STORE_C.get();
         towerMaxSegments = TOWER_MAX_SEGMENTS.get();
+        towerFieldRate = TOWER_FIELD_RATE.get();
     }
 }

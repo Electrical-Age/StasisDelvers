@@ -12,7 +12,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Block entities tick only where time runs: every ticking block entity asks LevelChunk.isTicking(pos) first. */
+/**
+ * Block entities tick only in the game ticks their block's rate runs in (never where time is stopped): every ticking
+ * block entity asks LevelChunk.isTicking(pos) first. Exempt ones (tower bases, their EA exporters) always tick.
+ */
 @Mixin(LevelChunk.class)
 public abstract class LevelChunkMixin {
     @Shadow
@@ -21,7 +24,7 @@ public abstract class LevelChunkMixin {
 
     @Inject(method = "isTicking", at = @At("RETURN"), cancellable = true)
     private void stasis$isTicking(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        if (cir.getReturnValueZ() && level instanceof ServerLevel sl && !Stasis.isRunning(sl, pos)
+        if (cir.getReturnValueZ() && level instanceof ServerLevel sl && !Stasis.ticksNow(sl, pos)
             && !Stasis.exemptBlockEntity(sl, pos)) cir.setReturnValue(false);
     }
 }
