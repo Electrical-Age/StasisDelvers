@@ -20,3 +20,11 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 
 ## Client
 - Suit glove: check slim (Alex) skins and two-handed maps; glove art is placeholder (mostly sleeve and cuff visible).
+
+## Field tick rates
+- From inside a slow field, entities (which still run at 20 on the server) are drawn creeping at the client rate,
+  then snap at the next position sync (arrow: drawn 5.7 b/s, jumps ~3.9 blocks; AdventurAgent). Idea: client-side,
+  interpolate non-player entities on real time rather than the slowed client tick.
+- An unpowered (0 energy, e.g. /give'n) Delver suit doesn't protect and gives no warning: show "suit unpowered"
+  before freezing.
+- Not yet checked: mob AI near/in slow fields; fields above or below the player.
