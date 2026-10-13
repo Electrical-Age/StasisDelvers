@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "P": "#c:plates/coal",
+    "A": "#c:circuits/advanced",
+    "D": "stasisdelvers:delver_chestplate"
+  },
+  "pattern": [
+    "PDP",
+    "PAP",
+    "PPP"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:stasis_chestplate"
+  }
+}

@@ -390,6 +390,17 @@ public final class StasisGameTests {
                 p.discard();
             };
         }));
+        // suit recipes load (they use EA's copper coil and coal plates)
+        CASES.put("suit_recipes_load", new Spec(1, (h, c) -> {
+            var recipes = h.getLevel().getServer().getRecipeManager();
+            List<String> missing = new ArrayList<>();
+            for (String n : List.of("delver_helmet", "delver_chestplate", "delver_leggings", "delver_boots",
+                "stasis_helmet", "stasis_chestplate", "stasis_leggings", "stasis_boots", "stasis_tower", "stasis_tower_segment")) {
+                var key = ResourceKey.create(Registries.RECIPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, n));
+                if (recipes.byKey(key).isEmpty()) missing.add(n);
+            }
+            return () -> c.check("all suit and tower recipes loaded", missing.isEmpty(), "missing " + missing);
+        }));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

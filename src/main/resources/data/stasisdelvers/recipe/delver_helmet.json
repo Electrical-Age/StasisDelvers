@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "C": "eln:copper_coil",
+    "L": "minecraft:leather_helmet"
+  },
+  "pattern": [
+    "CCC",
+    "CLC"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:delver_helmet"
+  }
+}

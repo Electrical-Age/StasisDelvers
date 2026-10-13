@@ -43,6 +43,36 @@ final class Suits {
         return left;
     }
 
+    /** J per durability point the advanced (stasis) suit spends to repair itself (Baughn: self-repair on power, as E-Coal). */
+    static final double REPAIR_J = 500;
+
+    /**
+     * Once a second: suit pieces top themselves up from batteries carried in the inventory (EA portable batteries and
+     * the like; Baughn: both suits run off inventory batteries), and the advanced suit repairs itself on power.
+     */
+    static void tick(ServerPlayer p) {
+        if (p.tickCount % 20 != 0 || p.isSpectator()) return;
+        var inv = p.getInventory();
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (!(s.getItem() instanceof TimeSuit) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
+            double need = Math.min(b.getEnergyMax(s) - b.getEnergy(s), b.getChargePower(s));
+            for (int i = 0; i < 36 && need > 1e-6; i++) {
+                ItemStack src = inv.getItem(i);
+                if (src.isEmpty() || src.getItem() instanceof TimeSuit || !(src.getItem() instanceof IItemEnergyBattery sb)) continue;
+                double take = Math.min(need, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
+                if (take <= 0) continue;
+                sb.setEnergy(src, sb.getEnergy(src) - take);
+                b.setEnergy(s, b.getEnergy(s) + take);
+                need -= take;
+            }
+            if (s.getItem() instanceof StasisArmorItem && s.isDamaged() && b.getEnergy(s) >= REPAIR_J) {
+                s.setDamageValue(s.getDamageValue() - 1);
+                b.setEnergy(s, b.getEnergy(s) - REPAIR_J);
+            }
+        }
+    }
+
     /** Would the suit protect (full and charged), without drawing power? */
     static boolean protectsWithoutDraw(ServerPlayer p) {
         for (EquipmentSlot slot : ARMOR) {

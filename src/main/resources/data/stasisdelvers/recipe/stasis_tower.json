@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": "#c:plates/iron",
+    "C": "eln:copper_coil",
+    "B": "eln:cost_oriented_battery",
+    "M": "eln:machine_block"
+  },
+  "pattern": [
+    "PCP",
+    "BMB",
+    "PCP"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:stasis_tower"
+  }
+}

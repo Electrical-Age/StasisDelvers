@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "C": "eln:copper_coil",
+    "L": "minecraft:leather_leggings"
+  },
+  "pattern": [
+    "CCC",
+    "CLC",
+    "C C"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:delver_leggings"
+  }
+}

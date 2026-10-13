@@ -53,6 +53,7 @@ public final class Freezing {
         if (!(p.level() instanceof ServerLevel level)) return;
         State s = state(p);
         s.counted++;
+        Suits.tick(p);
         boolean stopped = p.isAlive() && !Stasis.isRunning(level, p.blockPosition());
         boolean grace = level.getGameTime() < s.graceUntil;
         boolean suited = false;

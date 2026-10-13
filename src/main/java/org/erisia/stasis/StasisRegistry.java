@@ -30,9 +30,10 @@ public final class StasisRegistry {
         return m;
     }
 
-    /** Delver suit: no armour at all (Baughn: cheap, zero armour). */
+    /** Delver suit: copper coils on leather armour, so leather's protection (Baughn 2026-10-13); repaired with copper
+     *  coils (tag repairs_delver_suit). */
     static final net.minecraft.world.item.equipment.ArmorMaterial DELVER = new net.minecraft.world.item.equipment.ArmorMaterial(
-        12, defense(0, 0, 0, 0), 1, net.minecraft.sounds.SoundEvents.ARMOR_EQUIP_LEATHER, 0f, 0f,
+        12, defense(1, 2, 3, 1), 1, net.minecraft.sounds.SoundEvents.ARMOR_EQUIP_LEATHER, 0f, 0f,
         net.minecraft.tags.TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "repairs_delver_suit")), asset("delver"));
     /** The combined suit: E-Coal (energy instead of armour points) plus time protection. */
     static final net.minecraft.world.item.equipment.ArmorMaterial STASIS_ARMOR = new net.minecraft.world.item.equipment.ArmorMaterial(
