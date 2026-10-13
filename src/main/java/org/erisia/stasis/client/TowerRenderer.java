@@ -65,6 +65,8 @@ public final class TowerRenderer {
     /** Beyond this distance (blocks) the LOD without lacing is drawn. */
     static final double LOD_DIST = 48;
     static final int VERTEX_BYTES = 20;
+    /** The real core blocks stand in the world: the mesh doesn't draw one. */
+    static final VisualParams VP = VisualParams.fromJson(org.erisia.stasis.towergen.Json.parse("{\"drawCore\": false}"));
 
     private static final ExecutorService BUILD = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "stasis-towermesh");
@@ -157,7 +159,7 @@ public final class TowerRenderer {
             if (gen == null) gen = new TowerGen(Library.shared());
             gen.seed = seed;
             TowerGen.Result res = gen.build(layout, TowerStructure.Q);
-            VisualParams vp = VisualParams.defaults();
+            VisualParams vp = VP;
             Mesh m = new MeshBuilder(res.c, vp).build(res);
             int lodTris = 0;
             float[] lo = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE}, hi = {-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
@@ -205,9 +207,9 @@ public final class TowerRenderer {
         return (int) Math.max(0, Math.min(255, Math.round(v * 255)));
     }
 
-    /** The tower's origin in the world: the core's centre, on its top face (TowerStructure). */
+    /** The tower's origin in the world: the core's centre, on the ground (its bottom face; TowerStructure). */
     static Vec3 origin(BlockPos core) {
-        return new Vec3(core.getX() + 0.5, core.getY() + 1.0, core.getZ() + 0.5);
+        return new Vec3(core.getX() + 0.5, core.getY(), core.getZ() + 0.5);
     }
 
     /** Uploads finished meshes (no render pass is open here). */

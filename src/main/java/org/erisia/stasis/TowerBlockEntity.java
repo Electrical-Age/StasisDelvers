@@ -145,7 +145,7 @@ public class TowerBlockEntity extends BlockEntity {
 
     int countSegments() {
         int n = 0;
-        BlockPos p = worldPosition.above();
+        BlockPos p = TowerStructure.pole(worldPosition, 1);
         while (n < StasisConfig.towerMaxSegments && TowerPoleBlock.isMast(level.getBlockState(p))) {
             n++;
             p = p.above();

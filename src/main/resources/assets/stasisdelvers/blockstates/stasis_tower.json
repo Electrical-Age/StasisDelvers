@@ -1,7 +1,5 @@
 {
-  "variants": {
-    "": {
-      "model": "stasisdelvers:block/stasis_tower"
-    }
-  }
+  "multipart": [
+    { "apply": { "model": "stasisdelvers:block/stasis_tower" } }
+  ]
 }

@@ -331,7 +331,16 @@ def stitch(b, q=1.0, seed=1):
         for m, (i, j) in enumerate(bl):
             bars.append((loc[i], loc[j])); owner.append(('bay', bi))
         sts.append(stl)
-    em = [node([0, H, 0])]
+    top = [i for i, p in enumerate(pts) if abs(p[1] - H) < TOL and max(abs(p[0]), abs(p[2])) > 0.1]
+    if top and not any(abs(y - H) < TOL for y in pole_nodes.values()):
+        apex = node([0, H + L.CAP_H, 0])         # ladder well: a lattice top gets a cap to carry the emitter
+        for i in top:
+            bars.append((i, apex)); owner.append(('bay', len(b['specs']) - 1))
+            sts.append(dict(kind=np.array([0]), ws=np.array([L.CAP_WS]), cs=np.array([0]), pole=np.array([False]),
+                            floor=np.array([0.0])))
+        em = [apex]
+    else:
+        em = [node([0, H, 0])]
     ground = []
     for k, bo in enumerate(b['sp']['booms']):
         be = bo['entry']

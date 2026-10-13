@@ -119,6 +119,10 @@ public final class Stitch {
         return new double[]{p[0] * f, p[1] * h / hE, p[2] * f};
     }
 
+    /** The lattice-top cap: height above the top ring, strut width index (p2lib.CAP_H, CAP_WS). */
+    static final double CAP_H = 1.5;
+    static final int CAP_WS = 3;
+
     public Tower stitch(Layout layout, Spine.Result sp, double q, int seed) {
         int H = layout.H();
         Builder B = new Builder();
@@ -173,7 +177,23 @@ public final class Stitch {
             }
         }
         List<Integer> em = new ArrayList<>();
-        em.add(B.node(new double[]{0, H, 0}));
+        // ladder well: a tower whose top is still a lattice ring (a boom's stays anchor there) has no pole for the
+        // emitter; a pyramid cap on the top ring carries it (tools/towerlib p25lib stitch does the same)
+        List<Integer> top = new ArrayList<>();
+        for (int i = 0; i < B.pts.size(); i++) {
+            double[] p = B.pts.get(i);
+            if (Math.abs(p[1] - H) < 1e-6 && Math.max(Math.abs(p[0]), Math.abs(p[2])) > 0.1) top.add(i);
+        }
+        boolean poleAtTop = poleNodes.values().stream().anyMatch(y -> Math.abs(y - H) < 1e-6);
+        if (!top.isEmpty() && !poleAtTop) {
+            int apex = B.node(new double[]{0, H + CAP_H, 0});
+            for (int i : top) {
+                bars.add(new int[]{i, apex});
+                state.add(new int[]{0, CAP_WS, 0, 0, sp.specs.size() - 1});
+                floors.add(0.0);
+            }
+            em.add(apex);
+        } else em.add(B.node(new double[]{0, H, 0}));
         List<Integer> ground = new ArrayList<>();
         int[][] banch = new int[sp.booms.size()][];
         for (int k = 0; k < sp.booms.size(); k++) {

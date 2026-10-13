@@ -255,19 +255,19 @@ public final class StasisGameTests {
             };
             var Y = net.minecraft.core.Direction.Axis.Y;
             var X = net.minecraft.core.Direction.Axis.X;
-            use.accept(new BlockPos(3, 2, 4), net.minecraft.core.Direction.NORTH);
-            c.check("side of the lowest mast pole: the mast grows at its top", at.test(new BlockPos(3, 4, 4), Y) && h.getBlockState(new BlockPos(3, 2, 3)).isAir());
+            use.accept(new BlockPos(3, 3, 4), net.minecraft.core.Direction.NORTH);
+            c.check("side of the lowest mast pole: the mast grows at its top", at.test(new BlockPos(3, 5, 4), Y) && h.getBlockState(new BlockPos(3, 3, 3)).isAir());
             player.setShiftKeyDown(true);
-            use.accept(new BlockPos(3, 4, 4), net.minecraft.core.Direction.EAST);
-            c.check("sneaking on the mast's side: a boom starts", at.test(new BlockPos(4, 4, 4), X));
+            use.accept(new BlockPos(3, 5, 4), net.minecraft.core.Direction.EAST);
+            c.check("sneaking on the mast's side: a boom starts", at.test(new BlockPos(4, 5, 4), X));
             player.setShiftKeyDown(false);
-            use.accept(new BlockPos(4, 4, 4), net.minecraft.core.Direction.UP);
-            use.accept(new BlockPos(4, 4, 4), net.minecraft.core.Direction.UP);
-            c.check("on the boom: it grows outward, away from the mast", at.test(new BlockPos(5, 4, 4), X) && at.test(new BlockPos(6, 4, 4), X)
-                && h.getBlockState(new BlockPos(4, 5, 4)).isAir());
+            use.accept(new BlockPos(4, 5, 4), net.minecraft.core.Direction.UP);
+            use.accept(new BlockPos(4, 5, 4), net.minecraft.core.Direction.UP);
+            c.check("on the boom: it grows outward, away from the mast", at.test(new BlockPos(5, 5, 4), X) && at.test(new BlockPos(6, 5, 4), X)
+                && !h.getBlockState(new BlockPos(4, 6, 4)).is(pole));
             player.setShiftKeyDown(true);
-            use.accept(new BlockPos(3, 4, 4), net.minecraft.core.Direction.EAST);
-            c.check("sneaking on the mast's side again: that boom grows", at.test(new BlockPos(7, 4, 4), X));
+            use.accept(new BlockPos(3, 5, 4), net.minecraft.core.Direction.EAST);
+            c.check("sneaking on the mast's side again: that boom grows", at.test(new BlockPos(7, 5, 4), X));
             player.setShiftKeyDown(false);
             return () -> c.check("only the mast counts as segments", t.segments() == 3, "segments " + t.segments());
         }));
@@ -277,13 +277,13 @@ public final class StasisGameTests {
             tower(h, base, 12);
             var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
                 .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
-            for (int i = 1; i <= 4; i++) h.setBlock(base.above(6).east(i), boomPole);
-            h.setBlock(base.above(9).west(1), boomPole);
-            h.setBlock(base.above(3).north(1), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());   // vertical: not a boom
+            for (int i = 1; i <= 4; i++) h.setBlock(base.above(7).east(i), boomPole);
+            h.setBlock(base.above(10).west(1), boomPole);
+            h.setBlock(base.above(4).north(1), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());   // vertical: not a boom
             var l = org.erisia.stasis.TowerStructure.scan(h.getLevel(), h.absolutePos(base), 100);
-            return () -> c.check("mast 12, booms E 4 at y 6 and W 1 at y 9",
-                l != null && l.H() == 12 && l.booms().equals(List.of(new org.erisia.stasis.towergen.Layout.Boom(6, 0, 4),
-                    new org.erisia.stasis.towergen.Layout.Boom(9, 2, 1))), String.valueOf(l));
+            return () -> c.check("mast 12 (H 14), booms E 4 at y 8 and W 1 at y 11",
+                l != null && l.H() == 14 && l.booms().equals(List.of(new org.erisia.stasis.towergen.Layout.Boom(8, 0, 4),
+                    new org.erisia.stasis.towergen.Layout.Boom(11, 2, 1))), String.valueOf(l));
         }, false, true));
         CASES.put("tower_builds_and_parts_poles", new Spec(120, (h, c) -> {
             org.erisia.stasis.TowerStructure.syncBuild = true;
@@ -292,20 +292,20 @@ public final class StasisGameTests {
             var t = tower(h, base, 12);
             var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
                 .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
-            for (int i = 1; i <= 4; i++) h.setBlock(base.above(6).east(i), boomPole);
+            for (int i = 1; i <= 4; i++) h.setBlock(base.above(7).east(i), boomPole);
             return () -> {
                 var s = t.structure;
                 c.check("built OK", s.status == org.erisia.stasis.TowerStructure.Status.OK, s.status + " " + s.message);
-                c.check("ladder top inside the mast", s.ladderTop > 0 && s.ladderTop < 12, "ladder top " + s.ladderTop);
+                c.check("ladder top inside the mast", s.ladderTop > 2 && s.ladderTop <= 14, "ladder top " + s.ladderTop);
                 boolean ok = true;
                 StringBuilder sb = new StringBuilder();
                 for (int k = 1; k <= 12; k++) {
-                    var part = h.getBlockState(base.above(k)).getValue(org.erisia.stasis.TowerPoleBlock.PART);
-                    var want = k <= s.ladderTop ? org.erisia.stasis.TowerPoleBlock.Part.LADDER : org.erisia.stasis.TowerPoleBlock.Part.HIDDEN;
+                    var part = h.getBlockState(base.above(1 + k)).getValue(org.erisia.stasis.TowerPoleBlock.PART);
+                    var want = k + 2 <= s.ladderTop ? org.erisia.stasis.TowerPoleBlock.Part.LADDER : org.erisia.stasis.TowerPoleBlock.Part.HIDDEN;
                     if (part != want) { ok = false; sb.append(k).append('=').append(part).append(' '); }
                 }
                 c.check("mast poles: ladder up to the ladder top, hidden above", ok, sb.toString());
-                c.check("boom poles hidden", h.getBlockState(base.above(6).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
+                c.check("boom poles hidden", h.getBlockState(base.above(7).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
                     == org.erisia.stasis.TowerPoleBlock.Part.HIDDEN);
             };
         }, false, true));
@@ -314,10 +314,10 @@ public final class StasisGameTests {
             var t = tower(h, base, 12);
             var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
                 .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
-            h.setBlock(base.above(12).east(1), boomPole);       // a boom at the very top: y 12 > H - 2
+            h.setBlock(base.above(13).east(1), boomPole);       // a boom at the very top: y 14 > H - 2
             return () -> {
                 c.check("invalid", t.structure.status == org.erisia.stasis.TowerStructure.Status.INVALID, t.structure.status + " " + t.structure.message);
-                c.check("poles stay survey poles", h.getBlockState(base.above(5)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
+                c.check("poles stay survey poles", h.getBlockState(base.above(6)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
                     == org.erisia.stasis.TowerPoleBlock.Part.SURVEY);
             };
         }, false, true));
@@ -730,8 +730,8 @@ public final class StasisGameTests {
     }
 
     static org.erisia.stasis.TowerBlockEntity tower(GameTestHelper h, BlockPos base, int segments) {
-        for (int i = 1; i <= segments; i++) h.setBlock(base.above(i), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());
-        h.setBlock(base, org.erisia.stasis.StasisRegistry.TOWER.get());
+        for (int i = 1; i <= segments; i++) h.setBlock(base.above(1 + i), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());
+        if (!org.erisia.stasis.TowerBlock.placeCore(h.getLevel(), h.absolutePos(base), null)) throw new IllegalStateException("no room for the core");
         return (org.erisia.stasis.TowerBlockEntity) h.getLevel().getBlockEntity(h.absolutePos(base));
     }
 

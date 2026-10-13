@@ -104,7 +104,8 @@ public final class StasisRegistry {
         BLOCKS.register(modBus);
         BLOCK_ENTITIES.register(modBus);
         modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->
-            e.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, TOWER_ENTITY.get(), (be, side) -> be.energy()));
+            e.registerBlock(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, (level, pos, state, be, side) ->
+                level.getBlockEntity(TowerBlock.master(pos, state)) instanceof TowerBlockEntity t ? t.energy() : null, TOWER.get()));
         modBus.addListener(Tickets::register);
         TABS.register(modBus);
     }

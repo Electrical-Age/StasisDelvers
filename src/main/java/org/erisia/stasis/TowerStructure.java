@@ -25,8 +25,9 @@ import java.util.concurrent.Executors;
  * poles into the tower's ladder (mast up to the ladder top) or hides them (the rest: the generated tower is drawn in
  * their place). Clients get the layout and status through the block entity's sync and build the mesh themselves.
  * <p>
- * Tower coordinates: x = z = 0 on the core's centre, y = 0 on the core's top face. Mast pole k (1-based above the
- * core) spans y k-1..k; a boom on mast pole k is at y = k (the level you walk on).
+ * Tower coordinates: x = z = 0 on the core's centre, y = 0 on the ground (the core's bottom face; the core is
+ * TowerBlock.HEIGHT = 2 high). Mast pole k (1-based above the core) spans y k+1..k+2, and H = 2 + the number of mast
+ * poles; a boom on mast pole k is at y = k + 2 (the level you walk on).
  */
 public final class TowerStructure {
     public enum Status { NONE, WAITING, BUILDING, OK, INVALID, REFUSED, FAILED }
@@ -127,7 +128,8 @@ public final class TowerStructure {
         int[] ys = r.spine.ys;
         double[] s = r.spine.s;
         for (int i = 0; i + 1 < ys.length; i++) if (s[i] > 0 && s[i + 1] <= 0) return ys[i];
-        return -1;
+        // a lattice up to the top (capped): the well runs all the way
+        return s.length > 0 && s[s.length - 1] > 0 ? ys[ys.length - 1] : -1;
     }
 
     private void apply(Level level, BlockPos core, Outcome o) {
@@ -136,11 +138,11 @@ public final class TowerStructure {
         ladderTop = o.ladderTop();
         List<long[]> parts = new ArrayList<>();      // pos, part
         if (status == Status.OK && layout != null) {
-            for (int k = 1; k <= layout.H(); k++)
-                parts.add(new long[]{core.above(k).asLong(), (k <= ladderTop ? TowerPoleBlock.Part.LADDER : TowerPoleBlock.Part.HIDDEN).ordinal()});
+            for (int k = 1; k <= layout.H() - TowerBlock.HEIGHT; k++)
+                parts.add(new long[]{pole(core, k).asLong(), (k + TowerBlock.HEIGHT <= ladderTop ? TowerPoleBlock.Part.LADDER : TowerPoleBlock.Part.HIDDEN).ordinal()});
             for (Layout.Boom b : layout.booms()) {
                 Direction d = dir(b.dir());
-                BlockPos root = core.above(b.y());
+                BlockPos root = pole(core, b.y() - TowerBlock.HEIGHT);
                 for (int i = 1; i <= b.length(); i++) parts.add(new long[]{root.relative(d, i).asLong(), TowerPoleBlock.Part.HIDDEN.ordinal()});
             }
         }
@@ -182,11 +184,11 @@ public final class TowerStructure {
     /** The layout of the poles on this core: the vertical run above it, and horizontal runs off each mast pole. */
     public static Layout scan(Level level, BlockPos core, int maxH) {
         int H = 0;
-        while (H < maxH && TowerPoleBlock.isMast(level.getBlockState(core.above(H + 1)))) H++;
+        while (H < maxH && TowerPoleBlock.isMast(level.getBlockState(pole(core, H + 1)))) H++;
         if (H == 0) return null;
         List<Layout.Boom> booms = new ArrayList<>();
         for (int k = 1; k <= H; k++) {
-            BlockPos m = core.above(k);
+            BlockPos m = pole(core, k);
             for (int d = 0; d < 4; d++) {
                 Direction dir = dir(d);
                 int n = 0;
@@ -195,10 +197,15 @@ public final class TowerStructure {
                     if (!(s.is(StasisRegistry.TOWER_SEGMENT.get()) && s.getValue(TowerPoleBlock.AXIS) == dir.getAxis())) break;
                     n++;
                 }
-                if (n > 0) booms.add(new Layout.Boom(k, d, n));
+                if (n > 0) booms.add(new Layout.Boom(k + TowerBlock.HEIGHT, d, n));
             }
         }
-        return new Layout(H, booms);
+        return new Layout(H + TowerBlock.HEIGHT, booms);
+    }
+
+    /** Mast pole k (1-based) of the core whose master (bottom centre) is at core. */
+    public static BlockPos pole(BlockPos core, int k) {
+        return core.above(TowerBlock.HEIGHT - 1 + k);
     }
 
     void save(ValueOutput out) {

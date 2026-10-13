@@ -19,6 +19,9 @@ TOL = 1e-6
 # pole at all; transition bays (sb > 0, st = 0) carry only a pole socket from HB/2 to the apex. No member but the
 # legs may enter the plan square |x|, |z| < WELL (lattice: the whole bay; transition: below HB/2).
 WELL = float(os.environ.get('TOWERLIB_WELL', '0.62'))
+# A tower whose top is still a lattice ring (a boom's stays anchor there) has no pole for the emitter: the stitch puts a
+# pyramid cap on the top ring, CAP_H high, of struts of width index CAP_WS (towergen Stitch does the same).
+CAP_H, CAP_WS = 1.5, 3
 
 
 def well_skip(P, ylim, sb, st, hb):
@@ -378,7 +381,7 @@ def bay_problem(spec, boom_entries, above_entry=None):
     else:
         for k in range(F.K):
             Fv, Mv = can[k]
-            if st > 0:
+            if st > 0 and pt is not None:      # (a lattice bay of the ladder well has no pole top)
                 npole = min(-Fv[1], F.EMIT_W)
                 ext[k, pt, 1] -= npole
                 Fv = Fv + [0, npole, 0]
