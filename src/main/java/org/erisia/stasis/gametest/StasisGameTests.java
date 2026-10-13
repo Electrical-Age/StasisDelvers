@@ -321,6 +321,21 @@ public final class StasisGameTests {
                     == org.erisia.stasis.TowerPoleBlock.Part.SURVEY);
             };
         }, false, true));
+        // softlock audit 2: frozen items never count their pickup delay down; they must still be pickable
+        CASES.put("items_pickable_in_stopped_land", new Spec(5, (h, c) -> {
+            var item = new ItemEntity(h.getLevel(), h.absoluteVec(new Vec3(12.5, 1.5, 4.5)).x, h.absoluteVec(new Vec3(12.5, 1.5, 4.5)).y,
+                h.absoluteVec(new Vec3(12.5, 1.5, 4.5)).z, new ItemStack(Items.COBBLESTONE, 3));
+            item.setPickUpDelay(40);
+            h.getLevel().addFreshEntity(item);
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1, 4.5), false);
+            return () -> {
+                c.check("outside the field: stopped", !Stasis.isRunning(h.getLevel(), item.blockPosition()));
+                item.playerTouch(p);
+                c.check("picked up despite the frozen pickup delay", item.isRemoved() && p.getInventory().countItem(Items.COBBLESTONE) == 3,
+                    "removed " + item.isRemoved() + ", in inventory " + p.getInventory().countItem(Items.COBBLESTONE));
+                p.discard();
+            };
+        }));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

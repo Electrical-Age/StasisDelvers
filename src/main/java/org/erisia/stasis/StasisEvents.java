@@ -26,4 +26,15 @@ final class StasisEvents {
     static void levelUnload(LevelEvent.Unload e) {
         if (e.getLevel() instanceof ServerLevel level) Stasis.invalidate(level);
     }
+
+    /**
+     * Items in stopped land don't tick, so their pickup delay never runs out: without this, nothing dropped, mined or
+     * crumbled out of a statue there could ever be picked up (softlock audit 2).
+     */
+    static void pickup(net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent.Pre e) {
+        var item = e.getItemEntity();
+        if (item.hasPickUpDelay() && !item.level().isClientSide() && !Stasis.isRunning(item.level(), item.blockPosition())
+            && (item.getTarget() == null || item.getTarget().equals(e.getPlayer().getUUID())))
+            e.setCanPickup(net.minecraft.util.TriState.TRUE);
+    }
 }

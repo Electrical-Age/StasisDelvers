@@ -130,8 +130,17 @@ public class Statue extends Entity {
             player.sendOverlayMessage(Component.literal("This statue won't move for you."));
             return InteractionResult.FAIL;
         }
-        crumble(level);
+        crumble(level, player);
         return InteractionResult.SUCCESS_SERVER;
+    }
+
+    /** Give everything back to the player who broke the statue (what doesn't fit drops), and remove it. */
+    public void crumble(ServerLevel level, Player player) {
+        for (ItemStack st : items) player.getInventory().placeItemBackInInventory(st.copy(), net.minecraft.util.Prediction.SERVER_ONLY);
+        items.clear();
+        if (xp > 0) player.giveExperiencePoints(xp);
+        xp = 0;
+        discard();
     }
 
     /** Give back everything where the statue stands, and remove it. */

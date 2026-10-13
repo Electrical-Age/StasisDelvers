@@ -179,6 +179,8 @@ public final class Stasis {
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
         var be = level.getBlockEntity(pos);
         if (be instanceof TowerBlockEntity) return true;
+        // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
+        if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
         return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && towerInChunk(level, pos);
     }
 

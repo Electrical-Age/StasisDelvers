@@ -101,6 +101,25 @@ public final class Freezing {
         p.hurtServer(level, level.damageSources().source(StasisRegistry.FROZEN_IN_TIME), Float.MAX_VALUE);
     }
 
+    /** Players sent to world spawn instead of a respawn point in stopped land (told so once they're back). */
+    private static final java.util.Set<UUID> REDIRECTED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * No death loop (softlock audit 1): an unprotected player whose bed or anchor is in stopped land respawns at world
+     * spawn instead (the spawn area runs), else they would freeze again and again at the bed.
+     */
+    static void respawnPosition(net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer p) || p.isCreative() || p.isSpectator()) return;
+        var t = e.getTeleportTransition();
+        if (Stasis.isRunning(t.newLevel(), net.minecraft.core.BlockPos.containing(t.position())) || Suits.protect(p)) return;
+        var spawn = net.minecraft.world.level.portal.TeleportTransition.createDefault(p, t.postTeleportTransition());
+        if (!Stasis.isRunning(spawn.newLevel(), net.minecraft.core.BlockPos.containing(spawn.position()))) return;   // no safe place either
+        e.setTeleportTransition(spawn);
+        REDIRECTED.add(p.getUUID());
+        StasisDelvers.LOG.info("{}'s respawn point {} is in stopped land: respawning at world spawn", p.getName().getString(),
+            net.minecraft.core.BlockPos.containing(t.position()).toShortString());
+    }
+
     /** A fresh start in a new place: no freezing for a while. */
     static void grace(PlayerEvent e) {
         if (e.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level) {
@@ -108,6 +127,9 @@ public final class Freezing {
             s.ticks = 0;
             s.graceUntil = level.getGameTime() + StasisConfig.graceTicks;
             StasisNet.sendFields(p);
+            if (REDIRECTED.remove(p.getUUID()))
+                p.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                    "Your respawn point is in stopped land, where you would freeze without a charged suit. You woke at world spawn."));
         }
     }
 
