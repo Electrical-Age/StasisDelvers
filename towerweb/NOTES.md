@@ -94,6 +94,13 @@ worker message handler, so the status stayed at "building…" and an old error s
 - Test: `/tmp/twtest/stays.py` (presets, stacked-boom refusal, stayCap none / bogus, over-catalogue, random),
   sliders.py, repro.py; screenshot `screenshot-stays.png`. Not deployed.
 
+## Hull joints (2026-10-13)
+- Stats JSON gains `meshHash` (FNV-1a over the mesh float bits and parts, `Mesh.fnv`) and `meshHashParts` (per part,
+  plus `STRUTS` = both strut colours without the part id). `/tmp/twtest/hull.py` compares them with the JVM's
+  `towergen/build/mesh-fnv.json` (MeshTest.portableHashes) on the 7 presets: identical except H40b4, where geometry
+  matches but some strut colour (force sign) differs. The obsolete hub* visual keys give "obsolete key (ignored)"
+  warnings. Screenshot `screenshot-hull.png`. Browser mesh times in towergen/NOTES.md. Not deployed.
+
 ## Numbers (tsugumi, headless Chromium 1243 via playwright, SwiftShader WebGL, localhost)
 - Library: JSON 32.4 MB raw / 7.8 MB gz takes 4.65 s to parse in V8 (node, TeaVM code) vs 0.47 s on the JVM.
   TGLB1 is 6.6 MB raw / 2.0 MB gz: fetch 10 ms + gunzip 19 ms + parse 145 ms in the browser (JVM 20 ms).

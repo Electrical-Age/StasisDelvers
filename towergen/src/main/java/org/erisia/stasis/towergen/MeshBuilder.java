@@ -14,14 +14,20 @@ import org.erisia.stasis.towergen.VisualParams.Part;
  * turnbuckle, insulator-stack emitters with a glow ring, brass pole collars, concrete footings and core. All
  * proportions come from {@link VisualParams}.
  *
- * <p>Joints are watertight by construction: every node with two or more members gets a hub, a cube oriented to the
- * widest member there and just large enough that every member's end face (corners p + e d +- a u +- a v, crossing
- * offsets included) fits inside it; each member then starts at the largest such e, so its end face is sealed in the
- * hub and the union has no notches or cracks at any member angle or width. A leg running straight through a node
- * makes a hub that is exactly a short piece of the leg. Laced chords converge into the node hub at a free end; where a
- * laced member continues into another one (along a leg) the chords are paired and each pair meets in a small hub of
- * its own. Members that cross without sharing a node (X-braces, crossing cables) are pushed apart along the common
- * normal so no faces are coplanar (no z-fighting).
+ * <p>Joints (the lattice-CAD scheme): at every node with two or more solid member ends, each member is cut back by its
+ * setback, the distance along it at which its square section (from the node, crossing offset included) has left every
+ * other member's prism there (exact prism-prism intersection, {@link #clearance}), plus jointMargin x its width; at
+ * most jointMaxSetbackFrac x its length and jointMaxSetback x the widest member there (nearly parallel members would
+ * otherwise push each other far out: they overlap instead). The hub is the convex hull ({@link Hull3}) of all the cut faces' corners, so
+ * members run from hull face to hull face, every open member end lies inside the hull (watertight) and the hub never
+ * reaches beyond the members' own envelopes except for the small fill between them. Collinear members meet flush (the
+ * hull is a thin prism of the section, or a flat polygon at margin 0). If the hull still covers a member beyond its
+ * cut (a wide neighbour), the member is cut where its edges leave the hull and the hull rebuilt (no coplanar faces).
+ * Cables do not size hubs: they end where they leave the hull (or are added to it when a crossing offset moved their
+ * end outside). Laced chords at a free end are ordinary members of the node joint; where a laced member continues
+ * into another (along a leg) each chord pair gets a two-member hull joint (flush when collinear). Members that cross
+ * without sharing a node (X-braces, crossing cables) are pushed apart along the common normal so no faces are
+ * coplanar (no z-fighting).
  */
 public final class MeshBuilder {
     private final Consts c;
@@ -48,6 +54,7 @@ public final class MeshBuilder {
         final Part part;
         double e;              // the box starts at p + e d
         boolean sealed;
+        double[][] pl, vt;     // prism planes / vertices (clearance), computed on demand
 
         End(double[] p, double[] d, double[] sd, double a, double len, boolean cable, Part part) {
             this.p = p; this.d = d; this.sd = sd; this.a = a; this.len = len; this.cable = cable; this.part = part;
@@ -56,17 +63,22 @@ public final class MeshBuilder {
         }
     }
 
-    private static final class Hub {
-        final double[] c;
+    /** The member ends meeting at a node (or a chord pair along a laced leg) and their hull hub. */
+    private static final class Joint {
         final List<End> ends = new ArrayList<>();
-        int solid;             // non-cable ends
-        double h;              // half-size
-        double[] z;            // axis (drawn direction of the widest end)
+        final List<double[]> env = new ArrayList<>();       // outer envelopes of laced members ending here (tests)
+        Hull3 hull;
         Part part;
 
-        Hub(double[] c) { this.c = c; }
+        void add(End e) { ends.add(e); }
+    }
 
-        void add(End e) { ends.add(e); if (!e.cable) solid++; }
+    /** Test hook: one joint's hull and the prisms of its member ends. */
+    static final class JointInfo {
+        Hull3 hull;
+        final List<double[]> boxes = new ArrayList<>();     // p(3) d(3) u(3) v(3) a len
+        final List<double[][]> sealed = new ArrayList<>();  // cut-face corners of the sealed ends
+        double maxW;
     }
 
     /** Laced member geometry: section frame (canonical axis sign), chord directions and polylines. */
@@ -109,7 +121,10 @@ public final class MeshBuilder {
     public Mesh build(TowerGen.Result r) { return build(r.tower != null ? r.tower : r.raw, r.analysis); }
 
     /** an may be null (no force colouring: all struts steel). */
-    public Mesh build(Stitch.Tower t, RuntimePass.Analysis an) {
+    public Mesh build(Stitch.Tower t, RuntimePass.Analysis an) { return build(t, an, null); }
+
+    /** As {@link #build(Stitch.Tower, RuntimePass.Analysis)}; sink (may be null) receives every joint (tests). */
+    Mesh build(Stitch.Tower t, RuntimePass.Analysis an, List<JointInfo> sink) {
         Mesh mesh = new Mesh();
         int n = t.n, m = t.m;
         double[] P = t.P;
@@ -236,8 +251,8 @@ public final class MeshBuilder {
         }
 
         // --- hubs: node hubs (node + offset / chord ends at free laced ends), chord-pair hubs (continuing laced)
-        Hub[] nodeHub = new Hub[n];
-        List<Hub> chordHubs = new ArrayList<>();
+        Joint[] nodeHub = new Joint[n];
+        List<Joint> chordHubs = new ArrayList<>();
         End[] mEnd = new End[2 * m];           // solid / pole / cable member ends
         End[][] cEnd = new End[2 * m][];       // laced chord ends
         for (int b = 0; b < m; b++) {
@@ -248,16 +263,22 @@ public final class MeshBuilder {
                     if (cont[2 * b + e] >= 0) continue;
                     Laced g = lg[b];
                     cEnd[2 * b + e] = new End[g.nc];
+                    if (sink != null) {
+                        double[] d = e == 0 ? ax[b] : V.mul(ax[b], -1), q = node(P, nd);
+                        double[][] f = Mesh.frame(d);
+                        joint(nodeHub, nd).env.add(new double[]{q[0], q[1], q[2], d[0], d[1], d[2], f[0][0], f[0][1], f[0][2],
+                                f[1][0], f[1][1], f[1][2], dw[b] / 2, len[b]});
+                    }
                     for (int k = 0; k < g.nc; k++) {
                         End en = chordEnd(g, k, e, part[b]);
                         cEnd[2 * b + e][k] = en;
-                        hub(nodeHub, nd, P).add(en);
+                        joint(nodeHub, nd).add(en);
                     }
                 } else {
                     double[] p = V.add(node(P, nd), off[b]);
                     End en = new End(p, e == 0 ? ax[b] : V.mul(ax[b], -1), ax[b], dw[b] / 2, len[b], type[b] == CABLE, part[b]);
                     mEnd[2 * b + e] = en;
-                    hub(nodeHub, nd, P).add(en);
+                    joint(nodeHub, nd).add(en);
                 }
             }
         }
@@ -273,14 +294,14 @@ public final class MeshBuilder {
                 for (int k = 0; k < nc; k++) {
                     int q = chordMap[2 * b + e][k];
                     // both chords end at the midpoint of their raw end points: the leg's chords run on through the
-                    // node (a slight kink where the sections differ) and meet in a chord-sized splice hub
+                    // node (a slight kink where the sections differ) and meet in a two-member hull joint
                     double[][] pa = lg[b].pts[k], pb = lg[b2].pts[q];
                     int ia = e == 0 ? 0 : pa.length - 1, ib = e2 == 0 ? 0 : pb.length - 1;
                     double[] mid = V.mul(V.add(pa[ia], pb[ib]), 0.5);
                     pa[ia] = mid;
                     pb[ib] = mid.clone();
                     End ea = chordEnd(lg[b], k, e, part[b]), eb = chordEnd(lg[b2], q, e2, part[b2]);
-                    Hub hb = new Hub(V.mul(V.add(ea.p, eb.p), 0.5));
+                    Joint hb = new Joint();
                     hb.add(ea);
                     hb.add(eb);
                     cEnd[2 * b + e][k] = ea;
@@ -289,8 +310,8 @@ public final class MeshBuilder {
                 }
             }
         }
-        for (int nd = 0; nd < n; nd++) if (nodeHub[nd] != null && nodeHub[nd].solid >= 2) solve(nodeHub[nd]);
-        for (Hub hb : chordHubs) { solve(hb); hb.part = hb.ends.get(0).part; }   // chord splices: a piece of chord
+        for (int nd = 0; nd < n; nd++) if (nodeHub[nd] != null) solve(nodeHub[nd], sink);
+        for (Joint hb : chordHubs) { solve(hb, sink); hb.part = hb.ends.get(0).part; }   // chord splices: a piece of chord
 
         // --- members
         for (int b = 0; b < m; b++) {
@@ -307,8 +328,8 @@ public final class MeshBuilder {
             mesh.beam(p0, p1, dw[b], dw[b], part[b], !e0.sealed, !e1.sealed);
         }
         // --- hubs
-        for (int nd = 0; nd < n; nd++) if (nodeHub[nd] != null && nodeHub[nd].h > 0) drawHub(mesh, nodeHub[nd]);
-        for (Hub hb : chordHubs) drawHub(mesh, hb);
+        for (int nd = 0; nd < n; nd++) if (nodeHub[nd] != null && nodeHub[nd].hull != null) nodeHub[nd].hull.draw(mesh, nodeHub[nd].part);
+        for (Joint hb : chordHubs) if (hb.hull != null) hb.hull.draw(mesh, hb.part);
 
         // pole collars (brass), sized from the pole width
         for (int q = 2; q + 1 < t.poleChain.length; q++) {
@@ -355,62 +376,210 @@ public final class MeshBuilder {
         return mesh;
     }
 
-    private static Hub hub(Hub[] hubs, int nd, double[] P) {
-        if (hubs[nd] == null) hubs[nd] = new Hub(node(P, nd));
-        return hubs[nd];
+    private static Joint joint(Joint[] js, int nd) {
+        if (js[nd] == null) js[nd] = new Joint();
+        return js[nd];
+    }
+
+    private static final double TOL = 1e-7;
+    private static final double[][] SG = {{1, 1}, {-1, 1}, {-1, -1}, {1, -1}};   // corner order of Mesh.beam
+
+    /** Corner k of end en's section at extension s. */
+    private static double[] corner(End en, double s, int k) {
+        double[] r = new double[3];
+        for (int q = 0; q < 3; q++) r[q] = en.p[q] + s * en.d[q] + en.a * (SG[k][0] * en.u[q] + SG[k][1] * en.v[q]);
+        return r;
+    }
+
+    /** The prism of end en (extension 0 .. len): 6 half-spaces n . x <= c (rows nx ny nz c) and 8 vertices (corners
+     *  0..3 at the end point, 4..7 at the far end; Mesh.beam's corner order). Cached on the end. */
+    private static void prism(End en) {
+        if (en.pl != null) return;
+        double dp = V.dot(en.d, en.p), up = V.dot(en.u, en.p), vp = V.dot(en.v, en.p);
+        en.pl = new double[][]{
+                {en.d[0], en.d[1], en.d[2], dp + en.len}, {-en.d[0], -en.d[1], -en.d[2], -dp},
+                {en.u[0], en.u[1], en.u[2], up + en.a}, {-en.u[0], -en.u[1], -en.u[2], -up + en.a},
+                {en.v[0], en.v[1], en.v[2], vp + en.a}, {-en.v[0], -en.v[1], -en.v[2], -vp + en.a}};
+        en.vt = new double[8][];
+        for (int k = 0; k < 4; k++) { en.vt[k] = corner(en, 0, k); en.vt[4 + k] = corner(en, en.len, k); }
+    }
+
+    private static final int[][] EDGES = {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+
+    /**
+     * Setback of a against b: the largest (x - a.p) . a.d over the intersection of the two end prisms (0 if they do
+     * not meet). The maximum of a linear function over the convex intersection is at one of its vertices: a vertex
+     * of one prism inside the other, or an edge of one crossing a face plane of the other inside it. Points on an edge
+     * of a prism are inside that prism, and their plane distances and s interpolate linearly along the edge, so only
+     * the 8 x 6 vertex-plane distances per side are dot products.
+     */
+    static double clearance(End a, End b) { return clearance(a, b, new double[48], new double[8]); }
+
+    /** As {@link #clearance(End, End)} with scratch arrays (48 and 8 doubles). */
+    static double clearance(End a, End b, double[] dist, double[] sv) {
+        prism(a);
+        prism(b);
+        double best = 0;
+        for (int side = 0; side < 2; side++) {
+            double[][] v1 = side == 0 ? a.vt : b.vt, p2 = side == 0 ? b.pl : a.pl;
+            for (int i = 0; i < 8; i++) {
+                double[] x = v1[i];
+                boolean in = true;
+                for (int k = 0; k < 6; k++) {
+                    double[] h = p2[k];
+                    double dd = h[0] * x[0] + h[1] * x[1] + h[2] * x[2] - h[3];
+                    dist[6 * i + k] = dd;
+                    if (dd > TOL) in = false;
+                }
+                sv[i] = (x[0] - a.p[0]) * a.d[0] + (x[1] - a.p[1]) * a.d[1] + (x[2] - a.p[2]) * a.d[2];
+                if (in && sv[i] > best) best = sv[i];
+            }
+            for (int[] e : EDGES) {
+                int i0 = 6 * e[0], i1 = 6 * e[1];
+                for (int k = 0; k < 6; k++) {
+                    double d0 = dist[i0 + k], d1 = dist[i1 + k];
+                    if ((d0 > 0) == (d1 > 0) || d0 == d1) continue;    // the edge does not cross plane k
+                    double tt = d0 / (d0 - d1);
+                    double st = sv[e[0]] + tt * (sv[e[1]] - sv[e[0]]);
+                    if (st <= best) continue;
+                    boolean in = true;
+                    for (int q = 0; q < 6 && in; q++) if (q != k && dist[i0 + q] + tt * (dist[i1 + q] - dist[i0 + q]) > TOL) in = false;
+                    if (in) best = st;
+                }
+            }
+        }
+        return best;
+    }
+
+    private static Hull3 hullOf(List<End> core, List<double[]> extra) {
+        int m = 4 * core.size() + (extra == null ? 0 : extra.size());
+        double[] xyz = new double[3 * m];
+        int k = 0;
+        for (End en : core) {
+            for (int c = 0; c < 4; c++) {
+                for (int q = 0; q < 3; q++) xyz[k + q] = en.p[q] + en.e * en.d[q] + en.a * (SG[c][0] * en.u[q] + SG[c][1] * en.v[q]);
+                k += 3;
+            }
+        }
+        if (extra != null) for (double[] x : extra) { xyz[k] = x[0]; xyz[k + 1] = x[1]; xyz[k + 2] = x[2]; k += 3; }
+        return Hull3.of(xyz, m);
     }
 
     /**
-     * Hub size and member extensions. In the frame (X, Y, Z) of the widest end, the end face of end i at extension e
-     * lies in the cube of half-size h iff for every axis k: |delta_k + e d_k| + a (|u_k| + |v_k|) <= h (delta = end
-     * point - hub centre). h is the smallest size that holds at e = 0 for all ends (times hubScale, plus hubAdd);
-     * each end then gets the largest e that still holds, at most hubMaxExtendFrac x its length.
+     * Setbacks and the hull of one joint. Solid ends (struts, pole, laced chords) form the hull; with fewer than two
+     * solids, two or more cables form it instead, and a single solid end stays a plain capped end. Cables attach to
+     * the hull: cut where all four edges have left it, or (end outside it) added to it.
      */
-    private void solve(Hub hb) {
+    private void solve(Joint jt, List<JointInfo> sink) {
+        List<End> core = new ArrayList<>(), att = new ArrayList<>();
+        for (End en : jt.ends) (en.cable ? att : core).add(en);
+        if (core.size() < 2) {
+            if (!core.isEmpty() || att.size() < 2) return;
+            core = att;
+            att = new ArrayList<>();
+        }
+        double maxF = Math.max(0, Math.min(0.49, vp.jointMaxSetbackFrac()));
+        double margin = Math.max(0, vp.jointMargin());
+        int nc = core.size();
+        double wMax = 0;
+        for (End en : core) wMax = Math.max(wMax, 2 * en.a);
+        double capW = Math.max(0, vp.jointMaxSetback()) * wMax;
+        double[] bound = new double[nc];
+        int[] ord = new int[nc];
+        double[] scratchD = new double[48], scratchS = new double[8];
+        for (End en : core) {
+            // exact clearances, the most promising neighbours first: a neighbour b can hold a back by at most
+            // (r_a + r_b + |p_a - p_b|) / sin(angle) (circumscribed cylinders), so stop once that is below the best
+            double cap = Math.min(maxF * en.len, capW), s = 0;
+            for (int j = 0; j < nc; j++) {
+                End o = core.get(j);
+                ord[j] = j;
+                if (o == en) { bound[j] = -1; continue; }
+                double sn = V.crossNorm(en.d, o.d);
+                double wx = en.p[0] - o.p[0], wy = en.p[1] - o.p[1], wz = en.p[2] - o.p[2];
+                double w = Math.sqrt(wx * wx + wy * wy + wz * wz);
+                bound[j] = sn < 1e-9 ? 1e300 : (Math.sqrt(2) * (en.a + o.a) + w) / sn;
+            }
+            for (int x = 1; x < nc; x++) {                    // insertion sort: bound descending, then index
+                int v = ord[x], y = x - 1;
+                while (y >= 0 && (bound[ord[y]] < bound[v] || (bound[ord[y]] == bound[v] && ord[y] > v))) { ord[y + 1] = ord[y]; y--; }
+                ord[y + 1] = v;
+            }
+            for (int j : ord) {
+                if (bound[j] <= s || s >= cap) break;
+                s = Math.max(s, clearance(en, core.get(j), scratchD, scratchS));
+            }
+            en.e = Math.min(s + margin * 2 * en.a, cap);
+        }
+        Hull3 h = null;
+        for (int it = 0; it < 5; it++) {
+            h = hullOf(core, null);
+            if (h.dim != 3 || it == 4) break;
+            boolean changed = false;
+            for (End en : core) {
+                double ex = en.e;
+                for (int k = 0; k < 4; k++) {
+                    double[] iv = h.clip(corner(en, 0, k), en.d, TOL);
+                    if (iv != null && iv[0] <= en.e + 1e-6 && iv[1] > ex) ex = iv[1];
+                }
+                ex = Math.min(ex, Math.min(maxF * en.len, capW));
+                if (ex > en.e + 1e-6) { en.e = ex; changed = true; }
+            }
+            if (!changed) break;
+        }
+        if (h.dim < 2) {                                     // degenerate (collinear points): plain capped ends
+            for (End en : core) en.e = 0;
+            return;
+        }
+        if (h.dim == 3) {
+            List<double[]> extra = new ArrayList<>();
+            for (End en : att) {
+                double ex = 1e300;
+                boolean in = true;
+                for (int k = 0; k < 4 && in; k++) {
+                    double[] iv = h.clip(corner(en, 0, k), en.d, TOL);
+                    if (iv == null || iv[0] > 1e-6 || iv[1] < 0) in = false;
+                    else ex = Math.min(ex, iv[1]);
+                }
+                if (in) en.e = Math.min(ex, maxF * en.len);
+                else { en.e = 0; for (int k = 0; k < 4; k++) extra.add(corner(en, 0, k)); }
+                en.sealed = true;
+            }
+            if (!extra.isEmpty()) {
+
+                List<End> all = new ArrayList<>(core);
+                h = hullOf(all, extra);
+            }
+        }
+        for (End en : core) en.sealed = true;
+        jt.hull = h;
         End w = null;
-        for (End en : hb.ends) if (!en.cable && (w == null || en.a > w.a + 1e-12)) w = en;
-        double[][] B = {w.u, w.v, w.sd};
-        int ne = hb.ends.size();
-        double[][] dl = new double[ne][3], s = new double[ne][3];
-        double need = 0;
-        for (int i = 0; i < ne; i++) {
-            End en = hb.ends.get(i);
-            double[] r = V.sub(en.p, hb.c);
-            for (int k = 0; k < 3; k++) {
-                dl[i][k] = V.dot(r, B[k]);
-                s[i][k] = Math.abs(V.dot(en.u, B[k])) + Math.abs(V.dot(en.v, B[k]));
-                need = Math.max(need, Math.abs(dl[i][k]) + en.a * s[i][k]);
-            }
-        }
-        double h = Math.max(need, vp.hubScale() * need + vp.hubAdd());
-        double maxF = Math.max(0, Math.min(0.49, vp.hubMaxExtendFrac()));
-        for (int i = 0; i < ne; i++) {
-            End en = hb.ends.get(i);
-            double eh = Double.MAX_VALUE;
-            for (int k = 0; k < 3; k++) {
-                double dk = V.dot(en.d, B[k]);
-                if (Math.abs(dk) < 1e-9) continue;
-                double r = h - en.a * s[i][k];
-                eh = Math.min(eh, Math.max((r - dl[i][k]) / dk, (-r - dl[i][k]) / dk));
-            }
-            en.e = Math.max(0, Math.min(eh, maxF * en.len));
-            en.sealed = true;
-        }
-        hb.h = h;
-        hb.z = w.sd;
+        for (End en : core) if (w == null || en.a > w.a + 1e-12) w = en;
         // a pure pass-through (only collinear members, e.g. a leg with just cables attached) is a piece of that
         // member, not a joint; so is a hub on the pole (its brass collar marks the joint)
         boolean through = true, pole = false;
-        for (End en : hb.ends) {
+        for (End en : core) {
             if (en.part == Part.POLE) pole = true;
-            if (!en.cable && Math.abs(V.dot(en.d, w.sd)) < 0.9986) through = false;
+            if (Math.abs(V.dot(en.d, w.d)) < 0.9986) through = false;
         }
         through |= pole;
-        hb.part = vp.hubMemberColour() || through ? w.part : Part.KNUCKLE;
-    }
-
-    private static void drawHub(Mesh mesh, Hub hb) {
-        mesh.beam(V.sub(hb.c, V.mul(hb.z, hb.h)), V.add(hb.c, V.mul(hb.z, hb.h)), 2 * hb.h, 2 * hb.h, hb.part, true, true);
+        jt.part = vp.jointMemberColour() || through ? w.part : Part.KNUCKLE;
+        if (sink != null) {
+            JointInfo ji = new JointInfo();
+            ji.hull = h;
+            ji.boxes.addAll(jt.env);
+            for (End en : jt.ends) {
+                ji.boxes.add(new double[]{en.p[0], en.p[1], en.p[2], en.d[0], en.d[1], en.d[2], en.u[0], en.u[1], en.u[2],
+                        en.v[0], en.v[1], en.v[2], en.a, en.len});
+                ji.maxW = Math.max(ji.maxW, 2 * en.a);
+                if (en.sealed) {
+                    double[][] f = new double[4][];
+                    for (int k = 0; k < 4; k++) f[k] = corner(en, en.e, k);
+                    ji.sealed.add(f);
+                }
+            }
+            synchronized (sink) { sink.add(ji); }
+        }
     }
 
     /**

@@ -27,6 +27,7 @@ test {
         excludeTags 'slow'
     }
     maxHeapSize = '2g'
+    if (System.getProperty('meshDebug') != null) systemProperty 'meshDebug', '1'
     testLogging { events 'failed'; exceptionFormat 'full'; showStandardStreams = true }
 }
 

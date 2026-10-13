@@ -1,7 +1,8 @@
 # towergen / towerview (P3b, P3c)
 
 Java port of the TOWERLIB P3a runtime (notes/timestop/TOWERLIB-PLAN.md, timestop-proto/towerlib/NOTES-P3a.md).
-Python stays the offline library builder; Java owns statics, lookup, stitch, the pretensioned widening pass and the
+Python stays the offline library builder (now `tools/towerlib/`, see its README: `tools/towerlib/build_library.sh
+export|goldens|full`; the library header carries `provenance`); Java owns statics, lookup, stitch, the pretensioned widening pass and the
 mesh. `towergen` has no Minecraft or NeoForge dependency (and no third-party dependency at all).
 
 ## Layout
@@ -122,7 +123,48 @@ Known limits:
 - Random (slowTest, 400 x 2 q, seed 7): 645 pass, 19 over the catalogue (now refused), 136 refused by the stay rule
   (was 769 pass / 31 over); no exceptions.
 
-## Mesh: watertight joints, crossing offsets (2026-10-13)
+## Mesh: convex-hull joints (2026-10-13, replaces the cube hubs below)
+- Scheme (MeshBuilder javadoc, `Hull3`): per node, every solid member end (strut, pole, laced chord at a free laced
+  end) is cut back by its setback = the largest distance along it inside any other member's prism there (exact
+  prism-prism intersection: max of s over the vertices of the intersection polytope), + `jointMargin` x its width,
+  capped at `jointMaxSetbackFrac` x its length and `jointMaxSetback` x the widest member at the joint (nearly parallel
+  members overlap past the cap instead of making a long hub). The hub is the convex hull of all cut-face corners;
+  members run hull face to hull face (no end caps). If the hull still covers a member past its cut (a wide neighbour
+  reaching further along it), the cut moves to where the member's edges leave the hull and the hull is rebuilt (no
+  coplanar faces). Cables do not size hubs: they end where all four edges have left the hull, or (end outside it,
+  crossing offset) their end face is added to the hull. Two or more cables with no solid form a hull of their own; a
+  single solid end stays capped. Continuing laced legs: each chord pair is a two-member hull joint (thin prism when
+  collinear, frustum when the chord size changes; no splice cubes); bracing at that node forms its own hull inside
+  the leg. Lacing and battens unchanged. Crossing offsets are applied before (member end points include them).
+- `Hull3`: quickhull (maximal tetrahedron, farthest point of the first face with outside points, horizon fan,
+  conflict lists), eps = 1e-9 x extent, flat arrays, no hashing (deterministic, same on TeaVM); planar clouds give a
+  2D polygon drawn from both sides, collinear ones nothing; an inconsistent result retries with 10x eps.
+- VisualParams: `jointMargin` 0.1, `jointMaxSetbackFrac` 0.45, `jointMaxSetback` 1.0, `jointMemberColour` false.
+  The old hubScale / hubAdd / hubMaxExtendFrac / hubMemberColour still parse and are ignored
+  (`VisualParams.OBSOLETE`; the web page warns "obsolete key").
+- Tests (MeshTest): `hullJointsClosedAndContained` (all 7 goldens x 2 q: every hull built consistently, every
+  sealed end's cut face inside its hull, and hull points (face centroids, edge midpoints, interior samples) at most
+  0.3 x the widest member + 0.06 blocks outside the union of the members' prisms run back through the node by their
+  half-width (laced members: their outer envelope). Measured worst: 0.06-0.24 blocks, 0.16-0.37 x the widest member
+  at solid joints; up to 0.70 x at two-cable joints, where it is 0.035 blocks (cables pushed apart by crossing
+  offsets). `portableHashes` writes `build/mesh-fnv.json` (FNV-1a of the mesh, also per part) for the browser check;
+  `stats` prints triangles and mesh time.
+- Triangles q1 (cube hubs -> hulls): H16 1050 -> 1232, H24b 12024 -> 12886, H40 17456 -> 18148, H40r3 55096 -> 58042,
+  H40b4 45718 -> 47572, H64max 109664 -> 113966, H100 92184 -> 95356 (+3-17%).
+- Mesh time (JVM warm median): H16 0.09 -> 0.22 ms, H24b 0.9 -> 2.3, H40 1.4 -> 2.2, H40r3 3.8 -> 9.5, H40b4 3.3 -> 6.9,
+  H64max 4.9 -> 14.0, H100 4.3 -> 8.8 ms. Browser (headless Chromium, median of 6 rebuilds): H40r3 12 -> 33, H64max
+  19 -> 50, H100 18 -> 41 ms (builds 78/68/83 -> 97/99/106 ms). Most of it is the clearance pairs at the big pole
+  and boom-root joints (up to 33 ends) and the hulls themselves.
+- JVM vs browser: identical mesh FNV for H16, H24b, H40, H40r3, H64max, H100; H40b4 has identical geometry (strut
+  triangles hashed without their colour match) but some strut(s) flip rust/steel: the force-sign colouring of a
+  member whose dominant force differs between JS and JVM arithmetic (runtime pass, not the mesh).
+- Renders: `renders/contact_hull_joints.png` (1920 x 1440; pairs before | after: H40r3 bjoint, ljoint, splice;
+  H64max bjoint, ljoint, splice; H100 ljoint, splice). New towerview shot `splice` (a node where two laced members
+  continue, nearest 0.3 H). Singles in renders/before_hull, renders/after_hull (git-ignored).
+- Known: the hull fills the crotch between members at small angles (a gusset look, bounded as above); near-parallel
+  members beyond the setback cap overlap inside each other; hubs inside laced legs (bracing only) are still drawn.
+
+## Mesh: watertight joints, crossing offsets (2026-10-13; the cube hubs, superseded by the hulls above)
 - Every node with >= 2 member ends gets a hub: a cube oriented like the widest member, half-size the smallest that
   contains every member's end face (incl. its crossing offset), x `hubScale` + `hubAdd`. Each member is trimmed to
   the largest extension whose end face is still inside the hub (end caps omitted), so joints are closed for any

@@ -71,7 +71,10 @@ public final class TowerWeb {
             if (tree != null && !(tree instanceof Map)) throw new IllegalArgumentException("expected a JSON object");
             Map<String, Object> m = tree == null ? Map.of() : Json.obj(tree);
             List<String> keys = List.of(VisualParamsCodec.KEYS);
-            for (String k : m.keySet()) if (!keys.contains(k)) warnings.add("visual: unknown key \"" + k + "\" (ignored)");
+            for (String k : m.keySet()) {
+                if (VisualParams.OBSOLETE.contains(k)) warnings.add("visual: obsolete key \"" + k + "\" (ignored; joints are hull hubs now, see jointMargin)");
+                else if (!keys.contains(k)) warnings.add("visual: unknown key \"" + k + "\" (ignored)");
+            }
             vp = VisualParamsCodec.fromJson(m);
         } catch (Throwable t) {
             return err("visual: " + msg(t));
@@ -183,6 +186,11 @@ public final class TowerWeb {
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("H", (double) r.layout.H());
+        m.put("meshHash", mesh.fnv());
+        Map<String, Object> ph = new LinkedHashMap<>();
+        for (VisualParams.Part p : VisualParams.Part.values()) ph.put(p.name(), mesh.fnv(p));
+        ph.put("STRUTS", mesh.fnv(VisualParams.Part.STRUT_C, VisualParams.Part.STRUT_T));   // geometry, either colour
+        m.put("meshHashParts", ph);
         m.put("booms", (double) r.layout.booms().size());
         m.put("q", r.q);
         m.put("nodes", (double) t.n);

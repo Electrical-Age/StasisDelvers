@@ -420,12 +420,12 @@ const RANGES = {
   density: [0.1, 10, 'log'], extraWidthSteps: [0, 12],
   sunAzimuth: [0, 360], sunElevation: [0, 90], fovDeg: [15, 110], ambient: [0, 1], lacingPanelsMin: [1, 10],
   lacingPanelsMax: [2, 40], groundGrid: [0, 16], lacedEndTaper: [0, 0.5], lacedEndFrac: [0, 1], lacingWidthFrac: [0.05, 1],
-  hubScale: [1, 2], hubAdd: [0, 0.5], hubMaxExtendFrac: [0, 0.49], crossOffsetFrac: [0, 1], crossMinAngle: [0, 45],
+  jointMargin: [0, 1], jointMaxSetbackFrac: [0, 0.49], jointMaxSetback: [0, 4], crossOffsetFrac: [0, 1], crossMinAngle: [0, 45],
 };
 const SECTION_NAMES = [
   ['wire reduction', 'Wires'], ['back-stays', 'Back-stays'], ['boom stays', 'Stays'], ['pretension', 'Pass'], ['loads', 'Loads'],
   ['member catalogue', 'Catalogue'], ['solid struts', 'Struts, pole, cables'], ['laced', 'Lacing'],
-  ['joints (hubs)', 'Joints'], ['footings', 'Footings, deadmen, core, emitters'], ['colours', 'Colours'], ['viewer', 'Viewer'],
+  ['joints (hull hubs)', 'Joints'], ['footings', 'Footings, deadmen, core, emitters'], ['colours', 'Colours'], ['viewer', 'Viewer'],
 ];
 const OPEN_SECTIONS = ['Wires', 'Struts, pole, cables'];
 const paramCtls = { visual: [], solver: [] };

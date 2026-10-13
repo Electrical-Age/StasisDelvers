@@ -114,6 +114,34 @@ public final class Mesh {
         return b;
     }
 
+    /** 64-bit FNV-1a over the float bits of positions and normals and the parts, as hex (portable: the web build
+     *  reports it too, so JVM and browser meshes can be compared). */
+    public String fnv() {
+        long h = 0xcbf29ce484222325L;
+        for (int i = 0; i < 9 * tris; i++) h = fnvInt(h, Float.floatToIntBits(pos[i]));
+        for (int i = 0; i < 3 * tris; i++) h = fnvInt(h, Float.floatToIntBits(nrm[i]));
+        for (int i = 0; i < tris; i++) h = (h ^ (part[i] & 0xff)) * 0x100000001b3L;
+        return Long.toHexString(h);
+    }
+
+    /** As {@link #fnv()} over the triangles of the given parts only, without the part ids (localises a difference). */
+    public String fnv(VisualParams.Part... ps) {
+        long h = 0xcbf29ce484222325L;
+        for (int t = 0; t < tris; t++) {
+            boolean in = false;
+            for (VisualParams.Part p : ps) in |= part[t] == p.ordinal();
+            if (!in) continue;
+            for (int q = 0; q < 9; q++) h = fnvInt(h, Float.floatToIntBits(pos[9 * t + q]));
+            for (int q = 0; q < 3; q++) h = fnvInt(h, Float.floatToIntBits(nrm[3 * t + q]));
+        }
+        return Long.toHexString(h);
+    }
+
+    private static long fnvInt(long h, int x) {
+        for (int k = 0; k < 4; k++) { h = (h ^ ((x >>> (8 * k)) & 0xff)) * 0x100000001b3L; }
+        return h;
+    }
+
     /** SHA-256 over positions, normals and parts (determinism checks). */
     public String hash() {
         try {

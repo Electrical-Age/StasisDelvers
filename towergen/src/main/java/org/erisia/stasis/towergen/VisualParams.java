@@ -13,6 +13,10 @@ import java.util.Map;
  * Every visual proportion of the tower mesh (and the viewer's sky / sun), loaded from a JSON file whose keys are the
  * component names; missing keys keep their defaults, unknown keys are ignored. Colours are [r, g, b] in 0..1. Edit
  * the file while towerview runs: it is re-read on save. {@code towerview params > visual.json} writes the defaults.
+ *
+ * <p>Obsolete keys ({@link #OBSOLETE}, the cube hubs before 2026-10-13: hubScale, hubAdd, hubMaxExtendFrac,
+ * hubMemberColour) still parse and are ignored; the web page lists them as obsolete. Use jointMargin,
+ * jointMaxSetbackFrac and jointMemberColour.
  */
 public record VisualParams(
         // --- solid struts, pole, cables
@@ -31,14 +35,14 @@ public record VisualParams(
         double lacedEndTaper,        // fraction of the length over which the chords converge at a free end (not at a
                                      // node where a collinear member continues, e.g. along a leg)
         double lacedEndFrac,         // chord offset at the very end, as a fraction of the full offset
-        // --- joints (hubs) and crossings
-        double hubScale,             // joint hub (a cube at every node with 2+ members, oriented to the widest one, every
-                                     // member end sealed inside it) = scale x the smallest closed size + add; 1 = flush
-                                     // with the widest member (a leg reads straight through), below 1 counts as 1
-        double hubAdd,               // added to the hub half-size (blocks); > 0 shows a collar on straight legs
-        double hubMaxExtendFrac,     // members end at the hub face, but are shortened by at most this x their length
-                                     // (at most 0.49)
-        boolean hubMemberColour,     // node hubs take the widest member's part (rust / steel / pole) instead of colKnuckle
+        // --- joints (hull hubs) and crossings
+        double jointMargin,          // each member is cut back where it clears its neighbours at a joint, plus this x its
+                                     // own drawn width; the hub is the convex hull of the cut faces (0 = members meet
+                                     // with no visible hub where they run straight through)
+        double jointMaxSetbackFrac,  // a member is cut back by at most this x its length (at most 0.49)
+        double jointMaxSetback,      // ... and by at most this x the widest member at the joint (nearly parallel members
+                                     // overlap beyond it instead of making a long hub)
+        boolean jointMemberColour,   // hubs take the widest member's part (rust / steel / pole) instead of colKnuckle
                                      // (hubs on the pole, hubs where members only run straight through and the chord
                                      // splices where laced members continue always take the member's)
         double crossOffsetFrac,      // crossing members closer than frac x (sum of drawn widths) are pushed apart to it
@@ -84,6 +88,9 @@ public record VisualParams(
         boolean drawGround,
         double groundGrid            // grid line spacing in blocks (0 = none)
 ) {
+    /** Keys of earlier versions that are accepted and ignored. */
+    public static final java.util.List<String> OBSOLETE = java.util.List.of("hubScale", "hubAdd", "hubMaxExtendFrac", "hubMemberColour");
+
     /** Mesh parts (per triangle) and their material ids. */
     public enum Part {
         STRUT_C(Material.RUST), STRUT_T(Material.STEEL), POLE(Material.RUST), LACING(Material.STEEL),
@@ -109,7 +116,7 @@ public record VisualParams(
         return new VisualParams(
                 0.05, 0.30, 0.06, 1.0, 0.09,
                 0.4, 0.035, 1.3, 1.0, 2, 14, 0.15, 0.2,
-                1.0, 0.0, 0.45, false, 0.3, 10.0, 1.4, 0.04, 0.24,
+                0.1, 0.45, 1.0, false, 0.3, 10.0, 1.4, 0.04, 0.24,
                 1.6, 0.5, 0.30, 1.0, 0.65, 0.18, 0.40, 1.0, true, 3.0, 0.9,
                 c(0.40, 0.22, 0.13), c(0.48, 0.47, 0.45), c(0.30, 0.20, 0.14), c(0.55, 0.52, 0.47),
                 c(0.16, 0.15, 0.14), c(0.86, 0.84, 0.76), c(0.70, 0.66, 0.58), c(0.86, 0.84, 0.78),

@@ -41,7 +41,7 @@ public final class GenCodec {
             Map.entry("coreHeight", "core block height (blocks)"),
             Map.entry("colPole", "pole segments"),
             Map.entry("colLacing", "lacing bars and battens of laced members"),
-            Map.entry("colKnuckle", "joint hubs (unless hubMemberColour)"),
+            Map.entry("colKnuckle", "joint hubs (unless jointMemberColour)"),
             Map.entry("colCable", "cables"),
             Map.entry("colBackstay", "back-stay wire rope"),
             Map.entry("colPorcelain", "emitter insulator discs"),
