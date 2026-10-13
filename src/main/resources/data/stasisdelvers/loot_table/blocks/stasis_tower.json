@@ -8,13 +8,6 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "condition": {
-            "type": "minecraft:match_block",
-            "blocks": "stasisdelvers:stasis_tower",
-            "state": {
-              "cell": "4"
-            }
-          },
           "name": "stasisdelvers:stasis_tower"
         }
       ],

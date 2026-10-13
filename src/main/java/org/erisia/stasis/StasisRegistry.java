@@ -81,8 +81,7 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredBlock<TowerPoleBlock> TOWER_SEGMENT =
         BLOCKS.registerBlock("stasis_tower_segment", TowerPoleBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.METAL)
             .strength(1f, 6f).noOcclusion().sound(net.minecraft.world.level.block.SoundType.METAL));
-    public static final net.neoforged.neoforge.registries.DeferredItem<CoreItem> TOWER_ITEM =
-        ITEMS.registerItem("stasis_tower", p -> new CoreItem(TOWER.get(), p), p -> p.useBlockDescriptionPrefix());
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TOWER_ITEM = ITEMS.registerSimpleBlockItem(TOWER);
     public static final net.neoforged.neoforge.registries.DeferredItem<PoleItem> TOWER_SEGMENT_ITEM =
         ITEMS.registerItem("stasis_tower_segment", p -> new PoleItem(TOWER_SEGMENT.get(), p), p -> p.useBlockDescriptionPrefix());
 

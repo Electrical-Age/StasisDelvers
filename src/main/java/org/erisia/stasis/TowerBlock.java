@@ -1,17 +1,10 @@
 package org.erisia.stasis;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
@@ -22,21 +15,22 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The stasis tower's core: 3x3 wide and 2 high (Baughn), placed and broken as one, like a door. The item places it in
- * front of the player: the clicked spot is the middle of its near edge (else the player stood inside it). The bottom
- * centre (the master) holds the tower's block entity, which stores power (FE from EA's exporter) and keeps a field
- * running; the other cells hold a proxy so energy overlays (Jade) and cables see the store on every face. The mast
- * stands on the top centre. Right-click shows the tower's state.
+ * Tower core blocks (Baughn): the player places 18 of them, 3x3 wide and 2 high; the moment the last one goes in they
+ * form a core. The bottom centre (the master) then holds the tower's block entity, which stores power (FE from EA's
+ * exporter) and keeps a field running; the other cells hold a proxy so energy overlays (Jade) and cables see the store on
+ * every face. Breaking any block of a formed core turns the rest back into loose core blocks (the field goes). The mast
+ * stands on the top centre. Right-click a formed core to see the tower's state.
  */
 public class TowerBlock extends Block implements EntityBlock {
-    /** Which of the 18 cells: ((dy * 3) + dz + 1) * 3 + dx + 1, offsets from the master (bottom centre). */
-    public static final IntegerProperty CELL = IntegerProperty.create("cell", 0, 17);
-    public static final int MASTER = 4;
+    /** Which of the 18 cells of a formed core: ((dy * 3) + dz + 1) * 3 + dx + 1, offsets from the master (bottom
+     *  centre); LOOSE: a core block not (yet) part of a core. */
+    public static final IntegerProperty CELL = IntegerProperty.create("cell", 0, 18);
+    public static final int MASTER = 4, LOOSE = 18;
     public static final int HEIGHT = 2;
 
     public TowerBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(CELL, MASTER));
+        registerDefaultState(stateDefinition.any().setValue(CELL, LOOSE));
     }
 
     @Override
@@ -60,76 +54,79 @@ public class TowerBlock extends Block implements EntityBlock {
         return cell / 9;
     }
 
-    /** The master (bottom centre) of the core this cell belongs to. */
-    public static BlockPos master(BlockPos pos, BlockState state) {
-        int c = state.getValue(CELL);
-        return pos.offset(-dx(c), -dy(c), -dz(c));
+    public static boolean formed(BlockState s) {
+        return s.getValue(CELL) != LOOSE;
     }
 
-    /** Places a whole core with its master at pos, if all 18 places are free (also for tests and commands). */
-    public static boolean placeCore(Level level, BlockPos master, @Nullable BlockPlaceContext ctx) {
+    /** The master (bottom centre) of the core this formed cell belongs to. */
+    public static BlockPos master(BlockPos pos, BlockState state) {
+        int c = state.getValue(CELL);
+        return c == LOOSE ? pos : pos.offset(-dx(c), -dy(c), -dz(c));
+    }
+
+    /** Places a whole formed core with its master at pos, if all 18 places are free (tests, /stasis core). */
+    public static boolean placeCore(Level level, BlockPos master, @Nullable Object unused) {
         for (int c = 0; c < 18; c++) {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
-            BlockState s = level.getBlockState(p);
-            if (!(ctx != null ? s.canBeReplaced(ctx) : s.canBeReplaced()) || !level.isInWorldBounds(p)) return false;
+            if (!level.isInWorldBounds(p) || !level.getBlockState(p).canBeReplaced()) return false;
         }
-        BlockState base = StasisRegistry.TOWER.get().defaultBlockState();
-        for (int c = 0; c < 18; c++) {
-            if (c == MASTER) continue;
-            level.setBlock(master.offset(dx(c), dy(c), dz(c)), base.setValue(CELL, c), Block.UPDATE_CLIENTS);
-        }
-        level.setBlock(master, base.setValue(CELL, MASTER), Block.UPDATE_ALL);
+        BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
+        for (int c = 0; c < 18; c++) level.setBlock(master.offset(dx(c), dy(c), dz(c)), loose, Block.UPDATE_CLIENTS);
+        form(level, master);
         return true;
     }
 
-    /** Where the item puts the master: one block beyond the clicked spot, away from the player. */
-    static BlockPos masterFor(BlockPlaceContext ctx) {
-        return ctx.getClickedPos().relative(ctx.getHorizontalDirection());
-    }
-
+    /** A loose core block was placed: if it completes a 3x3x2 of loose core blocks, they form a core. */
     @Override
-    public @Nullable BlockState getStateForPlacement(BlockPlaceContext ctx) {
-        BlockPos m = ctx.getClickedPos();          // CoreItem has moved it to masterFor
-        Level level = ctx.getLevel();
-        BlockState master = defaultBlockState().setValue(CELL, MASTER);
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState old, boolean moved) {
+        super.onPlace(state, level, pos, old, moved);
+        if (level.isClientSide() || old.is(this) || formed(state)) return;
         for (int c = 0; c < 18; c++) {
-            BlockPos p = m.offset(dx(c), dy(c), dz(c));
-            if (!level.isInWorldBounds(p) || !level.getBlockState(p).canBeReplaced(ctx)
-                || !level.isUnobstructed(master, p, net.minecraft.world.phys.shapes.CollisionContext.empty())) return null;
+            BlockPos m = pos.offset(-dx(c), -dy(c), -dz(c));
+            if (complete(level, m)) {
+                form(level, m);
+                return;
+            }
         }
-        return master;
     }
 
-    /** The item placed the master: fill in the other 17 cells. */
-    @Override
-    public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity by, ItemStack stack) {
-        if (level.isClientSide()) return;
+    static boolean complete(Level level, BlockPos master) {
         for (int c = 0; c < 18; c++) {
-            if (c == MASTER) continue;
-            level.setBlock(pos.offset(dx(c), dy(c), dz(c)), state.setValue(CELL, c), Block.UPDATE_ALL);
+            BlockState s = level.getBlockState(master.offset(dx(c), dy(c), dz(c)));
+            if (!s.is(StasisRegistry.TOWER.get()) || formed(s)) return false;
         }
+        return true;
     }
 
-    /** A cell whose neighbour in the core is gone goes too, so breaking one cell takes the whole core. */
-    @Override
-    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction dir,
-                                     BlockPos neighbourPos, BlockState neighbourState, RandomSource random) {
-        int c = state.getValue(CELL);
-        int nx = dx(c) + dir.getStepX(), ny = dy(c) + dir.getStepY(), nz = dz(c) + dir.getStepZ();
-        boolean inCore = nx >= -1 && nx <= 1 && nz >= -1 && nz <= 1 && ny >= 0 && ny < HEIGHT;
-        if (inCore && !(neighbourState.is(this) && neighbourState.getValue(CELL) == cell(nx, ny, nz)))
-            return Blocks.AIR.defaultBlockState();
-        return super.updateShape(state, level, ticks, pos, dir, neighbourPos, neighbourState, random);
+    static void form(Level level, BlockPos master) {
+        BlockState base = StasisRegistry.TOWER.get().defaultBlockState();
+        for (int c = 0; c < 18; c++) {
+            BlockPos p = master.offset(dx(c), dy(c), dz(c));
+            BlockState s = base.setValue(CELL, c);
+            level.setBlock(p, s, Block.UPDATE_ALL);
+            level.removeBlockEntity(p);
+            level.setBlockEntity(c == MASTER ? new TowerBlockEntity(p, s) : new TowerCellBlockEntity(p, s));
+        }
+        if (level.getBlockEntity(master) instanceof TowerBlockEntity t) t.onLoad();
+        StasisDelvers.LOG.info("Tower core formed at {}", master.toShortString());
     }
 
-    /** Breaking any cell breaks the master, which drops the core (its loot table drops only for the master). */
+    /** A block of a formed core is gone: the rest fall back to loose core blocks, and the tower stops. */
     @Override
-    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
-        if (!level.isClientSide() && state.getValue(CELL) != MASTER) {
-            BlockPos m = master(pos, state);
-            if (level.getBlockState(m).is(this)) level.destroyBlock(m, !player.isCreative(), player);
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean moved) {
+        super.affectNeighborsAfterRemoval(state, level, pos, moved);
+        if (!formed(state)) return;
+        BlockPos master = master(pos, state);
+        // (removing the master's block entity stops its field and frees the poles: TowerBlockEntity.setRemoved)
+        BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
+        for (int c = 0; c < 18; c++) {
+            BlockPos p = master.offset(dx(c), dy(c), dz(c));
+            BlockState s = level.getBlockState(p);
+            if (!s.is(this) || !formed(s)) continue;
+            level.removeBlockEntity(p);
+            level.setBlock(p, loose, Block.UPDATE_ALL);
+            level.setBlockEntity(new TowerCellBlockEntity(p, loose));
         }
-        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override
@@ -137,11 +134,22 @@ public class TowerBlock extends Block implements EntityBlock {
         return state.getValue(CELL) == MASTER ? new TowerBlockEntity(pos, state) : new TowerCellBlockEntity(pos, state);
     }
 
+    /** With something in hand (a pole to stack, a core block to place) the item does its thing; the status is for an
+     *  empty hand (AdventurAgent: a pole used on the core showed the status instead of stacking). */
+    @Override
+    protected net.minecraft.world.InteractionResult useItemOn(net.minecraft.world.item.ItemStack stack, BlockState state, Level level,
+            BlockPos pos, Player player, net.minecraft.world.InteractionHand hand, net.minecraft.world.phys.BlockHitResult hit) {
+        return stack.isEmpty() ? net.minecraft.world.InteractionResult.TRY_WITH_EMPTY_HAND : net.minecraft.world.InteractionResult.PASS;
+    }
+
     @Override
     protected net.minecraft.world.InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
                                                                    net.minecraft.world.phys.BlockHitResult hit) {
         if (level.isClientSide()) return net.minecraft.world.InteractionResult.SUCCESS;
-        if (level.getBlockEntity(master(pos, state)) instanceof TowerBlockEntity t) player.sendSystemMessage(t.statusText());
+        if (!formed(state)) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                "Stasis tower core block: place 18 of them, 3x3 wide and 2 high, to form a tower core."));
+        } else if (level.getBlockEntity(master(pos, state)) instanceof TowerBlockEntity t) player.sendSystemMessage(t.statusText());
         return net.minecraft.world.InteractionResult.SUCCESS_SERVER;
     }
 
