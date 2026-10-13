@@ -85,6 +85,8 @@ public final class TowerStructure {
                 changed = true;
             }
         }
+        // towers built before core hiding existed (and any drift): keep the core hidden exactly while the tower stands
+        if (every % 20 == 10) TowerBlock.setHidden(level, core, status == Status.OK);
         if (status == Status.WAITING && ++quietTicks >= DEBOUNCE && pending == null) {
             List<String> v = layout.violations();
             if (!v.isEmpty()) {

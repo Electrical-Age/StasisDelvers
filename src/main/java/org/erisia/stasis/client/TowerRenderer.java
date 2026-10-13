@@ -67,7 +67,8 @@ public final class TowerRenderer {
     static final int VERTEX_BYTES = 20;
     /** The mesh draws the 3x3x2 core (the core blocks hide while the tower stands, Baughn). */
     static final VisualParams VP = VisualParams.fromJson(org.erisia.stasis.towergen.Json.parse(
-        "{\"drawCore\": true, \"coreWidth\": 3.0, \"coreHeight\": 2.0}"));
+        "{\"drawCore\": true, \"coreWidth\": 3.0, \"coreHeight\": 2.0, \"colCore\": [0.46, 0.45, 0.42]}"));   // lighter than the
+    // generator's near-black default, which read as unlit in game (AdventurAgent)
 
     private static final ExecutorService BUILD = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "stasis-towermesh");

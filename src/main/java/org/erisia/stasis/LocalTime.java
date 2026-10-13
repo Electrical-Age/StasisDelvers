@@ -197,6 +197,8 @@ public final class LocalTime {
                     inside = wrap(c[0] + (level.getGameTime() - c[2] + partial) * c[1]);
                 }
             }
+            // running land that isn't a field (the spawn area) shows the world's clock (AdventurAgent)
+            if (best <= 0 && Stasis.isRunning(level, BlockPos.containing(x, y, z))) return wrap(level.getDefaultClockTime());
             return wrap(outside + wrapDiff(outside, inside) * best);
         }
     }
