@@ -8,7 +8,8 @@
     "LiquidBlockMixin",
     "BlockMixin",
     "LivingEntityMixin",
-    "ServerPlayerGameModeMixin"
+    "ServerPlayerGameModeMixin",
+    "ItemEntityAccessor"
   ],
   "client": [
     "client.GameRendererMixin"

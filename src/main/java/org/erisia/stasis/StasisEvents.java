@@ -31,8 +31,31 @@ final class StasisEvents {
      * Items in stopped land don't tick, so their pickup delay never runs out: without this, nothing dropped, mined or
      * crumbled out of a statue there could ever be picked up (softlock audit 2).
      */
+    /** When frozen items appeared (server thread; weak, so removed items go). */
+    private static final java.util.Map<net.minecraft.world.entity.item.ItemEntity, Long> ITEM_BORN = new java.util.WeakHashMap<>();
+
+    static void itemJoin(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e) {
+        if (e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item && !e.getLevel().isClientSide())
+            ITEM_BORN.put(item, e.getLevel().getGameTime());
+    }
+
     static void pickup(net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent.Pre e) {
         var item = e.getItemEntity();
+        if (item.level().isClientSide() || Stasis.isRunning(item.level(), item.blockPosition())) return;
+        // /give's pickup-animation copy (never pickable, gone next tick): frozen it would hang there, and taking it is a dupe
+        if (item.getAge() >= item.getItem().getEntityLifespan(item.level()) - 1) {
+            item.discard();
+            e.setCanPickup(net.minecraft.util.TriState.FALSE);
+            return;
+        }
+        int delay = ((org.erisia.stasis.mixin.ItemEntityAccessor) item).stasis$pickupDelay();
+        if (delay == 32767) return;   // never pickable
+        // the delay still applies, counted in level time from when the item appeared (else a Q-dropped item jumps
+        // straight back into the hand)
+        Long born = ITEM_BORN.get(item);
+        long now = item.level().getGameTime();
+        if (born == null) ITEM_BORN.put(item, born = now);
+        if (now - born < delay) return;
         if (item.hasPickUpDelay() && !item.level().isClientSide() && !Stasis.isRunning(item.level(), item.blockPosition())
             && (item.getTarget() == null || item.getTarget().equals(e.getPlayer().getUUID())))
             e.setCanPickup(net.minecraft.util.TriState.TRUE);

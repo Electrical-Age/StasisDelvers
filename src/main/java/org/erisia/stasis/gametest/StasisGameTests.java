@@ -328,11 +328,32 @@ public final class StasisGameTests {
             item.setPickUpDelay(40);
             h.getLevel().addFreshEntity(item);
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1, 4.5), false);
+            var thrown = new ItemEntity(h.getLevel(), h.absoluteVec(new Vec3(12.5, 1.5, 4.5)).x, h.absoluteVec(new Vec3(12.5, 1.5, 4.5)).y,
+                h.absoluteVec(new Vec3(12.5, 1.5, 4.5)).z, new ItemStack(Items.COBBLESTONE, 2));
+            thrown.setPickUpDelay(40);
+            item.setPickUpDelay(4);
+            h.runAfterDelay(1, () -> {
+                h.getLevel().addFreshEntity(thrown);
+                thrown.playerTouch(p);
+                c.check("a fresh drop isn't picked up at once (Q-drop)", !thrown.isRemoved());
+                thrown.discard();
+            });
             return () -> {
                 c.check("outside the field: stopped", !Stasis.isRunning(h.getLevel(), item.blockPosition()));
                 item.playerTouch(p);
                 c.check("picked up despite the frozen pickup delay", item.isRemoved() && p.getInventory().countItem(Items.COBBLESTONE) == 3,
                     "removed " + item.isRemoved() + ", in inventory " + p.getInventory().countItem(Items.COBBLESTONE));
+                var fake = new ItemEntity(h.getLevel(), item.getX(), item.getY(), item.getZ(), new ItemStack(Items.DIRT));
+                fake.makeFakeItem();
+                h.getLevel().addFreshEntity(fake);
+                fake.playerTouch(p);
+                c.check("/give's fake item: not picked up (no dupe), and gone", p.getInventory().countItem(Items.DIRT) == 0 && fake.isRemoved());
+                var never = new ItemEntity(h.getLevel(), item.getX(), item.getY(), item.getZ(), new ItemStack(Items.STICK));
+                never.setNeverPickUp();
+                h.getLevel().addFreshEntity(never);
+                never.playerTouch(p);
+                c.check("never-pickup item stays", p.getInventory().countItem(Items.STICK) == 0 && !never.isRemoved());
+                never.discard();
                 p.discard();
             };
         }));

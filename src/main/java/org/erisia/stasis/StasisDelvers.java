@@ -34,6 +34,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(Freezing::logout);
         NeoForge.EVENT_BUS.addListener(Freezing::respawnPosition);
         NeoForge.EVENT_BUS.addListener(StasisEvents::pickup);
+        NeoForge.EVENT_BUS.addListener(StasisEvents::itemJoin);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, PlayerRates::tick);
         NeoForge.EVENT_BUS.addListener(PlayerRates::logout);
         NeoForge.EVENT_BUS.addListener(Freezing::onBreakSpeed);
