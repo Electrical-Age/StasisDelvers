@@ -15,7 +15,7 @@ public final class LocalClock {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.level.dimension() != Level.OVERWORLD || !Stasis.stops(mc.level)) return Double.NaN;
         var p = mc.player.getEyePosition(partial);
-        double tod = LocalTime.Client.timeOfDay(mc.level, p.x, p.y, p.z, partial);
+        double tod = LocalTime.Client.timeOfDay(mc.level, p.x, p.y, p.z, partial, LocalTime.wrap(totalTicks + (double) partial));
         return totalTicks - Math.floorMod(totalTicks, (long) LocalTime.DAY) + tod;
     }
 }

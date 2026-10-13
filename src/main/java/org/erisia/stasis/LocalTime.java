@@ -183,7 +183,9 @@ public final class LocalTime {
         }
 
         /** The time of day to draw at this position (sky, sun, light), with a 3-block blend at field edges. */
-        public static double timeOfDay(Level level, double x, double y, double z, float partial) {
+        /** globalTod: the world's time of day, as the caller read it raw (reading the clock here would recurse into the
+         *  clock mixin: AdventurAgent's StackOverflowError). */
+        public static double timeOfDay(Level level, double x, double y, double z, float partial, double globalTod) {
             double outside = outside(x, z);
             double best = 0, inside = outside;
             for (Field f : ClientFields.fields()) {
@@ -198,7 +200,7 @@ public final class LocalTime {
                 }
             }
             // running land that isn't a field (the spawn area) shows the world's clock (AdventurAgent)
-            if (best <= 0 && Stasis.isRunning(level, BlockPos.containing(x, y, z))) return wrap(level.getDefaultClockTime());
+            if (best <= 0 && Stasis.isRunning(level, BlockPos.containing(x, y, z))) return wrap(globalTod);
             return wrap(outside + wrapDiff(outside, inside) * best);
         }
     }
