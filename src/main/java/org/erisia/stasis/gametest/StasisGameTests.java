@@ -426,6 +426,23 @@ public final class StasisGameTests {
                     level.setBlock(spawn.offset(x, y, z), Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
             };
         }, false, true));
+        // the core item places the core in front of the player (the clicked spot is its near edge's middle)
+        CASES.put("core_item_places_in_front", new Spec(2, (h, c) -> {
+            var player = h.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+            player.setYRot(-90);   // facing east (+x)
+            BlockPos floor = h.absolutePos(new BlockPos(3, 0, 4));
+            var hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(floor).add(0, 0.5, 0), net.minecraft.core.Direction.UP, floor, false);
+            var stack = new ItemStack(org.erisia.stasis.StasisRegistry.TOWER_ITEM.get());
+            var r = stack.useOn(new net.minecraft.world.item.context.UseOnContext(h.getLevel(), player, net.minecraft.world.InteractionHand.MAIN_HAND, stack, hit));
+            return () -> {
+                BlockPos master = h.absolutePos(new BlockPos(4, 1, 4));
+                c.check("master one block beyond the clicked spot, away from the player", h.getLevel().getBlockEntity(master)
+                    instanceof org.erisia.stasis.TowerBlockEntity, r + " at " + master.toShortString());
+                c.check("all 18 cells", countCore(h.getLevel(), master) == 18, "" + countCore(h.getLevel(), master));
+                c.check("cells carry the proxy (energy overlays on every face)", h.getLevel().getBlockEntity(master.offset(1, 1, 1))
+                    instanceof org.erisia.stasis.TowerCellBlockEntity);
+            };
+        }));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

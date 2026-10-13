@@ -44,6 +44,15 @@ public final class StasisClient {
             if (p.equals("music.game") || p.equals("music.creative") || p.startsWith("music.overworld.") || p.startsWith("music.nether."))
                 e.setMusic(new net.minecraft.sounds.Music(org.erisia.stasis.StasisRegistry.MUSIC_STOPPED, m.minDelay(), m.maxDelay(), false));
         });
+        // how to use the tower blocks (Baughn: no indication otherwise)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent.class, e -> {
+            var it = e.getItemStack().getItem();
+            String key = it == org.erisia.stasis.StasisRegistry.TOWER_ITEM.get() ? "tooltip.stasisdelvers.stasis_tower"
+                : it == org.erisia.stasis.StasisRegistry.TOWER_SEGMENT_ITEM.get() ? "tooltip.stasisdelvers.stasis_tower_segment" : null;
+            if (key == null) return;
+            for (int i = 0; i < 3; i++)
+                e.getToolTip().add(net.minecraft.network.chat.Component.translatable(key + "." + i).withStyle(net.minecraft.ChatFormatting.GRAY));
+        });
         org.erisia.stasis.TowerClientHooks.onUpdate = TowerRenderer::updated;
         org.erisia.stasis.TowerClientHooks.onRemove = TowerRenderer::removed;
     }

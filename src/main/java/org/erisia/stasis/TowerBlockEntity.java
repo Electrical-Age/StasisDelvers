@@ -272,6 +272,32 @@ public class TowerBlockEntity extends BlockEntity {
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
 
+    /** What right-clicking the core says: the field, the store, the structure, and what to do next. */
+    public net.minecraft.network.chat.Component statusText() {
+        double r = radius(), stored = storedJ(), max = storeMaxJ();
+        StringBuilder sb = new StringBuilder("Stasis tower: ");
+        sb.append(switch (state) {
+            case OFF -> stored >= 0.5 * max ? "starting" : "off (needs half a store to start)";
+            case RUNNING -> "field up, radius " + (int) r;
+            case COLLAPSING -> "COLLAPSING";
+        });
+        sb.append(String.format(". Store %.0f%% (%.0f of %.0f kJ), draw %.0f W", 100 * stored / Math.max(1, max), stored / 1000,
+            max / 1000, drawFor(r)));
+        sb.append(". ");
+        TowerStructure s = structure;
+        sb.append(switch (s.status) {
+            case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top centre (each one widens the field); poles off "
+                + "the mast's side make booms. Feed power (FE, e.g. EA's exporter) into any face.";
+            case WAITING, BUILDING -> "Building the tower...";
+            case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
+                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ".";
+            case INVALID -> "Tower layout not allowed: " + s.message;
+            case REFUSED -> "Tower refused: " + s.message;
+            case FAILED -> "Tower could not be built (see the server log).";
+        });
+        return net.minecraft.network.chat.Component.literal(sb.toString());
+    }
+
     /** Fill the store (the spawn cottage's tower starts running at once). */
     public void fillStore() {
         segments = countSegments();

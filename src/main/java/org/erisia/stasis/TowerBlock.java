@@ -22,9 +22,11 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The stasis tower's core: 3x3 wide and 2 high (Baughn), placed and broken as one, like a door. The item places it
- * with the clicked spot as the bottom centre; that cell (the master) holds the block entity, which stores power (FE
- * from EA's exporter, on any cell) and keeps a field running. The mast stands on the top centre.
+ * The stasis tower's core: 3x3 wide and 2 high (Baughn), placed and broken as one, like a door. The item places it in
+ * front of the player: the clicked spot is the middle of its near edge (else the player stood inside it). The bottom
+ * centre (the master) holds the tower's block entity, which stores power (FE from EA's exporter) and keeps a field
+ * running; the other cells hold a proxy so energy overlays (Jade) and cables see the store on every face. The mast
+ * stands on the top centre. Right-click shows the tower's state.
  */
 public class TowerBlock extends Block implements EntityBlock {
     /** Which of the 18 cells: ((dy * 3) + dz + 1) * 3 + dx + 1, offsets from the master (bottom centre). */
@@ -80,15 +82,22 @@ public class TowerBlock extends Block implements EntityBlock {
         return true;
     }
 
+    /** Where the item puts the master: one block beyond the clicked spot, away from the player. */
+    static BlockPos masterFor(BlockPlaceContext ctx) {
+        return ctx.getClickedPos().relative(ctx.getHorizontalDirection());
+    }
+
     @Override
     public @Nullable BlockState getStateForPlacement(BlockPlaceContext ctx) {
-        BlockPos m = ctx.getClickedPos();
+        BlockPos m = ctx.getClickedPos();          // CoreItem has moved it to masterFor
         Level level = ctx.getLevel();
+        BlockState master = defaultBlockState().setValue(CELL, MASTER);
         for (int c = 0; c < 18; c++) {
             BlockPos p = m.offset(dx(c), dy(c), dz(c));
-            if (!level.isInWorldBounds(p) || !level.getBlockState(p).canBeReplaced(ctx)) return null;
+            if (!level.isInWorldBounds(p) || !level.getBlockState(p).canBeReplaced(ctx)
+                || !level.isUnobstructed(master, p, net.minecraft.world.phys.shapes.CollisionContext.empty())) return null;
         }
-        return defaultBlockState().setValue(CELL, MASTER);
+        return master;
     }
 
     /** The item placed the master: fill in the other 17 cells. */
@@ -125,7 +134,15 @@ public class TowerBlock extends Block implements EntityBlock {
 
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return state.getValue(CELL) == MASTER ? new TowerBlockEntity(pos, state) : null;
+        return state.getValue(CELL) == MASTER ? new TowerBlockEntity(pos, state) : new TowerCellBlockEntity(pos, state);
+    }
+
+    @Override
+    protected net.minecraft.world.InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
+                                                                   net.minecraft.world.phys.BlockHitResult hit) {
+        if (level.isClientSide()) return net.minecraft.world.InteractionResult.SUCCESS;
+        if (level.getBlockEntity(master(pos, state)) instanceof TowerBlockEntity t) player.sendSystemMessage(t.statusText());
+        return net.minecraft.world.InteractionResult.SUCCESS_SERVER;
     }
 
     @Override
