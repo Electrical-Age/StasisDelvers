@@ -360,6 +360,230 @@ public final class StasisGameTests {
                 pig.discard();
             };
         }));
+
+        // ---- field tick rates (rate = share of 20 TPS; stopped land = 0; overlapping fields: the fastest) ----
+        // the gate and the scheduled-tick delay, exactly
+        CASES.put("rate_math", new Spec(1, (h, c) -> () -> {
+            for (double r : new double[]{0, 0.001, 0.25, 0.5, 0.6, 0.75, 1}) {
+                int n = 0;
+                for (long t = 123456789L; t < 123456789L + 1000; t++) if (Stasis.runs(r, t)) n++;
+                c.check("rate " + r + ": " + Math.round(r * 1000) + " of 1000 ticks run", n == Math.round(r * 1000), "ran " + n);
+            }
+            boolean ok = true;
+            String bad = "";
+            for (double r : new double[]{0.1, 0.5, 0.6, 0.7, 0.999, 1})
+                for (long now = 1000; now < 1040; now++)
+                    for (int d = 1; d <= 25; d++) {
+                        long due = Stasis.dueTick(r, now, d);
+                        int n = 0;
+                        for (long t = now + 1; t <= due; t++) if (Stasis.runs(r, t)) n++;
+                        if (n != d || !Stasis.runs(r, due)) {
+                            ok = false;
+                            bad = "r " + r + " now " + now + " d " + d + " due " + due + " ran " + n;
+                        }
+                    }
+            c.check("a scheduled tick falls due `delay` running ticks later, on a running tick", ok, bad);
+            c.check("rate 1: vanilla's now + delay", Stasis.dueTick(1.0, 5000, 7) == 5007);
+            ServerLevel level = h.getLevel();
+            Field half = halfField(h, c, 0.5);
+            BlockPos in = h.absolutePos(new BlockPos(12, 1, 4)), full = h.absolutePos(new BlockPos(3, 1, 4));
+            long d = level.createTick(in, Blocks.STONE, 10).triggerTick() - level.getGameTime();
+            long d1 = level.createTick(full, Blocks.STONE, 10).triggerTick() - level.getGameTime();
+            c.check("createTick in a 0.5 field: delay 10 -> ~20", d >= 19 && d <= 21, "delay " + d + ", field " + half);
+            c.check("createTick in a full-speed field: delay 10", d1 == 10, "delay " + d1);
+            c.check("rateAt: 0.5 / 1 / 0 (stopped)", Stasis.rateAt(level, in) == 0.5 && Stasis.rateAt(level, full) == 1.0
+                && Stasis.rateAt(level, h.absolutePos(new BlockPos(15, 1, 0))) == 0.0);
+        }));
+        // block entities: a hopper pulls an item every 8 of its ticks; 160 game ticks give 20 / 10 / 0 items
+        CASES.put("rate_hopper", new Spec(160, (h, c) -> {
+            halfField(h, c, 0.5);
+            var full = hopper(h, new BlockPos(3, 1, 4)); var half = hopper(h, new BlockPos(12, 1, 4)); var out = hopper(h, new BlockPos(15, 1, 1));
+            return () -> {
+                int n1 = count(full), n05 = count(half), n0 = count(out);
+                c.check("full speed: about 20 items", n1 >= 18 && n1 <= 21, "items " + n1);
+                c.check("0.5 field: half as many", n05 * 2 >= n1 - 2 && n05 * 2 <= n1 + 2, n05 + " vs " + n1);
+                c.check("stopped: none", n0 == 0, "items " + n0);
+            };
+        }));
+        // scheduled ticks: a stone button stays pressed 20 ticks (40 in a 0.5 field, forever outside)
+        CASES.put("rate_scheduled_button", new Spec(50, (h, c) -> {
+            halfField(h, c, 0.5);
+            BlockPos b1 = new BlockPos(3, 1, 2), b05 = new BlockPos(12, 1, 4), b0 = new BlockPos(15, 1, 6);
+            var button = Blocks.STONE_BUTTON.defaultBlockState().setValue(net.minecraft.world.level.block.ButtonBlock.FACE,
+                net.minecraft.world.level.block.state.properties.AttachFace.FLOOR);
+            for (BlockPos b : new BlockPos[]{b1, b05, b0}) {
+                h.setBlock(b, button);
+                h.pressButton(b);
+            }
+            h.runAfterDelay(30, () -> {
+                c.check("30 ticks: full speed released", !pressed(h, b1));
+                c.check("30 ticks: 0.5 field still pressed", pressed(h, b05));
+            });
+            return () -> {
+                c.check("50 ticks: 0.5 field released", !pressed(h, b05));
+                c.check("50 ticks: stopped still pressed", pressed(h, b0));
+            };
+        }));
+        // random ticks: cactus age counts the random ticks a block got. Raised tick speed, four rounds of 24 ticks
+        CASES.put("rate_random_ticks", new Spec(100, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var rules = level.getGameRules();
+            int speed = rules.get(net.minecraft.world.level.gamerules.GameRules.RANDOM_TICK_SPEED);
+            rules.set(net.minecraft.world.level.gamerules.GameRules.RANDOM_TICK_SPEED, 1024, level.getServer());
+            c.cleanup.add(() -> rules.set(net.minecraft.world.level.gamerules.GameRules.RANDOM_TICK_SPEED, speed, level.getServer()));
+            halfField(h, c, 0.5);
+            int[][] spots = {{11, 3}, {13, 3}, {11, 5}, {13, 5}, {12, 4}, {10, 4}, {14, 4}, {12, 2}, {12, 6}};
+            List<BlockPos> half = new ArrayList<>(), full = new ArrayList<>(), out = List.of(new BlockPos(15, 1, 0), new BlockPos(15, 1, 7));
+            for (int[] s : spots) {
+                half.add(new BlockPos(s[0], 1, s[1]));
+                full.add(new BlockPos(s[0] - 9, 1, s[1]));
+            }
+            for (List<BlockPos> l : List.of(half, full, out))
+                for (BlockPos b : l) {
+                    h.setBlock(b.below(), Blocks.SAND);
+                    h.setBlock(b, Blocks.CACTUS);
+                }
+            int[] sums = new int[3];
+            for (int round = 1; round <= 4; round++)
+                h.runAfterDelay(24 * round, () -> {
+                    sums[0] += cactusTicks(h, full);
+                    sums[1] += cactusTicks(h, half);
+                    sums[2] += cactusTicks(h, out);
+                });
+            return () -> {
+                double ratio = sums[1] / (double) Math.max(1, sums[0]);
+                c.check("full speed: random ticks (~216 expected)", sums[0] > 120, "ticks " + sums[0]);
+                c.check("0.5 field: about half", ratio > 0.3 && ratio < 0.7, sums[1] + " vs " + sums[0] + String.format(" (%.2f)", ratio));
+                c.check("stopped: none", sums[2] == 0, "ticks " + sums[2]);
+            };
+        }, true, true));
+        // overlapping fields: the fastest wins; changing a rate takes effect at once
+        CASES.put("rate_overlap_max", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            Field a = field(h, c, new Vec3(11.5, 2.5, 4.5), 3.0, 0.3);
+            Field b = field(h, c, new Vec3(13.5, 2.5, 4.5), 3.0, 0.7);
+            field(h, c, new Vec3(6.5, 2.5, 4.5), 2.0, 0.3);
+            c.check("in both: 0.7", Stasis.rateAt(level, h.absolutePos(new BlockPos(12, 1, 4))) == 0.7);
+            c.check("only the 0.3 one: 0.3", Stasis.rateAt(level, h.absolutePos(new BlockPos(10, 1, 4))) == 0.3);
+            c.check("only the 0.7 one: 0.7", Stasis.rateAt(level, h.absolutePos(new BlockPos(15, 1, 4))) == 0.7);
+            c.check("a 0.3 field inside a full-speed one: 1", Stasis.rateAt(level, h.absolutePos(new BlockPos(6, 1, 4))) == 1.0);
+            c.check("in neither: stopped", Stasis.rateAt(level, h.absolutePos(new BlockPos(15, 1, 0))) == 0.0);
+            FieldData.get(level).update(level, a.id(), f -> f.withRate(0.9));
+            c.check("raised the 0.3 field to 0.9: now the fastest", Stasis.rateAt(level, h.absolutePos(new BlockPos(12, 1, 4))) == 0.9);
+            c.check("rates clamp into (0, 1]", b.withRate(5).rate() == 1.0 && b.withRate(0).rate() > 0);
+        }));
+        // the commands: add with a rate (and column), set a rate, refuse rates out of range
+        CASES.put("rate_command", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            var src = server.createCommandSourceStack().withLevel(level).withSuppressedOutput();
+            BlockPos p = h.absolutePos(new BlockPos(12, 2, 4));
+            String at = p.getX() + " " + p.getY() + " " + p.getZ();
+            var before = new java.util.HashSet<Integer>();
+            FieldData.get(level).fields().forEach(f -> before.add(f.id()));
+            server.getCommands().performPrefixedCommand(src, "stasis field add " + at + " 2 0.25");
+            server.getCommands().performPrefixedCommand(src, "stasis field add " + at + " 2 column 0.4");
+            server.getCommands().performPrefixedCommand(src, "stasis field add " + at + " 2");
+            var added = FieldData.get(level).fields().stream().filter(f -> !before.contains(f.id())).toList();
+            for (Field f : added) c.cleanup.add(() -> FieldData.get(level).remove(level, f.id()));
+            c.check("three fields added", added.size() == 3, added.toString());
+            if (added.size() != 3) return;
+            c.check("add ... 0.25: rate 0.25", added.get(0).rate() == 0.25 && !added.get(0).column(), added.get(0).toString());
+            c.check("add ... column 0.4: a column at 0.4", added.get(1).rate() == 0.4 && added.get(1).column(), added.get(1).toString());
+            c.check("add without a rate: 1", added.get(2).rate() == 1.0, added.get(2).toString());
+            int id = added.get(0).id();
+            server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 0.5");
+            c.check("field rate <id> 0.5", FieldData.get(level).get(id).map(Field::rate).orElse(-1.0) == 0.5);
+            server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 1.5");
+            server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 0");
+            c.check("rates above 1 or at 0 are refused", FieldData.get(level).get(id).map(Field::rate).orElse(-1.0) == 0.5);
+        }));
+        // players: in a 0.5 field the client is sent 10 TPS, and eating (32 ticks for bread), mining progress
+        // (gameTicks) and the attack cooldown count at half speed
+        CASES.put("rate_player_eats_slowly", new Spec(80, (h, c) -> {
+            halfField(h, c, 0.5);
+            ServerPlayer full = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            ServerPlayer half = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            int[] ticks0 = new int[2];
+            for (ServerPlayer p : new ServerPlayer[]{full, half}) {
+                p.getFoodData().setFoodLevel(10);
+                p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.BREAD));
+                p.startUsingItem(net.minecraft.world.InteractionHand.MAIN_HAND);
+                // the mock player's connection isn't ticked: drive the connection half of its tick
+                h.onEachTick(() -> {
+                    if (p.isAlive() && !p.isRemoved()) p.doTick();
+                });
+            }
+            ticks0[0] = gameTicks(full);
+            ticks0[1] = gameTicks(half);
+            h.runAfterDelay(40, () -> {
+                c.check("40 ticks: full speed has eaten", full.getMainHandItem().isEmpty() && full.getFoodData().getFoodLevel() > 10,
+                    full.getMainHandItem() + " food " + full.getFoodData().getFoodLevel());
+                c.check("40 ticks: in the 0.5 field still eating", half.isUsingItem() && half.getMainHandItem().is(Items.BREAD),
+                    half.getMainHandItem() + " remaining " + half.getUseItemRemainingTicks());
+                int g1 = gameTicks(full) - ticks0[0], g05 = gameTicks(half) - ticks0[1];
+                c.check("mining clock: half speed in the field", Math.abs(g05 * 2 - g1) <= 2, g05 + " vs " + g1);
+                c.check("client rate: 10 TPS sent in the field, nothing at full speed",
+                    org.erisia.stasis.PlayerRates.sent(half) == 10f && org.erisia.stasis.PlayerRates.sent(full) == 0f,
+                    org.erisia.stasis.PlayerRates.sent(half) + " / " + org.erisia.stasis.PlayerRates.sent(full));
+            });
+            return () -> {
+                c.check("80 ticks: the 0.5 field has eaten too", half.getMainHandItem().isEmpty() && half.getFoodData().getFoodLevel() > 10,
+                    half.getMainHandItem() + " food " + half.getFoodData().getFoodLevel());
+                // leaving the field: back to the server's rate
+                Vec3 a = h.absoluteVec(new Vec3(3.5, 1.0, 4.5));
+                half.teleportTo(a.x, a.y, a.z);
+                org.erisia.stasis.PlayerRates.update(h.getLevel().getServer(), half, false);
+                c.check("left the field: rate restored", org.erisia.stasis.PlayerRates.sent(half) == 0f);
+                remove(h, full);
+                remove(h, half);
+            };
+        }));
+        // MSPT with block entities in fields (logged, not checked): 512 hoppers in chains of four passing cobblestone
+        // down, 100 ticks per setup, all setups twice (the first pass warms the JIT; the second is the one to read)
+        CASES.put("rate_perf", new Spec(1120, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            for (int x = 0; x < 16; x++)
+                for (int z = 0; z < 8; z++)
+                    for (int y = 1; y <= 4; y++) {
+                        h.setBlock(new BlockPos(x, y, z), Blocks.HOPPER);
+                        if (y == 4) ((net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(h.absolutePos(new BlockPos(x, y, z))))
+                            .setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+                    }
+            Vec3 o = h.absoluteVec(new Vec3(8, 2.5, 4));
+            List<Field> made = new ArrayList<>();
+            Runnable clear = () -> {
+                made.forEach(f -> FieldData.get(level).remove(level, f.id()));
+                made.clear();
+            };
+            c.cleanup.add(clear);
+            String[] names = {"no field (all stopped)", "one r 20 field over all, rate 1",
+                "one r 20 field, rate 0.5", "three overlapping r 20 fields 0.5/0.6/0.7", "three overlapping r 20 fields, rate 1"};
+            double[][] setups = {{}, {1}, {0.5}, {0.5, 0.6, 0.7}, {1, 1, 1}};
+            StringBuilder log = new StringBuilder();
+            for (int i = 0; i < 2 * setups.length; i++) {
+                int k = i % setups.length, pass = i / setups.length;
+                h.runAfterDelay(10 + 110 * i, () -> {
+                    clear.run();
+                    for (int j = 0; j < setups[k].length; j++)
+                        made.add(FieldData.get(level).add(level, o.x + 3 * j, o.y, o.z, 20, false, setups[k][j]));
+                });
+                h.runAfterDelay(10 + 110 * i + 105, () -> {
+                    long t0 = System.nanoTime();
+                    int n = 0;
+                    BlockPos base = h.absolutePos(BlockPos.ZERO);
+                    for (int rep = 0; rep < 2000; rep++)
+                        for (int x = 0; x < 16; x++)
+                            for (int z = 0; z < 8; z++) if (Stasis.ticksNow(level, base.offset(x, 1 + (rep & 3), z))) n++;
+                    double ns = (System.nanoTime() - t0) / (2000.0 * 128);
+                    String l = String.format("pass %d, %s: MSPT %.3f, ticksNow %.1f ns/call", pass + 1, names[k],
+                        level.getServer().getAverageTickTimeNanos() / 1e6, ns);
+                    StasisDelvers.LOG.info("[rate_perf] {}", l);
+                    if (pass == 1) log.append(l).append("; ");
+                });
+            }
+            return () -> c.check("measured", true, log.toString());
+        }, false, true));
     }
 
     /** Place an EA six-node device (1.12 id) on the floor at a local position, as a player would. */
@@ -432,6 +656,67 @@ public final class StasisGameTests {
         f.setItem(0, new ItemStack(Items.RAW_IRON, 4));
         f.setItem(1, new ItemStack(Items.COAL, 2));
         return f;
+    }
+
+    /** A field at a local position (cleaned up after the test). */
+    static Field field(GameTestHelper h, Checks c, Vec3 local, double r, double rate) {
+        ServerLevel level = h.getLevel();
+        Vec3 p = h.absoluteVec(local);
+        Field f = FieldData.get(level).add(level, p.x, p.y, p.z, r, false, rate);
+        c.cleanup.add(() -> FieldData.get(level).remove(level, f.id()));
+        return f;
+    }
+
+    /** A slow field (r 3 at local 12.5, 2.5, 4.5) over the east end: (10..14, 1, 4) and (11..13, 1, 3..5) are inside. */
+    static Field halfField(GameTestHelper h, Checks c, double rate) {
+        return field(h, c, new Vec3(12.5, 2.5, 4.5), 3.0, rate);
+    }
+
+    /** A hopper on the floor under a chest of 64 cobblestone. */
+    static net.minecraft.world.level.block.entity.HopperBlockEntity hopper(GameTestHelper h, BlockPos local) {
+        h.setBlock(local.above(), Blocks.CHEST);
+        ((net.minecraft.world.level.block.entity.ChestBlockEntity) h.getLevel().getBlockEntity(h.absolutePos(local.above())))
+            .setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+        h.setBlock(local, Blocks.HOPPER);
+        return (net.minecraft.world.level.block.entity.HopperBlockEntity) h.getLevel().getBlockEntity(h.absolutePos(local));
+    }
+
+    static int count(net.minecraft.world.Container c) {
+        int n = 0;
+        for (int i = 0; i < c.getContainerSize(); i++) n += c.getItem(i).getCount();
+        return n;
+    }
+
+    static boolean pressed(GameTestHelper h, BlockPos local) {
+        return h.getBlockState(local).getValue(net.minecraft.world.level.block.ButtonBlock.POWERED);
+    }
+
+    /** Random ticks the cacti got since the last call (age, 16 per block grown), and reset them. */
+    static int cactusTicks(GameTestHelper h, List<BlockPos> spots) {
+        int n = 0;
+        for (BlockPos b : spots) {
+            var st = h.getBlockState(b);
+            if (!st.is(Blocks.CACTUS)) continue;
+            n += st.getValue(net.minecraft.world.level.block.CactusBlock.AGE);
+            for (int y = 1; y <= 2; y++) {
+                var above = h.getBlockState(b.above(y));
+                if (above.is(Blocks.CACTUS)) n += 16 + above.getValue(net.minecraft.world.level.block.CactusBlock.AGE);
+                if (!above.isAir()) h.setBlock(b.above(y), Blocks.AIR);
+            }
+            h.setBlock(b, Blocks.CACTUS);
+        }
+        return n;
+    }
+
+    /** ServerPlayerGameMode's tick count (what mining progress is measured against). */
+    static int gameTicks(ServerPlayer p) {
+        try {
+            var f = net.minecraft.server.level.ServerPlayerGameMode.class.getDeclaredField("gameTicks");
+            f.setAccessible(true);
+            return f.getInt(p.gameMode);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Collected checks; the test fails at the end listing every failed one. */
