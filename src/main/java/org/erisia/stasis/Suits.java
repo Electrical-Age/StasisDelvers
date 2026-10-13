@@ -53,19 +53,47 @@ final class Suits {
     static void tick(ServerPlayer p) {
         if (p.tickCount % 20 != 0 || p.isSpectator()) return;
         var inv = p.getInventory();
+        // what the pieces want this second, and what the inventory's batteries can give
+        java.util.List<ItemStack> pieces = new java.util.ArrayList<>();
+        double[] want = new double[4];
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
             if (!(s.getItem() instanceof TimeSuit) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
-            double need = Math.min(b.getEnergyMax(s) - b.getEnergy(s), b.getChargePower(s));
-            for (int i = 0; i < 36 && need > 1e-6; i++) {
-                ItemStack src = inv.getItem(i);
-                if (src.isEmpty() || src.getItem() instanceof TimeSuit || !(src.getItem() instanceof IItemEnergyBattery sb)) continue;
-                double take = Math.min(need, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
-                if (take <= 0) continue;
-                sb.setEnergy(src, sb.getEnergy(src) - take);
-                b.setEnergy(s, b.getEnergy(s) + take);
-                need -= take;
+            want[pieces.size()] = Math.max(0, Math.min(b.getEnergyMax(s) - b.getEnergy(s), b.getChargePower(s)));
+            pieces.add(s);
+        }
+        double supply = 0;
+        for (int i = 0; i < 36; i++) {
+            ItemStack src = inv.getItem(i);
+            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && src.getItem() instanceof IItemEnergyBattery sb)
+                supply += Math.max(0, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
+        }
+        // share it evenly (water-filling), so every piece gets charge at once: a suit protects only when all have some
+        double[] give = new double[pieces.size()];
+        double left = supply;
+        for (int round = 0; round < 4 && left > 1e-6; round++) {
+            int open = 0;
+            for (int k = 0; k < give.length; k++) if (want[k] - give[k] > 1e-6) open++;
+            if (open == 0) break;
+            double share = left / open;
+            for (int k = 0; k < give.length; k++) {
+                double g = Math.min(share, want[k] - give[k]);
+                if (g > 0) { give[k] += g; left -= g; }
             }
+        }
+        double draw = supply - left;
+        for (int i = 0; i < 36 && draw > 1e-6; i++) {
+            ItemStack src = inv.getItem(i);
+            if (src.isEmpty() || src.getItem() instanceof TimeSuit || !(src.getItem() instanceof IItemEnergyBattery sb)) continue;
+            double take = Math.min(draw, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
+            if (take <= 0) continue;
+            sb.setEnergy(src, sb.getEnergy(src) - take);
+            draw -= take;
+        }
+        for (int k = 0; k < pieces.size(); k++) {
+            ItemStack s = pieces.get(k);
+            IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
+            b.setEnergy(s, b.getEnergy(s) + give[k]);
             if (s.getItem() instanceof StasisArmorItem && s.isDamaged() && b.getEnergy(s) >= REPAIR_J) {
                 s.setDamageValue(s.getDamageValue() - 1);
                 b.setEnergy(s, b.getEnergy(s) - REPAIR_J);
