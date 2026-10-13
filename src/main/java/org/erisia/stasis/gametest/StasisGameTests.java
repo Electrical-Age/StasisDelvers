@@ -271,6 +271,56 @@ public final class StasisGameTests {
             player.setShiftKeyDown(false);
             return () -> c.check("only the mast counts as segments", t.segments() == 3, "segments " + t.segments());
         }));
+        // P3d: the core reads its poles into a layout, builds it off-thread, then turns the poles into ladder / hidden
+        CASES.put("tower_reads_poles", new Spec(1, (h, c) -> {
+            BlockPos base = new BlockPos(3, 1, 4);
+            tower(h, base, 12);
+            var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
+                .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
+            for (int i = 1; i <= 4; i++) h.setBlock(base.above(6).east(i), boomPole);
+            h.setBlock(base.above(9).west(1), boomPole);
+            h.setBlock(base.above(3).north(1), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());   // vertical: not a boom
+            var l = org.erisia.stasis.TowerStructure.scan(h.getLevel(), h.absolutePos(base), 100);
+            return () -> c.check("mast 12, booms E 4 at y 6 and W 1 at y 9",
+                l != null && l.H() == 12 && l.booms().equals(List.of(new org.erisia.stasis.towergen.Layout.Boom(6, 0, 4),
+                    new org.erisia.stasis.towergen.Layout.Boom(9, 2, 1))), String.valueOf(l));
+        }, false, true));
+        CASES.put("tower_builds_and_parts_poles", new Spec(120, (h, c) -> {
+            org.erisia.stasis.TowerStructure.syncBuild = true;
+            c.cleanup.add(() -> org.erisia.stasis.TowerStructure.syncBuild = false);
+            BlockPos base = new BlockPos(3, 1, 4);
+            var t = tower(h, base, 12);
+            var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
+                .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
+            for (int i = 1; i <= 4; i++) h.setBlock(base.above(6).east(i), boomPole);
+            return () -> {
+                var s = t.structure;
+                c.check("built OK", s.status == org.erisia.stasis.TowerStructure.Status.OK, s.status + " " + s.message);
+                c.check("ladder top inside the mast", s.ladderTop > 0 && s.ladderTop < 12, "ladder top " + s.ladderTop);
+                boolean ok = true;
+                StringBuilder sb = new StringBuilder();
+                for (int k = 1; k <= 12; k++) {
+                    var part = h.getBlockState(base.above(k)).getValue(org.erisia.stasis.TowerPoleBlock.PART);
+                    var want = k <= s.ladderTop ? org.erisia.stasis.TowerPoleBlock.Part.LADDER : org.erisia.stasis.TowerPoleBlock.Part.HIDDEN;
+                    if (part != want) { ok = false; sb.append(k).append('=').append(part).append(' '); }
+                }
+                c.check("mast poles: ladder up to the ladder top, hidden above", ok, sb.toString());
+                c.check("boom poles hidden", h.getBlockState(base.above(6).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
+                    == org.erisia.stasis.TowerPoleBlock.Part.HIDDEN);
+            };
+        }, false, true));
+        CASES.put("tower_invalid_keeps_survey_poles", new Spec(120, (h, c) -> {
+            BlockPos base = new BlockPos(3, 1, 4);
+            var t = tower(h, base, 12);
+            var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
+                .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
+            h.setBlock(base.above(12).east(1), boomPole);       // a boom at the very top: y 12 > H - 2
+            return () -> {
+                c.check("invalid", t.structure.status == org.erisia.stasis.TowerStructure.Status.INVALID, t.structure.status + " " + t.structure.message);
+                c.check("poles stay survey poles", h.getBlockState(base.above(5)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
+                    == org.erisia.stasis.TowerPoleBlock.Part.SURVEY);
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

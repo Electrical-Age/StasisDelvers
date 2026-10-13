@@ -76,14 +76,30 @@ public class TowerBlockEntity extends BlockEntity {
     private int received;   // FE inserted this tick
     private boolean sized;
 
+    /** The generated tower over this core (P3d). */
+    public final TowerStructure structure = new TowerStructure();
+
     public TowerBlockEntity(BlockPos pos, BlockState state) {
         super(StasisRegistry.TOWER_ENTITY.get(), pos, state);
+        structure.seed = (int) (pos.asLong() ^ (pos.asLong() >>> 32));
+    }
+
+    /** Sends the tower's layout and status to clients (they build and draw the mesh). */
+    @Override
+    public net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveCustomOnly(registries);
     }
 
     /** Count the segments and size the store as soon as the tower exists (before its first tick). */
     @Override
     public void onLoad() {
         super.onLoad();
+        if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
         if (level != null && !level.isClientSide()) {
             segments = countSegments();
             store.setCapacity((int) (storeFor(radius()) * FE_PER_J));
@@ -142,6 +158,10 @@ public class TowerBlockEntity extends BlockEntity {
     void serverTick() {
         if (!(level instanceof ServerLevel sl)) return;
         ticks++;
+        if (structure.tick(sl, worldPosition, ticks)) {
+            setChanged();
+            sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
         if (level.getGameTime() % 20 == 0 || segments == 0) {
             int s = countSegments();
             if (s != segments) {
@@ -205,6 +225,8 @@ public class TowerBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         if (level instanceof ServerLevel sl && state != State.OFF && !removedByUnload) stop(sl);
+        if (level != null && !level.isClientSide() && !removedByUnload) structure.release(level);
+        if (level != null && level.isClientSide()) TowerClientHooks.removed(this);
         super.setRemoved();
     }
 
@@ -225,6 +247,7 @@ public class TowerBlockEntity extends BlockEntity {
         out.putInt("collapse", collapseTicks);
         out.putInt("energy", store.amount());
         out.putDouble("failing", failing);
+        structure.save(out);
     }
 
     @Override
@@ -241,6 +264,8 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity(Integer.MAX_VALUE);
         store.set(in.getIntOr("energy", 0));
         failing = in.getDoubleOr("failing", 0);
+        structure.load(in);
+        if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
 
     /** For tests and the tower's own chunk loading. */

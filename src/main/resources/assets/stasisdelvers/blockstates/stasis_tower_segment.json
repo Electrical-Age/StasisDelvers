@@ -1,7 +1,40 @@
 {
-  "variants": {
-    "axis=y": { "model": "stasisdelvers:block/stasis_tower_segment" },
-    "axis=z": { "model": "stasisdelvers:block/stasis_tower_segment", "x": 90 },
-    "axis=x": { "model": "stasisdelvers:block/stasis_tower_segment", "x": 90, "y": 90 }
+ "variants": {
+  "axis=y,part=survey": {
+   "model": "stasisdelvers:block/stasis_tower_segment"
+  },
+  "axis=z,part=survey": {
+   "model": "stasisdelvers:block/stasis_tower_segment",
+   "x": 90
+  },
+  "axis=x,part=survey": {
+   "model": "stasisdelvers:block/stasis_tower_segment",
+   "x": 90,
+   "y": 90
+  },
+  "axis=y,part=ladder": {
+   "model": "stasisdelvers:block/stasis_tower_ladder"
+  },
+  "axis=z,part=ladder": {
+   "model": "stasisdelvers:block/stasis_tower_segment",
+   "x": 90
+  },
+  "axis=x,part=ladder": {
+   "model": "stasisdelvers:block/stasis_tower_segment",
+   "x": 90,
+   "y": 90
+  },
+  "axis=y,part=hidden": {
+   "model": "stasisdelvers:block/stasis_tower_segment"
+  },
+  "axis=z,part=hidden": {
+   "model": "stasisdelvers:block/stasis_tower_segment",
+   "x": 90
+  },
+  "axis=x,part=hidden": {
+   "model": "stasisdelvers:block/stasis_tower_segment",
+   "x": 90,
+   "y": 90
   }
+ }
 }

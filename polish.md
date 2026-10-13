@@ -28,3 +28,7 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 - An unpowered (0 energy, e.g. /give'n) Delver suit doesn't protect and gives no warning: show "suit unpowered"
   before freezing.
 - Not yet checked: mob AI near/in slow fields; fields above or below the player.
+
+## Later (Baughn 2026-10-13, msg 1559534246849282069)
+- Doors in the lattice (ladder well access).
+- Lattice a bit too dense: stronger material would thin it.

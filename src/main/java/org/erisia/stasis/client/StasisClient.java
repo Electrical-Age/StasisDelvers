@@ -24,5 +24,14 @@ public final class StasisClient {
         // a suited player's first-person arm is the suit (sleeve and glove); drawn after the desaturation in stopped
         // land (mixin/client/GameRendererMixin)
         NeoForge.EVENT_BUS.addListener(RenderArmEvent.class, SuitArm::renderArm);
+        // the generated towers (P3d): meshes built off-thread, kept in GPU buffers, drawn after opaque terrain
+        modBus.addListener(net.neoforged.neoforge.client.event.RegisterRenderPipelinesEvent.class, TowerRenderer::registerPipelines);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.PrepareRenderBuffersEvent.class, TowerRenderer::prepare);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.RenderLevelStageEvent.AfterOpaqueBlocks.class, TowerRenderer::draw);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.LevelEvent.Unload.class, e -> {
+            if (e.getLevel().isClientSide()) TowerRenderer.clear();
+        });
+        org.erisia.stasis.TowerClientHooks.onUpdate = TowerRenderer::updated;
+        org.erisia.stasis.TowerClientHooks.onRemove = TowerRenderer::removed;
     }
 }

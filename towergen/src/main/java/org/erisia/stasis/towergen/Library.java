@@ -85,8 +85,13 @@ public final class Library {
 
     public static long sig(int sb4, int st4, int h) { return ((long) sb4 << 40) | ((long) st4 << 20) | h; }
 
-    /** Default library from the classpath (/towergen/p3a_library.json.gz). */
+    /** Default library from the classpath: the TGLB1 binary (/towergen/p3a_library.bin.gz, shipped in the mod) if
+     *  present, else the JSON (/towergen/p3a_library.json.gz). */
     public static Library loadDefault() throws IOException {
+        InputStream bin = Library.class.getResourceAsStream("/towergen/p3a_library.bin.gz");
+        if (bin != null) {
+            try (InputStream gz = new java.util.zip.GZIPInputStream(bin)) { return LibraryBin.read(gz.readAllBytes()); }
+        }
         InputStream in = Library.class.getResourceAsStream("/towergen/p3a_library.json.gz");
         if (in == null) throw new IOException("library resource /towergen/p3a_library.json.gz missing");
         return load(in, true);

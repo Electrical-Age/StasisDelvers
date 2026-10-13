@@ -74,6 +74,16 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
     into "build/generated/sources/modMetadata"
 }
 sourceSets.main.resources.srcDir generateModMetadata
+
+// The tower generator (pure Java, :towergen) is compiled into the mod; the mod ships its compact TGLB1 library
+// (/towergen/p3a_library.bin.gz), not the JSON one.
+sourceSets.main.java.srcDir 'towergen/src/main/java'
+def towerLibRes = tasks.register('towerLibraryResource', Copy) {
+    dependsOn ':towergen:libraryBin'
+    from project(':towergen').layout.buildDirectory.file('libbin/p3a_library.bin.gz')
+    into layout.buildDirectory.dir('generated/towerlib/towergen')
+}
+sourceSets.main.resources.srcDir(files(layout.buildDirectory.dir('generated/towerlib')).builtBy(towerLibRes))
 neoForge.ideSyncTask generateModMetadata
 
 tasks.withType(JavaCompile).configureEach {

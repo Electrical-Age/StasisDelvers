@@ -25,6 +25,19 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public class TowerPoleBlock extends Block {
     public static final EnumProperty<Direction.Axis> AXIS = BlockStateProperties.AXIS;
 
+    /** SURVEY: a plain pole. Once its tower is built (TowerStructure): LADDER, the box ladder in the tower's well (the
+     *  mast up to the ladder top); HIDDEN, not drawn (the generated tower is drawn in its place). */
+    public enum Part implements net.minecraft.util.StringRepresentable {
+        SURVEY, LADDER, HIDDEN;
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(java.util.Locale.ROOT);
+        }
+    }
+
+    public static final EnumProperty<Part> PART = EnumProperty.create("part", Part.class);
+
     static final VoxelShape Y_SHAPE = Block.box(5, 0, 5, 11, 16, 11);
     static final VoxelShape X_SHAPE = Block.box(0, 5, 5, 16, 11, 11);
     static final VoxelShape Z_SHAPE = Block.box(5, 5, 0, 11, 11, 16);
@@ -33,12 +46,12 @@ public class TowerPoleBlock extends Block {
 
     public TowerPoleBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(AXIS, Direction.Axis.Y));
+        registerDefaultState(stateDefinition.any().setValue(AXIS, Direction.Axis.Y).setValue(PART, Part.SURVEY));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(AXIS);
+        builder.add(AXIS, PART);
     }
 
     public static boolean isMast(BlockState s) {
@@ -75,14 +88,24 @@ public class TowerPoleBlock extends Block {
         return ctx.isAbove(Shapes.block(), pos, true) && !ctx.isDescending() ? DECK : Shapes.empty();
     }
 
+    static boolean climbable(BlockState state) {
+        return state.getValue(AXIS) == Direction.Axis.Y && state.getValue(PART) != Part.HIDDEN;
+    }
+
     @Override
     public boolean isLadder(BlockState state, LevelReader level, BlockPos pos, LivingEntity entity) {
-        return state.getValue(AXIS) == Direction.Axis.Y;
+        return climbable(state);
     }
 
     @Override
     public boolean isScaffolding(BlockState state, LevelReader level, BlockPos pos, LivingEntity entity) {
-        return state.getValue(AXIS) == Direction.Axis.Y;
+        return climbable(state);
+    }
+
+    @Override
+    protected net.minecraft.world.level.block.RenderShape getRenderShape(BlockState state) {
+        return state.getValue(PART) == Part.HIDDEN ? net.minecraft.world.level.block.RenderShape.INVISIBLE
+            : net.minecraft.world.level.block.RenderShape.MODEL;
     }
 
     @Override
