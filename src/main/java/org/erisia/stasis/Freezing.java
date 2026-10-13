@@ -72,8 +72,15 @@ public final class Freezing {
                     .withStyle(left < 30 ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.GOLD));
             } else {
                 String why = Suits.problem(p);
-                if (why != null) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal(why).withStyle(net.minecraft.ChatFormatting.RED));
+                p.sendOverlayMessage(net.minecraft.network.chat.Component.literal((why != null ? why + ". " : "") + "Freezing!")
+                    .withStyle(net.minecraft.ChatFormatting.RED));
             }
+        }
+        // in grace in stopped land: a countdown, so the freeze isn't a surprise
+        if (stopped && grace && !p.isCreative() && !p.isSpectator() && s.counted % 20 == 0 && !Suits.protectsWithoutDraw(p)) {
+            long left = (s.graceUntil - level.getGameTime() + 19) / 20;
+            p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("Time stops here: " + left + " s to safety")
+                .withStyle(net.minecraft.ChatFormatting.GOLD));
         }
         int max = StasisConfig.freezeTicks;
         float progress = Math.min(1f, s.ticks / (float) max);

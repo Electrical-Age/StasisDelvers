@@ -43,6 +43,16 @@ final class Suits {
         return left;
     }
 
+    /** Would the suit protect (full and charged), without drawing power? */
+    static boolean protectsWithoutDraw(ServerPlayer p) {
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) return false;
+            if (b.getEnergy(s) < t.stasisDraw(s) / 20.0) return false;
+        }
+        return true;
+    }
+
     /** Is the player wearing a full charged suit? If so, draw one tick's power from each piece. */
     static boolean protect(ServerPlayer p) {
         for (EquipmentSlot slot : ARMOR) {
