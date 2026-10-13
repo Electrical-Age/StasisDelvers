@@ -12,6 +12,37 @@ final class Suits {
 
     static final EquipmentSlot[] ARMOR = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
 
+    /**
+     * Why a worn suit doesn't protect (null: it does, or no suit pieces at all). Shown to the player in stopped land, so
+     * a missing or empty piece isn't a silent death (softlock audit 7).
+     */
+    static String problem(ServerPlayer p) {
+        int pieces = 0;
+        String missing = null, empty = null;
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b) {
+                pieces++;
+                if (b.getEnergy(s) < t.stasisDraw(s) / 20.0 && empty == null) empty = s.getHoverName().getString();
+            } else if (missing == null) missing = slot.getName();
+        }
+        if (pieces == 0) return null;
+        if (missing != null) return "Suit incomplete: no " + missing + " piece";
+        if (empty != null) return "Suit piece out of charge: " + empty;
+        return null;
+    }
+
+    /** Seconds of protection left: the emptiest piece (a full charged suit assumed). */
+    static double secondsLeft(ServerPlayer p) {
+        double left = Double.MAX_VALUE;
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b && t.stasisDraw(s) > 0)
+                left = Math.min(left, b.getEnergy(s) / t.stasisDraw(s));
+        }
+        return left;
+    }
+
     /** Is the player wearing a full charged suit? If so, draw one tick's power from each piece. */
     static boolean protect(ServerPlayer p) {
         for (EquipmentSlot slot : ARMOR) {

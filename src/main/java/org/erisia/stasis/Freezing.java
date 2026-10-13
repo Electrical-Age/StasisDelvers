@@ -64,6 +64,17 @@ public final class Freezing {
             if (fatigue == null || fatigue.getDuration() < 20)
                 p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MINING_FATIGUE, 40, 0, true, true));
         }
+        if (stopped && !grace && !p.isCreative() && !p.isSpectator() && s.counted % 20 == 0) {
+            if (suited) {
+                double left = Suits.secondsLeft(p);
+                if (left < 120) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal(
+                    String.format("Suit charge: %d:%02d left", (int) left / 60, (int) left % 60))
+                    .withStyle(left < 30 ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.GOLD));
+            } else {
+                String why = Suits.problem(p);
+                if (why != null) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal(why).withStyle(net.minecraft.ChatFormatting.RED));
+            }
+        }
         int max = StasisConfig.freezeTicks;
         float progress = Math.min(1f, s.ticks / (float) max);
         AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
