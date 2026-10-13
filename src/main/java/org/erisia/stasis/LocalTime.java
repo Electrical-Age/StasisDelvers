@@ -171,7 +171,7 @@ public final class LocalTime {
             double c = CHUNKS.getOrDefault(ChunkPos.pack(cx, cz + 1), DEFAULT_TOD);
             double d = CHUNKS.getOrDefault(ChunkPos.pack(cx + 1, cz + 1), DEFAULT_TOD);
             // circular blend, all relative to a
-            double ab = a + wrapDiff(a, b) * tx, cd = c + wrapDiff(a, c) + (wrapDiff(a, d) - wrapDiff(a, c)) * tx;
+            double ab = a + wrapDiff(a, b) * tx, cd = a + wrapDiff(a, c) + (wrapDiff(a, d) - wrapDiff(a, c)) * tx;
             return wrap(ab + (cd - ab) * tz);
         }
 
