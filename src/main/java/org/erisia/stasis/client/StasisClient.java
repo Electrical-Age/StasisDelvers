@@ -31,11 +31,13 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.LevelEvent.Unload.class, e -> {
             if (e.getLevel().isClientSide()) TowerRenderer.clear();
         });
-        // in a world of stopped time the background music is the melancholic/eldritch subset (Baughn)
+        // in stopped land the background music is the melancholic/eldritch subset (Baughn)
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.SelectMusicEvent.class, e -> {
             var mc = net.minecraft.client.Minecraft.getInstance();
             var m = e.getMusic();
-            if (mc.level == null || m == null || !org.erisia.stasis.Stasis.stops(mc.level)) return;
+            if (mc.level == null || mc.player == null || m == null || !org.erisia.stasis.Stasis.stops(mc.level)) return;
+            // only out in the grey; inside a field the music is the world's own (Baughn)
+            if (org.erisia.stasis.Stasis.isRunning(mc.level, mc.player.blockPosition())) return;
             var key = m.sound().unwrapKey().map(k -> k.identifier()).orElse(null);
             if (key == null || !key.getNamespace().equals("minecraft")) return;
             String p = key.getPath();
