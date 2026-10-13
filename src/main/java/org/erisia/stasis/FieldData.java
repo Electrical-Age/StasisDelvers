@@ -59,10 +59,13 @@ public final class FieldData extends SavedData {
     public void update(ServerLevel level, int id, java.util.function.UnaryOperator<Field> change) {
         for (int i = 0; i < fields.size(); i++) {
             if (fields.get(i).id() == id) {
-                Field f = change.apply(fields.get(i));
-                if (!f.equals(fields.get(i))) {
+                Field old = fields.get(i);
+                Field f = change.apply(old);
+                if (!f.equals(old)) {
+                    var safe = f.radius() < old.radius() ? Freezing.running(level) : null;
                     fields.set(i, f);
                     changed(level);
+                    if (safe != null) Freezing.graceIfStopped(level, safe);
                 }
                 return;
             }
@@ -74,15 +77,21 @@ public final class FieldData extends SavedData {
     }
 
     public boolean remove(ServerLevel level, int id) {
+        var safe = Freezing.running(level);
         boolean removed = fields.removeIf(f -> f.id() == id);
-        if (removed) changed(level);
+        if (removed) {
+            changed(level);
+            Freezing.graceIfStopped(level, safe);
+        }
         return removed;
     }
 
     public int clear(ServerLevel level) {
+        var safe = Freezing.running(level);
         int n = fields.size();
         fields.clear();
         changed(level);
+        Freezing.graceIfStopped(level, safe);
         return n;
     }
 

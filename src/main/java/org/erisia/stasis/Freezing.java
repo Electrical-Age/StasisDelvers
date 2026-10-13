@@ -91,6 +91,8 @@ public final class Freezing {
 
     /** Leave a statue with the player's inventory and experience, and kill the player. */
     static void freeze(ServerLevel level, ServerPlayer p, State s) {
+        var source = level.damageSources().source(StasisRegistry.FROZEN_IN_TIME);
+        if (p.isInvulnerableTo(level, source)) return;      // e.g. still loading in: don't take the inventory
         Statue statue = Statue.of(level, p);
         level.addFreshEntity(statue);
         s.ticks = 0;
@@ -98,7 +100,7 @@ public final class Freezing {
         if (speed != null) speed.removeModifier(SLOW);
         StasisDelvers.LOG.info("{} froze in time at {} ({} stacks, {} xp in the statue)", p.getName().getString(),
             p.blockPosition().toShortString(), statue.items().size(), statue.xp());
-        p.hurtServer(level, level.damageSources().source(StasisRegistry.FROZEN_IN_TIME), Float.MAX_VALUE);
+        p.hurtServer(level, source, Float.MAX_VALUE);
     }
 
     /** Players sent to world spawn instead of a respawn point in stopped land (told so once they're back). */
@@ -118,6 +120,25 @@ public final class Freezing {
         REDIRECTED.add(p.getUUID());
         StasisDelvers.LOG.info("{}'s respawn point {} is in stopped land: respawning at world spawn", p.getName().getString(),
             net.minecraft.core.BlockPos.containing(t.position()).toShortString());
+    }
+
+    /** The players of a level who stand where time runs (before a field shrinks or goes: see graceIfStopped). */
+    static java.util.List<ServerPlayer> running(ServerLevel level) {
+        return level.players().stream().filter(p -> Stasis.isRunning(level, p.blockPosition())).toList();
+    }
+
+    /**
+     * A field shrank or vanished at once (tower broken, mast cut, /stasis field remove|clear): players it left in
+     * stopped land get the grace period, not just the 5 s freeze (softlock audit 4). A collapse is gradual and warned.
+     */
+    static void graceIfStopped(ServerLevel level, java.util.List<ServerPlayer> wereSafe) {
+        for (ServerPlayer p : wereSafe) {
+            if (p.isRemoved() || Stasis.isRunning(level, p.blockPosition())) continue;
+            State s = state(p);
+            s.ticks = 0;
+            s.graceUntil = Math.max(s.graceUntil, level.getGameTime() + StasisConfig.graceTicks);
+            p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The field around you is gone: time stops here. Get to safety!"));
+        }
     }
 
     /** A fresh start in a new place: no freezing for a while. */

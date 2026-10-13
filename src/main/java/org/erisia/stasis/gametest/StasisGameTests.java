@@ -357,6 +357,18 @@ public final class StasisGameTests {
                 p.discard();
             };
         }));
+        // softlock audit 4: a field that vanishes at once leaves its players a grace period, not just the 5 s freeze
+        CASES.put("field_removed_gives_grace", new Spec(130, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 a = h.absoluteVec(new Vec3(3.5, 1, 4.5));
+            Field f = FieldData.get(level).add(level, a.x, a.y, a.z, 6);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1, 4.5), true);
+            h.runAfterDelay(5, () -> FieldData.get(level).remove(level, f.id()));
+            return () -> {
+                c.check("still alive after more than the freeze time", p.isAlive() && Freezing.ticks(p) == 0, "alive " + p.isAlive() + " ticks " + Freezing.ticks(p));
+                p.discard();
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

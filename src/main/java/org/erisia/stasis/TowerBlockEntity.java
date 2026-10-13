@@ -180,6 +180,10 @@ public class TowerBlockEntity extends BlockEntity {
                 if (storedJ() >= 0.5 * storeFor(r)) start(sl);
             }
             case RUNNING -> {
+                if (FieldData.get(sl).get(fieldId).isEmpty()) {     // removed by a command: start over
+                    stop(sl);
+                    break;
+                }
                 store.take((int) Math.ceil(perTick * FE_PER_J));
                 lastIn = 0.9 * lastIn + 0.1 * in;
                 // the shield shows a shortfall: how far the store has run down, while less comes in than goes out

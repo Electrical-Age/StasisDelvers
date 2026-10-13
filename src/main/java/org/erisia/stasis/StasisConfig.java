@@ -35,9 +35,9 @@ public final class StasisConfig {
         SPAWN_RADIUS = b.comment("Chunks around world spawn that always run, in each direction (1 = 3x3 chunks). -1: none.")
             .defineInRange("spawnRadiusChunks", 1, -1, 64);
         FREEZE_TICKS = b.comment("Ticks a player without a suit lasts in stopped land before freezing into a statue.")
-            .defineInRange("freezeTicks", 100, 20, 1200);
+            .defineInRange("freezeTicks", 100, 60, 1200);
         GRACE_TICKS = b.comment("Ticks after login, respawn or a dimension change during which nobody freezes.")
-            .defineInRange("graceTicks", 200, 0, 2400);
+            .defineInRange("graceTicks", 200, 100, 2400);
         TOWER_DRAW_K = b.comment("Tower draw P = k * r^1.5 W (r = field radius). Default: r 24 draws about 1.2 kW.")
             .defineInRange("towerDrawK", 10.0, 0.0, 1e6);
         TOWER_STORE_C = b.comment("Tower store E = c * r^2 J. Default: a full store runs an r 24 field for 10 minutes.")
