@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": {
-      "model": "stasisdelvers:block/stasis_tower_segment"
-    }
+    "axis=y": { "model": "stasisdelvers:block/stasis_tower_segment" },
+    "axis=z": { "model": "stasisdelvers:block/stasis_tower_segment", "x": 90 },
+    "axis=x": { "model": "stasisdelvers:block/stasis_tower_segment", "x": 90, "y": 90 }
   }
 }

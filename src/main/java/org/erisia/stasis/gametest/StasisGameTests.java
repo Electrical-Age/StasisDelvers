@@ -238,6 +238,39 @@ public final class StasisGameTests {
             };
         }));
         // towers: height sets the radius; half a store starts the field; an empty store collapses it over 15 s
+        // survey poles extend like scaffolding: the mast from anywhere on it, booms outward, sneaking starts a boom
+        CASES.put("poles_extend_like_scaffolding", new Spec(25, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 2);
+            var player = h.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+            var pole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get();
+            java.util.function.BiConsumer<BlockPos, net.minecraft.core.Direction> use = (local, face) -> {
+                BlockPos a = h.absolutePos(local);
+                var hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(a).relative(face, 0.5), face, a, false);
+                new ItemStack(pole).useOn(new net.minecraft.world.item.context.UseOnContext(h.getLevel(), player,
+                    net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(pole), hit));
+            };
+            java.util.function.BiPredicate<BlockPos, net.minecraft.core.Direction.Axis> at = (local, axis) -> {
+                var st = h.getBlockState(local);
+                return st.is(pole) && st.getValue(org.erisia.stasis.TowerPoleBlock.AXIS) == axis;
+            };
+            var Y = net.minecraft.core.Direction.Axis.Y;
+            var X = net.minecraft.core.Direction.Axis.X;
+            use.accept(new BlockPos(3, 2, 4), net.minecraft.core.Direction.NORTH);
+            c.check("side of the lowest mast pole: the mast grows at its top", at.test(new BlockPos(3, 4, 4), Y) && h.getBlockState(new BlockPos(3, 2, 3)).isAir());
+            player.setShiftKeyDown(true);
+            use.accept(new BlockPos(3, 4, 4), net.minecraft.core.Direction.EAST);
+            c.check("sneaking on the mast's side: a boom starts", at.test(new BlockPos(4, 4, 4), X));
+            player.setShiftKeyDown(false);
+            use.accept(new BlockPos(4, 4, 4), net.minecraft.core.Direction.UP);
+            use.accept(new BlockPos(4, 4, 4), net.minecraft.core.Direction.UP);
+            c.check("on the boom: it grows outward, away from the mast", at.test(new BlockPos(5, 4, 4), X) && at.test(new BlockPos(6, 4, 4), X)
+                && h.getBlockState(new BlockPos(4, 5, 4)).isAir());
+            player.setShiftKeyDown(true);
+            use.accept(new BlockPos(3, 4, 4), net.minecraft.core.Direction.EAST);
+            c.check("sneaking on the mast's side again: that boom grows", at.test(new BlockPos(7, 4, 4), X));
+            player.setShiftKeyDown(false);
+            return () -> c.check("only the mast counts as segments", t.segments() == 3, "segments " + t.segments());
+        }));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

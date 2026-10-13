@@ -1,6 +1,20 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/block",
   "textures": {
-    "all": "stasisdelvers:block/stasis_tower_segment"
-  }
+    "particle": "stasisdelvers:block/stasis_tower_segment",
+    "side": "stasisdelvers:block/stasis_tower_segment"
+  },
+  "elements": [
+    {
+      "from": [5, 0, 5], "to": [11, 16, 11],
+      "faces": {
+        "north": { "uv": [5, 0, 11, 16], "texture": "#side" },
+        "south": { "uv": [5, 0, 11, 16], "texture": "#side" },
+        "east":  { "uv": [5, 0, 11, 16], "texture": "#side" },
+        "west":  { "uv": [5, 0, 11, 16], "texture": "#side" },
+        "up":    { "uv": [5, 5, 11, 11], "texture": "#side", "cullface": "up" },
+        "down":  { "uv": [5, 5, 11, 11], "texture": "#side", "cullface": "down" }
+      }
+    }
+  ]
 }

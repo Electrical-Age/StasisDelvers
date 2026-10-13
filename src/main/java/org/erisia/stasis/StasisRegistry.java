@@ -76,11 +76,13 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredBlock<TowerBlock> TOWER = BLOCKS.registerBlock("stasis_tower",
         TowerBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.METAL).strength(5f, 6f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.METAL));
-    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> TOWER_SEGMENT =
-        BLOCKS.registerSimpleBlock("stasis_tower_segment", p -> p.mapColor(net.minecraft.world.level.material.MapColor.METAL)
-            .strength(5f, 6f).requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.METAL));
+    /** The survey pole (mast and booms). Its id is still the V1 segment's, so worlds keep their masts. */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<TowerPoleBlock> TOWER_SEGMENT =
+        BLOCKS.registerBlock("stasis_tower_segment", TowerPoleBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.METAL)
+            .strength(1f, 6f).noOcclusion().sound(net.minecraft.world.level.block.SoundType.METAL));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TOWER_ITEM = ITEMS.registerSimpleBlockItem(TOWER);
-    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TOWER_SEGMENT_ITEM = ITEMS.registerSimpleBlockItem(TOWER_SEGMENT);
+    public static final net.neoforged.neoforge.registries.DeferredItem<PoleItem> TOWER_SEGMENT_ITEM =
+        ITEMS.registerItem("stasis_tower_segment", p -> new PoleItem(TOWER_SEGMENT.get(), p), p -> p.useBlockDescriptionPrefix());
 
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TowerBlockEntity>> TOWER_ENTITY =
         BLOCK_ENTITIES.register("stasis_tower", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TowerBlockEntity::new, TOWER.get()));
