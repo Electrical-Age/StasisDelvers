@@ -192,6 +192,35 @@ public final class Main {
             }
         }
         if (lj >= 0) out.put("ljoint", jointCam(t.node(lj), 4.0, 1.2, 20, fov));
+        // "splice": a leg node where two laced members continue (nearly collinear), nearest 0.3 H
+        int sp = -1;
+        best = 1e30;
+        for (int i = 0; i < n; i++) {
+            int b1 = -1, b2 = -1;
+            boolean ok = false;
+            for (int b = 0; b < t.m && !ok; b++) {
+                if (t.kind[b] != 2 || (t.bi[b] != i && t.bj[b] != i)) continue;
+                if (b1 < 0) { b1 = b; continue; }
+                b2 = b;
+                double[] d1 = away(t, b1, i), d2 = away(t, b2, i);
+                ok = d1[0] * d2[0] + d1[1] * d2[1] + d1[2] * d2[2] < -0.98;
+            }
+            if (!ok) continue;
+            double s = Math.abs(t.P[3 * i + 1] - 0.3 * H);
+            if (s < best - 1e-9) { best = s; sp = i; }
+        }
+        if (sp >= 0) out.put("splice", jointCam(t.node(sp), 7.0, 1.5, 30, fov));
+    }
+
+    /** Unit direction of member b away from its end node nd. */
+    static double[] away(Stitch.Tower t, int b, int nd) {
+        int o = t.bi[b] == nd ? t.bj[b] : t.bi[b];
+        double[] d = new double[3];
+        double l = 0;
+        for (int q = 0; q < 3; q++) { d[q] = t.P[3 * o + q] - t.P[3 * nd + q]; l += d[q] * d[q]; }
+        l = Math.sqrt(l);
+        for (int q = 0; q < 3; q++) d[q] /= l;
+        return d;
     }
 
     /** Camera dist blocks from p, deg degrees around from the outward radial direction, up blocks above. */
