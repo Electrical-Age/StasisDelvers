@@ -28,6 +28,15 @@ final class StoppedLand {
         return !Stasis.isRunning(l, centre.getX(), centre.getY(), centre.getZ());
     }
 
+    /** At a block column (at the player's height, else sea level). */
+    static boolean stoppedAt(ResourceKey<Level> dim, int x, int z) {
+        Level l = level(dim);
+        if (l == null) return false;
+        var p = Minecraft.getInstance().player;
+        int y = p != null ? p.getBlockY() : l.getSeaLevel();
+        return !Stasis.isRunning(l, x, y, z);
+    }
+
     static boolean anyStopped(ResourceKey<Level> dim) {
         return level(dim) != null;
     }

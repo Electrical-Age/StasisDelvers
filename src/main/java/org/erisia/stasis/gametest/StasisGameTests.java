@@ -463,6 +463,16 @@ public final class StasisGameTests {
                 pig.discard(); cow.discard(); p.discard();
             };
         }, false, true));
+        // a frozen mob can be hit more than once (its hit cooldown counts down in level time)
+        CASES.put("frozen_mob_takes_repeated_hits", new Spec(40, (h, c) -> {
+            var pig = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.PIG, new Vec3(12.5, 1.0, 4.5));
+            h.runAfterDelay(2, () -> pig.hurtServer(h.getLevel(), h.getLevel().damageSources().generic(), 3f));
+            h.runAfterDelay(20, () -> pig.hurtServer(h.getLevel(), h.getLevel().damageSources().generic(), 3f));
+            return () -> {
+                c.check("two hits 18 ticks apart both land", Math.abs(pig.getHealth() - 4f) < 0.01f, "hp " + pig.getHealth());
+                pig.discard();
+            };
+        }, false, true));
         // a mob killed in stopped land finishes dying and goes (it used to lie there at 0 health, frozen mid-death)
         CASES.put("killed_mob_goes_in_stopped_land", new Spec(60, (h, c) -> {
             var pig = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.PIG, new Vec3(12.5, 1.0, 4.5));

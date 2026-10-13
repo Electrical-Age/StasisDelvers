@@ -62,4 +62,22 @@ final class StasisEvents {
             && (item.getTarget() == null || item.getTarget().equals(e.getPlayer().getUUID())))
             e.setCanPickup(net.minecraft.util.TriState.TRUE);
     }
+
+    /** When frozen mobs were last hit (server thread; weak). */
+    private static final java.util.Map<net.minecraft.world.entity.LivingEntity, Long> LAST_HIT = new java.util.WeakHashMap<>();
+
+    /**
+     * A frozen mob's hit cooldown counts down in its tick, which never comes: after one hit it could never be hit again
+     * (AdventurAgent: a pig stuck at 2 HP). Count it down in level time instead, as items' pickup delay.
+     */
+    static void incomingDamage(net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent e) {
+        var le = e.getEntity();
+        if (le.level().isClientSide() || !Stasis.isFrozen(le)) return;
+        long now = le.level().getGameTime();
+        Long last = LAST_HIT.put(le, now);
+        if (last == null) return;
+        int elapsed = (int) Math.min(Integer.MAX_VALUE, now - last);
+        le.damageCooldownTime = Math.max(0, le.damageCooldownTime - elapsed);
+        le.hurtTime = Math.max(0, le.hurtTime - elapsed);
+    }
 }

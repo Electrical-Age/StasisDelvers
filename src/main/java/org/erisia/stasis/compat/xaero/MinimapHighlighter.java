@@ -31,6 +31,8 @@ public class MinimapHighlighter extends ChunkHighlighter {
 
     @Override
     public void addChunkHighlightTooltips(InfoDisplayCompiler compiler, ResourceKey<Level> dim, int x, int z, int width) {
-        compiler.addLine(Component.literal("Time stopped"));
+        // the chunk's centre decides its tint, but the line is about where the player stands (AdventurAgent: it said
+        // "Time stopped" in a small field whose chunk centre was outside)
+        if (StoppedLand.stoppedAt(dim, x, z)) compiler.addLine(Component.literal("Time stopped"));
     }
 }
