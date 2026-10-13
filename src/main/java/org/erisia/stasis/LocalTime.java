@@ -158,9 +158,33 @@ public final class LocalTime {
             CHUNKS.clear();
         }
 
+        /**
+         * Stopped land's time at (x, z): the chunk's, blended with its neighbours' over ~3 blocks at each chunk edge
+         * (AdventurAgent: a hard sun jump at the edge of a removed field's chunks).
+         */
+        static double outside(double x, double z) {
+            double fx = (x - 8) / 16.0, fz = (z - 8) / 16.0;   // between chunk centres
+            int cx = (int) Math.floor(fx), cz = (int) Math.floor(fz);
+            double tx = edge(fx - cx), tz = edge(fz - cz);
+            double a = CHUNKS.getOrDefault(ChunkPos.pack(cx, cz), DEFAULT_TOD);
+            double b = CHUNKS.getOrDefault(ChunkPos.pack(cx + 1, cz), DEFAULT_TOD);
+            double c = CHUNKS.getOrDefault(ChunkPos.pack(cx, cz + 1), DEFAULT_TOD);
+            double d = CHUNKS.getOrDefault(ChunkPos.pack(cx + 1, cz + 1), DEFAULT_TOD);
+            // circular blend, all relative to a
+            double ab = a + wrapDiff(a, b) * tx, cd = c + wrapDiff(a, c) + (wrapDiff(a, d) - wrapDiff(a, c)) * tx;
+            return wrap(ab + (cd - ab) * tz);
+        }
+
+        /** 0..1 across the gap between two chunk centres, changing only within 1.5 blocks of the chunk edge. */
+        private static double edge(double t) {
+            double u = (t - 0.5) * 16.0 / 3.0 + 0.5;
+            u = Math.max(0, Math.min(1, u));
+            return u * u * (3 - 2 * u);
+        }
+
         /** The time of day to draw at this position (sky, sun, light), with a 3-block blend at field edges. */
         public static double timeOfDay(Level level, double x, double y, double z, float partial) {
-            double outside = CHUNKS.getOrDefault(ChunkPos.pack(BlockPos.containing(x, y, z)), DEFAULT_TOD);
+            double outside = outside(x, z);
             double best = 0, inside = outside;
             for (Field f : ClientFields.fields()) {
                 double[] c = FIELDS.get(f.id());

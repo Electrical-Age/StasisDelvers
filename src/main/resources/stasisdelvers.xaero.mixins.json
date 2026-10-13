@@ -1,6 +1,7 @@
 {
   "required": false,
   "package": "org.erisia.stasis.mixin.xaero",
+  "plugin": "org.erisia.stasis.mixin.xaero.XaeroPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
     "MinimapSessionMixin",

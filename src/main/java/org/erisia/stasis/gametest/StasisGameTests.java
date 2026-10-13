@@ -483,7 +483,7 @@ public final class StasisGameTests {
         CASES.put("field_clock_skews_and_chunks_remember", new Spec(41, (h, c) -> {
             ServerLevel level = h.getLevel();
             Vec3 a = h.absoluteVec(new Vec3(3.5, 1, 4.5));
-            Field f = FieldData.get(level).add(level, a.x, a.y, a.z, 6);
+            Field f = FieldData.get(level).add(level, a.x, a.y, a.z, 12);   // r 12 always covers its own chunk's centre
             double[] first = new double[1];
             h.runAfterDelay(1, () -> first[0] = org.erisia.stasis.LocalTime.clockOf(level, f.id()));
             return () -> {
