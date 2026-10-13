@@ -149,6 +149,8 @@ Known limits:
   at solid joints; up to 0.70 x at two-cable joints, where it is 0.035 blocks (cables pushed apart by crossing
   offsets). `portableHashes` writes `build/mesh-fnv.json` (FNV-1a of the mesh, also per part) for the browser check;
   `stats` prints triangles and mesh time.
+  SlowTest `hullJointsRandom` (`-Dtowergen.random=200`): 200 random buildable layouts x 2 q = 400 towers, 104209
+  hulls, 0 inconsistent, 0 flat, 0 sealed corners outside, no exceptions.
 - Triangles q1 (cube hubs -> hulls): H16 1050 -> 1232, H24b 12024 -> 12886, H40 17456 -> 18148, H40r3 55096 -> 58042,
   H40b4 45718 -> 47572, H64max 109664 -> 113966, H100 92184 -> 95356 (+3-17%).
 - Mesh time (JVM warm median): H16 0.09 -> 0.22 ms, H24b 0.9 -> 2.3, H40 1.4 -> 2.2, H40r3 3.8 -> 9.5, H40b4 3.3 -> 6.9,

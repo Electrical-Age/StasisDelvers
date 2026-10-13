@@ -102,4 +102,35 @@ class SlowTest {
         for (String s : t) m.merge(s, 1, Integer::sum);
         return m.toString();
     }
+
+    /** Hull joints on random buildable layouts (q 1 and 0.3): no exception, every hull consistent, sealed ends inside. */
+    @org.junit.jupiter.api.Test
+    void hullJointsRandom() {
+        int nl = Integer.getInteger("towergen.random", 60);
+        java.util.Random rng = new java.util.Random(Long.getLong("towergen.seed", 20261012L) + 77);
+        TowerGen g = new TowerGen(Library.shared());
+        MeshBuilder mb = new MeshBuilder(g.c, VisualParams.defaults());
+        int towers = 0, refused = 0, hulls = 0, bad = 0, flat = 0, outside = 0;
+        for (int k = 0; k < nl; k++) {
+            Layout l = LayoutGen.randomBuildable(rng, g.c);
+            for (double q : new double[]{1.0, 0.3}) {
+                TowerGen.Result r;
+                try { r = g.build(l, q); } catch (RefusedException ex) { refused++; continue; }
+                java.util.List<MeshBuilder.JointInfo> js = new java.util.ArrayList<>();
+                mb.build(r.tower, r.analysis, js);
+                towers++;
+                for (MeshBuilder.JointInfo ji : js) {
+                    if (!ji.hull.ok) { bad++; continue; }
+                    if (ji.hull.dim == 2) flat++;
+                    if (ji.hull.dim != 3) continue;
+                    hulls++;
+                    for (double[][] f : ji.sealed) for (double[] c : f) if (!ji.hull.contains(c, 1e-6)) outside++;
+                }
+            }
+        }
+        System.out.printf("hull joints random: %d towers (%d refused), %d hulls, %d flat, %d failed, %d sealed corners outside%n",
+                towers, refused, hulls, flat, bad, outside);
+        org.junit.jupiter.api.Assertions.assertEquals(0, bad, "inconsistent hulls");
+        org.junit.jupiter.api.Assertions.assertEquals(0, outside, "sealed ends outside their hulls");
+    }
 }
