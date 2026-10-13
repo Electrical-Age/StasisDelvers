@@ -23,7 +23,9 @@ public abstract class LiquidBlockMixin {
     @Inject(method = "getCollisionShape", at = @At("RETURN"), cancellable = true)
     private void stasis$solidWhenStopped(BlockState state, BlockGetter getter, BlockPos pos, CollisionContext context,
                                          CallbackInfoReturnable<VoxelShape> cir) {
-        if (context instanceof EntityCollisionContext ec && ec.getEntity() != null
+        // an entity already in a fluid (a swimmer when the field collapsed) may still move through it, or it would be
+        // walled in for good (softlock audit 5); from outside, stopped fluid stays solid
+        if (context instanceof EntityCollisionContext ec && ec.getEntity() != null && !ec.getEntity().isInLiquid()
             && !Stasis.isRunning(ec.getEntity().level(), pos)) cir.setReturnValue(Shapes.block());
     }
 }
