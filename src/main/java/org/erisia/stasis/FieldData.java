@@ -14,7 +14,8 @@ import java.util.List;
 public final class FieldData extends SavedData {
     public static final Codec<FieldData> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.INT.fieldOf("next_id").forGetter(d -> d.nextId),
-        Field.CODEC.listOf().fieldOf("fields").forGetter(d -> d.fields)
+        Field.CODEC.listOf().fieldOf("fields").forGetter(d -> d.fields),
+        Codec.BOOL.optionalFieldOf("cottage", false).forGetter(d -> d.cottage)
     ).apply(i, FieldData::new));
 
     public static final SavedDataType<FieldData> TYPE = new SavedDataType<>(
@@ -22,14 +23,26 @@ public final class FieldData extends SavedData {
 
     private int nextId;
     private final List<Field> fields;
+    /** The spawn cottage has been placed (or tried) in this level (SpawnCottage). */
+    private boolean cottage;
 
     public FieldData() {
-        this(1, List.of());
+        this(1, List.of(), false);
     }
 
-    private FieldData(int nextId, List<Field> fields) {
+    private FieldData(int nextId, List<Field> fields, boolean cottage) {
         this.nextId = nextId;
         this.fields = new ArrayList<>(fields);
+        this.cottage = cottage;
+    }
+
+    public boolean cottageDone() {
+        return cottage;
+    }
+
+    public void markCottage() {
+        cottage = true;
+        setDirty();
     }
 
     public static FieldData get(ServerLevel level) {

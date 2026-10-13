@@ -401,6 +401,31 @@ public final class StasisGameTests {
             }
             return () -> c.check("all suit and tower recipes loaded", missing.isEmpty(), "missing " + missing);
         }));
+        // the spawn cottage: a template with a tower is placed on the surface, its tower starts full and runs a field
+        CASES.put("spawn_cottage_places_a_running_tower", new Spec(10, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos base = new BlockPos(3, 1, 4);
+            tower(h, base, 2);
+            var t = new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate();
+            BlockPos from = h.absolutePos(new BlockPos(2, 1, 3));
+            t.fillFromWorld(level, from, new net.minecraft.core.Vec3i(3, 4, 3), false, List.of());
+            for (int x = 2; x <= 4; x++) for (int y = 1; y <= 4; y++) for (int z = 3; z <= 5; z++) h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+            var saved = level.getRespawnData();
+            c.cleanup.add(() -> level.setRespawnData(saved));
+            BlockPos spawn = org.erisia.stasis.SpawnCottage.place(level, t, h.absolutePos(new BlockPos(11, 1, 4)));
+            return () -> {
+                BlockPos master = null;
+                for (int x = -3; x <= 3; x++) for (int y = -6; y <= 0; y++) for (int z = -3; z <= 3; z++)
+                    if (level.getBlockEntity(spawn.offset(x, y, z)) instanceof org.erisia.stasis.TowerBlockEntity) master = spawn.offset(x, y, z);
+                c.check("the cottage's core arrived whole (18 cells)", master != null && countCore(level, master) == 18, "master " + master + " cells " + (master == null ? 0 : countCore(level, master)));
+                var tb = master == null ? null : (org.erisia.stasis.TowerBlockEntity) level.getBlockEntity(master);
+                c.check("its tower runs (full store)", tb != null && tb.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, tb == null ? "-" : tb.state() + " " + tb.storedJ());
+                c.check("spawn set to the cottage", level.getRespawnData().pos().equals(spawn), spawn.toShortString());
+                if (tb != null) tb.setRemoved();
+                for (int x = -3; x <= 3; x++) for (int y = -6; y <= 1; y++) for (int z = -3; z <= 3; z++)
+                    level.setBlock(spawn.offset(x, y, z), Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();
@@ -759,6 +784,13 @@ public final class StasisGameTests {
             throw new IllegalStateException("placing " + d.name + " failed");
         var node = (mods.eln.node.six.SixNode) mods.eln.node.NodeManager.instance.getNodeFromCoordonate(new mods.eln.misc.Coordonate(p, level));
         return node.getElement(mods.eln.misc.Direction.YN);
+    }
+
+    static int countCore(ServerLevel level, BlockPos master) {
+        int n = 0;
+        for (int dx = -1; dx <= 1; dx++) for (int dy = 0; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++)
+            if (level.getBlockState(master.offset(dx, dy, dz)).is(org.erisia.stasis.StasisRegistry.TOWER.get())) n++;
+        return n;
     }
 
     static org.erisia.stasis.TowerBlockEntity tower(GameTestHelper h, BlockPos base, int segments) {

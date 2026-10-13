@@ -272,6 +272,15 @@ public class TowerBlockEntity extends BlockEntity {
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
 
+    /** Fill the store (the spawn cottage's tower starts running at once). */
+    public void fillStore() {
+        segments = countSegments();
+        store.setCapacity((int) (storeFor(radiusFor(segments)) * FE_PER_J));
+        store.set((int) (storeFor(radiusFor(segments)) * FE_PER_J));
+        sized = true;
+        setChanged();
+    }
+
     /** For tests and the tower's own chunk loading. */
     public SimpleEnergyHandler energy() {
         return store;
