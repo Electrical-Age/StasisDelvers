@@ -309,4 +309,4 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   patterns 214. Both golden sets regenerated (the main one under the stay rule, p3arule under stayCap none). All
   14 pass with 0 members in the well below the ladder top. Steel volume changes by -25% to +30%.
   Random slowTest: 94/120 pass, 2 over, 24 refused, the same as the old library.
-- Solve cache: /var/lib/mclab/agent/scratch/wellfull/cache on tsugumi (7846 pickles).
+- Solve cache: /var/lib/mclab/agent/scratch/wellfull2/cache on tsugumi (rebuilt 2026-10-13 with the npole fix and the lattice-top cap; 7843 entries).
