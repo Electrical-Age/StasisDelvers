@@ -65,8 +65,9 @@ public final class TowerRenderer {
     /** Beyond this distance (blocks) the LOD without lacing is drawn. */
     static final double LOD_DIST = 48;
     static final int VERTEX_BYTES = 20;
-    /** The real core blocks stand in the world: the mesh doesn't draw one. */
-    static final VisualParams VP = VisualParams.fromJson(org.erisia.stasis.towergen.Json.parse("{\"drawCore\": false}"));
+    /** The mesh draws the 3x3x2 core (the core blocks hide while the tower stands, Baughn). */
+    static final VisualParams VP = VisualParams.fromJson(org.erisia.stasis.towergen.Json.parse(
+        "{\"drawCore\": true, \"coreWidth\": 3.0, \"coreHeight\": 2.0}"));
 
     private static final ExecutorService BUILD = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "stasis-towermesh");

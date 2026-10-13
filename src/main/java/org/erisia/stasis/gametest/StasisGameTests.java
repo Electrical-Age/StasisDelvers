@@ -305,6 +305,8 @@ public final class StasisGameTests {
                     if (part != want) { ok = false; sb.append(k).append('=').append(part).append(' '); }
                 }
                 c.check("mast poles: ladder up to the ladder top, hidden above", ok, sb.toString());
+                c.check("core blocks hidden (the tower draws its core)", h.getBlockState(base).getValue(org.erisia.stasis.TowerBlock.HIDDEN)
+                    && h.getBlockState(base.offset(1, 1, -1)).getValue(org.erisia.stasis.TowerBlock.HIDDEN));
                 c.check("boom poles hidden", h.getBlockState(base.above(7).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
                     == org.erisia.stasis.TowerPoleBlock.Part.HIDDEN);
             };

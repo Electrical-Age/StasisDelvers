@@ -28,15 +28,18 @@ public class TowerBlock extends Block implements EntityBlock {
     public static final IntegerProperty CELL = IntegerProperty.create("cell", 0, 18);
     public static final int MASTER = 4, LOOSE = 18;
     public static final int HEIGHT = 2;
+    /** Set while a built tower stands on the core: the tower's mesh draws the core instead (Baughn). */
+    public static final net.minecraft.world.level.block.state.properties.BooleanProperty HIDDEN =
+        net.minecraft.world.level.block.state.properties.BooleanProperty.create("hidden");
 
     public TowerBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(CELL, LOOSE));
+        registerDefaultState(stateDefinition.any().setValue(CELL, LOOSE).setValue(HIDDEN, false));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(CELL);
+        builder.add(CELL, HIDDEN);
     }
 
     static int cell(int dx, int dy, int dz) {
@@ -63,6 +66,21 @@ public class TowerBlock extends Block implements EntityBlock {
     public static BlockPos master(BlockPos pos, BlockState state) {
         int c = state.getValue(CELL);
         return c == LOOSE ? pos : pos.offset(-dx(c), -dy(c), -dz(c));
+    }
+
+    @Override
+    protected net.minecraft.world.level.block.RenderShape getRenderShape(BlockState state) {
+        return state.getValue(HIDDEN) ? net.minecraft.world.level.block.RenderShape.INVISIBLE : net.minecraft.world.level.block.RenderShape.MODEL;
+    }
+
+    /** Shows or hides a formed core's 18 blocks (collision and clicks stay). */
+    public static void setHidden(Level level, BlockPos master, boolean hidden) {
+        for (int c = 0; c < 18; c++) {
+            BlockPos p = master.offset(dx(c), dy(c), dz(c));
+            BlockState s = level.getBlockState(p);
+            if (s.is(StasisRegistry.TOWER.get()) && formed(s) && s.getValue(HIDDEN) != hidden)
+                level.setBlock(p, s.setValue(HIDDEN, hidden), Block.UPDATE_CLIENTS);
+        }
     }
 
     /** Places a whole formed core with its master at pos, if all 18 places are free (tests, /stasis core). */

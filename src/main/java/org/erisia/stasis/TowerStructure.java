@@ -78,7 +78,10 @@ public final class TowerStructure {
                 quietTicks = 0;
                 status = l == null ? Status.NONE : Status.WAITING;
                 message = "";
-                if (l == null) changed |= resetParts(level, List.of());
+                if (l == null) {
+                    changed |= resetParts(level, List.of());
+                    TowerBlock.setHidden(level, core, false);
+                }
                 changed = true;
             }
         }
@@ -147,6 +150,7 @@ public final class TowerStructure {
             }
         }
         resetParts(level, parts);
+        TowerBlock.setHidden(level, core, status == Status.OK);
     }
 
     /** Sets the given poles' parts and resets the poles of the previous build that aren't in the list. */
