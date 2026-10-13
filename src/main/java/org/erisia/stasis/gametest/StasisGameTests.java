@@ -369,6 +369,27 @@ public final class StasisGameTests {
                 p.discard();
             };
         }, false, true));
+        // the 3x3x2 core breaks as one and drops one core item
+        CASES.put("core_breaks_as_one", new Spec(5, (h, c) -> {
+            BlockPos base = new BlockPos(3, 1, 4);
+            tower(h, base, 0);
+            ServerPlayer p = survivalPlayer(h, new Vec3(6.5, 1, 4.5), true);
+            p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_PICKAXE));
+            var corner = h.getBlockState(base.offset(-1, 1, -1));
+            var drops = net.minecraft.world.level.block.Block.getDrops(corner, h.getLevel(), h.absolutePos(base.offset(-1, 1, -1)), null);
+            c.check("a corner cell drops nothing by itself", drops.isEmpty(), corner + " -> " + drops);
+            p.gameMode.destroyBlock(h.absolutePos(base.offset(-1, 1, -1)));
+            return () -> {
+                int cells = 0;
+                for (int dx = -1; dx <= 1; dx++) for (int dy = 0; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++)
+                    if (h.getBlockState(base.offset(dx, dy, dz)).is(org.erisia.stasis.StasisRegistry.TOWER.get())) cells++;
+                int items = h.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(h.absolutePos(base)).inflate(4))
+                    .stream().mapToInt(e -> e.getItem().is(org.erisia.stasis.StasisRegistry.TOWER_ITEM.get()) ? e.getItem().getCount() : 0).sum();
+                c.check("whole core gone", cells == 0, cells + " cells left");
+                c.check("one core item dropped", items == 1, items + " dropped");
+                p.discard();
+            };
+        }));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

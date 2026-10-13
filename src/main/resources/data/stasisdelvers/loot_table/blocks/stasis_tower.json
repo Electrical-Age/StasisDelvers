@@ -2,25 +2,24 @@
   "type": "minecraft:block",
   "pools": [
     {
-      "rolls": 1,
-      "conditions": [
-        {
-          "condition": "minecraft:survives_explosion"
-        },
-        {
-          "condition": "minecraft:block_state_property",
-          "block": "stasisdelvers:stasis_tower",
-          "properties": {
-            "cell": "4"
-          }
-        }
-      ],
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
       "entries": [
         {
           "type": "minecraft:item",
+          "condition": {
+            "type": "minecraft:match_block",
+            "blocks": "stasisdelvers:stasis_tower",
+            "state": {
+              "cell": "4"
+            }
+          },
           "name": "stasisdelvers:stasis_tower"
         }
-      ]
+      ],
+      "rolls": 1
     }
-  ]
+  ],
+  "random_sequence": "stasisdelvers:blocks/stasis_tower"
 }

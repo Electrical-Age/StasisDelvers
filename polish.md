@@ -32,3 +32,5 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 ## Later (Baughn 2026-10-13, msg 1559534246849282069)
 - Doors in the lattice (ladder well access).
 - Lattice a bit too dense: stronger material would thin it.
+
+- Lattice-top cap (H14 E8 L4): big grey joint hulls at the top-ring corners where the cap struts meet (cosmetic).

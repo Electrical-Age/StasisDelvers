@@ -2,18 +2,17 @@
   "type": "minecraft:block",
   "pools": [
     {
-      "rolls": 1,
-      "conditions": [
-        {
-          "condition": "minecraft:survives_explosion"
-        }
-      ],
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
       "entries": [
         {
           "type": "minecraft:item",
           "name": "stasisdelvers:stasis_tower_segment"
         }
-      ]
+      ],
+      "rolls": 1
     }
-  ]
+  ],
+  "random_sequence": "stasisdelvers:blocks/stasis_tower_segment"
 }
