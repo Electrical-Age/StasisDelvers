@@ -139,6 +139,10 @@ public final class Main {
         double yb = !r.layout.booms().isEmpty() ? r.layout.booms().get(0).y() : Math.min(12, H * 0.3);
         double rc = Math.toRadians(235);
         out.put("close", new Raster.Camera(new double[]{12 * Math.cos(rc), yb + 3, 12 * Math.sin(rc)}, new double[]{1, yb, 0}, fov));
+        // "sideW" / "sideE": the lower mast from the west / east (legs and joints near the first boom), 10 blocks out
+        double ys = Math.min(yb + 3, 0.6 * H);
+        out.put("sideW", new Raster.Camera(new double[]{-10, ys + 2, -4}, new double[]{0, ys, 0}, fov));
+        out.put("sideE", new Raster.Camera(new double[]{10, ys + 2, 4}, new double[]{0, ys, 0}, fov));
         if (t.ground.length > 0) {
             double dd = Math.max(H, 2 * extAll) * 1.05;
             double rw = Math.toRadians(250);

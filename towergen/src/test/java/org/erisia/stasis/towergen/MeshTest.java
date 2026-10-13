@@ -177,4 +177,76 @@ class MeshTest {
         System.out.println("mesh fnv " + sb);
         java.nio.file.Files.writeString(java.nio.file.Path.of("build", "mesh-fnv.json"), sb.toString());
     }
+
+    /**
+     * Laced members: chords run straight (every chord segment within 1 degree of the member axis, so no chord bends
+     * inside a member) and inside the member's outer envelope; and every pair of laced members meeting at a node
+     * within 5 degrees of collinear is spliced (at least one of the two continues), never treated as two free ends. Goldens, the owner's
+     * H16 W4/W5 boom-at-2 layouts and random layouts, q 1 and 0.3.
+     */
+    @Test
+    void lacedChordsStraightAndSpliced() throws Exception {
+        TowerGen g = new TowerGen(Library.shared());
+        MeshBuilder mb = new MeshBuilder(g.c, VisualParams.defaults());
+        List<Layout> ls = new java.util.ArrayList<>();
+        for (String nm : GOLDEN) ls.add(Layout.read(java.nio.file.Path.of("layouts", nm + ".json")));
+        ls.add(new Layout(16, List.of(new Layout.Boom(2, 2, 4))));
+        ls.add(new Layout(16, List.of(new Layout.Boom(2, 2, 5))));
+        java.util.Random rng = new java.util.Random(4242);
+        for (int k = 0; k < 40; k++) ls.add(LayoutGen.randomBuildable(rng, g.c));
+        double cos1 = Math.cos(Math.toRadians(1)), cos5 = Math.cos(Math.toRadians(5));
+        int members = 0, spliced = 0;
+        double maxBend = 0;
+        for (Layout l : ls) {
+            for (double q : new double[]{1.0, 0.3}) {
+                TowerGen.Result r;
+                try { r = g.build(l, q); } catch (RefusedException ex) { continue; }
+                Stitch.Tower t = r.tower;
+                List<MeshBuilder.LacedInfo> li = new java.util.ArrayList<>();
+                mb.build(t, r.analysis, null, li);
+                java.util.Map<Integer, MeshBuilder.LacedInfo> byMember = new java.util.HashMap<>();
+                for (MeshBuilder.LacedInfo x : li) {
+                    byMember.put(x.member, x);
+                    members++;
+                    double L = V.norm(x.dv);
+                    double[] a = V.mul(x.dv, 1 / L);
+                    double[][] f = Mesh.frame(a);
+                    for (double[][] ch : x.pts) {
+                        for (int i = 0; i + 1 < ch.length; i++) {
+                            double[] sd = V.sub(ch[i + 1], ch[i]);
+                            double sl = V.norm(sd);
+                            if (sl < 1e-9) continue;
+                            assertTrue(Math.abs(V.dot(sd, a)) / sl >= cos1, l + " q" + q + ": chord of member " + x.member + " bends");
+                        }
+                        for (double[] p : ch) {
+                            double[] rr = V.sub(p, x.p0);
+                            double sp = V.dot(rr, a) / L;
+                            double cu = V.dot(rr, f[0]), cv = V.dot(rr, f[1]);
+                            boolean in = x.pts.length == 3 ? Math.hypot(cu, cv) <= x.b / Math.sqrt(3) + 1e-9      // triangle of side b
+                                    : Math.abs(cu) <= x.b / 2 + 1e-9 && Math.abs(cv) <= x.b / 2 + 1e-9;      // square of side b
+                            assertTrue(sp > -1e-9 && sp < 1 + 1e-9 && in, l + " q" + q + ": chord point outside member " + x.member);
+                        }
+                    }
+                }
+                for (MeshBuilder.LacedInfo x : li) {
+                    for (int e = 0; e < 2; e++) {
+                        int nd = e == 0 ? t.bi[x.member] : t.bj[x.member];
+                        double[] d = V.unit(e == 0 ? x.dv : V.mul(x.dv, -1));
+                        int cont = e == 0 ? x.cont0 : x.cont1;
+                        for (MeshBuilder.LacedInfo y : li) {
+                            if (y == x || (t.bi[y.member] != nd && t.bj[y.member] != nd)) continue;
+                            double[] d2 = V.unit(t.bi[y.member] == nd ? y.dv : V.mul(y.dv, -1));
+                            double c = -V.dot(d, d2);
+                            int ycont = t.bi[y.member] == nd ? y.cont0 : y.cont1;
+                            // at least one of the two continues (the other may be a third, overlapping member whose
+                            // partner was taken by a more collinear one)
+                            if (c >= cos5) assertTrue(cont >= 0 || ycont >= 0, l + " q" + q + ": collinear laced members " + x.member + ", " + y.member + " at node " + nd + " not spliced");
+                            if (cont == y.member) { spliced++; maxBend = Math.max(maxBend, Math.toDegrees(Math.acos(Math.min(1, c)))); }
+                        }
+                    }
+                }
+            }
+        }
+        System.out.printf("laced: %d members, %d spliced ends, largest bend at a splice %.2f deg%n", members, spliced, maxBend);
+    }
 }

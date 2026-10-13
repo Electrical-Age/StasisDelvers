@@ -32,8 +32,9 @@ public record VisualParams(
         double lacingPanelPerWidth,  // lacing panel length = outer width * this
         int lacingPanelsMin,
         int lacingPanelsMax,
-        double lacedEndTaper,        // fraction of the length over which the chords converge at a free end (not at a
-                                     // node where a collinear member continues, e.g. along a leg)
+        double lacedEndTaper,        // optional, default 0 (off: chords run straight into the joint hull like solid
+                                     // members): fraction of the length over which the chords converge at a free end
+                                     // (a node where no laced member continues within ~11 degrees)
         double lacedEndFrac,         // chord offset at the very end, as a fraction of the full offset
         // --- joints (hull hubs) and crossings
         double jointMargin,          // each member is cut back where it clears its neighbours at a joint, plus this x its
@@ -115,7 +116,7 @@ public record VisualParams(
     public static VisualParams defaults() {
         return new VisualParams(
                 0.05, 0.30, 0.06, 1.0, 0.09,
-                0.4, 0.035, 1.3, 1.0, 2, 14, 0.15, 0.2,
+                0.4, 0.035, 1.3, 1.0, 2, 14, 0.0, 0.2,
                 0.1, 0.45, 1.0, false, 0.3, 10.0, 1.4, 0.04, 0.24,
                 1.6, 0.5, 0.30, 1.0, 0.65, 0.18, 0.40, 1.0, true, 3.0, 0.9,
                 c(0.40, 0.22, 0.13), c(0.48, 0.47, 0.45), c(0.30, 0.20, 0.14), c(0.55, 0.52, 0.47),

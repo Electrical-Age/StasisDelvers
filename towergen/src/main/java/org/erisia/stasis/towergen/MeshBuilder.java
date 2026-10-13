@@ -124,7 +124,17 @@ public final class MeshBuilder {
     public Mesh build(Stitch.Tower t, RuntimePass.Analysis an) { return build(t, an, null); }
 
     /** As {@link #build(Stitch.Tower, RuntimePass.Analysis)}; sink (may be null) receives every joint (tests). */
-    Mesh build(Stitch.Tower t, RuntimePass.Analysis an, List<JointInfo> sink) {
+    Mesh build(Stitch.Tower t, RuntimePass.Analysis an, List<JointInfo> sink) { return build(t, an, sink, null); }
+
+    /** Test hook: one laced member's frame, chord polylines and continuation partners (-1: free end). */
+    static final class LacedInfo {
+        int member, cont0, cont1;
+        double[] p0, dv;
+        double b;
+        double[][][] pts;
+    }
+
+    Mesh build(Stitch.Tower t, RuntimePass.Analysis an, List<JointInfo> sink, List<LacedInfo> lacedSink) {
         Mesh mesh = new Mesh();
         int n = t.n, m = t.m;
         double[] P = t.P;
@@ -192,7 +202,7 @@ public final class MeshBuilder {
         // --- crossing offsets (z-fighting)
         double[][] off = crossOffsets(t, type, ax, len, dw);
 
-        // --- laced continuation: the most collinear laced partner with the same chord count, if mutual
+        // --- laced continuation: the most collinear laced partner (within CONT_DOT, any section / chord count), if mutual
         int[] best = new int[2 * m], cont = new int[2 * m];
         Arrays.fill(best, -1);
         Arrays.fill(cont, -1);
@@ -201,46 +211,47 @@ public final class MeshBuilder {
             for (int e = 0; e < 2; e++) {
                 int nd = e == 0 ? t.bi[b] : t.bj[b];
                 double[] d = e == 0 ? ax[b] : V.mul(ax[b], -1);
-                double bd = -0.98;
+                double bd = CONT_DOT;
                 for (int b2 : at.get(nd)) {
-                    if (b2 == b || type[b2] != LACED || lg[b2].nc != lg[b].nc) continue;
+                    if (b2 == b || type[b2] != LACED) continue;
                     double[] d2 = t.bi[b2] == nd ? ax[b2] : V.mul(ax[b2], -1);
                     double dd = V.dot(d, d2);
                     if (dd < bd - 1e-12) { bd = dd; best[2 * b + e] = b2; }
                 }
             }
         }
-        int[][] chordMap = new int[2 * m][];   // for the lower-index member of a continuing pair: partner chord per chord
+        int[][] chordGrp = new int[2 * m][];   // for the lower-index member of a continuing pair: splice pair per chord
         for (int b = 0; b < m; b++) {
             if (type[b] != LACED) continue;
             for (int e = 0; e < 2; e++) {
                 int b2 = best[2 * b + e];
                 if (b2 < 0) continue;
                 int nd = e == 0 ? t.bi[b] : t.bj[b], e2 = t.bi[b2] == nd ? 0 : 1;
-                if (best[2 * b2 + e2] != b) continue;
-                if (b < b2) {
-                    // pair chords by nearest end point; give up (taper both) unless it is one-to-one
-                    int nc = lg[b].nc;
-                    int[] map = new int[nc];
-                    boolean[] used = new boolean[nc];
-                    boolean ok = true;
-                    for (int k = 0; k < nc && ok; k++) {
-                        double[] pa = lg[b].rawEnd(k, e);
-                        int bj = -1;
-                        double bdist = 1e300;
-                        for (int q = 0; q < nc; q++) {
-                            double dd = dist2(pa, lg[b2].rawEnd(q, e2));
-                            if (dd < bdist - 1e-15) { bdist = dd; bj = q; }
+                if (best[2 * b2 + e2] != b || b > b2) continue;
+                // splice pairs: chords matched one-to-one by increasing end distance (ties: lower indices); where
+                // the chord counts differ (4 -> 3) the unmatched chord just ends at the node (capped, no hub)
+                int na = lg[b].nc, nb2 = lg[b2].nc;
+                int[] grp = new int[na + nb2];
+                Arrays.fill(grp, -1);
+                boolean[] ua = new boolean[na], ub = new boolean[nb2];
+                for (int r = 0; r < Math.min(na, nb2); r++) {
+                    int bk = -1, bq = -1;
+                    double bd2 = 1e300;
+                    for (int k = 0; k < na; k++) {
+                        if (ua[k]) continue;
+                        for (int q2 = 0; q2 < nb2; q2++) {
+                            if (ub[q2]) continue;
+                            double dd = dist2(lg[b].rawEnd(k, e), lg[b2].rawEnd(q2, e2));
+                            if (dd < bd2 - 1e-15) { bd2 = dd; bk = k; bq = q2; }
                         }
-                        if (used[bj]) ok = false;
-                        used[bj] = true;
-                        map[k] = bj;
                     }
-                    if (!ok) continue;
-                    chordMap[2 * b + e] = map;
-                    cont[2 * b + e] = b2;
-                    cont[2 * b2 + e2] = b;
+                    ua[bk] = ub[bq] = true;
+                    grp[bk] = bk;
+                    grp[na + bq] = bk;
                 }
+                chordGrp[2 * b + e] = grp;
+                cont[2 * b + e] = b2;
+                cont[2 * b2 + e2] = b;
             }
         }
         for (int b = 0; b < m; b++) {
@@ -288,24 +299,27 @@ public final class MeshBuilder {
                 int b2 = cont[2 * b + e];
                 if (b2 < b) continue;
                 int nd = e == 0 ? t.bi[b] : t.bj[b], e2 = t.bi[b2] == nd ? 0 : 1;
-                int nc = lg[b].nc;
-                cEnd[2 * b + e] = new End[nc];
-                if (cEnd[2 * b2 + e2] == null) cEnd[2 * b2 + e2] = new End[nc];
-                for (int k = 0; k < nc; k++) {
-                    int q = chordMap[2 * b + e][k];
-                    // both chords end at the midpoint of their raw end points: the leg's chords run on through the
-                    // node (a slight kink where the sections differ) and meet in a two-member hull joint
-                    double[][] pa = lg[b].pts[k], pb = lg[b2].pts[q];
-                    int ia = e == 0 ? 0 : pa.length - 1, ib = e2 == 0 ? 0 : pb.length - 1;
-                    double[] mid = V.mul(V.add(pa[ia], pb[ib]), 0.5);
-                    pa[ia] = mid;
-                    pb[ib] = mid.clone();
-                    End ea = chordEnd(lg[b], k, e, part[b]), eb = chordEnd(lg[b2], q, e2, part[b2]);
+                int na = lg[b].nc, nb2 = lg[b2].nc;
+                int[] grp = chordGrp[2 * b + e];          // -1: unmatched chord, capped
+                cEnd[2 * b + e] = new End[na];
+                cEnd[2 * b2 + e2] = new End[nb2];
+                // chords stay straight; each splice group of chord ends is one hull joint (flush when the chords are
+                // collinear, a short frustum / bridge where the section or chord count changes)
+                for (int r = 0; r < na + nb2; r++) {
+                    if (grp[r] != r || r >= na) continue;
                     Joint hb = new Joint();
-                    hb.add(ea);
-                    hb.add(eb);
-                    cEnd[2 * b + e][k] = ea;
-                    cEnd[2 * b2 + e2][q] = eb;
+                    if (sink != null) for (int[] me : new int[][]{{b, e}, {b2, e2}}) {
+                        double[] d = me[1] == 0 ? ax[me[0]] : V.mul(ax[me[0]], -1), q = node(P, nd);
+                        double[][] f = Mesh.frame(d);
+                        hb.env.add(new double[]{q[0], q[1], q[2], d[0], d[1], d[2], f[0][0], f[0][1], f[0][2],
+                                f[1][0], f[1][1], f[1][2], dw[me[0]] / 2, len[me[0]]});
+                    }
+                    for (int k = 0; k < na + nb2; k++) {
+                        if (grp[k] != r) continue;
+                        End en = k < na ? chordEnd(lg[b], k, e, part[b]) : chordEnd(lg[b2], k - na, e2, part[b2]);
+                        if (k < na) cEnd[2 * b + e][k] = en; else cEnd[2 * b2 + e2][k - na] = en;
+                        hb.add(en);
+                    }
                     chordHubs.add(hb);
                 }
             }
@@ -317,6 +331,12 @@ public final class MeshBuilder {
         for (int b = 0; b < m; b++) {
             if (type[b] == SKIP) continue;
             if (type[b] == LACED) {
+                if (lacedSink != null) {
+                    LacedInfo li = new LacedInfo();
+                    li.member = b; li.cont0 = cont[2 * b]; li.cont1 = cont[2 * b + 1];
+                    li.p0 = lg[b].p0; li.dv = lg[b].dv; li.b = lg[b].b; li.pts = lg[b].pts;
+                    lacedSink.add(li);
+                }
                 drawLaced(mesh, lg[b], part[b], cEnd[2 * b], cEnd[2 * b + 1], cont[2 * b] >= 0 && cont[2 * b] < b,
                         cont[2 * b + 1] >= 0 && cont[2 * b + 1] < b);
                 continue;
@@ -568,6 +588,7 @@ public final class MeshBuilder {
             JointInfo ji = new JointInfo();
             ji.hull = h;
             ji.boxes.addAll(jt.env);
+            for (double[] ev : jt.env) ji.maxW = Math.max(ji.maxW, 2 * ev[12]);
             for (End en : jt.ends) {
                 ji.boxes.add(new double[]{en.p[0], en.p[1], en.p[2], en.d[0], en.d[1], en.d[2], en.u[0], en.u[1], en.u[2],
                         en.v[0], en.v[1], en.v[2], en.a, en.len});
@@ -648,6 +669,9 @@ public final class MeshBuilder {
         }
         return off;
     }
+
+    /** Continuing laced members: the bend between them below 30 degrees (leg kinks at the base flare included). */
+    static final double CONT_DOT = -0.866;
 
     private static long pk(int a, int b) { return ((long) Math.min(a, b) << 32) | Math.max(a, b); }
 

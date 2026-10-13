@@ -123,6 +123,35 @@ Known limits:
 - Random (slowTest, 400 x 2 q, seed 7): 645 pass, 19 over the catalogue (now refused), 136 refused by the stay rule
   (was 769 pass / 31 over); no exceptions.
 
+## Laced members: straight chords, splices at every continuing node (2026-10-13, owner report)
+- Report: `{"H": 16, "booms": [[2, "W", 4]]}` (and W5) drew the west laced legs as spindles: chords converging to a
+  point at every bay node and bowing out between, with kinked joints; the joint keys had no effect there.
+- Cause: a laced end counted as continuing only if the collinear partner had the **same chord count** (and a
+  one-to-one nearest-chord map). Where the leg section changes 3 <-> 4 chords (outer width across 0.7, e.g. around
+  the boom-root bay), both ends were treated as free ends, so `lacedEndTaper` pulled the chords together at both
+  ends of the member (a spindle), and the converged chord ends went into the node hull instead of a splice.
+- Fix: continuation = the mutually most collinear laced partner within 30 degrees (`CONT_DOT`, so base-flare kinks
+  splice too), any section / chord count. Chords are matched one-to-one by increasing end distance; each pair is a
+  two-member hull joint (flush / frustum / wedge at a kink: the hull bridges, chords stay straight); an unmatched
+  chord (4 -> 3) just ends capped at the node. Chord ends are no longer moved to a common midpoint (no kink inside a
+  member). `lacedEndTaper` now defaults to 0: at a genuine free end the chords run straight into the node hull like
+  solid members (the old taper is still available as an optional key). Every laced joint is a hull joint, so the
+  joint* keys apply.
+- Test `MeshTest.lacedChordsStraightAndSpliced` (7 goldens + H16 W4@2 + H16 W5@2 + 40 random, q 1 and 0.3): every
+  chord segment within 1 degree of its member axis, every chord point inside the member envelope (square of side b,
+  triangle of side b for 3 chords), and of any two laced members meeting within 5 degrees of collinear at least one
+  is spliced. 8479 members, 10430 spliced ends; the largest member bend at a splice is 28.6 degrees (chords stay
+  straight; the hull bridges). Hull test still passes (laced envelopes now count for splice and free-end joints);
+  slow random sweep: 400 towers, 109149 hulls, 0 inconsistent.
+- Triangles q1 drop (no taper breakpoints, fewer chord segments): H24b 12886 -> 10802, H40 18148 -> 17306, H40r3
+  58042 -> 45588, H40b4 47572 -> 39094, H64max 113966 -> 86284, H100 95356 -> 80036. Mesh time about the same.
+- Renders: `renders/contact_laced_splices.png` (1920 x 1800, pairs before | after: H16 W4 / W5 from west and east
+  (new towerview shots `sideW`, `sideE`), then the `close` shot of H24b, H40r3, H40b4, H64max, H100). Browser: 6/7
+  mesh hashes identical (H40b4 strut colour as before), the W4 layout builds straight legs
+  (`towerweb/screenshot-laced.png`; script /var/lib/mclab/agent/scratch/twtest/hull.py).
+- Known: at a 4 -> 3 chord section change the end battens of the wider member show as a step; members meeting
+  at 11-30 degrees now splice with a wedge-shaped hull at each chord instead of a node knuckle.
+
 ## Mesh: convex-hull joints (2026-10-13, replaces the cube hubs below)
 - Scheme (MeshBuilder javadoc, `Hull3`): per node, every solid member end (strut, pole, laced chord at a free laced
   end) is cut back by its setback = the largest distance along it inside any other member's prism there (exact
