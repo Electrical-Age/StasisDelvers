@@ -6,7 +6,9 @@
     "ServerLevelMixin",
     "LevelChunkMixin",
     "LiquidBlockMixin",
-    "BlockMixin"
+    "BlockMixin",
+    "LivingEntityMixin",
+    "ServerPlayerGameModeMixin"
   ],
   "client": [
     "client.GameRendererMixin"
