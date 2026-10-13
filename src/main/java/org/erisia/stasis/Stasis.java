@@ -178,7 +178,7 @@ public final class Stasis {
      */
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
         var be = level.getBlockEntity(pos);
-        if (be instanceof TowerBlockEntity) return true;
+        if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
         // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
         return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && towerInChunk(level, pos);
@@ -187,7 +187,7 @@ public final class Stasis {
     /** Is there a tower base in this position's chunk? */
     public static boolean towerInChunk(ServerLevel level, BlockPos pos) {
         var chunk = level.getChunkAt(pos);
-        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity) return true;
+        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
         return false;
     }
 
@@ -195,7 +195,7 @@ public final class Stasis {
     public static boolean towerInChunkIfLoaded(ServerLevel level, BlockPos pos) {
         var chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
         if (chunk == null) return false;
-        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity) return true;
+        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
         return false;
     }
 

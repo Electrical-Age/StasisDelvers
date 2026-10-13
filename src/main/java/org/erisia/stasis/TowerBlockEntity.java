@@ -298,6 +298,22 @@ public class TowerBlockEntity extends BlockEntity {
         return net.minecraft.network.chat.Component.literal(sb.toString());
     }
 
+    /** Is this the tower (the bottom centre of a formed core), not just a core block? */
+    public boolean isMaster() {
+        var s = getBlockState();
+        return s.is(StasisRegistry.TOWER.get()) && s.getValue(TowerBlock.CELL) == TowerBlock.MASTER;
+    }
+
+    /** The core fell apart: no field, the poles back to survey poles, no tower (the store is kept). */
+    void unform() {
+        if (!(level instanceof ServerLevel sl)) return;
+        if (state != State.OFF) stop(sl);
+        structure.release(level);
+        structure.reset();
+        setChanged();
+        sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+    }
+
     /** Fill the store (the spawn cottage's tower starts running at once). */
     public void fillStore() {
         segments = countSegments();

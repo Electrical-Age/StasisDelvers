@@ -167,6 +167,15 @@ public final class TowerStructure {
             level.setBlock(p, s.setValue(TowerPoleBlock.PART, part), Block.UPDATE_CLIENTS);
     }
 
+    /** Forget the tower (the core fell apart); it is read again if the core forms anew. */
+    void reset() {
+        layout = null;
+        status = Status.NONE;
+        message = "";
+        ladderTop = -1;
+        dirty = true;
+    }
+
     /** Before the core goes: every pole back to a survey pole. */
     void release(Level level) {
         resetParts(level, List.of());

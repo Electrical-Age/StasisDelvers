@@ -55,7 +55,8 @@ public final class SpawnCottage {
         for (int x = 0; x < size.getX(); x++)
             for (int yy = 0; yy < size.getY(); yy++)
                 for (int z = 0; z < size.getZ(); z++)
-                    if (level.getBlockEntity(origin.offset(x, yy, z)) instanceof TowerBlockEntity tower) tower.fillStore();
+                    if (level.getBlockEntity(origin.offset(x, yy, z)) instanceof TowerBlockEntity tower
+                        && tower.getBlockState().getValue(TowerBlock.CELL) == TowerBlock.MASTER) tower.fillStore();
         level.setRespawnData(LevelData.RespawnData.of(Level.OVERWORLD, spawnPos, 0f, 0f));
         StasisDelvers.LOG.info("Spawn cottage placed at {} ({}), spawn {}", origin.toShortString(), size.toShortString(), spawnPos.toShortString());
         return spawnPos;

@@ -16,9 +16,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Tower core blocks (Baughn): the player places 18 of them, 3x3 wide and 2 high; the moment the last one goes in they
- * form a core. The bottom centre (the master) then holds the tower's block entity, which stores power (FE from EA's
- * exporter) and keeps a field running; the other cells hold a proxy so energy overlays (Jade) and cables see the store on
- * every face. Breaking any block of a formed core turns the rest back into loose core blocks (the field goes). The mast
+ * form a core. Every core block carries a TowerBlockEntity (one type for all, so client and server always agree on
+ * it); the bottom centre's (the master's) is the tower: it stores power (FE from EA's exporter) and keeps a field
+ * running, and the energy capability of every cell resolves to it, so overlays (Jade) and cables see the store on every
+ * face. Breaking any block of a formed core turns the rest back into loose core blocks (the field goes). The mast
  * stands on the top centre. Right-click a formed core to see the tower's state.
  */
 public class TowerBlock extends Block implements EntityBlock {
@@ -104,10 +105,17 @@ public class TowerBlock extends Block implements EntityBlock {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
             BlockState s = base.setValue(CELL, c);
             level.setBlock(p, s, Block.UPDATE_ALL);
-            level.removeBlockEntity(p);
-            level.setBlockEntity(c == MASTER ? new TowerBlockEntity(p, s) : new TowerCellBlockEntity(p, s));
+            // a cell formed from a pre-fix loose block may still hold the old proxy entity: make it a tower entity
+            if (!(level.getBlockEntity(p) instanceof TowerBlockEntity)) {
+                level.removeBlockEntity(p);
+                level.setBlockEntity(new TowerBlockEntity(p, s));
+            }
         }
-        if (level.getBlockEntity(master) instanceof TowerBlockEntity t) t.onLoad();
+        if (level.getBlockEntity(master) instanceof TowerBlockEntity t) {
+            t.onLoad();
+            t.setChanged();
+            level.sendBlockUpdated(master, base.setValue(CELL, MASTER), base.setValue(CELL, MASTER), Block.UPDATE_CLIENTS);
+        }
         StasisDelvers.LOG.info("Tower core formed at {}", master.toShortString());
     }
 
@@ -117,21 +125,19 @@ public class TowerBlock extends Block implements EntityBlock {
         super.affectNeighborsAfterRemoval(state, level, pos, moved);
         if (!formed(state)) return;
         BlockPos master = master(pos, state);
-        // (removing the master's block entity stops its field and frees the poles: TowerBlockEntity.setRemoved)
+        if (level.getBlockEntity(master) instanceof TowerBlockEntity t) t.unform();
         BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
         for (int c = 0; c < 18; c++) {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
             BlockState s = level.getBlockState(p);
             if (!s.is(this) || !formed(s)) continue;
-            level.removeBlockEntity(p);
             level.setBlock(p, loose, Block.UPDATE_ALL);
-            level.setBlockEntity(new TowerCellBlockEntity(p, loose));
         }
     }
 
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return state.getValue(CELL) == MASTER ? new TowerBlockEntity(pos, state) : new TowerCellBlockEntity(pos, state);
+        return new TowerBlockEntity(pos, state);
     }
 
     /** With something in hand (a pole to stack, a core block to place) the item does its thing; the status is for an
