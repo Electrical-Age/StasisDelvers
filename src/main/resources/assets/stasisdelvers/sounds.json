@@ -1,0 +1,127 @@
+{
+ "music.stopped": {
+  "category": "music",
+  "sounds": [
+   {
+    "name": "music/game/ancestry",
+    "stream": true
+   },
+   {
+    "name": "music/game/deeper",
+    "stream": true
+   },
+   {
+    "name": "music/game/eld_unknown",
+    "stream": true
+   },
+   {
+    "name": "music/game/endless",
+    "stream": true
+   },
+   {
+    "name": "music/game/nether/soulsand_valley/so_below",
+    "stream": true
+   },
+   {
+    "name": "music/game/nether/concrete_halls",
+    "stream": true
+   },
+   {
+    "name": "music/game/nether/dead_voxel",
+    "stream": true
+   },
+   {
+    "name": "music/game/swamp/labyrinthine",
+    "stream": true
+   },
+   {
+    "name": "music/game/broken_clocks",
+    "stream": true
+   },
+   {
+    "name": "music/game/watcher",
+    "stream": true
+   },
+   {
+    "name": "music/game/wending",
+    "stream": true
+   },
+   {
+    "name": "music/game/infinite_amethyst",
+    "stream": true
+   },
+   {
+    "name": "music/menu/mutation",
+    "stream": true
+   },
+   {
+    "name": "music/game/subwoofer_lullaby",
+    "stream": true
+   },
+   {
+    "name": "music/game/mice_on_venus",
+    "stream": true
+   },
+   {
+    "name": "music/game/living_mice",
+    "stream": true
+   },
+   {
+    "name": "music/game/ebb",
+    "stream": true
+   },
+   {
+    "name": "music/game/nightly",
+    "stream": true
+   },
+   {
+    "name": "music/game/shores",
+    "stream": true
+   },
+   {
+    "name": "music/game/oxygene",
+    "stream": true
+   },
+   {
+    "name": "music/game/wet_hands",
+    "stream": true
+   },
+   {
+    "name": "music/game/dry_hands",
+    "stream": true
+   },
+   {
+    "name": "music/game/key",
+    "stream": true
+   },
+   {
+    "name": "music/game/sweden",
+    "stream": true
+   },
+   {
+    "name": "music/game/floating_dream",
+    "stream": true
+   },
+   {
+    "name": "music/game/yakusoku",
+    "stream": true
+   },
+   {
+    "name": "music/game/os_piano",
+    "stream": true
+   },
+   {
+    "name": "music/game/an_ordinary_day",
+    "stream": true
+   },
+   {
+    "name": "music/game/echo_in_the_wind",
+    "stream": true
+   },
+   {
+    "name": "music/game/komorebi",
+    "stream": true
+   }
+  ]
+ }
+}

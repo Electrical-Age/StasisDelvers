@@ -88,6 +88,11 @@ public final class StasisRegistry {
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TowerBlockEntity>> TOWER_ENTITY =
         BLOCK_ENTITIES.register("stasis_tower", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TowerBlockEntity::new, TOWER.get()));
 
+    static final DeferredRegister<net.minecraft.sounds.SoundEvent> SOUNDS = DeferredRegister.create(Registries.SOUND_EVENT, StasisDelvers.MODID);
+    /** Music for stopped land: a melancholic/eldritch subset of the vanilla tracks (assets/stasisdelvers/sounds.json). */
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> MUSIC_STOPPED = SOUNDS.register("music.stopped",
+        () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "music.stopped")));
+
     static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE, StasisDelvers.MODID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<Statue>> STATUE = ENTITY_TYPES.register("statue",
@@ -101,6 +106,7 @@ public final class StasisRegistry {
 
     static void register(IEventBus modBus) {
         ENTITY_TYPES.register(modBus);
+        SOUNDS.register(modBus);
         ITEMS.register(modBus);
         BLOCKS.register(modBus);
         BLOCK_ENTITIES.register(modBus);

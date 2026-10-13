@@ -31,6 +31,17 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.LevelEvent.Unload.class, e -> {
             if (e.getLevel().isClientSide()) TowerRenderer.clear();
         });
+        // in a world of stopped time the background music is the melancholic/eldritch subset (Baughn)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.SelectMusicEvent.class, e -> {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            var m = e.getMusic();
+            if (mc.level == null || m == null || !org.erisia.stasis.Stasis.stops(mc.level)) return;
+            var key = m.sound().unwrapKey().map(k -> k.identifier()).orElse(null);
+            if (key == null || !key.getNamespace().equals("minecraft")) return;
+            String p = key.getPath();
+            if (p.equals("music.game") || p.equals("music.creative") || p.startsWith("music.overworld.") || p.startsWith("music.nether."))
+                e.setMusic(new net.minecraft.sounds.Music(org.erisia.stasis.StasisRegistry.MUSIC_STOPPED, m.minDelay(), m.maxDelay(), false));
+        });
         org.erisia.stasis.TowerClientHooks.onUpdate = TowerRenderer::updated;
         org.erisia.stasis.TowerClientHooks.onRemove = TowerRenderer::removed;
     }

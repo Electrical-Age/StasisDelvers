@@ -12,7 +12,8 @@
     "ItemEntityAccessor"
   ],
   "client": [
-    "client.GameRendererMixin"
+    "client.GameRendererMixin",
+    "client.ClientLevelMixin"
   ],
   "injectors": {
     "defaultRequire": 1
