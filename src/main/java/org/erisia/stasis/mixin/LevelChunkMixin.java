@@ -26,5 +26,7 @@ public abstract class LevelChunkMixin {
     private void stasis$isTicking(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValueZ() && level instanceof ServerLevel sl && !Stasis.ticksNow(sl, pos)
             && !Stasis.exemptBlockEntity(sl, pos)) cir.setReturnValue(false);
+        // client block-entity ticks too (trial spawner hum, campfire smoke): stopped land is still (AdventurAgent)
+        else if (cir.getReturnValueZ() && level.isClientSide() && !Stasis.isRunning(level, pos)) cir.setReturnValue(false);
     }
 }
