@@ -13,7 +13,9 @@
   ],
   "client": [
     "client.GameRendererMixin",
-    "client.ClientLevelMixin"
+    "client.ClientLevelMixin",
+    "client.ClientClockManagerMixin",
+    "client.ClientClockInstanceMixin"
   ],
   "injectors": {
     "defaultRequire": 1

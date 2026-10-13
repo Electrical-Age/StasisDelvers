@@ -479,6 +479,24 @@ public final class StasisGameTests {
             h.runAfterDelay(5, () -> pig.hurtServer(h.getLevel(), h.getLevel().damageSources().generic(), 100f));
             return () -> c.check("the dead pig is gone", pig.isRemoved(), "removed " + pig.isRemoved() + " hp " + pig.getHealth() + " deathTime " + pig.deathTime);
         }, false, true));
+        // local time (visual): a field's clock skews at 50-200% towards the world's; when it goes, its chunks keep its time
+        CASES.put("field_clock_skews_and_chunks_remember", new Spec(41, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 a = h.absoluteVec(new Vec3(3.5, 1, 4.5));
+            Field f = FieldData.get(level).add(level, a.x, a.y, a.z, 6);
+            double[] first = new double[1];
+            h.runAfterDelay(1, () -> first[0] = org.erisia.stasis.LocalTime.clockOf(level, f.id()));
+            return () -> {
+                double now = org.erisia.stasis.LocalTime.clockOf(level, f.id());
+                double moved = org.erisia.stasis.LocalTime.wrapDiff(first[0], now);
+                c.check("the clock moves at 0.5x or 2x (40 ticks: 20 or 80)", Math.abs(moved - 20) < 2.5 || Math.abs(moved - 80) < 2.5,
+                    "moved " + moved + " from " + first[0]);
+                FieldData.get(level).remove(level, f.id());
+                long chunk = net.minecraft.world.level.ChunkPos.pack(net.minecraft.core.BlockPos.containing(a.x, a.y, a.z));
+                double kept = org.erisia.stasis.LocalTime.ChunkClocks.get(level).at(chunk);
+                c.check("its centre chunk keeps that time", Math.abs(kept - now) < 0.001, "kept " + kept + " clock " + now);
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

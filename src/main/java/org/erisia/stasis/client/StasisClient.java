@@ -29,7 +29,10 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.PrepareRenderBuffersEvent.class, TowerRenderer::prepare);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.RenderLevelStageEvent.AfterOpaqueBlocks.class, TowerRenderer::draw);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.LevelEvent.Unload.class, e -> {
-            if (e.getLevel().isClientSide()) TowerRenderer.clear();
+            if (e.getLevel().isClientSide()) {
+                TowerRenderer.clear();
+                org.erisia.stasis.LocalTime.Client.clear();
+            }
         });
         // in stopped land the background music is the melancholic/eldritch subset (Baughn)
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.SelectMusicEvent.class, e -> {

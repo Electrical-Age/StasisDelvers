@@ -15,7 +15,12 @@ public final class FieldData extends SavedData {
     public static final Codec<FieldData> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.INT.fieldOf("next_id").forGetter(d -> d.nextId),
         Field.CODEC.listOf().fieldOf("fields").forGetter(d -> d.fields),
-        Codec.BOOL.optionalFieldOf("cottage", false).forGetter(d -> d.cottage)
+        Codec.BOOL.optionalFieldOf("cottage", false).forGetter(d -> d.cottage),
+        Codec.unboundedMap(Codec.STRING, Codec.DOUBLE).optionalFieldOf("clocks", java.util.Map.of()).forGetter(d -> {
+            java.util.Map<String, Double> m = new java.util.HashMap<>();
+            d.clocks.forEach((k, v) -> m.put(Integer.toString(k), v));
+            return m;
+        })
     ).apply(i, FieldData::new));
 
     public static final SavedDataType<FieldData> TYPE = new SavedDataType<>(
@@ -26,14 +31,18 @@ public final class FieldData extends SavedData {
     /** The spawn cottage has been placed (or tried) in this level (SpawnCottage). */
     private boolean cottage;
 
+    /** Field id -> its local time of day (LocalTime). */
+    final java.util.Map<Integer, Double> clocks = new java.util.HashMap<>();
+
     public FieldData() {
-        this(1, List.of(), false);
+        this(1, List.of(), false, java.util.Map.of());
     }
 
-    private FieldData(int nextId, List<Field> fields, boolean cottage) {
+    private FieldData(int nextId, List<Field> fields, boolean cottage, java.util.Map<String, Double> clocks) {
         this.nextId = nextId;
         this.fields = new ArrayList<>(fields);
         this.cottage = cottage;
+        clocks.forEach((k, v) -> this.clocks.put(Integer.parseInt(k), v));
     }
 
     public boolean cottageDone() {
@@ -91,6 +100,7 @@ public final class FieldData extends SavedData {
 
     public boolean remove(ServerLevel level, int id) {
         var safe = Freezing.running(level);
+        for (Field f : fields) if (f.id() == id) LocalTime.fieldGone(level, f);
         boolean removed = fields.removeIf(f -> f.id() == id);
         if (removed) {
             changed(level);
@@ -101,6 +111,7 @@ public final class FieldData extends SavedData {
 
     public int clear(ServerLevel level) {
         var safe = Freezing.running(level);
+        for (Field f : fields) LocalTime.fieldGone(level, f);
         int n = fields.size();
         fields.clear();
         changed(level);

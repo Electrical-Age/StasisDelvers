@@ -46,14 +46,72 @@ public final class StasisNet {
         }
     }
 
+    /** Field clocks (LocalTime): id -> {time of day, step per tick}. */
+    public record FieldClocks(java.util.Map<Integer, double[]> clocks) implements CustomPacketPayload {
+        public static final Type<FieldClocks> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "field_clocks"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, FieldClocks> CODEC = StreamCodec.of(
+            (buf, p) -> {
+                buf.writeVarInt(p.clocks().size());
+                p.clocks().forEach((id, v) -> { buf.writeVarInt(id); buf.writeDouble(v[0]); buf.writeDouble(v[1]); });
+            },
+            buf -> {
+                int n = buf.readVarInt();
+                java.util.Map<Integer, double[]> m = new java.util.HashMap<>();
+                for (int i = 0; i < n; i++) m.put(buf.readVarInt(), new double[]{buf.readDouble(), buf.readDouble()});
+                return new FieldClocks(m);
+            });
+
+        @Override
+        public Type<FieldClocks> type() {
+            return TYPE;
+        }
+    }
+
+    /** Chunk clocks (LocalTime): packed chunk pos -> frozen time of day. */
+    public record ChunkClocks(java.util.Map<Long, Double> clocks) implements CustomPacketPayload {
+        public static final Type<ChunkClocks> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "chunk_clocks"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ChunkClocks> CODEC = StreamCodec.of(
+            (buf, p) -> {
+                buf.writeVarInt(p.clocks().size());
+                p.clocks().forEach((k, v) -> { buf.writeLong(k); buf.writeDouble(v); });
+            },
+            buf -> {
+                int n = buf.readVarInt();
+                java.util.Map<Long, Double> m = new java.util.HashMap<>();
+                for (int i = 0; i < n; i++) m.put(buf.readLong(), buf.readDouble());
+                return new ChunkClocks(m);
+            });
+
+        @Override
+        public Type<ChunkClocks> type() {
+            return TYPE;
+        }
+    }
+
+    static void sendFieldClocks(ServerLevel level, java.util.Map<Integer, double[]> clocks) {
+        FieldClocks f = new FieldClocks(clocks);
+        for (ServerPlayer p : level.players()) send(p, f);
+    }
+
+    static void sendChunkClocks(ServerLevel level, java.util.Map<Long, Double> clocks) {
+        ChunkClocks c = new ChunkClocks(clocks);
+        for (ServerPlayer p : level.players()) send(p, c);
+    }
+
+    static void sendChunkClocks(ServerPlayer player, java.util.Map<Long, Double> clocks) {
+        send(player, new ChunkClocks(clocks));
+    }
+
     /** Client side: the latest freeze progress, for the screen effect. */
     public static volatile float clientFreeze;
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("2");
+            var r = e.registrar("3");
             r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> ClientFields.set(p.fields(), ctx.player().level()));
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
+            r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
+            r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
         });
     }
 
