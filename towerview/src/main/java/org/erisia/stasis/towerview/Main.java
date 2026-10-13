@@ -28,7 +28,7 @@ import org.erisia.stasis.towergen.WireReduction;
 /**
  * towerview: standalone tower viewer.
  * <pre>
- *   towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close,wide,legs] [--orbit N]
+ *   towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close,wide,legs,nodeN,nodeNin] [--orbit N]
  *                    [--size 1280x720] [--ss 2] [--params visual.json] [--solver solver.json] [--name TAG]
  *                    [--lib library.json.gz]
  *   towerview view LAYOUT.json [--q 1.0] [--params visual.json] [--solver solver.json]   interactive window
@@ -153,7 +153,7 @@ public final class Main {
             double rl = Math.toRadians(215);
             out.put("legs", new Raster.Camera(new double[]{9 * Math.cos(rl), ym + 2, 9 * Math.sin(rl)}, new double[]{0, ym + 1, 0}, fov));
         }
-        jointCams(t, H, fov, out);
+        jointCams(t, H, fov, out, yb);
         return out;
     }
 
@@ -161,7 +161,7 @@ public final class Main {
      * Joint close-ups: "bjoint" a few blocks from an inner node of the first boom (about 40% out along it), "ljoint"
      * a few blocks outside a mast leg node with bracing near 0.3 H.
      */
-    static void jointCams(Stitch.Tower t, int H, double fov, Map<String, Raster.Camera> out) {
+    static void jointCams(Stitch.Tower t, int H, double fov, Map<String, Raster.Camera> out, double yb) {
         int n = t.n;
         int[] degBay = new int[n], degBoom0 = new int[n];
         boolean[] boomNode = new boolean[n];
@@ -214,6 +214,27 @@ public final class Main {
             if (s < best - 1e-9) { best = s; sp = i; }
         }
         if (sp >= 0) out.put("splice", jointCam(t.node(sp), 7.0, 1.5, 30, fov));
+        // "branch" / "branchIn": a node where laced members branch (3+ laced ends, or 2 bending > ~11 deg: Y / K / boom
+        // root), nearest the first boom level (the 0.3 H level without booms), from outside / inside
+        int[] nl = new int[n];
+        for (int b = 0; b < t.m; b++) if (t.kind[b] == 2) { nl[t.bi[b]]++; nl[t.bj[b]]++; }
+        int br = -1;
+        best = 1e30;
+        for (int i = 0; i < n; i++) {
+            if (nl[i] < 2) continue;
+            if (nl[i] == 2) {                         // two laced ends: a branch only if they bend by more than ~11 deg
+                int b1 = -1, b2 = -1;
+                for (int b = 0; b < t.m; b++) if (t.kind[b] == 2 && (t.bi[b] == i || t.bj[b] == i)) { if (b1 < 0) b1 = b; else b2 = b; }
+                double[] d1 = away(t, b1, i), d2 = away(t, b2, i);
+                if (d1[0] * d2[0] + d1[1] * d2[1] + d1[2] * d2[2] < -0.98) continue;
+            }
+            double s = Math.abs(t.P[3 * i + 1] - yb) + (t.P[3 * i] > 0 ? 0.5 : 0);   // nearest the first boom, west first
+            if (s < best - 1e-9) { best = s; br = i; }
+        }
+        if (br >= 0) {
+            out.put("branch", jointCam(t.node(br), 4.5, 1.2, 35, fov));
+            out.put("branchIn", jointCam(t.node(br), 3.0, 0.8, 160, fov));   // from inside the tower
+        }
     }
 
     /** Unit direction of member b away from its end node nd. */
@@ -263,6 +284,9 @@ public final class Main {
         for (String s : shots.split(",")) {
             if (s.isBlank()) continue;
             Raster.Camera cam = cams.get(s);
+            java.util.regex.Matcher nm = java.util.regex.Pattern.compile("node(\\d+)(in)?").matcher(s);
+            if (cam == null && nm.matches() && Integer.parseInt(nm.group(1)) < r.tower.n)    // close-up of one node
+                cam = jointCam(r.tower.node(Integer.parseInt(nm.group(1))), nm.group(2) != null ? 3.0 : 4.5, 1.0, nm.group(2) != null ? 160 : 35, vp.fovDeg());
             if (cam == null) { System.out.println("no camera " + s + " (have " + cams.keySet() + ")"); continue; }
             long t0 = System.nanoTime();
             BufferedImage img = ras.render(mesh, cam, s.startsWith("a") || s.equals("wide") ? cap : name + " q" + q + " " + s);

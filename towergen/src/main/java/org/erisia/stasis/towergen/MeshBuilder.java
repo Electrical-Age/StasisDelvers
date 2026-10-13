@@ -55,6 +55,7 @@ public final class MeshBuilder {
         double e;              // the box starts at p + e d
         boolean sealed;
         double[][] pl, vt;     // prism planes / vertices (clearance), computed on demand
+        boolean envelope;      // a laced member's outer section (not drawn; its chords are cut at e)
 
         End(double[] p, double[] d, double[] sd, double a, double len, boolean cable, Part part) {
             this.p = p; this.d = d; this.sd = sd; this.a = a; this.len = len; this.cable = cable; this.part = part;
@@ -254,6 +255,26 @@ public final class MeshBuilder {
                 cont[2 * b2 + e2] = b;
             }
         }
+        // chord-pair splices only where the continuing pair is the main member at the node: no other laced member
+        // there is wider (a leg with laced bracing keeps its splices; the bracing joins the node's inner hull by its
+        // envelope, like solid bracing). Every other laced end (branch / Y / T where a wider member arrives, a laced
+        // member ending on another, boom roots, free ends) is an envelope end of the node joint (below).
+        double[] bOther = new double[2 * m];
+        for (int b = 0; b < m; b++) {
+            if (type[b] != LACED) continue;
+            for (int e = 0; e < 2; e++) {
+                int nd = e == 0 ? t.bi[b] : t.bj[b], b2 = cont[2 * b + e];
+                for (int b3 : at.get(nd)) if (type[b3] == LACED && b3 != b && b3 != b2) bOther[2 * b + e] = Math.max(bOther[2 * b + e], lg[b3].b);
+            }
+        }
+        for (int b = 0; b < m; b++) {
+            if (type[b] != LACED) continue;
+            for (int e = 0; e < 2; e++) {
+                int b2 = cont[2 * b + e];
+                if (b2 < 0) continue;
+                if (bOther[2 * b + e] > Math.min(lg[b].b, lg[b2].b) + 1e-9) { cont[2 * b + e] = -1; chordGrp[2 * b + e] = null; }
+            }
+        }
         for (int b = 0; b < m; b++) {
             if (type[b] != LACED) continue;
             lg[b].tap0 = cont[2 * b] < 0;
@@ -266,6 +287,7 @@ public final class MeshBuilder {
         List<Joint> chordHubs = new ArrayList<>();
         End[] mEnd = new End[2 * m];           // solid / pole / cable member ends
         End[][] cEnd = new End[2 * m][];       // laced chord ends
+        End[] envEnd = new End[2 * m];         // laced envelope ends (envelope joints)
         for (int b = 0; b < m; b++) {
             if (type[b] == SKIP) continue;
             for (int e = 0; e < 2; e++) {
@@ -280,11 +302,18 @@ public final class MeshBuilder {
                         joint(nodeHub, nd).env.add(new double[]{q[0], q[1], q[2], d[0], d[1], d[2], f[0][0], f[0][1], f[0][2],
                                 f[1][0], f[1][1], f[1][2], dw[b] / 2, len[b]});
                     }
-                    for (int k = 0; k < g.nc; k++) {
-                        End en = chordEnd(g, k, e, part[b]);
-                        cEnd[2 * b + e][k] = en;
-                        joint(nodeHub, nd).add(en);
-                    }
+                    // the member joins the node joint by its outer section: a square (frame of the axis) holding every
+                    // chord's section; its chords are cut where the envelope is
+                    double[] d = e == 0 ? ax[b] : V.mul(ax[b], -1);
+                    End env = new End(node(P, nd), d, ax[b], 0, len[b], false, part[b]);
+                    double aEnv = 0;
+                    for (int k = 0; k < g.nc; k++)
+                        aEnv = Math.max(aEnv, g.h * Math.max(Math.abs(V.dot(g.dir[k], env.u)), Math.abs(V.dot(g.dir[k], env.v))) + g.cw / 2);
+                    env = new End(node(P, nd), d, ax[b], aEnv, len[b], false, part[b]);
+                    env.envelope = true;
+                    envEnd[2 * b + e] = env;
+                    joint(nodeHub, nd).add(env);
+                    for (int k = 0; k < g.nc; k++) cEnd[2 * b + e][k] = chordEnd(g, k, e, part[b]);
                 } else {
                     double[] p = V.add(node(P, nd), off[b]);
                     End en = new End(p, e == 0 ? ax[b] : V.mul(ax[b], -1), ax[b], dw[b] / 2, len[b], type[b] == CABLE, part[b]);
@@ -326,6 +355,11 @@ public final class MeshBuilder {
         }
         for (int nd = 0; nd < n; nd++) if (nodeHub[nd] != null) solve(nodeHub[nd], sink);
         for (Joint hb : chordHubs) { solve(hb, sink); hb.part = hb.ends.get(0).part; }   // chord splices: a piece of chord
+        for (int k = 0; k < 2 * m; k++) {         // chords run straight to their envelope's cut
+            End env = envEnd[k];
+            if (env == null || !env.sealed) continue;
+            for (End ce : cEnd[k]) { ce.e = Math.min(env.e, 0.49 * ce.len); ce.sealed = true; }
+        }
 
         // --- members
         for (int b = 0; b < m; b++) {
@@ -583,7 +617,10 @@ public final class MeshBuilder {
             if (Math.abs(V.dot(en.d, w.d)) < 0.9986) through = false;
         }
         through |= pole;
-        jt.part = vp.jointMemberColour() || through ? w.part : Part.KNUCKLE;
+        boolean gusset = false;
+        for (End en : core) gusset |= en.envelope;
+        // hubs holding laced members are gusset blocks in the widest member's part
+        jt.part = vp.jointMemberColour() || through || gusset ? w.part : Part.KNUCKLE;
         if (sink != null) {
             JointInfo ji = new JointInfo();
             ji.hull = h;
@@ -764,15 +801,25 @@ public final class MeshBuilder {
         }
         double lw = Math.max(vp.lacingMinWidth(), vp.lacingWidthFrac() * cw);
         int npan = (int) Math.max(vp.lacingPanelsMin(), Math.min(vp.lacingPanelsMax(), Math.rint(g.L / Math.max(g.b * vp.lacingPanelPerWidth(), 0.3))));
+        // lacing and battens span the visible part: from the chords' cut at each end (gusset / splice hull face)
+        double tA = Math.min(0.45, cutFrac(end0, g)), tB = 1 - Math.min(0.45, cutFrac(end1, g));
         for (int fc = 0; fc < g.nc; fc++) {
             int oa = fc, ob = (fc + 1) % g.nc;
             for (int k = 0; k < npan; k++) {
-                double t0 = k / (double) npan, t1 = (k + 1) / (double) npan;
+                double t0 = tA + (tB - tA) * k / npan, t1 = tA + (tB - tA) * (k + 1) / npan;
                 mesh.beam(g.at(k % 2 == 0 ? oa : ob, t0), g.at(k % 2 == 0 ? ob : oa, t1), lw, Part.LACING);
             }
-            if (!skip0) mesh.beam(g.at(oa, 0), g.at(ob, 0), lw * vp.battenScale(), Part.LACING);
-            if (!skip1) mesh.beam(g.at(oa, 1), g.at(ob, 1), lw * vp.battenScale(), Part.LACING);
+            if (!skip0) mesh.beam(g.at(oa, tA), g.at(ob, tA), lw * vp.battenScale(), Part.LACING);
+            if (!skip1) mesh.beam(g.at(oa, tB), g.at(ob, tB), lw * vp.battenScale(), Part.LACING);
         }
+    }
+
+    /** Fraction of the member length cut off at one end (the smallest sealed chord cut; 0 if any chord is open). */
+    private static double cutFrac(End[] ends, Laced g) {
+        if (ends == null) return 0;
+        double f = 1e300;
+        for (End en : ends) { if (en == null || !en.sealed) return 0; f = Math.min(f, en.e / g.L); }
+        return f == 1e300 ? 0 : f;
     }
 
     /** Run-on at a bend from unit d1 to unit d2 for a square section of width w: (w/2) sqrt2 tan(theta/2). */

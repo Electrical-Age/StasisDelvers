@@ -123,6 +123,30 @@ Known limits:
 - Random (slowTest, 400 x 2 q, seed 7): 645 pass, 19 over the catalogue (now refused), 136 refused by the stay rule
   (was 769 pass / 31 over); no exceptions.
 
+## Laced members at branch nodes: envelope (gusset) joints (2026-10-13, owner report 2)
+- Report: H16 W4@2 / W5@2, lower west leg: a laced member ending at a node (Y: the laced leg ends where a solid leg
+  and a strut carry on) made a spiky clump: its chords went into the node hull one by one, so the hub was the hull
+  of scattered chord corners.
+- Fix (general, not a Y special case): every laced end that is not a chord-pair splice joins the node joint by its
+  **outer envelope** (a square in the axis frame holding all its chords' sections, i.e. b x b for 4 chords), as an
+  ordinary solid end: setbacks on the envelope against all neighbours (solid and laced envelopes), hull of the
+  envelope cut faces (a gusset block, in the widest member's colour rather than knuckle), and all its chords are cut
+  flat at the envelope's setback (straight, no bend; lacing and end battens move to the cut). Splices stay only for
+  the continuing pair when no wider laced member arrives at the node: a leg with laced bracing keeps its chord
+  splices, and the bracing joins the node's inner hull by its envelope, as solid bracing does (making every leg node
+  with laced bracing one envelope block turned H64max / H100 legs into solid slabs, so that variant was dropped).
+- Tests: `hullJointsClosedAndContained` now runs the goldens, both owner layouts and 25 random layouts at q 1 and
+  0.3, samples hull vertices, edge midpoints and face points, and asserts 0 "spiky" points (farther than 0.35 x the
+  widest member + 0.06 blocks outside every member envelope, laced envelopes included): 3.14 M points, 0 spiky. The
+  threshold went from 0.3 to 0.35 because K-node gussets fill the crotch between two wide laced diagonals (worst
+  0.64 blocks at a 1.92-wide H64max leg node). `lacedChordsStraightAndSpliced` accepts an unspliced collinear pair
+  only at a node with more than two laced ends. Random sweep (slowTest): 400 towers, 106683 hulls, all consistent.
+- Mesh time fell (fewer chord-level joints): H64max 14 -> 6 ms, H100 10 -> 5 ms (JVM); browser H64max 33 ms.
+- Renders: `renders/contact_gusset_joints.png` (1920 x 1800, before | after: H16 W4 node 18 outside / inside (the
+  Y), node 19 inside at q 0.3, H16 W4 west / east, H16 W5 west, H40r3 and H64max `branch`, H64max and H100 `close`).
+  towerview: shots `branch` / `branchIn` (a node where laced members branch, nearest the first boom) and `nodeN` /
+  `nodeNin` (close-up of node N from outside / inside).
+
 ## Laced members: straight chords, splices at every continuing node (2026-10-13, owner report)
 - Report: `{"H": 16, "booms": [[2, "W", 4]]}` (and W5) drew the west laced legs as spindles: chords converging to a
   point at every bay node and bowing out between, with kinked joints; the joint keys had no effect there.

@@ -102,7 +102,7 @@ class MeshTest {
     /**
      * Hull hubs: (1) every sealed member end (its cut face) lies inside its hull, so joints are closed; (2) no part of
      * a hub reaches beyond the union of its members' prisms (each run back through the node by its half-width) by
-     * more than 0.3 x the widest member there + 0.06 blocks (the fill between members): sampled at face centroids, edge
+     * more than 0.35 x the widest member there + 0.06 blocks (the fill between members; gusset blocks at K / Y nodes): sampled at face centroids, edge
      * midpoints and interior points of every hull face. Prints the measured worst case per layout.
      */
     @Test
@@ -110,11 +110,20 @@ class MeshTest {
         TowerGen g = new TowerGen(Library.shared());
         VisualParams vp = VisualParams.defaults();
         MeshBuilder mb = new MeshBuilder(g.c, vp);
-        double[][] bary = {{1 / 3.0, 1 / 3.0, 1 / 3.0}, {0.5, 0.5, 0}, {0, 0.5, 0.5}, {0.5, 0, 0.5}, {0.6, 0.2, 0.2},
+        double[][] bary = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1 / 3.0, 1 / 3.0, 1 / 3.0}, {0.5, 0.5, 0}, {0, 0.5, 0.5}, {0.5, 0, 0.5}, {0.6, 0.2, 0.2},
                 {0.2, 0.6, 0.2}, {0.2, 0.2, 0.6}};
-        for (String nm : GOLDEN) {
+        java.util.LinkedHashMap<String, Layout> lays = new java.util.LinkedHashMap<>();
+        for (String nm : GOLDEN) lays.put(nm, Layout.read(java.nio.file.Path.of("layouts", nm + ".json")));
+        lays.put("H16W4@2", new Layout(16, List.of(new Layout.Boom(2, 2, 4))));
+        lays.put("H16W5@2", new Layout(16, List.of(new Layout.Boom(2, 2, 5))));
+        java.util.Random rng = new java.util.Random(99);
+        for (int k = 0; k < 25; k++) { Layout l = LayoutGen.randomBuildable(rng, g.c); lays.put("random" + k + " " + l, l); }
+        int spiky = 0, total = 0;
+        for (var le : lays.entrySet()) {
+            String nm = le.getKey();
             for (double q : new double[]{1.0, 0.3}) {
-                TowerGen.Result r = g.build(Layout.read(java.nio.file.Path.of("layouts", nm + ".json")), q);
+                TowerGen.Result r;
+                try { r = g.build(le.getValue(), q); } catch (RefusedException ex) { continue; }
                 List<MeshBuilder.JointInfo> js = new java.util.ArrayList<>();
                 mb.build(r.tower, r.analysis, js);
                 int hulls = 0, flat = 0, sealedEnds = 0;
@@ -136,8 +145,10 @@ class MeshTest {
                             for (int k = 0; k < 3; k++) for (int qq = 0; qq < 3; qq++) x[qq] += w[k] * h.xyz[3 * f[k] + qq];
                             double ex = 1e300;
                             for (double[] b : ji.boxes) ex = Math.min(ex, boxDist(b, x));
-                            double allow = 0.3 * ji.maxW + 0.06;
+                            double allow = 0.35 * ji.maxW + 0.06;
                             worst = Math.max(worst, ex);
+                            total++;
+                            if (ex > allow) spiky++;
                             if (ex / ji.maxW > worstRel && System.getProperty("meshDebug") != null) {
                                 System.out.println("DBGW " + nm + " q" + q + " x " + java.util.Arrays.toString(x) + " ex " + ex);
                                 for (double[] b : ji.boxes) System.out.println("DBGW box a " + b[12] + " len " + b[13] + " p " + b[0] + "," + b[1] + "," + b[2] + " d " + b[3] + "," + b[4] + "," + b[5]);
@@ -148,15 +159,18 @@ class MeshTest {
                                 for (double[] b : ji.boxes) System.out.println("DBG box " + java.util.Arrays.toString(b));
                                 for (int pi = 0; pi < h.n; pi++) System.out.println("DBG pt " + java.util.Arrays.toString(h.point(pi)));
                             }
-                            assertTrue(ex <= allow, nm + " q" + q + ": hub point " + java.util.Arrays.toString(x) + " is " + ex
+                            if (ex > allow) System.out.println("SPIKY " + nm + " q" + q + ": hub point " + java.util.Arrays.toString(x) + " is " + ex
                                     + " outside its members (max width " + ji.maxW + ")");
                         }
                     }
                 }
+                if (nm.startsWith("random")) continue;
                 System.out.printf("hull joints %s q%.1f: %d hulls, %d flat, %d sealed ends; worst excess %.4f blocks, %.3f x max width%n",
                         nm, q, hulls, flat, sealedEnds, worst, worstRel);
             }
         }
+        System.out.printf("hull joints: %d layouts x 2 q, %d hub points sampled (vertices, edge midpoints, face points), %d spiky%n", lays.size(), total, spiky);
+        assertEquals(0, spiky, "spiky hub points (beyond 0.35 x widest member + 0.06 outside the member envelopes)");
     }
 
     /** Mesh FNV hashes of the golden layouts (q 1, default params): compared with the web build's stats.meshHash. */
@@ -181,7 +195,8 @@ class MeshTest {
     /**
      * Laced members: chords run straight (every chord segment within 1 degree of the member axis, so no chord bends
      * inside a member) and inside the member's outer envelope; and every pair of laced members meeting at a node
-     * within 5 degrees of collinear is spliced (at least one of the two continues), never treated as two free ends. Goldens, the owner's
+     * within 5 degrees of collinear is spliced (at least one of the two continues) or, at a node with more than two laced ends, joins the gusset
+     * (envelope) joint; never two free ends. Goldens, the owner's
      * H16 W4/W5 boom-at-2 layouts and random layouts, q 1 and 0.3.
      */
     @Test
@@ -228,6 +243,8 @@ class MeshTest {
                         }
                     }
                 }
+                java.util.Map<Integer, Integer> nLaced = new java.util.HashMap<>();
+                for (MeshBuilder.LacedInfo x : li) { nLaced.merge(t.bi[x.member], 1, Integer::sum); nLaced.merge(t.bj[x.member], 1, Integer::sum); }
                 for (MeshBuilder.LacedInfo x : li) {
                     for (int e = 0; e < 2; e++) {
                         int nd = e == 0 ? t.bi[x.member] : t.bj[x.member];
@@ -240,7 +257,8 @@ class MeshTest {
                             int ycont = t.bi[y.member] == nd ? y.cont0 : y.cont1;
                             // at least one of the two continues (the other may be a third, overlapping member whose
                             // partner was taken by a more collinear one)
-                            if (c >= cos5) assertTrue(cont >= 0 || ycont >= 0, l + " q" + q + ": collinear laced members " + x.member + ", " + y.member + " at node " + nd + " not spliced");
+                            // (a pair is not spliced only where a wider laced member arrives: an envelope / gusset joint)
+                            if (c >= cos5) assertTrue(cont >= 0 || ycont >= 0 || nLaced.get(nd) > 2, l + " q" + q + ": collinear laced members " + x.member + ", " + y.member + " at node " + nd + " not spliced");
                             if (cont == y.member) { spliced++; maxBend = Math.max(maxBend, Math.toDegrees(Math.acos(Math.min(1, c)))); }
                         }
                     }
