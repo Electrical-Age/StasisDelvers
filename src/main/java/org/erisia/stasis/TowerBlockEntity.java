@@ -37,6 +37,8 @@ public class TowerBlockEntity extends BlockEntity {
     float weather;
     /** Share of the field in a static deep's outer zone: up to x3 draw. */
     float staticWeather;
+    /** Tests: keep the weather set by testWeather. */
+    boolean weatherPinned;
 
     double weatherFactor() {
         return 1 + 0.5 * weather + 2 * staticWeather;
@@ -212,7 +214,9 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity((int) (storeFor(r) * FE_PER_J));
         double in = received / FE_PER_J;
         received = 0;
-        if (state == State.RUNNING && level.getGameTime() % 20 == 0) {
+        if (weatherPinned) {
+            // (test)
+        } else if (state == State.RUNNING && level.getGameTime() % 20 == 0) {
             weather = FieldData.get(sl).get(fieldId).map(f -> Deeps.overlap(sl, f)).orElse(0f);
             staticWeather = FieldData.get(sl).get(fieldId).map(f -> staticOverlap(sl, f)).orElse(0f);
         } else if (state != State.RUNNING) weather = staticWeather = 0;
@@ -269,6 +273,12 @@ public class TowerBlockEntity extends BlockEntity {
     public void testCharge(double share) {
         store.setShare(share);
         setChanged();
+    }
+
+    public void testWeather(float drifting, float statics) {
+        weather = drifting;
+        staticWeather = statics;
+        weatherPinned = true;
     }
 
     public void testBolt() {
@@ -370,8 +380,7 @@ public class TowerBlockEntity extends BlockEntity {
         });
         sb.append(String.format(". Store %.0f%% (%.0f of %.0f kJ), draw %.0f W", 100 * stored / Math.max(1, max), stored / 1000,
             max / 1000, drawFor(r) * weatherFactor()));
-        if (weatherFactor() > 1.001) sb.append(String.format(" (a deep %s the field: +%.0f%%)", staticWeather > 0 ? "is in" : "is crossing",
-            100 * (weatherFactor() - 1)));
+        // (the draw shows what a deep adds, unexplained: Baughn wants no messages about deeps)
         sb.append(". ");
         TowerStructure s = structure;
         sb.append(switch (s.status) {

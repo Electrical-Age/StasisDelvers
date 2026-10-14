@@ -27,6 +27,7 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue TOWER_MAX_SEGMENTS;
     static final ModConfigSpec.DoubleValue TOWER_FIELD_RATE;
     static final ModConfigSpec.DoubleValue GUTTER_CHANCE;
+    static final ModConfigSpec.BooleanValue DEBUG_MESSAGES;
     static final ModConfigSpec.IntValue GUTTER_MIN_TICKS;
     static final ModConfigSpec.IntValue GUTTER_MAX_TICKS;
 
@@ -56,6 +57,9 @@ public final class StasisConfig {
         TOWER_FIELD_RATE = b.comment("Tick rate a tower's field starts at, as a share of 20 TPS (0.6 = 12 TPS). Blocks inside and the",
                 "clients of players inside run at it. Set at tower start; /stasis field rate changes a running field.")
             .defineInRange("towerFieldRate", 0.6, 0.05, 1.0);
+        DEBUG_MESSAGES = b.comment("Action-bar messages when a deep holds a player or a rift takes one (debugging; off: Baughn wants",
+                "no messages about weather, deeps and rifts: fear of the unknown).")
+            .define("debugMessages", false);
         GUTTER_CHANCE = b.comment("Chance that a random tick makes a flame (block tag stasisdelvers:flames) gutter to light 4-7.",
                 "A block gets a random tick about every 68 s at randomTickSpeed 3, so 0.25 is about once in 4.5 minutes.")
             .defineInRange("gutterChance", 0.25, 0.0, 1.0);
@@ -75,6 +79,7 @@ public final class StasisConfig {
     static volatile int towerMaxSegments = 30;
     static volatile double towerFieldRate = 0.6;
     static volatile double gutterChance = 0.25;
+    static volatile boolean debugMessages = false;
     static volatile int gutterMinTicks = 100;
     static volatile int gutterMaxTicks = 600;
 
@@ -108,6 +113,7 @@ public final class StasisConfig {
         towerMaxSegments = TOWER_MAX_SEGMENTS.get();
         towerFieldRate = TOWER_FIELD_RATE.get();
         gutterChance = GUTTER_CHANCE.get();
+        debugMessages = DEBUG_MESSAGES.get();
         gutterMinTicks = GUTTER_MIN_TICKS.get();
         gutterMaxTicks = GUTTER_MAX_TICKS.get();
     }

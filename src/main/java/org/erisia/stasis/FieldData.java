@@ -78,6 +78,11 @@ public final class FieldData extends SavedData {
         return d;
     }
 
+    /** Tests: a known deep seed. */
+    public void testDeepSeed(int seed) {
+        deepSeed = seed;
+    }
+
     /** Any thread: the level's deep seed if its data is loaded (made at level load), else 0. */
     static int peekDeepSeed(ServerLevel level) {
         FieldData d = LOADED.get(level);

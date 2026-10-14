@@ -645,6 +645,84 @@ public final class StasisGameTests {
                 c.check("far outside is nothing", org.erisia.stasis.StaticDeeps.zone(seed, d.x() + d.radius() * 2.5f, d.y(), d.z()) == 0);
             }
         }, false));
+        // weather (Baughn): a deep over a field raises the tower's draw (+50% at full drifting overlap); the overlap
+        // measure sees a deep at its centre and nothing far from any
+        CASES.put("tower_weather_raises_draw", new Spec(45, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.9 * 4 / 3), tx);
+                tx.commit();
+            }
+            double[] at = new double[2];
+            h.runAfterDelay(4, () -> {
+                t.testWeather(1.0f, 0f);
+                at[0] = t.storedJ();
+            });
+            h.runAfterDelay(44, () -> at[1] = t.storedJ());
+            return () -> {
+                double used = at[0] - at[1], expect = org.erisia.stasis.TowerBlockEntity.drawFor(16) * 1.5 / 20 * 40;
+                c.check("full drifting overlap: 1.5x the draw", Math.abs(used - expect) < 0.05 * expect, String.format("%.0f J vs %.0f J", used, expect));
+                // the overlap measure, with deeps on and a known seed
+                ServerLevel level = h.getLevel();
+                int old = org.erisia.stasis.Deeps.seed(level);
+                org.erisia.stasis.Deeps.testDeeps = true;
+                try {
+                    FieldData.get(level).testDeepSeed(777);
+                    float tm = (level.getGameTime() % 1048576L) / 20f;
+                    var near = org.erisia.stasis.Deeps.near(0, 0, tm, 777);
+                    var d = near.stream().filter(x -> x.strength() > 0.9f && x.radius() > 20).findFirst();
+                    if (d.isEmpty()) c.check("found a strong deep to measure", false, near.toString());
+                    else {
+                        int bx = (int) d.get().x(), bz = (int) d.get().z();
+                        for (int cx = -1; cx <= 1; cx++)
+                            for (int cz = -1; cz <= 1; cz++) level.getChunk((bx >> 4) + cx, (bz >> 4) + cz);
+                        int surf = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
+                        Field in = new Field(1, bx + 0.5, surf + 4.5, bz + 0.5, 10), out = new Field(2, bx + 0.5 + 2000, surf + 4.5, bz + 0.5, 10);
+                        float oi = org.erisia.stasis.Deeps.overlap(level, in), oo = org.erisia.stasis.Deeps.overlap(level, out);
+                        c.check("a field at a deep's centre is mostly in it", oi > 0.5f, "" + oi);
+                        c.check("far away: nothing (unless another deep happens to be there)", oo < 0.5f || oo == oi, "" + oo);
+                    }
+                } finally {
+                    org.erisia.stasis.Deeps.testDeeps = false;
+                    FieldData.get(level).testDeepSeed(old);
+                }
+                t.setRemoved();
+            };
+        }, false, true));
+        // eddies stop mobs in a pocket (and only there)
+        CASES.put("eddies_stop_mobs", new Spec(4, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Field f = field(h, c, new Vec3(8.5, 3.5, 4.5), 12, 1.0);
+            FieldData.get(level).update(level, f.id(), x -> x.withFailing(0.95));
+            BlockPos inPocket = null, inField = null;
+            for (int x = 1; x < 16 && (inPocket == null || inField == null); x++)
+                for (int z = 1; z < 8; z++) {
+                    BlockPos p = h.absolutePos(new BlockPos(x, 1, z));
+                    if (!f.containsBlock(p.getX(), p.getY(), p.getZ())) continue;
+                    boolean run = Stasis.isRunning(level, p), steady = Stasis.isRunningSteady(level, p);
+                    if (!run && steady && inPocket == null) inPocket = p;
+                    if (run && inField == null) inField = p;
+                }
+            if (inPocket == null || inField == null) {
+                c.check("found a pocket and running land at floor level", false, inPocket + " / " + inField);
+                return () -> { };
+            }
+            var held = (net.minecraft.world.entity.Mob) EntityTypes.PIG.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            var free = (net.minecraft.world.entity.Mob) EntityTypes.PIG.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            held.setPos(Vec3.atBottomCenterOf(inPocket));
+            free.setPos(Vec3.atBottomCenterOf(inField));
+            level.addFreshEntity(held);
+            level.addFreshEntity(free);
+            int h0 = held.tickCount, f0 = free.tickCount;
+            BlockPos hp = inPocket;
+            return () -> {
+                boolean stillPocket = !Stasis.isRunning(level, hp);
+                c.check("the pig in running land ticked", free.tickCount > f0, f0 + " -> " + free.tickCount);
+                c.check("the pig in the pocket didn't (while the pocket stayed)", !stillPocket || held.tickCount == h0, h0 + " -> " + held.tickCount);
+                held.discard();
+                free.discard();
+            };
+        }, false, true));
         CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {

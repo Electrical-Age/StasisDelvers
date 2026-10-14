@@ -76,10 +76,10 @@ public final class Freezing {
             s.ticks = 0;
         }
         if (zone == 2 && !grace && !p.isCreative() && !p.isSpectator()) {
-            // a rift: nothing protects, a statue in about 3 s (Baughn)
+            // a rift: nothing protects, a statue in about 3 s (Baughn). No messages for deeps, rifts or eddies: fear of
+            // the unknown is part of the theme (Baughn)
             s.ticks += 2;
-            if (s.counted % 20 == 0) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The rift takes you")
-                .withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+            if (StasisConfig.debugMessages && s.counted % 20 == 0) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("(debug) rift"));
         } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
             suited = true;
@@ -91,7 +91,7 @@ public final class Freezing {
                 // (falls through to the statue check below)
             } else if (s.ticks >= StasisConfig.freezeTicks - 1) {
                 s.heldUntil = level.getGameTime() + 1200;
-                p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The deep holds you").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+                if (StasisConfig.debugMessages) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("(debug) held by a deep for 60 s"));
             }
         } else s.ticks = Math.max(0, s.ticks - 3);
         // a suited player digs slowly in stopped land (Mining Fatigue I; the EA mining drill ignores it: onBreakSpeed)
