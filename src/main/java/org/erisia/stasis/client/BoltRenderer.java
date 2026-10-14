@@ -123,6 +123,47 @@ public final class BoltRenderer {
         vc.addVertex(pose, (float) (p.x - cam.x), (float) (p.y - cam.y), (float) (p.z - cam.z)).setColor(col);
     }
 
+    /**
+     * The live bolts as screen-space polylines for the post shader (stasis.fsh draws them, after the desaturation, so
+     * they keep their colour and are depth-tested against the scene): per point NDC x, y, depth (reversed Z), half
+     * width (NDC), intensity; intensity 0 breaks the line. Returns the number of points written (at most max).
+     */
+    static int fill(float[] d, int base, int max, org.joml.Matrix4f viewProj, Vec3 cam, double aspect) {
+        long now = System.nanoTime();
+        List<Live> live;
+        synchronized (LIVE) {
+            LIVE.removeIf(l -> (now - l.born()) / 1e9 > LIFE);
+            live = new ArrayList<>(LIVE);
+        }
+        int n = 0;
+        org.joml.Vector4f v = new org.joml.Vector4f();
+        for (Live l : live) {
+            double age = (now - l.born()) / 1e9;
+            float a = age < 0.12 ? (((int) (age * 60)) % 2 == 0 ? 1f : 0.6f) : (float) Math.max(0, 1 - (age - 0.12) / (LIFE - 0.12)) * 0.5f;
+            for (int s = 0; s < l.strokes().size(); s++) {
+                float w = s == 0 ? 0.35f : 0.18f;
+                for (Vector3d p : l.strokes().get(s)) {
+                    if (n >= max - 1) return n;
+                    v.set((float) (p.x - cam.x), (float) (p.y - cam.y), (float) (p.z - cam.z), 1f);
+                    viewProj.transform(v);
+                    int o = base + 5 * n++;
+                    if (v.w <= 0.05f) {          // behind the camera: break the line
+                        d[o + 4] = 0;
+                        continue;
+                    }
+                    d[o] = v.x / v.w;
+                    d[o + 1] = v.y / v.w;
+                    d[o + 2] = v.z / v.w;
+                    d[o + 3] = Math.max(0.0015f, w / v.w);
+                    d[o + 4] = a;
+                }
+                int o = base + 5 * n++;
+                d[o + 4] = 0;                    // end of stroke
+            }
+        }
+        return n;
+    }
+
     static void init() {
         StasisNet.boltSink = BoltRenderer::receive;
     }

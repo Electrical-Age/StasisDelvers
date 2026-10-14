@@ -2,11 +2,12 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // Stasis Delvers: drain the colour of everything where time is stopped, and the player's freeze warning (grey
-// creeping in from the screen edges). Field data comes in a 256x1 texture of packed floats (StasisPost.java):
+// creeping in from the screen edges). Field data comes in a 1024x1 texture of packed floats (StasisPost.java):
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
 // min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] deep count; [168 + 6i ..] drifting deep i:
-// centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id; [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
+// centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id; [256] bolt point
+// count; [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
@@ -307,10 +308,10 @@ void main() {
                     int sd = int(data(k + 7));
                     for (int m = 0; m < 12; m++) {
                         vec3 wp = camI + o + v * (ta + (float(m) + 0.5) * stepLen);
-                        float dn = smoothstep(thr - 0.08, thr + 0.02, eddy(wp, et, sd));
-                        mist += (1.0 - mist) * dn * min(1.0, stepLen * 0.09);
+                        float dn = smoothstep(thr - 0.03, thr + 0.03, eddy(wp, et, sd));
+                        mist += (1.0 - mist) * dn * min(1.0, stepLen * 0.025);
                     }
-                    c = mix(c, vec3(0.78, 0.82, 0.88), mist * 0.85);
+                    c = mix(c, vec3(0.78, 0.82, 0.88), mist * 0.6);
                 }
             }
             // far hit first, then near (back to front)
@@ -364,6 +365,29 @@ void main() {
                 c = mix(c, sh.rgb, sh.a);
             }
         }
+    }
+    // lightning (BoltRenderer): glowing polylines in screen space, hidden behind nearer scene geometry
+    int bp = int(data(256));
+    if (bp > 1) {
+        vec2 ndc = texCoord * 2.0 - 1.0;
+        float aspect = OutSize.x / OutSize.y;
+        float glow = 0.0;
+        for (int i = 0; i < bp - 1 && i < 149; i++) {
+            int o = 260 + 5 * i;
+            float ia = data(o + 4), ib = data(o + 9);
+            if (ia <= 0.0 || ib <= 0.0) continue;
+            vec2 a = vec2(data(o), data(o + 1)), b = vec2(data(o + 5), data(o + 6));
+            vec2 pa = (ndc - a) * vec2(aspect, 1.0), ba = (b - a) * vec2(aspect, 1.0);
+            float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-9), 0.0, 1.0);
+            float dist = length(pa - ba * h);
+            float w = mix(data(o + 3), data(o + 8), h);
+            float bd = mix(data(o + 2), data(o + 7), h);
+            if (bd < depth - 1e-5) continue;     // reversed Z: the scene is nearer here
+            float core = 1.0 - smoothstep(w * 0.4, w, dist);
+            float halo = exp(-dist * dist / (w * w * 9.0)) * 0.35;
+            glow = max(glow, (core + halo) * mix(ia, ib, h));
+        }
+        c = mix(c, vec3(0.85, 0.9, 1.0), clamp(glow, 0.0, 1.0));
     }
     if (warn > 0.0) {
         float v = length((texCoord - 0.5) * vec2(1.7, 1.0));

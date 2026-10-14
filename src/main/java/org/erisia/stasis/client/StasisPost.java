@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * The desaturation of stopped land and the freeze warning: a post effect (assets/stasisdelvers/post_effect/stasis.json)
- * that reads the depth buffer. It learns where the fields are from a 256x1 texture of packed floats, refreshed every
+ * that reads the depth buffer. It learns where the fields are from a 1024x1 texture of packed floats, refreshed every
  * frame (the layout is in shaders/post/stasis.fsh). Requested through the player's active post effects while the
  * player is in a dimension where time stops.
  */
@@ -32,7 +32,7 @@ public final class StasisPost {
 
     /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
-        texture = new DynamicTexture(() -> "stasisdelvers field data", 256, 1, true);
+        texture = new DynamicTexture(() -> "stasisdelvers field data", 1024, 1, true);
         Minecraft.getInstance().getTextureManager().register(DATA, texture);
     }
 
@@ -55,7 +55,7 @@ public final class StasisPost {
         if (mc.level == null) return;
         if (texture == null) init();
         var camState = e.getCameraState();
-        float[] d = new float[256];
+        float[] d = new float[1024];
         Matrix4f vp = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix).invert();
         vp.get(d, 0);   // column-major
         var cam = camState.pos;
@@ -119,9 +119,12 @@ public final class StasisPost {
             }
         }
         d[31] = nd;
+        // lightning bolts (BoltRenderer), projected to the screen
+        Matrix4f fwd = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
+        d[256] = BoltRenderer.fill(d, 260, 150, fwd, cam, 1.0);
         var img = texture.getPixels();
         if (img == null) return;
-        for (int i = 0; i < 256; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
+        for (int i = 0; i < 1024; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
         texture.upload();
     }
 }
