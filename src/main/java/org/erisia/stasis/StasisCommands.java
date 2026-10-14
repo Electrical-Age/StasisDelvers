@@ -102,6 +102,25 @@ final class StasisCommands {
                         c.getSource().sendSuccess(() -> Component.literal(String.format("  %d: %.1f %.1f %.1f r %.1f rate %.3f%s", f.id(), f.x(), f.y(), f.z(), f.radius(), f.rate(), f.column() ? " column" : "")), false);
                     return fields.size();
                 })))
+            .then(Commands.literal("tower")
+                .then(Commands.literal("charge").then(Commands.argument("pos", BlockPosArgument.blockPos())
+                    .then(Commands.argument("share", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0, 1)).executes(c -> {
+                        if (!(c.getSource().getLevel().getBlockEntity(BlockPosArgument.getBlockPos(c, "pos")) instanceof TowerBlockEntity t)) {
+                            c.getSource().sendFailure(Component.literal("No tower core there (the bottom core block)"));
+                            return 0;
+                        }
+                        t.testCharge(com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(c, "share"));
+                        c.getSource().sendSuccess(() -> Component.literal("Tower store set"), true);
+                        return 1;
+                    }))))
+                .then(Commands.literal("bolt").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
+                    if (!(c.getSource().getLevel().getBlockEntity(BlockPosArgument.getBlockPos(c, "pos")) instanceof TowerBlockEntity t)) {
+                        c.getSource().sendFailure(Component.literal("No tower core there (the bottom core block)"));
+                        return 0;
+                    }
+                    t.testBolt();
+                    return 1;
+                }))))
             .then(Commands.literal("at").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
                 BlockPos p = BlockPosArgument.getBlockPos(c, "pos");
                 double rate = Stasis.rateAt(c.getSource().getLevel(), p);

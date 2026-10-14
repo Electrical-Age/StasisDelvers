@@ -265,12 +265,13 @@ void main() {
                 float brk = 1.0;
                 if (collapse > 0.0) {
                     vec3 camI = vec3(data(16), data(17), data(18));
-                    vec3 under = centre * (r - 0.5);
+                    // the land a little way in under the hex (at the shell itself everything goes early: outer first)
+                    vec3 under = centre * (0.6 * r);
                     if (column) under.y = hp.y;
                     vec3 blk = floor(camI + fc + under);
                     vec3 off = blk + 0.5 - (camI + fc);
                     if (column) off.y = 0.0;
-                    brk = (1.0 - collapseScore(blk, off, r - 0.5, r, int(data(k + 7)))) - collapse;
+                    brk = (1.0 - collapseScore(blk, off, 0.6 * r, r, int(data(k + 7)))) - collapse;
                     if (brk < 0.0) continue;
                 }
                 float age = data(k + 8);
@@ -283,7 +284,12 @@ void main() {
                 }
                 vec4 sh = shieldAt(cell, nn, -v, r, collapse > 0.0 ? 0.0 : failing, time, h2 == 0 && !inside);
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
-                if (brk < 0.03) sh = vec4(mix(sh.rgb, vec3(1.0, 0.95, 0.85), 0.7), min(0.9, sh.a + 0.5));
+                // about to die: the rim crackles white-gold (rim only, flickering; ~0.4 s in a real collapse)
+                if (brk < 0.015) {
+                    float rimm = 1.0 - smoothstep(0.1, 0.4, cell.x);
+                    float fl = step(0.4, hash13(vec3(cell.y * 53.0, floor(time * 18.0), 9.1)));
+                    sh = vec4(mix(sh.rgb, vec3(1.0, 0.95, 0.85), rimm * fl), min(0.9, sh.a + 0.5 * rimm * fl));
+                }
                 c = mix(c, sh.rgb, sh.a);
             }
         }

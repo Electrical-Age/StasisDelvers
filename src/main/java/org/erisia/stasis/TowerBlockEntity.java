@@ -63,6 +63,11 @@ public class TowerBlockEntity extends BlockEntity {
             return energy;
         }
 
+        /** Testing (/stasis tower charge): set the store to a share of its capacity. */
+        void setShare(double share) {
+            energy = (int) Math.max(0, Math.min(capacity, share * capacity));
+        }
+
         void take(int fe) {
             energy = Math.max(0, energy - fe);
         }
@@ -198,8 +203,11 @@ public class TowerBlockEntity extends BlockEntity {
                 }
                 if (startedAt >= 0 && sl.getGameTime() - startedAt == 60) {
                     sl.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.CONDUIT_ACTIVATE, net.minecraft.sounds.SoundSource.BLOCKS, 2.5F, 0.7F);
+                    bolt(sl);   // lock-on
                     startedAt = -1;
                 }
+                // a failing shield sparks now and then (about every 25 s when empty)
+                if (failing > 0.1 && sl.getRandom().nextDouble() < 0.002 * failing * failing) bolt(sl);
                 store.take((int) Math.ceil(perTick * FE_PER_J));
                 netAvg += (in - perTick - netAvg) / 60.0;
                 if (netAvg < -0.02 * perTick) draining = true;
@@ -218,12 +226,39 @@ public class TowerBlockEntity extends BlockEntity {
             }
             case COLLAPSING -> {
                 collapseTicks++;
+                if (sl.getRandom().nextInt(20) == 0) bolt(sl);   // every second or so
                 double c = Math.min(1.0, collapseTicks / (double) COLLAPSE_TICKS);
                 if (collapseTicks % 5 == 0 || c >= 1) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
                 if (c >= 1) stop(sl);
             }
         }
         setChanged();
+    }
+
+    /**
+     * A lightning bolt (visual only, Baughn: it hits the tower, not players): from a random point of the upper shield
+     * to the top of the mast, with a crackle.
+     */
+    /** Testing: /stasis tower charge|bolt. */
+    public void testCharge(double share) {
+        store.setShare(share);
+        setChanged();
+    }
+
+    public void testBolt() {
+        if (level instanceof ServerLevel sl) bolt(sl);
+    }
+
+    void bolt(ServerLevel sl) {
+        var rnd = sl.getRandom();
+        double r = radius();
+        double ux = rnd.nextGaussian(), uy = Math.abs(rnd.nextGaussian()) + 0.3, uz = rnd.nextGaussian();
+        double ul = Math.sqrt(ux * ux + uy * uy + uz * uz);
+        double cx = worldPosition.getX() + 0.5, cy = worldPosition.getY() + 0.5, cz = worldPosition.getZ() + 0.5;
+        double top = worldPosition.getY() + TowerBlock.HEIGHT + segments + 0.5;
+        StasisNet.sendBolt(sl, new StasisNet.Bolt(cx + ux / ul * r * 0.97, cy + uy / ul * r * 0.97, cz + uz / ul * r * 0.97, cx, top, cz, rnd.nextInt()));
+        sl.playSound(null, worldPosition.getX(), top, worldPosition.getZ(), net.minecraft.sounds.SoundEvents.LIGHTNING_BOLT_IMPACT,
+            net.minecraft.sounds.SoundSource.WEATHER, 1.5F, 0.8F + rnd.nextFloat() * 0.4F);
     }
 
     void start(ServerLevel sl) {

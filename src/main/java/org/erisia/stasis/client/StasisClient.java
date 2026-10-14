@@ -28,6 +28,9 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.ChunkEvent.Load.class, e -> {
             if (e.getLevel() instanceof net.minecraft.world.level.Level l && l.isClientSide()) org.erisia.stasis.Flames.clientChunkLoad(l, e.getChunk().getPos());
         });
+        // lightning from the shield to the tower (visual only)
+        BoltRenderer.init();
+        NeoForge.EVENT_BUS.addListener(SubmitCustomGeometryEvent.class, BoltRenderer::submit);
         // EA flashlight beams, per pixel (Baughn)
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, FlashlightPost::frame);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, FlashlightPost::tick);

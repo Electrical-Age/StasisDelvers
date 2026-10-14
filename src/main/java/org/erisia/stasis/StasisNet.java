@@ -138,6 +138,33 @@ public final class StasisNet {
         }
     }
 
+    /** A lightning bolt to draw (visual only): from, to (world), seed for its shape. */
+    public record Bolt(double fx, double fy, double fz, double tx, double ty, double tz, int seed) implements CustomPacketPayload {
+        public static final Type<Bolt> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "bolt"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, Bolt> CODEC = StreamCodec.of(
+            (buf, b) -> {
+                buf.writeDouble(b.fx()); buf.writeDouble(b.fy()); buf.writeDouble(b.fz());
+                buf.writeDouble(b.tx()); buf.writeDouble(b.ty()); buf.writeDouble(b.tz());
+                buf.writeInt(b.seed());
+            },
+            buf -> new Bolt(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readInt()));
+
+        @Override
+        public Type<Bolt> type() {
+            return TYPE;
+        }
+    }
+
+    /** Clients draw bolts through this (set by the client; the server never calls it). */
+    public static volatile java.util.function.Consumer<Bolt> boltSink = b -> {
+    };
+
+    /** To players within 160 blocks of the bolt's end. */
+    static void sendBolt(ServerLevel level, Bolt b) {
+        for (ServerPlayer p : level.players())
+            if (p.distanceToSqr(b.tx(), b.ty(), b.tz()) < 160 * 160) send(p, b);
+    }
+
     static void sendGutters(ServerPlayer player, java.util.Map<Long, Byte> lights) {
         send(player, new Gutters(lights));
     }
@@ -150,6 +177,7 @@ public final class StasisNet {
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
+            r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
         });
     }
 
