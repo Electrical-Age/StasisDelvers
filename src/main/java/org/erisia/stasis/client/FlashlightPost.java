@@ -96,12 +96,12 @@ public final class FlashlightPost {
         var mc = Minecraft.getInstance();
         if (mc.level == null) return;
         if (texture == null) {
-            texture = new DynamicTexture(() -> "stasisdelvers beam data", 64, 1, true);
+            texture = new DynamicTexture(() -> "stasisdelvers beam data", 128, 1, true);
             mc.getTextureManager().register(DATA, texture);
         }
         var cam = e.getCameraState();
         float pt = cam.cameraEntityPartialTicks;
-        float[] d = new float[64];
+        float[] d = new float[128];
         new Matrix4f(cam.projectionMatrix).mul(cam.viewRotationMatrix).invert().get(d, 0);
         d[17] = STRENGTH;
         d[18] = TINT[0];
@@ -112,7 +112,7 @@ public final class FlashlightPost {
         int n = 0;
         for (int i = 0; i < holders.size(); i++) {
             Player p = holders.get(i);
-            float len = lights.get(i) * LENGTH_PER_LIGHT;
+            float len = lights.get(i) * LENGTH_PER_LIGHT, cut = len;
             Vec3 org, dir;
             if (p == mc.getCameraEntity() && cam.isFirstPerson) {
                 org = cam.pos;
@@ -121,9 +121,10 @@ public final class FlashlightPost {
                 org = p.getEyePosition(pt);
                 dir = p.getViewVector(pt);
                 var hit = mc.level.clip(new ClipContext(org, org.add(dir.scale(len)), ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, p));
-                if (hit.getType() != HitResult.Type.MISS) len = (float) Math.min(len, hit.getLocation().distanceTo(org) + 1.0);
+                // ends just past the first block hit (no light through that wall); the falloff stays the full beam's
+                if (hit.getType() != HitResult.Type.MISS) cut = (float) Math.min(len, hit.getLocation().distanceTo(org) + 1.0);
             }
-            int o = 24 + 8 * n++;
+            int o = 24 + 9 * n++;
             d[o] = (float) (org.x - cam.pos.x);
             d[o + 1] = (float) (org.y - cam.pos.y);
             d[o + 2] = (float) (org.z - cam.pos.z);
@@ -132,11 +133,12 @@ public final class FlashlightPost {
             d[o + 5] = (float) dir.z;
             d[o + 6] = len;
             d[o + 7] = cosHalf;
+            d[o + 8] = cut;
         }
         d[16] = n;
         var img = texture.getPixels();
         if (img == null) return;
-        for (int i = 0; i < 64; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
+        for (int i = 0; i < 128; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
         texture.upload();
     }
 }

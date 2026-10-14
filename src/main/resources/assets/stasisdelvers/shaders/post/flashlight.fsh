@@ -2,9 +2,10 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // Stasis Delvers: flashlight beams (EA flashlights), drawn per pixel so they follow the view with no lag (Baughn).
-// Data in a 64x1 texture of packed floats (FlashlightPost.java): [0..15] inverse(projection * view rotation);
+// Data in a 128x1 texture of packed floats (FlashlightPost.java): [0..15] inverse(projection * view rotation);
 // [16] beam count; [17] strength; [18..20] tint; [21] near cut (m: the hand's depth is merged into the main buffer);
-// [24 + 8i ..] beam i: origin - camera (3), direction (3), length (blocks), cos of the cone's half angle.
+// [24 + 9i ..] beam i: origin - camera (3), direction (3), length (blocks: the falloff), cos of the cone's half
+// angle, cut (blocks: where the beam ends, just past the first block it hits; = length if nothing).
 // The scene's albedo isn't known here, so the beam multiplies what is there, guarded by luminance: dark surfaces
 // brighten a lot, lit ones hardly change.
 
@@ -49,13 +50,13 @@ void main() {
     if (dot(nrm, p) > 0.0) nrm = -nrm;
     float light = 0.0;
     for (int i = 0; i < n && i < 5; i++) {
-        int o = 24 + 8 * i;
+        int o = 24 + 9 * i;
         vec3 org = vec3(data(o), data(o + 1), data(o + 2));
         vec3 dir = vec3(data(o + 3), data(o + 4), data(o + 5));
-        float len = data(o + 6), cosHalf = data(o + 7);
+        float len = data(o + 6), cosHalf = data(o + 7), cut = data(o + 8);
         vec3 l = p - org;
         float d = length(l);
-        if (d > len || d < 1e-3) continue;
+        if (d > min(len, cut) || d < 1e-3) continue;
         vec3 ld = l / d;
         float cone = smoothstep(cosHalf, mix(cosHalf, 1.0, 0.6), dot(ld, dir));
         float fall = (1.0 - smoothstep(0.6 * len, len, d)) / (1.0 + 0.012 * d * d);
