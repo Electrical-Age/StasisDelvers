@@ -21,6 +21,42 @@ final class Noise {
         return lerp(fz, lerp(fy, a, b), lerp(fy, c, d));
     }
 
+    // ---- 32-bit variant, written identically in GLSL (shaders/post/stasis.fsh: hash32, vnoise32, fbm32): ints wrap
+    // the same way, and float maths agrees closely. Seeds are 24-bit (exact as floats in the shader's data texture).
+
+    static float hash32(int x, int y, int z, int seed) {
+        int h = x * 0x8da6b343 ^ y * 0xd8163841 ^ z * 0xcb1ab31f ^ seed * 0x9e3779b9;
+        h ^= h >>> 16;
+        h *= 0x7feb352d;
+        h ^= h >>> 15;
+        h *= 0x846ca68b;
+        h ^= h >>> 16;
+        return (h >>> 8) / 16777216f;
+    }
+
+    static float value32(float x, float y, float z, int seed) {
+        int ix = (int) Math.floor(x), iy = (int) Math.floor(y), iz = (int) Math.floor(z);
+        float fx = s32(x - ix), fy = s32(y - iy), fz = s32(z - iz);
+        float a = lerp32(fx, hash32(ix, iy, iz, seed), hash32(ix + 1, iy, iz, seed));
+        float b = lerp32(fx, hash32(ix, iy + 1, iz, seed), hash32(ix + 1, iy + 1, iz, seed));
+        float c = lerp32(fx, hash32(ix, iy, iz + 1, seed), hash32(ix + 1, iy, iz + 1, seed));
+        float d = lerp32(fx, hash32(ix, iy + 1, iz + 1, seed), hash32(ix + 1, iy + 1, iz + 1, seed));
+        return lerp32(fz, lerp32(fy, a, b), lerp32(fy, c, d));
+    }
+
+    /** Two octaves in [0, 1]. */
+    static float fbm32(float x, float y, float z, int seed) {
+        return 0.65f * value32(x, y, z, seed) + 0.35f * value32(x * 2.03f + 17.1f, y * 2.03f + 5.3f, z * 2.03f + 11.7f, seed);
+    }
+
+    private static float s32(float t) {
+        return t * t * (3 - 2 * t);
+    }
+
+    private static float lerp32(float t, float a, float b) {
+        return a + (b - a) * t;
+    }
+
     private static double s(double t) {
         return t * t * (3 - 2 * t);
     }

@@ -554,8 +554,28 @@ public final class StasisGameTests {
                 c.check("just started: no dropout", early[0] < 0.05, "" + early[0]);
                 c.check("no input: draining, and the shield shows it", t.draining() && t.failing() > 0.2 && t.failing() < 0.5,
                     "draining " + t.draining() + ", failing " + t.failing());
+                t.setRemoved();   // take its field down (other tower tests look for an r 16 field)
             };
         }, false, true));
+        // Baughn: no two collapses alike; the outside still tends to go first
+        CASES.put("collapse_differs_by_seed", new Spec(1, (h, c) -> () -> {
+            Field a = new Field(1, 0.5, 0.5, 0.5, 20).withSeed(12345).withCollapse(0.5), b = a.withSeed(987654);
+            int differ = 0, n = 0, outerA = 0, outerN = 0, innerA = 0, innerN = 0;
+            for (int x = -19; x <= 19; x += 2)
+                for (int y = -19; y <= 19; y += 2)
+                    for (int z = -19; z <= 19; z += 2) {
+                        double d = Math.sqrt(x * x + y * y + z * z);
+                        if (d > 18) continue;
+                        boolean ia = a.containsBlock(x, y, z), ib = b.containsBlock(x, y, z);
+                        n++;
+                        if (ia != ib) differ++;
+                        if (d > 13) { outerN++; if (!ia) outerA++; }
+                        if (d < 6) { innerN++; if (!ia) innerA++; }
+                    }
+            c.check("two seeds stop different blocks (>15% differ)", differ > 0.15 * n, differ + " of " + n);
+            c.check("outer blocks stop more often than inner ones", outerA / (double) outerN > innerA / (double) Math.max(1, innerN),
+                outerA + "/" + outerN + " vs " + innerA + "/" + innerN);
+        }, false));
         CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {

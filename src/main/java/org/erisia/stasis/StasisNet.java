@@ -18,10 +18,22 @@ public final class StasisNet {
     private StasisNet() {
     }
 
-    static final StreamCodec<RegistryFriendlyByteBuf, Field> FIELD = StreamCodec.composite(
-        ByteBufCodecs.VAR_INT, Field::id, ByteBufCodecs.DOUBLE, Field::x, ByteBufCodecs.DOUBLE, Field::y,
-        ByteBufCodecs.DOUBLE, Field::z, ByteBufCodecs.DOUBLE, Field::radius, ByteBufCodecs.DOUBLE, Field::failing,
-        ByteBufCodecs.DOUBLE, Field::collapse, ByteBufCodecs.BOOL, Field::column, ByteBufCodecs.DOUBLE, Field::rate, Field::new);
+    static final StreamCodec<RegistryFriendlyByteBuf, Field> FIELD = StreamCodec.of(
+        (buf, f) -> {
+            buf.writeVarInt(f.id());
+            buf.writeDouble(f.x());
+            buf.writeDouble(f.y());
+            buf.writeDouble(f.z());
+            buf.writeDouble(f.radius());
+            buf.writeDouble(f.failing());
+            buf.writeDouble(f.collapse());
+            buf.writeBoolean(f.column());
+            buf.writeDouble(f.rate());
+            buf.writeInt(f.seed());
+            buf.writeLong(f.formedAt());
+        },
+        buf -> new Field(buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(),
+            buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong()));
 
     public record Fields(List<Field> fields) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));
@@ -132,7 +144,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("4");
+            var r = e.registrar("5");
             r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> ClientFields.set(p.fields(), ctx.player().level()));
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));

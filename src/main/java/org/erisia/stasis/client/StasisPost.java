@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * The desaturation of stopped land and the freeze warning: a post effect (assets/stasisdelvers/post_effect/stasis.json)
- * that reads the depth buffer. It learns where the fields are from a 128x1 texture of packed floats, refreshed every
+ * that reads the depth buffer. It learns where the fields are from a 256x1 texture of packed floats, refreshed every
  * frame (the layout is in shaders/post/stasis.fsh). Requested through the player's active post effects while the
  * player is in a dimension where time stops.
  */
@@ -32,7 +32,7 @@ public final class StasisPost {
 
     /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
-        texture = new DynamicTexture(() -> "stasisdelvers field data", 128, 1, true);
+        texture = new DynamicTexture(() -> "stasisdelvers field data", 256, 1, true);
         Minecraft.getInstance().getTextureManager().register(DATA, texture);
     }
 
@@ -55,7 +55,7 @@ public final class StasisPost {
         if (mc.level == null) return;
         if (texture == null) init();
         var camState = e.getCameraState();
-        float[] d = new float[128];
+        float[] d = new float[256];
         Matrix4f vp = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix).invert();
         vp.get(d, 0);   // column-major
         var cam = camState.pos;
@@ -82,7 +82,7 @@ public final class StasisPost {
         int n = 0;
         for (Field f : ClientFields.fields()) {
             if (n == 13) break;
-            int o = 32 + 7 * n++;
+            int o = 32 + 10 * n++;
             d[o] = (float) (f.x() - fx);
             d[o + 1] = (float) (f.y() - fy);
             d[o + 2] = (float) (f.z() - fz);
@@ -90,11 +90,13 @@ public final class StasisPost {
             d[o + 4] = (float) f.collapse();
             d[o + 5] = (float) f.failing();
             d[o + 6] = f.column() ? 1 : 0;
+            d[o + 7] = f.seed();
+            d[o + 8] = f.formedAt() > 0 ? (mc.level.getGameTime() - f.formedAt()) / 20f : -1;
         }
         d[24] = n;
         var img = texture.getPixels();
         if (img == null) return;
-        for (int i = 0; i < 128; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
+        for (int i = 0; i < 256; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
         texture.upload();
     }
 }

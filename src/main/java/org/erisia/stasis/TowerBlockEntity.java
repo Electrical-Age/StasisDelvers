@@ -205,6 +205,8 @@ public class TowerBlockEntity extends BlockEntity {
                 if (store.amount() <= 0) {
                     state = State.COLLAPSING;
                     collapseTicks = 0;
+                    int seed = sl.getRandom().nextInt();
+                    FieldData.get(sl).update(sl, fieldId, f -> f.withSeed(seed));
                     StasisDelvers.LOG.info("Stasis tower at {} ran out of power: field {} collapses", worldPosition.toShortString(), fieldId);
                 }
             }
