@@ -102,6 +102,18 @@ final class StasisCommands {
                         c.getSource().sendSuccess(() -> Component.literal(String.format("  %d: %.1f %.1f %.1f r %.1f rate %.3f%s", f.id(), f.x(), f.y(), f.z(), f.radius(), f.rate(), f.column() ? " column" : "")), false);
                     return fields.size();
                 })))
+            .then(Commands.literal("deeps").executes(c -> {
+                var src = c.getSource();
+                var level = src.getLevel();
+                var pos = src.getPosition();
+                var list = Deeps.near((float) pos.x, (float) pos.z, Eddies.time(level), Deeps.seed(level));
+                src.sendSuccess(() -> Component.literal(list.size() + " drifting deep(s) around; here: "
+                    + String.format("%.2f", Deeps.at(level, (int) Math.floor(pos.x), (int) Math.floor(pos.y), (int) Math.floor(pos.z)))), false);
+                for (var dp : list)
+                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f, radius %.0f, strength %.2f, %.0f blocks away",
+                        dp.x(), dp.z(), dp.radius(), dp.strength(), Math.hypot(dp.x() - pos.x, dp.z() - pos.z))), false);
+                return list.size();
+            }))
             .then(Commands.literal("tower")
                 .then(Commands.literal("charge").then(Commands.argument("pos", BlockPosArgument.blockPos())
                     .then(Commands.argument("share", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0, 1)).executes(c -> {
