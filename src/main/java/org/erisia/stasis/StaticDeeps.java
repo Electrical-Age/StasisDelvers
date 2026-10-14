@@ -25,10 +25,11 @@ public final class StaticDeeps {
 
     /** The static deep of grid cell (i, j, k), or null. */
     public static Deep cell(int i, int j, int k, int seed) {
-        if (Noise.hash32(i, j, k, seed ^ 0x57A7) >= OCCUPANCY) return null;
+        // only the cells that overlap the overworld's build height (-64..320): j = -1, 0, 1
+        if (j < -1 || j > 1 || Noise.hash32(i, j, k, seed ^ 0x57A7) >= OCCUPANCY) return null;
         float r = 24 + 40 * Noise.hash32(i, j, k, seed ^ 0x57A8);
         float x = i * CX + r + (CX - 2 * r) * Noise.hash32(i, j, k, seed ^ 0x57A9);
-        float y = j * CY + r * 0.6f + (CY - 1.2f * r) * Noise.hash32(i, j, k, seed ^ 0x57AA);
+        float y = Math.max(-50, Math.min(280, j * CY + r * 0.6f + (CY - 1.2f * r) * Noise.hash32(i, j, k, seed ^ 0x57AA)));
         float z = k * CZ + r + (CZ - 2 * r) * Noise.hash32(i, j, k, seed ^ 0x57AB);
         // 24-bit id: the shader gets it as an exact float
         return new Deep(x, y, z, r, ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ seed) & 0xFFFFFF);
