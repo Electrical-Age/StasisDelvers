@@ -73,7 +73,7 @@ public final class Flames {
         if (base == 0 || !state.is(TAG)) return base;
         Level level = getter instanceof Level l ? l : getter instanceof LevelChunk c ? c.getLevel() : clientResolver.apply(getter);
         if (level == null) return base;
-        if (!Stasis.isRunning(level, pos)) return 0;
+        if (!Stasis.isRunningSteady(level, pos)) return 0;   // eddies don't relight flames (Baughn)
         Byte dim = dims(level).get(pos.asLong());
         return dim == null ? base : Math.min(base, dim);
     }

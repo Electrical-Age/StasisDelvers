@@ -69,6 +69,8 @@ public final class StasisPost {
         d[22] = Stasis.stops(mc.level) ? 1 : 0;
         d[23] = StasisNet.clientFreeze;
         d[29] = (float) ((mc.level.getGameTime() % 24000L) / 20.0);
+        // eddy time (Eddies.time), with the partial tick so the mist drifts smoothly
+        d[30] = ((mc.level.getGameTime() % 1048576L) + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f;
         int[] spawn = Stasis.spawnArea(mc.level);
         if (spawn != null) {
             d[25] = spawn[0];

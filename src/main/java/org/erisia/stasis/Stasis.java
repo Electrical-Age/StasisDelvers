@@ -105,6 +105,18 @@ public final class Stasis {
      * that holds the whole block (collapsed blocks don't count). This is the one rule: stopped means rate 0.
      */
     public static double rateAt(Level level, int x, int y, int z) {
+        return rateAt(level, x, y, z, true);
+    }
+
+    /**
+     * The rate without eddies (Eddies): for what must not churn as pockets drift past (flame light, EA nodes, the
+     * tower) and to tell an eddy from stopped land (Freezing holds players in eddies).
+     */
+    public static double rateAtSteady(Level level, int x, int y, int z) {
+        return rateAt(level, x, y, z, false);
+    }
+
+    static double rateAt(Level level, int x, int y, int z, boolean eddies) {
         if (!stops(level)) return 1.0;
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz)) return 1.0;
@@ -112,12 +124,16 @@ public final class Stasis {
         if (fs == null) return 0.0;
         double rate = 0.0;
         for (Field f : fs) {
-            if (f.rate() > rate && f.containsBlock(x, y, z)) {
+            if (f.rate() > rate && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
                 rate = f.rate();
                 if (rate >= 1.0) break;
             }
         }
         return rate;
+    }
+
+    public static boolean isRunningSteady(Level level, BlockPos pos) {
+        return rateAtSteady(level, pos.getX(), pos.getY(), pos.getZ()) > 0.0;
     }
 
     public static double rateAt(Level level, BlockPos pos) {

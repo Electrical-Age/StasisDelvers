@@ -57,7 +57,10 @@ public final class Freezing {
         boolean stopped = p.isAlive() && !Stasis.isRunning(level, p.blockPosition());
         boolean grace = level.getGameTime() < s.graceUntil;
         boolean suited = false;
-        if (stopped && !grace && !(suited = isProtected(p))) s.ticks++;
+        // in an eddy (a pocket drifting through a weak field) an unsuited player is held, never made a statue: the
+        // pocket moves on within seconds (Baughn)
+        boolean eddy = stopped && Stasis.isRunningSteady(level, p.blockPosition());
+        if (stopped && !grace && !(suited = isProtected(p))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
         else s.ticks = Math.max(0, s.ticks - 3);
         // a suited player digs slowly in stopped land (Mining Fatigue I; the EA mining drill ignores it: onBreakSpeed)
         if (stopped && suited && !p.isCreative() && !p.isSpectator()) {

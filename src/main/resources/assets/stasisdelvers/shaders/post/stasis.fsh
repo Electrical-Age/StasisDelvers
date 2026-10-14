@@ -5,7 +5,7 @@
 // creeping in from the screen edges). Field data comes in a 256x1 texture of packed floats (StasisPost.java):
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
-// min > max); [29] time (s); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
+// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
@@ -75,6 +75,18 @@ float collapseScore(vec3 block, vec3 off, float dist, float r, int seed) {
         }
     }
     return score;
+}
+
+// Eddies.value: the drifting eddy noise of a weak field (wind from the seed, 0.7 blocks/s)
+float eddy(vec3 w, float t, int seed) {
+    float ang = hash32(seed, 11, 0, 0) * 6.2831853;
+    vec2 vel = vec2(cos(ang), sin(ang)) * 0.7;
+    return fbm32(vec3((w.x - vel.x * t) / 6.0, w.y / 6.0 + t * 0.05, (w.z - vel.y * t) / 6.0), seed ^ 0x5eed);
+}
+
+float eddyShare(float collapse, float failing) {
+    if (collapse > 0.0) return 0.35 + 0.25 * collapse;
+    return 0.15 + 0.3 * min(1.0, (failing - 0.7) / 0.3);
 }
 
 
@@ -250,6 +262,22 @@ void main() {
             float t1 = (-b - sq) / aa, t2 = (-b + sq) / aa;
             bool inside = cc < 0.0;
             float f = max(4.0, floor(r / 2.3 + 0.5));
+            if (collapse > 0.0 || failing > 0.7) {
+                // mist where the eddies are (Eddies): pale, cold, densest in the stopped pockets
+                float thr = 0.5 + (0.5 - eddyShare(collapse, failing)) * 0.45;
+                float ta = max(t1, 0.0), tb = min(t2, tmax);
+                if (tb > ta) {
+                    vec3 camI = vec3(data(16), data(17), data(18));
+                    float et = data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
+                    int sd = int(data(k + 7));
+                    for (int m = 0; m < 12; m++) {
+                        vec3 wp = camI + o + v * (ta + (float(m) + 0.5) * stepLen);
+                        float dn = smoothstep(thr - 0.08, thr + 0.02, eddy(wp, et, sd));
+                        mist += (1.0 - mist) * dn * min(1.0, stepLen * 0.09);
+                    }
+                    c = mix(c, vec3(0.78, 0.82, 0.88), mist * 0.85);
+                }
+            }
             // far hit first, then near (back to front)
             for (int h2 = 0; h2 < 2; h2++) {
                 float t = h2 == 0 ? t2 : t1;

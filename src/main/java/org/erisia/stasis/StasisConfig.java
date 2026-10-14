@@ -86,6 +86,10 @@ public final class StasisConfig {
     }
 
     /** Tests: set the tower draw constant (returns the old one). */
+    public static int freezeTicks() {
+        return freezeTicks;
+    }
+
     public static double testTowerDrawK(double k) {
         double old = towerDrawK;
         towerDrawK = k;

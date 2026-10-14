@@ -64,7 +64,8 @@ public final class NodeFreezer {
     static boolean runs(NodeBase n) {
         if (!(n.coordonate.world() instanceof ServerLevel level)) return true;
         BlockPos pos = n.coordonate.pos();
-        return Stasis.isRunning(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
+        // eddies don't touch EA (Baughn): no networks connecting and disconnecting as pockets drift past
+        return Stasis.isRunningSteady(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
     }
 
     /** EA asks before it puts a node into the simulation, so a frozen node never slips back in (Baughn). */

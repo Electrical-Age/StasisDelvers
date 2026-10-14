@@ -190,6 +190,47 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // eddies (Baughn): a weak field has drifting stopped pockets; flames and EA keep the steady rule; an unsuited
+        // player caught in one is held but never made a statue
+        CASES.put("eddies_in_a_weak_field", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Field f = field(h, c, new Vec3(8.5, 6.5, 4.5), 14, 1.0);
+            int[] counts = new int[3];
+            BlockPos[] pocket = {null};
+            Runnable count = () -> {
+                counts[0] = counts[1] = counts[2] = 0;
+                Field now = FieldData.get(level).get(f.id()).orElseThrow();
+                for (int x = -10; x <= 10; x++)
+                    for (int y = -6; y <= 6; y++)
+                        for (int z = -10; z <= 10; z++) {
+                            BlockPos p = BlockPos.containing(now.x() + x, now.y() + y, now.z() + z);
+                            if (!now.containsBlock(p.getX(), p.getY(), p.getZ())) continue;
+                            counts[0]++;
+                            if (!Stasis.isRunning(level, p)) {
+                                counts[1]++;
+                                if (Stasis.isRunningSteady(level, p)) counts[2]++;
+                                if (pocket[0] == null && y == -6 + 2) pocket[0] = p;
+                            }
+                        }
+            };
+            return () -> {
+                count.run();
+                c.check("a healthy field has no pockets", counts[1] == 0, counts[1] + " of " + counts[0]);
+                FieldData.get(level).update(level, f.id(), x -> x.withFailing(0.95));
+                pocket[0] = null;
+                count.run();
+                c.check("a weak field: 5-60% of it in stopped pockets", counts[1] > 0.05 * counts[0] && counts[1] < 0.6 * counts[0], counts[1] + " of " + counts[0]);
+                c.check("the steady rule (flames, EA) ignores them", counts[2] == counts[1], counts[2] + " vs " + counts[1]);
+                if (pocket[0] != null) {
+                    ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+                    p.teleportTo(pocket[0].getX() + 0.5, pocket[0].getY(), pocket[0].getZ() + 0.5);
+                    for (int i = 0; i < 400; i++) Freezing.tick(p);
+                    c.check("held in the pocket, never a statue", p.isAlive() && Freezing.ticks(p) > 0 && Freezing.ticks(p) < org.erisia.stasis.StasisConfig.freezeTicks(),
+                        "alive " + p.isAlive() + ", ticks " + Freezing.ticks(p));
+                    remove(h, p);
+                } else c.check("found a pocket at player height", false, "none");
+            };
+        }, false, true));
         CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {
