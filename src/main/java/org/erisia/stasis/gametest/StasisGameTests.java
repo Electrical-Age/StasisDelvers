@@ -685,6 +685,46 @@ public final class StasisGameTests {
                 c.cleanup.add(() -> Flames.gutter(level, in, 5, 0));
             };
         }, true, true));
+        // EA lamps light the world inside a field (Baughn: "EA lights don't work"): a Lamp Supply powering a Robust Lamp
+        // Socket by channel, all in the field
+        CASES.put("ea_lamp_lights_in_a_field", new Spec(100, (h, c) -> {
+            var src = (mods.eln.sixnode.electricalsource.ElectricalSourceElement) eaSix(h, new BlockPos(1, 1, 4), 0 + (3 << 6));
+            src.networkUnserialize(eaStream(o -> {
+                o.writeByte(mods.eln.sixnode.electricalsource.ElectricalSourceElement.setVoltageId);
+                o.writeFloat(50f);
+            }));
+            eaSix(h, new BlockPos(2, 1, 4), 4 + (32 << 6));
+            var supply = (mods.eln.sixnode.lampsupply.LampSupplyElement) eaSix(h, new BlockPos(3, 1, 4), 0 + (65 << 6));
+            for (var f : mods.eln.misc.LRDU.values())
+                if (supply.side.applyLRDU(f) == mods.eln.misc.Direction.XN) {
+                    supply.front = f;
+                    supply.sixNode.reconnect();
+                }
+            supply.getInventory().setItem(0, mods.eln.Eln.sixNodeItem.getDescriptor(4 + (32 << 6)).newItemStack(1));
+            supply.getInventory().setChanged();
+            String ch = "stasis lamp " + System.nanoTime();
+            supply.networkUnserialize(eaStream(o -> {
+                o.writeByte(mods.eln.sixnode.lampsupply.LampSupplyElement.setPowerName);
+                o.writeByte(0);
+                o.writeUTF(ch);
+            }));
+            var lamp = (mods.eln.sixnode.lampsocket.LampSocketElement) eaSix(h, new BlockPos(5, 1, 4), 4 + (64 << 6));
+            lamp.getInventory().setItem(0, mods.eln.Eln.sharedItem.getDescriptor(0 + (4 << 6)).newItemStack());
+            lamp.getInventory().setItem(1, mods.eln.Eln.sixNodeItem.getDescriptor(4 + (32 << 6)).newItemStack(1));
+            lamp.getInventory().setChanged();
+            lamp.networkUnserialize(eaStream(o -> {
+                o.writeByte(4);   // LampSocketElement.setChannel
+                o.writeUTF(ch);
+            }));
+            return () -> {
+                var light = settledLight(h);
+                int max = 0;
+                BlockPos lp = h.absolutePos(new BlockPos(5, 1, 4));
+                for (BlockPos q : BlockPos.betweenClosed(lp.offset(-1, 0, -1), lp.offset(1, 4, 1))) max = Math.max(max, light.getLightValue(q));
+                c.check("the lamp lights the world in the field", max >= 12, "max block light around the lamp " + max
+                    + ", lamp U " + String.format("%.1f", lamp.positiveLoad.getU()));
+            };
+        }));
         CASES.put("ea_tower_yard_keeps_cables", new Spec(30, (h, c) -> {
             tower(h, new BlockPos(12, 1, 6), 0);                                   // unpowered: no field
             var cable = eaSix(h, new BlockPos(12, 1, 4), 4 + (32 << 6));
@@ -969,6 +1009,20 @@ public final class StasisGameTests {
             throw new IllegalStateException("placing " + d.name + " failed");
         var node = (mods.eln.node.six.SixNode) mods.eln.node.NodeManager.instance.getNodeFromCoordonate(new mods.eln.misc.Coordonate(p, level));
         return node.getElement(mods.eln.misc.Direction.YN);
+    }
+
+    static java.io.DataInputStream eaStream(EaWriter w) {
+        var bos = new java.io.ByteArrayOutputStream();
+        try {
+            w.write(new java.io.DataOutputStream(bos));
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
+        return new java.io.DataInputStream(new java.io.ByteArrayInputStream(bos.toByteArray()));
+    }
+
+    interface EaWriter {
+        void write(java.io.DataOutputStream out) throws java.io.IOException;
     }
 
     static int countCore(ServerLevel level, BlockPos master) {
