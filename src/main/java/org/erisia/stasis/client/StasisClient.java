@@ -28,6 +28,9 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.ChunkEvent.Load.class, e -> {
             if (e.getLevel() instanceof net.minecraft.world.level.Level l && l.isClientSide()) org.erisia.stasis.Flames.clientChunkLoad(l, e.getChunk().getPos());
         });
+        // EA flashlight beams, per pixel (Baughn)
+        NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, FlashlightPost::frame);
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, FlashlightPost::tick);
         // a suited player's first-person arm is the suit (sleeve and glove); drawn after the desaturation in stopped
         // land (mixin/client/GameRendererMixin)
         NeoForge.EVENT_BUS.addListener(RenderArmEvent.class, SuitArm::renderArm);
