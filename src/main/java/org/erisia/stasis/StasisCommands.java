@@ -114,6 +114,16 @@ final class StasisCommands {
                         dp.x(), dp.z(), dp.radius(), dp.strength(), Math.hypot(dp.x() - pos.x, dp.z() - pos.z))), false);
                 return list.size();
             }))
+            .then(Commands.literal("status").then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player()).executes(c -> {
+                var p = net.minecraft.commands.arguments.EntityArgument.getPlayer(c, "player");
+                var level = p.level();
+                int x = p.getBlockX(), y = p.getBlockY(), z = p.getBlockZ();
+                String msg = String.format("%s: %s; time %s here (steady %s), drifting deep %.2f, static zone %d",
+                    p.getName().getString(), Freezing.describe(p), Stasis.isRunning(level, p.blockPosition()) ? "runs" : "stopped",
+                    Stasis.isRunningSteady(level, p.blockPosition()) ? "runs" : "stopped", Deeps.at(level, x, y, z), StaticDeeps.zone(level, x, y, z));
+                c.getSource().sendSuccess(() -> Component.literal(msg), false);
+                return 1;
+            })))
             .then(Commands.literal("rifts").executes(c -> {
                 var src = c.getSource();
                 var level = src.getLevel();

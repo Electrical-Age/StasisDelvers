@@ -222,6 +222,14 @@ public final class Freezing {
         return state(p).counted;
     }
 
+    /** For /stasis status: freeze ticks, the limit, and the hold left (ticks; 0 = none). */
+    public static String describe(ServerPlayer p) {
+        State s = state(p);
+        long hold = Math.max(0, s.heldUntil - p.level().getGameTime());
+        return "freeze " + s.ticks + "/" + StasisConfig.freezeTicks + (hold > 0 ? ", held by a deep for " + hold / 20 + " s more" : "")
+            + (p.level().getGameTime() < s.graceUntil ? ", in grace" : "");
+    }
+
     /** For tests: the player's current freeze ticks. */
     public static int ticks(ServerPlayer p) {
         return state(p).ticks;
