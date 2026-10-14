@@ -7,7 +7,8 @@
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
 // min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] deep count; [168 + 6i ..] drifting deep i:
 // centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id; [256] bolt point
-// count; [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
+// count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius, shape id;
+// [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
@@ -93,6 +94,19 @@ float eddyShare(float collapse, float failing) {
 
 // Deeps.horizontal plus the height band: intensity 0..1 of the drifting deeps at q (= world - floor(camera));
 // camI = floor(camera) for the edge noise (world coordinates)
+// StaticDeeps.shape: the organic distance of world point w to static deep i (<= 0.35 rift, <= 1 outer zone)
+float staticShape(int i, vec3 w, vec3 camI) {
+    int o = 220 + 5 * i;
+    vec3 c = vec3(data(o), data(o + 1), data(o + 2)) + camI;
+    float R = data(o + 3);
+    int id = int(data(o + 4));
+    vec3 wp = vec3(value32(w / 18.0, id), value32(w / 18.0 + vec3(31.0, 0.0, 0.0), id), value32(w / 18.0 + vec3(0.0, 47.0, 0.0), id)) - 0.5;
+    vec3 dv = w + wp * vec3(16.0, 10.0, 16.0) - c;
+    dv.y *= 1.4;
+    float rough = 1.0 + 0.3 * (fbm32(w / 9.0, id ^ 0x77) - 0.5) * 2.0;
+    return length(dv) / (R * rough);
+}
+
 float deepAt(vec3 q, vec3 camI) {
     int nd = int(data(31));
     float best = 0.0;
@@ -254,6 +268,18 @@ void main() {
         float l = dot(c, vec3(0.299, 0.587, 0.114));
         // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast
         float deep = data(31) > 0.0 ? deepAt(depth > 0.0 ? p : camFrac, camInt) * (1.0 - run) : 0.0;
+        int nsd = int(data(218));
+        float riftHere = 0.0, fringe = 0.0;
+        for (int i = 0; i < nsd && i < 4; i++) {
+            vec3 sc = vec3(data(220 + 5 * i), data(221 + 5 * i), data(222 + 5 * i));
+            float sR = data(223 + 5 * i);
+            vec3 q = depth > 0.0 ? p : camFrac;
+            if (length(q - sc) > sR * 1.6 + 20.0) continue;
+            float sh = staticShape(i, q + camInt, camInt);
+            deep = max(deep, (1.0 - smoothstep(0.8, 1.05, sh)) * (1.0 - run));
+            riftHere = max(riftHere, 1.0 - smoothstep(0.32, 0.36, sh));
+            fringe = max(fringe, smoothstep(0.32, 0.36, sh) * (1.0 - smoothstep(0.36, 0.45, sh)));
+        }
         vec3 grey = mix(vec3(l), c, 0.18 * (1.0 - deep)) * mix(vec3(0.96, 0.99, 1.04), vec3(0.62, 0.6, 0.74), deep);
         c = mix(grey, c, run);
         if (data(31) > 0.0) {
@@ -267,6 +293,29 @@ void main() {
                 mist += (1.0 - mist) * dn * min(1.0, sl * 0.03);
             }
             c = mix(c, vec3(0.55, 0.53, 0.64), mist * 0.8);
+        }
+        if (nsd > 0) {
+            // rifts: no light at all, a faint violet fringe at the edge, and they swallow what lies behind them
+            c = mix(c, vec3(0.0), riftHere);
+            c += vec3(0.25, 0.1, 0.4) * fringe * 0.6;
+            float tEnd = depth > 0.0 ? length(rel) : 200.0;
+            vec4 hs2 = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
+            vec3 dir2 = depth > 0.0 ? normalize(rel) : normalize(hs2.xyz / hs2.w);
+            float trans = 1.0;
+            for (int i = 0; i < nsd && i < 4; i++) {
+                vec3 sc = vec3(data(220 + 5 * i), data(221 + 5 * i), data(222 + 5 * i)) - camFrac;
+                float sR = data(223 + 5 * i) * 0.6;          // the rift lies within ~0.5 r (warp included)
+                float b = dot(sc, dir2), cc = dot(sc, sc) - sR * sR, disc = b * b - cc;
+                if (disc <= 0.0) continue;
+                float sq = sqrt(disc), ta = max(b - sq, 0.0), tb = min(b + sq, tEnd);
+                if (tb <= ta) continue;
+                float sl = (tb - ta) / 10.0;
+                for (int m = 0; m < 10; m++) {
+                    vec3 qq = camFrac + dir2 * (ta + (float(m) + 0.5) * sl);
+                    if (staticShape(i, qq + camInt, camInt) < 0.35) trans *= exp(-sl * 0.6);
+                }
+            }
+            c *= trans;
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }

@@ -30,7 +30,8 @@ public final class StaticDeeps {
         float x = i * CX + r + (CX - 2 * r) * Noise.hash32(i, j, k, seed ^ 0x57A9);
         float y = j * CY + r * 0.6f + (CY - 1.2f * r) * Noise.hash32(i, j, k, seed ^ 0x57AA);
         float z = k * CZ + r + (CZ - 2 * r) * Noise.hash32(i, j, k, seed ^ 0x57AB);
-        return new Deep(x, y, z, r, (i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ seed);
+        // 24-bit id: the shader gets it as an exact float
+        return new Deep(x, y, z, r, ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ seed) & 0xFFFFFF);
     }
 
     /** The static deeps whose cells touch the box around (x, y, z) with this margin: at most 8. */

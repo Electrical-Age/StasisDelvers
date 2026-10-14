@@ -95,6 +95,13 @@ public final class StasisRegistry {
     public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> MUSIC_STOPPED = SOUNDS.register("music.stopped",
         () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "music.stopped")));
 
+    /** Worldgen around static deeps (DeepFeature; data/stasisdelvers/worldgen, neoforge/biome_modifier). */
+    static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.levelgen.feature.Feature>> FEATURE_TYPES =
+        DeferredRegister.create(Registries.FEATURE_TYPE, StasisDelvers.MODID);
+    static {
+        FEATURE_TYPES.register("deep_dislocations", () -> DeepFeature.CODEC);
+    }
+
     static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE, StasisDelvers.MODID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<Statue>> STATUE = ENTITY_TYPES.register("statue",
@@ -108,6 +115,7 @@ public final class StasisRegistry {
 
     static void register(IEventBus modBus) {
         ENTITY_TYPES.register(modBus);
+        FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);
         ITEMS.register(modBus);
         BLOCKS.register(modBus);

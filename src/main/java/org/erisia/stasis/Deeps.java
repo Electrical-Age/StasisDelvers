@@ -65,7 +65,7 @@ public final class Deeps {
         float r0 = 20 + 28 * Noise.hash32(i, k, cycle, seed ^ 0x4D33);
         float breathe = 1 + 0.2f * (float) Math.sin(t / 150.0 + Noise.hash32(i, k, cycle, seed ^ 0x5D33) * 6.2831853);
         return new Deep(i * CELL + ox + drift[0], k * CELL + oz + drift[1], r0 * breathe * (0.4f + 0.6f * env), env,
-            (i * 73856093) ^ (k * 19349663) ^ cycle);
+            ((i * 73856093) ^ (k * 19349663) ^ cycle) & 0xFFFFFF);
     }
 
     private static float smooth(float x) {

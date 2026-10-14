@@ -114,6 +114,19 @@ final class StasisCommands {
                         dp.x(), dp.z(), dp.radius(), dp.strength(), Math.hypot(dp.x() - pos.x, dp.z() - pos.z))), false);
                 return list.size();
             }))
+            .then(Commands.literal("rifts").executes(c -> {
+                var src = c.getSource();
+                var level = src.getLevel();
+                var pos = src.getPosition();
+                var list = StaticDeeps.near((float) pos.x, (float) pos.y, (float) pos.z, 1024, Deeps.seed(level));
+                list.sort(java.util.Comparator.comparingDouble(sd0 -> Math.hypot(sd0.x() - pos.x, sd0.z() - pos.z)));
+                src.sendSuccess(() -> Component.literal(list.size() + " static deep(s) within ~1 km; here: zone "
+                    + StaticDeeps.zone(level, (int) Math.floor(pos.x), (int) Math.floor(pos.y), (int) Math.floor(pos.z))), false);
+                for (var sd : list.subList(0, Math.min(8, list.size())))
+                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f %.0f, radius %.0f (rift ~%.0f), %.0f blocks away",
+                        sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z))), false);
+                return list.size();
+            }))
             .then(Commands.literal("tower")
                 .then(Commands.literal("charge").then(Commands.argument("pos", BlockPosArgument.blockPos())
                     .then(Commands.argument("share", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0, 1)).executes(c -> {

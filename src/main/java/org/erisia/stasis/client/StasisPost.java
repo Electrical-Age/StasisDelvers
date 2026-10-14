@@ -119,6 +119,22 @@ public final class StasisPost {
             }
         }
         d[31] = nd;
+        // static deeps near the camera (StaticDeeps): centre - floor(camera), radius, shape id; at most 4
+        int ns = 0;
+        if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {
+            for (var sd : org.erisia.stasis.StaticDeeps.near((float) cam.x, (float) cam.y, (float) cam.z, 260, ClientFields.deepSeed())) {
+                if (ns == 4) break;
+                double dist = Math.sqrt(Math.pow(sd.x() - cam.x, 2) + Math.pow(sd.y() - cam.y, 2) + Math.pow(sd.z() - cam.z, 2));
+                if (dist - sd.radius() * 1.5 > 200) continue;
+                int o = 220 + 5 * ns++;
+                d[o] = (float) (sd.x() - fx);
+                d[o + 1] = (float) (sd.y() - fy);
+                d[o + 2] = (float) (sd.z() - fz);
+                d[o + 3] = sd.radius();
+                d[o + 4] = sd.id() & 0xFFFFFF;
+            }
+        }
+        d[218] = ns;
         // lightning bolts (BoltRenderer), projected to the screen
         Matrix4f fwd = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
         d[256] = BoltRenderer.fill(d, 260, 150, fwd, cam, 1.0);
