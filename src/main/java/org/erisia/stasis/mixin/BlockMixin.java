@@ -14,9 +14,20 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Standing on stopped lava hurts like a magma block (no fire: the heat doesn't move either). */
+/**
+ * Standing on stopped lava hurts like a magma block (no fire: the heat doesn't move either). Flames' light depends on
+ * where they are (Flames): these override NeoForge's IBlockExtension defaults.
+ */
 @Mixin(Block.class)
 public abstract class BlockMixin {
+    public int getLightEmission(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos) {
+        return org.erisia.stasis.Flames.emission(state, level, pos);
+    }
+
+    public boolean hasDynamicLightEmission(BlockState state) {
+        return org.erisia.stasis.Flames.isFlame(state);
+    }
+
     @Inject(method = "stepOn", at = @At("HEAD"))
     private void stasis$stoppedLava(Level level, BlockPos pos, BlockState onState, Entity entity, CallbackInfo ci) {
         if ((Object) this instanceof LiquidBlock && !level.isClientSide() && onState.getFluidState().is(FluidTags.LAVA)

@@ -14,6 +14,7 @@ public final class ClientFields {
     }
 
     static void set(List<Field> f, net.minecraft.world.level.Level level) {
+        Flames.clientLevel(level);
         fields = List.copyOf(f);
         if (level != null) Stasis.invalidate(level);
     }

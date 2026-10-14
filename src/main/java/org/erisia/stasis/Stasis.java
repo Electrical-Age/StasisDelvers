@@ -52,16 +52,25 @@ public final class Stasis {
     private static synchronized Index index(Level level) {
         Index idx = INDEX.get(level);
         if (idx == null) {
-            idx = new Index();
+            // off the main thread (the light engine) the server's saved data can't be loaded: use what's loaded
+            List<Field> fields;
+            if (level instanceof ServerLevel sl && !sl.getServer().isSameThread()) {
+                fields = FieldData.peek(sl);
+                if (fields == null) fields = List.of();   // not loaded yet: don't cache this
+                else INDEX.put(level, idx = new Index());
+                if (idx == null) idx = new Index();
+            } else {
+                fields = fields(level);
+                INDEX.put(level, idx = new Index());
+            }
             Long2ObjectOpenHashMap<List<Field>> lists = new Long2ObjectOpenHashMap<>();
-            for (Field f : fields(level)) {
+            for (Field f : fields) {
                 int x0 = (int) Math.floor(f.x() - f.radius()) >> 4, x1 = (int) Math.floor(f.x() + f.radius()) >> 4;
                 int z0 = (int) Math.floor(f.z() - f.radius()) >> 4, z1 = (int) Math.floor(f.z() + f.radius()) >> 4;
                 for (int cx = x0; cx <= x1; cx++)
                     for (int cz = z0; cz <= z1; cz++) lists.computeIfAbsent(ChunkPos.pack(cx, cz), k -> new ArrayList<>()).add(f);
             }
             for (var e : lists.long2ObjectEntrySet()) idx.columns.put(e.getLongKey(), e.getValue().toArray(NONE));
-            INDEX.put(level, idx);
         }
         return idx;
     }

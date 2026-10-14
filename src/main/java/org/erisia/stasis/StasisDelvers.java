@@ -23,6 +23,7 @@ public final class StasisDelvers {
         modBus.addListener(ModConfigEvent.Reloading.class, e -> StasisConfig.refresh());
         NeoForge.EVENT_BUS.addListener(StasisEvents::entityTick);
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
+        NeoForge.EVENT_BUS.addListener(StasisEvents::levelLoad);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelUnload);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> StasisCommands.register(e.getDispatcher()));
         StasisRegistry.register(modBus);
@@ -44,6 +45,9 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(PlayerRates::logout);
         NeoForge.EVENT_BUS.addListener(Freezing::onBreakSpeed);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, NodeFreezer::tick);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Flames::tick);
+        NeoForge.EVENT_BUS.addListener(Flames::chunkLoad);
+        NeoForge.EVENT_BUS.addListener(Flames::watch);
         NodeFreezer.install();
         org.erisia.stasis.gametest.StasisGameTests.register(modBus);
     }

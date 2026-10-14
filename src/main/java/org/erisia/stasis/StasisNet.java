@@ -105,13 +105,39 @@ public final class StasisNet {
     /** Client side: the latest freeze progress, for the screen effect. */
     public static volatile float clientFreeze;
 
+    /** Flame gutters (pos -> light; 0 = recovered). */
+    public record Gutters(java.util.Map<Long, Byte> lights) implements CustomPacketPayload {
+        public static final Type<Gutters> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "gutters"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, Gutters> CODEC = StreamCodec.of(
+            (buf, p) -> {
+                buf.writeVarInt(p.lights().size());
+                p.lights().forEach((k, v) -> { buf.writeLong(k); buf.writeByte(v); });
+            },
+            buf -> {
+                int n = buf.readVarInt();
+                java.util.Map<Long, Byte> m = new java.util.HashMap<>();
+                for (int i = 0; i < n; i++) m.put(buf.readLong(), buf.readByte());
+                return new Gutters(m);
+            });
+
+        @Override
+        public Type<Gutters> type() {
+            return TYPE;
+        }
+    }
+
+    static void sendGutters(ServerPlayer player, java.util.Map<Long, Byte> lights) {
+        send(player, new Gutters(lights));
+    }
+
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("3");
+            var r = e.registrar("4");
             r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> ClientFields.set(p.fields(), ctx.player().level()));
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
+            r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights()));
         });
     }
 

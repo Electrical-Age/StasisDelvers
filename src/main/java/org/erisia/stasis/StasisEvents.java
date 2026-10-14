@@ -25,6 +25,11 @@ final class StasisEvents {
             e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
     }
 
+    /** Load the fields on the main thread (the light engine reads them from its own: FieldData.peek). */
+    static void levelLoad(LevelEvent.Load e) {
+        if (e.getLevel() instanceof ServerLevel level) FieldData.get(level);
+    }
+
     static void levelUnload(LevelEvent.Unload e) {
         if (e.getLevel() instanceof ServerLevel level) Stasis.invalidate(level);
     }

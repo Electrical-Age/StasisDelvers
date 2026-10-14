@@ -23,6 +23,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.erisia.stasis.Field;
+import org.erisia.stasis.Flames;
 import org.erisia.stasis.Freezing;
 import org.erisia.stasis.Statue;
 import net.minecraft.server.level.ServerPlayer;
@@ -601,6 +602,62 @@ public final class StasisGameTests {
             };
         }, false, true));
         // EA infrastructure within 6 blocks of a tower core runs in stopped land (a battery can start the tower)
+        // flames (Baughn): no light in stopped land; light comes back when a field covers them; guttering dims and
+        // recovers; the overworld lets monsters spawn up to block light 7
+        CASES.put("flames_dark_in_the_grey", new Spec(20, (h, c) -> {
+            h.setBlock(new BlockPos(1, 1, 4), Blocks.TORCH);       // in the field
+            h.setBlock(new BlockPos(15, 1, 4), Blocks.TORCH);      // stopped land, 14 blocks from the other
+            h.setBlock(new BlockPos(15, 1, 7), Blocks.LANTERN);
+            return () -> {
+                var light = settledLight(h);
+                BlockPos tp = h.absolutePos(new BlockPos(1, 1, 4)), op = h.absolutePos(new BlockPos(15, 1, 4));
+                c.check("a torch in the field gives light 14", light.getLightValue(tp) == 14, "" + light.getLightValue(tp));
+                c.check("a torch in stopped land gives none", light.getLightValue(op) == 0, "" + light.getLightValue(op));
+                c.check("a lantern in stopped land gives none", light.getLightValue(h.absolutePos(new BlockPos(15, 1, 7))) == 0);
+                c.check("the overworld's monster spawn block light limit is 7", h.getLevel().dimensionType().monsterSpawnBlockLightLimit() == 7,
+                    "" + h.getLevel().dimensionType().monsterSpawnBlockLightLimit());
+            };
+        }, true, true));
+        CASES.put("flames_light_up_when_a_field_comes", new Spec(20, (h, c) -> {
+            h.setBlock(new BlockPos(12, 1, 4), Blocks.TORCH);
+            h.runAfterDelay(5, () -> halfField(h, c, 1.0));
+            return () -> {
+                int l = settledLight(h).getLightValue(h.absolutePos(new BlockPos(12, 1, 4)));
+                BlockPos tp = h.absolutePos(new BlockPos(12, 1, 4));
+                c.check("the torch the new field covers gives light 14", l == 14, l + " emission " + Flames.emission(h.getLevel().getBlockState(tp), h.getLevel(), tp)
+                    + " running " + Stasis.isRunning(h.getLevel(), tp));
+            };
+        }, true, true));
+        CASES.put("flames_gutter_and_recover", new Spec(40, (h, c) -> {
+            BlockPos local = new BlockPos(3, 1, 4);
+            h.setBlock(local, Blocks.TORCH);
+            int[] dimmed = {-1};
+            h.runAfterDelay(2, () -> Flames.gutter(h.getLevel(), h.absolutePos(local), 5, 15));
+            h.runAfterDelay(10, () -> dimmed[0] = settledLight(h).getLightValue(h.absolutePos(local)));
+            return () -> {
+                var light = settledLight(h);
+                c.check("while guttering the torch gives light 5", dimmed[0] == 5, "" + dimmed[0]);
+                int l = light.getLightValue(h.absolutePos(local));
+                c.check("after the gutter it gives 14 again", l == 14 && !Flames.guttering(h.getLevel(), h.absolutePos(local)), "" + l);
+            };
+        }, true, true));
+        // random ticks gutter flames where time runs (here: very fast random ticks), never in stopped land
+        CASES.put("flames_gutter_on_random_ticks", new Spec(60, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var rules = level.getGameRules();
+            int speed = rules.get(net.minecraft.world.level.gamerules.GameRules.RANDOM_TICK_SPEED);
+            rules.set(net.minecraft.world.level.gamerules.GameRules.RANDOM_TICK_SPEED, 4096, level.getServer());
+            c.cleanup.add(() -> rules.set(net.minecraft.world.level.gamerules.GameRules.RANDOM_TICK_SPEED, speed, level.getServer()));
+            h.setBlock(new BlockPos(3, 1, 4), Blocks.TORCH);
+            h.setBlock(new BlockPos(12, 1, 4), Blocks.TORCH);
+            return () -> {
+                BlockPos in = h.absolutePos(new BlockPos(3, 1, 4)), out = h.absolutePos(new BlockPos(12, 1, 4));
+                int e = Flames.emission(level.getBlockState(in), level, in);
+                c.check("the torch in the field guttered (light 4-7)", e >= 4 && e <= 7, "" + e);
+                c.check("the torch in stopped land has no gutter", !Flames.guttering(level, out));
+                c.cleanup.add(() -> Flames.gutter(level, in, 5, 0));
+            };
+        }, true, true));
         CASES.put("ea_tower_yard_keeps_cables", new Spec(30, (h, c) -> {
             tower(h, new BlockPos(12, 1, 6), 0);                                   // unpowered: no field
             var cable = eaSix(h, new BlockPos(12, 1, 4), 4 + (32 << 6));
@@ -953,6 +1010,24 @@ public final class StasisGameTests {
         f.setItem(0, new ItemStack(Items.RAW_IRON, 4));
         f.setItem(1, new ItemStack(Items.COAL, 2));
         return f;
+    }
+
+    /**
+     * Wait for the light engine (its own thread; the test server runs ticks without pause, so light can lag many ticks
+     * behind) to finish what is queued for the test's chunk.
+     */
+    static net.minecraft.world.level.lighting.LayerLightEventListener settledLight(GameTestHelper h) {
+        var engine = (net.minecraft.server.level.ThreadedLevelLightEngine) h.getLevel().getChunkSource().getLightEngine();
+        BlockPos o = h.absolutePos(BlockPos.ZERO);
+        for (int round = 0; round < 2; round++) {   // twice: a relight can queue more work
+            var f = engine.waitForPendingTasks(o.getX() >> 4, o.getZ() >> 4);
+            long deadline = System.nanoTime() + 2_000_000_000L;
+            while (!f.isDone() && System.nanoTime() < deadline) {
+                engine.tryScheduleUpdate();
+                Thread.onSpinWait();
+            }
+        }
+        return h.getLevel().getLightEngine().getLayerListener(net.minecraft.world.level.LightLayer.BLOCK);
     }
 
     /** A field at a local position (cleaned up after the test). */

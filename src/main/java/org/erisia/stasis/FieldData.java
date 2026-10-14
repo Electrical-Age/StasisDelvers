@@ -41,6 +41,7 @@ public final class FieldData extends SavedData {
     private FieldData(int nextId, List<Field> fields, boolean cottage, java.util.Map<String, Double> clocks) {
         this.nextId = nextId;
         this.fields = new ArrayList<>(fields);
+        this.snapshot = List.copyOf(fields);
         this.cottage = cottage;
         clocks.forEach((k, v) -> this.clocks.put(Integer.parseInt(k), v));
     }
@@ -54,12 +55,27 @@ public final class FieldData extends SavedData {
         setDirty();
     }
 
+    /** Loaded instances, for other threads (the light engine asks Stasis.isRunning): the data storage isn't thread-safe. */
+    private static final java.util.Map<ServerLevel, FieldData> LOADED = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /** Main thread only. */
     public static FieldData get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(TYPE);
+        FieldData d = level.getDataStorage().computeIfAbsent(TYPE);
+        if (LOADED.get(level) != d) LOADED.put(level, d);
+        return d;
     }
 
+    /** Any thread: the level's fields if they have been loaded (on the main thread), else null. */
+    static List<Field> peek(ServerLevel level) {
+        FieldData d = LOADED.get(level);
+        return d == null ? null : d.snapshot;
+    }
+
+    /** An immutable copy of `fields`, renewed on every change (read from other threads). */
+    private volatile List<Field> snapshot = List.of();
+
     public List<Field> fields() {
-        return List.copyOf(fields);
+        return snapshot;
     }
 
     public Field add(ServerLevel level, double x, double y, double z, double radius) {
@@ -120,8 +136,10 @@ public final class FieldData extends SavedData {
     }
 
     private void changed(ServerLevel level) {
+        snapshot = List.copyOf(fields);
         setDirty();
         Stasis.invalidate(level);
         StasisNet.sendFields(level);
+        Flames.fieldsChanged(level);
     }
 }

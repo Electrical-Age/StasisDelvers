@@ -25,6 +25,9 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue TOWER_STORE_C;
     static final ModConfigSpec.IntValue TOWER_MAX_SEGMENTS;
     static final ModConfigSpec.DoubleValue TOWER_FIELD_RATE;
+    static final ModConfigSpec.DoubleValue GUTTER_CHANCE;
+    static final ModConfigSpec.IntValue GUTTER_MIN_TICKS;
+    static final ModConfigSpec.IntValue GUTTER_MAX_TICKS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -49,6 +52,11 @@ public final class StasisConfig {
         TOWER_FIELD_RATE = b.comment("Tick rate a tower's field starts at, as a share of 20 TPS (0.6 = 12 TPS). Blocks inside and the",
                 "clients of players inside run at it. Set at tower start; /stasis field rate changes a running field.")
             .defineInRange("towerFieldRate", 0.6, 0.05, 1.0);
+        GUTTER_CHANCE = b.comment("Chance that a random tick makes a flame (block tag stasisdelvers:flames) gutter to light 4-7.",
+                "A block gets a random tick about every 68 s at randomTickSpeed 3, so 0.25 is about once in 4.5 minutes.")
+            .defineInRange("gutterChance", 0.25, 0.0, 1.0);
+        GUTTER_MIN_TICKS = b.comment("Shortest gutter, in ticks.").defineInRange("gutterMinTicks", 100, 1, 72000);
+        GUTTER_MAX_TICKS = b.comment("Longest gutter, in ticks.").defineInRange("gutterMaxTicks", 600, 1, 72000);
         SPEC = b.build();
     }
 
@@ -62,6 +70,9 @@ public final class StasisConfig {
     static volatile double towerStoreC = 306.25;
     static volatile int towerMaxSegments = 30;
     static volatile double towerFieldRate = 0.6;
+    static volatile double gutterChance = 0.25;
+    static volatile int gutterMinTicks = 100;
+    static volatile int gutterMaxTicks = 600;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -88,5 +99,8 @@ public final class StasisConfig {
         towerStoreC = TOWER_STORE_C.get();
         towerMaxSegments = TOWER_MAX_SEGMENTS.get();
         towerFieldRate = TOWER_FIELD_RATE.get();
+        gutterChance = GUTTER_CHANCE.get();
+        gutterMinTicks = GUTTER_MIN_TICKS.get();
+        gutterMaxTicks = GUTTER_MAX_TICKS.get();
     }
 }
