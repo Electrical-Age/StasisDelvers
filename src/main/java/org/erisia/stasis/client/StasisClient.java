@@ -23,6 +23,11 @@ public final class StasisClient {
         // flames' light in chunk meshes (smooth lighting) depends on where they are
         org.erisia.stasis.Flames.clientResolver = g -> g instanceof org.erisia.stasis.mixin.client.RenderSectionRegionAccessor r ? r.stasis$level() : null;
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);
+        // flames: recheck gutters once their chunk (and its light) is in
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> org.erisia.stasis.Flames.clientTick(net.minecraft.client.Minecraft.getInstance().level));
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.ChunkEvent.Load.class, e -> {
+            if (e.getLevel() instanceof net.minecraft.world.level.Level l && l.isClientSide()) org.erisia.stasis.Flames.clientChunkLoad(l, e.getChunk().getPos());
+        });
         // a suited player's first-person arm is the suit (sleeve and glove); drawn after the desaturation in stopped
         // land (mixin/client/GameRendererMixin)
         NeoForge.EVENT_BUS.addListener(RenderArmEvent.class, SuitArm::renderArm);

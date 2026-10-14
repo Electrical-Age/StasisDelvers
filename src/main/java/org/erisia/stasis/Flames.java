@@ -201,6 +201,7 @@ public final class Flames {
     static boolean clientLevel(Level level) {
         if (level != null && clientLevel.get() != level) {
             CLIENT.clear();
+            RECHECK.clear();
             clientLevel = new java.lang.ref.WeakReference<>(level);
             return true;
         }
@@ -212,8 +213,39 @@ public final class Flames {
         m.forEach((k, v) -> {
             if (v == 0) CLIENT.remove(k);
             else CLIENT.put(k, v);
-            if (level != null) level.getChunkSource().getLightEngine().checkBlock(BlockPos.of(k));
+            if (level != null) {
+                level.getChunkSource().getLightEngine().checkBlock(BlockPos.of(k));
+                RECHECK.put(k, level.getGameTime() + 5);   // again once the chunk's light is surely in
+            }
         });
+    }
+
+    /**
+     * Client: flames to check again at a game time. At login the gutters can arrive before their chunk, or the chunk's
+     * light data can land after the check (AdventurAgent: a dim torch kept full light until its next gutter).
+     */
+    private static final Map<Long, Long> RECHECK = new ConcurrentHashMap<>();
+
+    /** Client: a chunk arrived; check its gutters a few ticks later. */
+    public static void clientChunkLoad(Level level, ChunkPos cp) {
+        long due = level.getGameTime() + 5;
+        for (long k : CLIENT.keySet())
+            if (ChunkPos.containing(BlockPos.of(k)).equals(cp)) RECHECK.put(k, due);
+    }
+
+    /** Client tick. */
+    public static void clientTick(Level level) {
+        if (level == null || RECHECK.isEmpty()) return;
+        long now = level.getGameTime();
+        var it = RECHECK.entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            if (e.getValue() > now) continue;
+            BlockPos pos = BlockPos.of(e.getKey());
+            if (level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4) != null)
+                level.getChunkSource().getLightEngine().checkBlock(pos);
+            it.remove();
+        }
     }
 
     // ---------------------------------------------------------------- relighting on field changes (server)
