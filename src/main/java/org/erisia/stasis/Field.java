@@ -56,6 +56,11 @@ public record Field(int id, double x, double y, double z, double radius, double 
         return new Field(id, x, y, z, radius, failing, collapse, column, clampRate(r), seed, formedAt);
     }
 
+    /** Formed at this game time: clients animate the start-up (towers only; 0 = no animation). */
+    public Field withFormedAt(long t) {
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, t);
+    }
+
     /** A new seed (24 bits: the shader gets it as an exact float): a fresh pattern, e.g. for a collapse. */
     public Field withSeed(int s) {
         return new Field(id, x, y, z, radius, failing, collapse, column, rate, s & 0xFFFFFF, formedAt);

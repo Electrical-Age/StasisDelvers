@@ -91,7 +91,8 @@ public final class StasisPost {
             d[o + 5] = (float) f.failing();
             d[o + 6] = f.column() ? 1 : 0;
             d[o + 7] = f.seed();
-            d[o + 8] = f.formedAt() > 0 ? (mc.level.getGameTime() - f.formedAt()) / 20f : -1;
+            d[o + 8] = f.formedAt() > 0
+                ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;
         }
         d[24] = n;
         var img = texture.getPixels();

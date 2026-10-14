@@ -187,7 +187,7 @@ void main() {
         vec3 p = rel + camFrac;                                    // world position minus floor(camera)
         vec3 camInt = vec3(data(16), data(17), data(18));
         // how much time runs here: 1 inside a field (soft at the edge: the border shouldn't look blocky), 0 outside
-        float run = 0.0;
+        float run = 0.0, vivid = 0.0;
         vec3 w = p + camInt;
         if (w.x >= data(25) && w.z >= data(26) && w.x < data(27) + 1.0 && w.z < data(28) + 1.0) run = 1.0;
         int n = int(data(24));
@@ -207,11 +207,20 @@ void main() {
                 float score = collapseScore(blk, off, d, r, int(data(o + 7)));
                 inside *= 1.0 - smoothstep(-0.02, 0.02, collapse - (1.0 - score));
             }
+            float age = data(o + 8);
+            if (age >= 0.0 && age < 3.5) {
+                // start-up (visual only): the colour comes back inner-first, a noisy front reaching the shell at 2.2 s,
+                // then a brief over-vivid flash
+                float front = r * smoothstep(0.0, 2.2, age) + 1.5 * (fbm32(floor(w) / 3.0, int(data(o + 7))) - 0.5);
+                inside *= 1.0 - smoothstep(front - 1.5, front, d);
+                vivid = max(vivid, inside * 0.35 * exp(-(age - 2.5) * (age - 2.5) / 0.08));
+            }
             run = max(run, inside);
         }
         float l = dot(c, vec3(0.299, 0.587, 0.114));
         vec3 grey = mix(vec3(l), c, 0.18) * vec3(0.96, 0.99, 1.04);
         c = mix(grey, c, run);
+        if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }
     // the shields, over the (desaturated) scene: every sphere surface the view ray crosses before the scene
     if (stops > 0.5) {
@@ -264,7 +273,16 @@ void main() {
                     brk = (1.0 - collapseScore(blk, off, r - 0.5, r, int(data(k + 7)))) - collapse;
                     if (brk < 0.0) continue;
                 }
+                float age = data(k + 8);
+                float pop = 1.0;
+                if (age >= 0.0 && age < 3.5) {
+                    // start-up: hexes pop in from the top down once the colour front reaches the shell, rims flashing
+                    float at = 2.0 + 0.5 * (1.0 - centre.y) * 0.5 + 0.3 * cell.y;
+                    if (age < at) continue;
+                    pop = age - at;
+                }
                 vec4 sh = shieldAt(cell, nn, -v, r, collapse > 0.0 ? 0.0 : failing, time, h2 == 0 && !inside);
+                if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 if (brk < 0.03) sh = vec4(mix(sh.rgb, vec3(1.0, 0.95, 0.85), 0.7), min(0.9, sh.a + 0.5));
                 c = mix(c, sh.rgb, sh.a);
             }

@@ -33,6 +33,8 @@ public class TowerBlockEntity extends BlockEntity {
     int collapseTicks;
     /** Net power (in - draw, J per tick), averaged over about 3 s; draining with hysteresis (Baughn: no flicker). */
     double netAvg;
+    /** Game time the field started (for the lock-on sound; not saved). */
+    long startedAt = -1;
     boolean draining;
 
     public double failing() {
@@ -194,6 +196,10 @@ public class TowerBlockEntity extends BlockEntity {
                     stop(sl);
                     break;
                 }
+                if (startedAt >= 0 && sl.getGameTime() - startedAt == 60) {
+                    sl.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.CONDUIT_ACTIVATE, net.minecraft.sounds.SoundSource.BLOCKS, 2.5F, 0.7F);
+                    startedAt = -1;
+                }
                 store.take((int) Math.ceil(perTick * FE_PER_J));
                 netAvg += (in - perTick - netAvg) / 60.0;
                 if (netAvg < -0.02 * perTick) draining = true;
@@ -224,6 +230,11 @@ public class TowerBlockEntity extends BlockEntity {
         Field f = FieldData.get(sl).add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, radius(), false,
             StasisConfig.towerFieldRate);
         fieldId = f.id();
+        // start-up: visual only (Baughn); clients animate from formedAt, about 3 s, with a hum and a lock-on sound
+        long now = sl.getGameTime();
+        FieldData.get(sl).update(sl, fieldId, x -> x.withFormedAt(now));
+        startedAt = now;
+        sl.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.BEACON_ACTIVATE, net.minecraft.sounds.SoundSource.BLOCKS, 2.0F, 0.6F);
         state = State.RUNNING;
         failing = 0;
         netAvg = 0;
