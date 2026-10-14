@@ -70,9 +70,11 @@ public final class Flames {
     /** The light a flame gives at pos (BlockMixin); base = the state's own emission. */
     public static int emission(BlockState state, BlockGetter getter, BlockPos pos) {
         int base = state.getLightEmission();
-        if (base == 0 || !state.is(TAG)) return base;
+        if (base == 0) return base;
         Level level = getter instanceof Level l ? l : getter instanceof LevelChunk c ? c.getLevel() : clientResolver.apply(getter);
         if (level == null) return base;
+        if (StaticDeeps.inRift(level, pos.getX(), pos.getY(), pos.getZ())) return 0;   // no light in a rift, of any kind
+        if (!state.is(TAG)) return base;
         if (!Stasis.isRunningSteady(level, pos)) return 0;   // eddies don't relight flames (Baughn)
         Byte dim = dims(level).get(pos.asLong());
         return dim == null ? base : Math.min(base, dim);

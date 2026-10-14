@@ -617,6 +617,34 @@ public final class StasisGameTests {
             c.check("outer blocks stop more often than inner ones", outerA / (double) outerN > innerA / (double) Math.max(1, innerN),
                 outerA + "/" + outerN + " vs " + innerA + "/" + innerN);
         }, false));
+        // static deeps (Baughn): about a quarter of grid cells; organic; a rift core at the centre, outer zone around
+        CASES.put("static_deeps_shape", new Spec(1, (h, c) -> () -> {
+            int seed = 4242, found = 0, cells = 0;
+            org.erisia.stasis.StaticDeeps.Deep d0 = null;
+            for (int i = -6; i < 6; i++)
+                for (int k = -6; k < 6; k++) {
+                    cells++;
+                    var d = org.erisia.stasis.StaticDeeps.cell(i, 0, k, seed);
+                    if (d != null) {
+                        found++;
+                        if (d0 == null) d0 = d;
+                    }
+                }
+            c.check("about a quarter of the cells hold one", found > 0.12 * cells && found < 0.4 * cells, found + " of " + cells);
+            if (d0 != null) {
+                var d = d0;
+                c.check("the centre is rift", org.erisia.stasis.StaticDeeps.zone(seed, d.x(), d.y(), d.z()) == 2);
+                int outer = 0, n = 0;
+                for (int a = 0; a < 16; a++) {
+                    double ang = a * Math.PI / 8;
+                    float x = (float) (d.x() + Math.cos(ang) * d.radius() * 0.7), z = (float) (d.z() + Math.sin(ang) * d.radius() * 0.7);
+                    n++;
+                    if (org.erisia.stasis.StaticDeeps.zone(seed, x, d.y(), z) == 1) outer++;
+                }
+                c.check("most of a ring at 0.7 r is the outer zone (organic: not all)", outer >= n / 3 && outer <= n, outer + " of " + n);
+                c.check("far outside is nothing", org.erisia.stasis.StaticDeeps.zone(seed, d.x() + d.radius() * 2.5f, d.y(), d.z()) == 0);
+            }
+        }, false));
         CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {

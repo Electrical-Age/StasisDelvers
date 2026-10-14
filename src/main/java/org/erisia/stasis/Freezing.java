@@ -68,19 +68,28 @@ public final class Freezing {
         boolean eddy = stopped && Stasis.isRunningSteady(level, p.blockPosition());
         // in a deep (Deeps): suits drain twice as fast; a Delver suit only slows the freeze (a quarter rate), and a
         // full freeze there holds the player for a minute instead of making a statue (the deep is passing weather)
-        boolean deep = stopped && !eddy && Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f;
+        int zone = stopped ? StaticDeeps.zone(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) : 0;
+        boolean deep = stopped && !eddy && (zone > 0 || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
         boolean held = level.getGameTime() < s.heldUntil;
         if (s.heldUntil != 0 && !held) {   // the hold is over: start fresh
             s.heldUntil = 0;
             s.ticks = 0;
         }
-        if (held) {
+        if (zone == 2 && !grace && !p.isCreative() && !p.isSpectator()) {
+            // a rift: nothing protects, a statue in about 3 s (Baughn)
+            s.ticks += 2;
+            if (s.counted % 20 == 0) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The rift takes you")
+                .withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+        } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
             suited = true;
-        } else if (stopped && !grace && !(suited = isProtected(p, deep ? 2 : 1))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
+        } else if (stopped && !grace && !(suited = isProtected(p, zone == 1 ? 3 : deep ? 2 : 1))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
         else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && Suits.delverOnly(p)) {
             if (s.counted % 4 == 0) s.ticks++;
-            if (s.ticks >= StasisConfig.freezeTicks - 1) {
+            // a static deep is no passing weather: there the Delver suit's freeze ends as a statue, as anywhere
+            if (zone == 1) {
+                // (falls through to the statue check below)
+            } else if (s.ticks >= StasisConfig.freezeTicks - 1) {
                 s.heldUntil = level.getGameTime() + 1200;
                 p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The deep holds you").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
             }

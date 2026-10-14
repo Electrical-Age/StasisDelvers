@@ -95,12 +95,20 @@ public final class Deeps {
     /** Deep intensity 0..1 at a block (drifting deeps; 0 in dimensions where time doesn't stop). */
     public static float at(Level level, int x, int y, int z) {
         if (!Stasis.stops(level)) return 0;
-        float h = horizontal(x + 0.5f, z + 0.5f, Eddies.time(level), seed(level));
+        int seed = seed(level);
+        if (seed == 0) return 0;
+        float h = horizontal(x + 0.5f, z + 0.5f, Eddies.time(level), seed);
         return h > 0 && inBand(level, x, y, z) ? h : 0;
     }
 
+    /** GameTests run without deeps (their spots must be ordinary Grey), except tests that switch them on. */
+    public static volatile boolean testDeeps;
+
     public static int seed(Level level) {
-        return level instanceof net.minecraft.server.level.ServerLevel sl ? FieldData.get(sl).deepSeed() : ClientFields.deepSeed();
+        if (StasisConfig.NO_SPAWN_AREA && !testDeeps) return 0;
+        if (level instanceof net.minecraft.server.level.ServerLevel sl)
+            return sl.getServer().isSameThread() ? FieldData.get(sl).deepSeed() : FieldData.peekDeepSeed(sl);   // light, worldgen threads
+        return ClientFields.deepSeed();
     }
 
     /**

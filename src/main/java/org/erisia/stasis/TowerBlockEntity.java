@@ -35,6 +35,25 @@ public class TowerBlockEntity extends BlockEntity {
     double netAvg;
     /** Share of the field in a drifting deep ("weather": up to +50% draw, more lightning); updated every second. */
     float weather;
+    /** Share of the field in a static deep's outer zone: up to x3 draw. */
+    float staticWeather;
+
+    double weatherFactor() {
+        return 1 + 0.5 * weather + 2 * staticWeather;
+    }
+
+    static float staticOverlap(ServerLevel level, Field f) {
+        int in = 0, n = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++) {
+                    double l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    double k = l == 0 ? 0 : 0.7 * f.radius() / l;
+                    n++;
+                    if (StaticDeeps.zone(level, (int) Math.floor(f.x() + dx * k), (int) Math.floor(f.y() + dy * k), (int) Math.floor(f.z() + dz * k)) > 0) in++;
+                }
+        return in / (float) n;
+    }
     /** Game time the field started (for the lock-on sound; not saved). */
     long startedAt = -1;
     boolean draining;
@@ -193,10 +212,11 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity((int) (storeFor(r) * FE_PER_J));
         double in = received / FE_PER_J;
         received = 0;
-        if (state == State.RUNNING && level.getGameTime() % 20 == 0)
+        if (state == State.RUNNING && level.getGameTime() % 20 == 0) {
             weather = FieldData.get(sl).get(fieldId).map(f -> Deeps.overlap(sl, f)).orElse(0f);
-        else if (state != State.RUNNING) weather = 0;
-        double perTick = drawFor(r) * testDrawFactor * (1 + 0.5 * weather) / 20.0;
+            staticWeather = FieldData.get(sl).get(fieldId).map(f -> staticOverlap(sl, f)).orElse(0f);
+        } else if (state != State.RUNNING) weather = staticWeather = 0;
+        double perTick = drawFor(r) * testDrawFactor * weatherFactor() / 20.0;
         switch (state) {
             case OFF -> {
                 if (storedJ() >= 0.5 * storeFor(r)) start(sl);
@@ -349,8 +369,9 @@ public class TowerBlockEntity extends BlockEntity {
             case COLLAPSING -> "COLLAPSING";
         });
         sb.append(String.format(". Store %.0f%% (%.0f of %.0f kJ), draw %.0f W", 100 * stored / Math.max(1, max), stored / 1000,
-            max / 1000, drawFor(r) * (1 + 0.5 * weather)));
-        if (weather > 0) sb.append(String.format(" (a deep is crossing the field: +%.0f%%)", 50 * weather));
+            max / 1000, drawFor(r) * weatherFactor()));
+        if (weatherFactor() > 1.001) sb.append(String.format(" (a deep %s the field: +%.0f%%)", staticWeather > 0 ? "is in" : "is crossing",
+            100 * (weatherFactor() - 1)));
         sb.append(". ");
         TowerStructure s = structure;
         sb.append(switch (s.status) {

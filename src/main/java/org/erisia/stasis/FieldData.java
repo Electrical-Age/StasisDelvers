@@ -78,6 +78,12 @@ public final class FieldData extends SavedData {
         return d;
     }
 
+    /** Any thread: the level's deep seed if its data is loaded (made at level load), else 0. */
+    static int peekDeepSeed(ServerLevel level) {
+        FieldData d = LOADED.get(level);
+        return d == null ? 0 : d.deepSeed;
+    }
+
     /** Any thread: the level's fields if they have been loaded (on the main thread), else null. */
     static List<Field> peek(ServerLevel level) {
         FieldData d = LOADED.get(level);

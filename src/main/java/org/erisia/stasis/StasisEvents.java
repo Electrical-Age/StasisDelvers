@@ -27,7 +27,7 @@ final class StasisEvents {
 
     /** Load the fields on the main thread (the light engine reads them from its own: FieldData.peek). */
     static void levelLoad(LevelEvent.Load e) {
-        if (e.getLevel() instanceof ServerLevel level) FieldData.get(level);
+        if (e.getLevel() instanceof ServerLevel level) FieldData.get(level).deepSeed();   // made now, on the main thread
     }
 
     static void levelUnload(LevelEvent.Unload e) {

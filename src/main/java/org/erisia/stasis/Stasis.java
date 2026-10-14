@@ -129,6 +129,8 @@ public final class Stasis {
                 if (rate >= 1.0) break;
             }
         }
+        // no field holds a rift (Baughn): a stopped, dark hole through it
+        if (rate > 0 && StaticDeeps.inRift(level, x, y, z)) return 0.0;
         return rate;
     }
 
