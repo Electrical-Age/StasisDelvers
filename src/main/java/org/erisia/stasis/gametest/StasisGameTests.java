@@ -540,6 +540,22 @@ public final class StasisGameTests {
                 c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 40.0));
             };
         }, false, true));
+        // Baughn: the shield shows the charge only while the store drains, averaged (no flicker at break-even)
+        CASES.put("tower_shield_shows_drain", new Spec(120, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.6 * 4 / 3), tx);
+                tx.commit();
+            }
+            double[] early = {-1};
+            h.runAfterDelay(3, () -> early[0] = t.failing());
+            return () -> {
+                c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                c.check("just started: no dropout", early[0] < 0.05, "" + early[0]);
+                c.check("no input: draining, and the shield shows it", t.draining() && t.failing() > 0.2 && t.failing() < 0.5,
+                    "draining " + t.draining() + ", failing " + t.failing());
+            };
+        }, false, true));
         CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {

@@ -31,7 +31,17 @@ public class TowerBlockEntity extends BlockEntity {
     int fieldId;
     int segments;
     int collapseTicks;
-    double lastIn;    // J received last tick
+    /** Net power (in - draw, J per tick), averaged over about 3 s; draining with hysteresis (Baughn: no flicker). */
+    double netAvg;
+    boolean draining;
+
+    public double failing() {
+        return failing;
+    }
+
+    public boolean draining() {
+        return draining;
+    }
     double failing;
 
     /** The store, in FE (insert-only from outside). */
@@ -185,10 +195,12 @@ public class TowerBlockEntity extends BlockEntity {
                     break;
                 }
                 store.take((int) Math.ceil(perTick * FE_PER_J));
-                lastIn = 0.9 * lastIn + 0.1 * in;
-                // the shield shows a shortfall: how far the store has run down, while less comes in than goes out
-                double target = lastIn < perTick * 0.999 ? 1 - storedJ() / storeFor(r) : 0;
-                failing += Math.signum(target - failing) * Math.min(Math.abs(target - failing), 0.01);
+                netAvg += (in - perTick - netAvg) / 60.0;
+                if (netAvg < -0.02 * perTick) draining = true;
+                else if (netAvg > 0.02 * perTick) draining = false;
+                // the shield shows the charge only while the store drains (Baughn), eased over about 2 s
+                double target = draining ? 1 - storedJ() / storeFor(r) : 0;
+                failing += (target - failing) / 40.0;
                 if (level.getGameTime() % 5 == 0) FieldData.get(sl).update(sl, fieldId, f -> f.withFailing(failing));
                 if (store.amount() <= 0) {
                     state = State.COLLAPSING;
@@ -212,7 +224,8 @@ public class TowerBlockEntity extends BlockEntity {
         fieldId = f.id();
         state = State.RUNNING;
         failing = 0;
-        lastIn = drawFor(radius()) / 20.0;
+        netAvg = 0;
+        draining = false;
         Tickets.update(sl, this);
         StasisDelvers.LOG.info("Stasis tower at {} started: field {} r {}", worldPosition.toShortString(), fieldId, radius());
     }
