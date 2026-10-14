@@ -23,7 +23,7 @@ import java.util.Set;
  * EA does when a node goes away: disconnect) and put back when time runs there again (connect). A cable crossing into
  * stopped land is cut there, so a field needs its power from inside it.
  * <p>
- * In a tower's chunk, cables, batteries and exporters keep running even with the field down (Baughn: no machinery,
+ * Within 6 blocks of a tower core, cables, batteries and exporters keep running even with the field down (Baughn: no machinery,
  * not even a heat turbine), so a battery can start the tower.
  */
 public final class NodeFreezer {
@@ -45,7 +45,7 @@ public final class NodeFreezer {
             present.add(n);
             if (n.isDestructing() || !(n.coordonate.world() instanceof ServerLevel level)) continue;
             BlockPos pos = n.coordonate.pos();
-            boolean runs = Stasis.isRunning(level, pos) || (Stasis.towerInChunkIfLoaded(level, pos) && infrastructure(n));
+            boolean runs = Stasis.isRunning(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
             if (!runs && FROZEN.add(n)) {
                 n.disconnect();
             } else if (runs && FROZEN.remove(n)) {

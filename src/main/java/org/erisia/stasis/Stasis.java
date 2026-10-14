@@ -174,28 +174,39 @@ public final class Stasis {
 
     /**
      * Block entities that tick even in stopped land: tower bases (or no tower could ever start), and EA's energy
-     * exporters in a tower's chunk (they feed it).
+     * exporters near a tower (they feed it).
      */
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
         var be = level.getBlockEntity(pos);
         if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
         // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
-        return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && towerInChunk(level, pos);
+        return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && nearTower(level, pos);
     }
 
-    /** Is there a tower base in this position's chunk? */
-    public static boolean towerInChunk(ServerLevel level, BlockPos pos) {
-        var chunk = level.getChunkAt(pos);
-        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
-        return false;
-    }
+    /** How far from a tower core (its 3x3x2 blocks) EA infrastructure keeps running in stopped land (Baughn: 6). */
+    public static final int TOWER_YARD = 6;
 
-    /** As towerInChunk, but never loads a chunk: an unloaded chunk counts as having no tower. */
-    public static boolean towerInChunkIfLoaded(ServerLevel level, BlockPos pos) {
-        var chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
-        if (chunk == null) return false;
-        for (var be : chunk.getBlockEntities().values()) if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
+    /**
+     * Is pos within TOWER_YARD blocks (per axis) of a formed tower core? Only loaded chunks are looked at (an unloaded
+     * one counts as having no tower). Replaces the old "in the tower's chunk", which a 3x3x2 core next to a chunk line
+     * made a lottery.
+     */
+    public static boolean nearTower(ServerLevel level, BlockPos pos) {
+        int r = TOWER_YARD + 1;
+        for (int cx = (pos.getX() - r) >> 4; cx <= (pos.getX() + r) >> 4; cx++)
+            for (int cz = (pos.getZ() - r) >> 4; cz <= (pos.getZ() + r) >> 4; cz++) {
+                var chunk = level.getChunkSource().getChunkNow(cx, cz);
+                if (chunk == null) continue;
+                for (var be : chunk.getBlockEntities().values()) {
+                    if (!(be instanceof TowerBlockEntity t) || !t.isMaster()) continue;
+                    BlockPos m = be.getBlockPos();
+                    int dx = Math.max(Math.abs(pos.getX() - m.getX()) - 1, 0);
+                    int dz = Math.max(Math.abs(pos.getZ() - m.getZ()) - 1, 0);
+                    int dy = pos.getY() < m.getY() ? m.getY() - pos.getY() : Math.max(pos.getY() - (m.getY() + TowerBlock.HEIGHT - 1), 0);
+                    if (Math.max(dx, Math.max(dy, dz)) <= TOWER_YARD) return true;
+                }
+            }
         return false;
     }
 

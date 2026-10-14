@@ -568,21 +568,17 @@ public final class StasisGameTests {
             return () -> c.check("a field arrived: the source runs again", !org.erisia.stasis.NodeFreezer.isFrozen(outSrc.sixNode)
                 && outSrc.electricalLoadList.get(0).getSubSystem() != null);
         }, true, true));
-        CASES.put("ea_tower_chunk_keeps_cables", new Spec(30, (h, c) -> {
+        // EA infrastructure within 6 blocks of a tower core runs in stopped land (a battery can start the tower)
+        CASES.put("ea_tower_yard_keeps_cables", new Spec(30, (h, c) -> {
             tower(h, new BlockPos(12, 1, 6), 0);                                   // unpowered: no field
             var cable = eaSix(h, new BlockPos(12, 1, 4), 4 + (32 << 6));
             var src = eaSix(h, new BlockPos(11, 1, 4), 0 + (3 << 6));
-            boolean sameChunk = (h.absolutePos(new BlockPos(12, 1, 6)).getX() >> 4) == (h.absolutePos(new BlockPos(11, 1, 4)).getX() >> 4)
-                && (h.absolutePos(new BlockPos(12, 1, 6)).getZ() >> 4) == (h.absolutePos(new BlockPos(11, 1, 4)).getZ() >> 4)
-                && (h.absolutePos(new BlockPos(12, 1, 6)).getZ() >> 4) == (h.absolutePos(new BlockPos(12, 1, 4)).getZ() >> 4);
+            var far = eaSix(h, new BlockPos(3, 1, 2), 4 + (32 << 6));            // 8 blocks from the core
             return () -> {
                 org.erisia.stasis.NodeFreezer.pass();
-                if (!sameChunk) {
-                    c.check("(tower and devices fell in different chunks: skipped)", true);
-                    return;
-                }
-                c.check("in a tower's chunk the cable runs", !org.erisia.stasis.NodeFreezer.isFrozen(cable.sixNode));
+                c.check("next to the core the cable runs", !org.erisia.stasis.NodeFreezer.isFrozen(cable.sixNode));
                 c.check("a source is machinery: stopped", org.erisia.stasis.NodeFreezer.isFrozen(src.sixNode));
+                c.check("8 blocks away a cable is stopped", org.erisia.stasis.NodeFreezer.isFrozen(far.sixNode));
             };
         }, false, true));
         // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
