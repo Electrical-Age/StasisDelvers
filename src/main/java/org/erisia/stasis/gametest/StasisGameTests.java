@@ -628,6 +628,16 @@ public final class StasisGameTests {
                     + " running " + Stasis.isRunning(h.getLevel(), tp));
             };
         }, true, true));
+        CASES.put("flames_go_dark_when_the_field_goes", new Spec(20, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            h.setBlock(new BlockPos(12, 1, 4), Blocks.TORCH);
+            Field f = halfField(h, c, 1.0);
+            h.runAfterDelay(5, () -> FieldData.get(level).remove(level, f.id()));
+            return () -> {
+                int l = settledLight(h).getLightValue(h.absolutePos(new BlockPos(12, 1, 4)));
+                c.check("the torch the removed field covered gives no light", l == 0, "" + l);
+            };
+        }, true, true));
         CASES.put("flames_gutter_and_recover", new Spec(40, (h, c) -> {
             BlockPos local = new BlockPos(3, 1, 4);
             h.setBlock(local, Blocks.TORCH);

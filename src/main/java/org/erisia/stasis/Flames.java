@@ -197,12 +197,14 @@ public final class Flames {
 
     private static java.lang.ref.WeakReference<Level> clientLevel = new java.lang.ref.WeakReference<>(null);
 
-    /** Client: the player is in this level (ClientFields.set); a new level drops the old one's gutters. */
-    static void clientLevel(Level level) {
+    /** Client: the player is in this level (ClientFields.set); a new level drops the old one's gutters (true). */
+    static boolean clientLevel(Level level) {
         if (level != null && clientLevel.get() != level) {
             CLIENT.clear();
             clientLevel = new java.lang.ref.WeakReference<>(level);
+            return true;
         }
+        return false;
     }
 
     /** Client: gutters from the server (0 = recovered); the client relights them itself. */
@@ -216,20 +218,13 @@ public final class Flames {
 
     // ---------------------------------------------------------------- relighting on field changes (server)
 
-    private static final Map<Level, List<Field>> LAST = new WeakHashMap<>();
-
     /**
-     * The fields of a level changed (FieldData on the server, ClientFields on the client): relight the flames where
-     * running land changed shape. Both sides: the client's light engine only relights on its own block changes.
+     * The fields of a level changed from old to now (FieldData on the server, ClientFields on the client): relight
+     * the flames where running land changed shape. Both sides: the client's light engine only relights on its own
+     * block changes.
      */
-    static void fieldsChanged(Level level) {
+    static void fieldsChanged(Level level, List<Field> old, List<Field> now) {
         if (!Stasis.stops(level)) return;
-        List<Field> now = Stasis.fields(level);
-        List<Field> old;
-        synchronized (LAST) {
-            old = LAST.getOrDefault(level, List.of());
-            LAST.put(level, now);
-        }
         Map<Integer, Field> before = new HashMap<>();
         for (Field f : old) before.put(f.id(), f);
         List<Field> regions = new ArrayList<>();

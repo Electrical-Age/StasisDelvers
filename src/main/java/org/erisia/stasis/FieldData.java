@@ -136,10 +136,11 @@ public final class FieldData extends SavedData {
     }
 
     private void changed(ServerLevel level) {
+        List<Field> old = snapshot;
         snapshot = List.copyOf(fields);
         setDirty();
         Stasis.invalidate(level);
         StasisNet.sendFields(level);
-        Flames.fieldsChanged(level);
+        Flames.fieldsChanged(level, old, snapshot);
     }
 }

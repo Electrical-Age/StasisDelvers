@@ -14,11 +14,12 @@ public final class ClientFields {
     }
 
     static void set(List<Field> f, net.minecraft.world.level.Level level) {
-        Flames.clientLevel(level);
+        boolean newLevel = Flames.clientLevel(level);
+        List<Field> old = newLevel ? List.of() : fields;
         fields = List.copyOf(f);
         if (level != null) {
             Stasis.invalidate(level);
-            Flames.fieldsChanged(level);
+            Flames.fieldsChanged(level, old, fields);
         }
     }
 }
