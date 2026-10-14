@@ -61,11 +61,17 @@ public final class Flames {
         return state.is(TAG);
     }
 
+    /**
+     * The client's chunk meshing reads a flame's own light through a region copy (smooth lighting samples it, so a
+     * dark flame must say 0 there too, or the floor around it glows); StasisClient sets this to find its level.
+     */
+    public static volatile java.util.function.Function<BlockGetter, Level> clientResolver = g -> null;
+
     /** The light a flame gives at pos (BlockMixin); base = the state's own emission. */
     public static int emission(BlockState state, BlockGetter getter, BlockPos pos) {
         int base = state.getLightEmission();
         if (base == 0 || !state.is(TAG)) return base;
-        Level level = getter instanceof Level l ? l : getter instanceof LevelChunk c ? c.getLevel() : null;
+        Level level = getter instanceof Level l ? l : getter instanceof LevelChunk c ? c.getLevel() : clientResolver.apply(getter);
         if (level == null) return base;
         if (!Stasis.isRunning(level, pos)) return 0;
         Byte dim = dims(level).get(pos.asLong());

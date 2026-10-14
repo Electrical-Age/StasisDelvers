@@ -14,6 +14,7 @@
   ],
   "client": [
     "client.GameRendererMixin",
+    "client.RenderSectionRegionAccessor",
     "client.ClientLevelMixin",
     "client.ClientClockManagerMixin",
     "client.ClientClockInstanceMixin"
