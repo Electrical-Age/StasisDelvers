@@ -188,7 +188,7 @@ public final class Stasis {
     public static final int TOWER_YARD = 6;
 
     /**
-     * Is pos within TOWER_YARD blocks (per axis) of a formed tower core? Only loaded chunks are looked at (an unloaded
+     * Is pos within TOWER_YARD blocks (per axis) of a formed tower core (its 2 blocks)? Only loaded chunks are looked at (an unloaded
      * one counts as having no tower). Replaces the old "in the tower's chunk", which a 3x3x2 core next to a chunk line
      * made a lottery.
      */
@@ -201,8 +201,8 @@ public final class Stasis {
                 for (var be : chunk.getBlockEntities().values()) {
                     if (!(be instanceof TowerBlockEntity t) || !t.isMaster()) continue;
                     BlockPos m = be.getBlockPos();
-                    int dx = Math.max(Math.abs(pos.getX() - m.getX()) - 1, 0);
-                    int dz = Math.max(Math.abs(pos.getZ() - m.getZ()) - 1, 0);
+                    int dx = Math.abs(pos.getX() - m.getX());   // the core is 1x1x2
+                    int dz = Math.abs(pos.getZ() - m.getZ());
                     int dy = pos.getY() < m.getY() ? m.getY() - pos.getY() : Math.max(pos.getY() - (m.getY() + TowerBlock.HEIGHT - 1), 0);
                     if (Math.max(dx, Math.max(dy, dz)) <= TOWER_YARD) return true;
                 }

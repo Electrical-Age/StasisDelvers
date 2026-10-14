@@ -274,6 +274,18 @@ public final class StasisGameTests {
             player.setShiftKeyDown(false);
             return () -> c.check("only the mast counts as segments", t.segments() == 7, "segments " + t.segments());
         }));
+        // Baughn: a boom may start from the core's top block (y 2), e.g. a lopsided H 4 tower
+        CASES.put("boom_from_core_top", new Spec(1, (h, c) -> {
+            BlockPos base = new BlockPos(3, 1, 4);
+            tower(h, base, 2);                                                     // H 4
+            var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
+                .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
+            h.setBlock(base.above().east(1), boomPole);
+            h.setBlock(base.above().east(2), boomPole);
+            var l = org.erisia.stasis.TowerStructure.scan(h.getLevel(), h.absolutePos(base), 100);
+            return () -> c.check("H 4 with a boom E 2 at y 2, valid", l != null && l.H() == 4
+                && l.booms().equals(List.of(new org.erisia.stasis.towergen.Layout.Boom(2, 0, 2))) && l.violations().isEmpty(), l + " " + (l == null ? "" : l.violations()));
+        }, false, true));
         // P3d: the core reads its poles into a layout, builds it off-thread, then turns the poles into ladder / hidden
         CASES.put("tower_reads_poles", new Spec(1, (h, c) -> {
             BlockPos base = new BlockPos(3, 1, 4);
@@ -309,7 +321,7 @@ public final class StasisGameTests {
                 }
                 c.check("mast poles: ladder up to the ladder top, hidden above", ok, sb.toString());
                 c.check("core blocks hidden (the tower draws its core)", h.getBlockState(base).getValue(org.erisia.stasis.TowerBlock.HIDDEN)
-                    && h.getBlockState(base.offset(1, 1, -1)).getValue(org.erisia.stasis.TowerBlock.HIDDEN));
+                    && h.getBlockState(base.above()).getValue(org.erisia.stasis.TowerBlock.HIDDEN));
                 c.check("boom poles hidden", h.getBlockState(base.above(7).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
                     == org.erisia.stasis.TowerPoleBlock.Part.HIDDEN);
             };
@@ -380,18 +392,18 @@ public final class StasisGameTests {
             tower(h, base, 0);
             ServerPlayer p = survivalPlayer(h, new Vec3(6.5, 1, 4.5), true);
             p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_PICKAXE));
-            p.gameMode.destroyBlock(h.absolutePos(base.offset(-1, 1, -1)));
+            p.gameMode.destroyBlock(h.absolutePos(base.above()));
             return () -> {
                 int loose = 0, formed = 0;
-                for (int dx = -1; dx <= 1; dx++) for (int dy = 0; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
-                    var st = h.getBlockState(base.offset(dx, dy, dz));
+                for (int dy = 0; dy <= 1; dy++) {
+                    var st = h.getBlockState(base.above(dy));
                     if (st.is(org.erisia.stasis.StasisRegistry.TOWER.get())) {
                         if (org.erisia.stasis.TowerBlock.formed(st)) formed++; else loose++;
                     }
                 }
                 int items = h.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(h.absolutePos(base)).inflate(4))
                     .stream().mapToInt(e -> e.getItem().is(org.erisia.stasis.StasisRegistry.TOWER_ITEM.get()) ? e.getItem().getCount() : 0).sum();
-                c.check("17 loose blocks left, none formed", loose == 17 && formed == 0, loose + " loose, " + formed + " formed");
+                c.check("1 loose block left, none formed", loose == 1 && formed == 0, loose + " loose, " + formed + " formed");
                 c.check("the broken block dropped itself", items == 1, items + " dropped");
                 var be = h.getLevel().getBlockEntity(h.absolutePos(base));
                 c.check("no tower left: off, no structure", be instanceof org.erisia.stasis.TowerBlockEntity t
@@ -428,7 +440,7 @@ public final class StasisGameTests {
                     if (level.getBlockState(spawn.offset(x, y, z)).is(org.erisia.stasis.StasisRegistry.TOWER.get())
                         && level.getBlockState(spawn.offset(x, y, z)).getValue(org.erisia.stasis.TowerBlock.CELL) == org.erisia.stasis.TowerBlock.MASTER)
                         master = spawn.offset(x, y, z);
-                c.check("the cottage's core arrived whole (18 cells)", master != null && countCore(level, master) == 18, "master " + master + " cells " + (master == null ? 0 : countCore(level, master)));
+                c.check("the cottage's core arrived whole (2 cells)", master != null && countCore(level, master) == 2, "master " + master + " cells " + (master == null ? 0 : countCore(level, master)));
                 var tb = master == null ? null : (org.erisia.stasis.TowerBlockEntity) level.getBlockEntity(master);
                 c.check("its tower runs (full store)", tb != null && tb.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, tb == null ? "-" : tb.state() + " " + tb.storedJ());
                 c.check("spawn set to the cottage", level.getRespawnData().pos().equals(spawn), spawn.toShortString());
@@ -437,20 +449,19 @@ public final class StasisGameTests {
                     level.setBlock(spawn.offset(x, y, z), Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
             };
         }, false, true));
-        // placing the 18th loose core block forms the core (master bottom centre, proxies on the other cells)
-        CASES.put("core_forms_from_18_blocks", new Spec(2, (h, c) -> {
+        // placing the second core block on the first forms the core (master bottom)
+        CASES.put("core_forms_from_2_blocks", new Spec(2, (h, c) -> {
             BlockPos base = new BlockPos(3, 1, 4);
             var loose = org.erisia.stasis.StasisRegistry.TOWER.get().defaultBlockState();
-            for (int dx = -1; dx <= 1; dx++) for (int dy = 0; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++)
-                if (!(dx == 1 && dy == 1 && dz == 1)) h.setBlock(base.offset(dx, dy, dz), loose);
+            h.setBlock(base, loose);
             boolean before = org.erisia.stasis.TowerBlock.formed(h.getBlockState(base));
-            h.setBlock(base.offset(1, 1, 1), loose);
+            h.setBlock(base.above(), loose);
             return () -> {
                 BlockPos master = h.absolutePos(base);
-                c.check("17 blocks: no core yet", !before);
-                c.check("18th block: formed, tower entity at the bottom centre", h.getLevel().getBlockEntity(master)
-                    instanceof org.erisia.stasis.TowerBlockEntity && countCore(h.getLevel(), master) == 18);
-                c.check("every cell has the same entity type (client and server agree)", h.getLevel().getBlockEntity(master.offset(1, 1, 1))
+                c.check("1 block: no core yet", !before);
+                c.check("2nd block on top: formed, tower entity at the bottom", h.getLevel().getBlockEntity(master)
+                    instanceof org.erisia.stasis.TowerBlockEntity && countCore(h.getLevel(), master) == 2);
+                c.check("every cell has the same entity type (client and server agree)", h.getLevel().getBlockEntity(master.above())
                     instanceof org.erisia.stasis.TowerBlockEntity);
                 if (h.getLevel().getBlockEntity(master) instanceof org.erisia.stasis.TowerBlockEntity t) t.setRemoved();
             };
@@ -878,9 +889,9 @@ public final class StasisGameTests {
 
     static int countCore(ServerLevel level, BlockPos master) {
         int n = 0;
-        for (int dx = -1; dx <= 1; dx++) for (int dy = 0; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++)
-            if (level.getBlockState(master.offset(dx, dy, dz)).is(org.erisia.stasis.StasisRegistry.TOWER.get())
-                && org.erisia.stasis.TowerBlock.formed(level.getBlockState(master.offset(dx, dy, dz)))) n++;
+        for (int dy = 0; dy <= 1; dy++)
+            if (level.getBlockState(master.above(dy)).is(org.erisia.stasis.StasisRegistry.TOWER.get())
+                && org.erisia.stasis.TowerBlock.formed(level.getBlockState(master.above(dy)))) n++;
         return n;
     }
 

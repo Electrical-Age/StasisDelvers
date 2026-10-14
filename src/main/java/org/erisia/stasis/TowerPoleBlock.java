@@ -63,7 +63,7 @@ public class TowerPoleBlock extends Block {
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
         Direction face = ctx.getClickedFace();
         BlockState behind = ctx.getLevel().getBlockState(ctx.getClickedPos().relative(face.getOpposite()));
-        Direction.Axis axis = face.getAxis().isHorizontal() && behind.is(this) ? face.getAxis() : Direction.Axis.Y;
+        Direction.Axis axis = face.getAxis().isHorizontal() && (behind.is(this) || TowerBlock.isCoreTop(behind)) ? face.getAxis() : Direction.Axis.Y;
         return defaultBlockState().setValue(AXIS, axis);
     }
 

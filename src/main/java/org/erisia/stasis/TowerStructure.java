@@ -202,7 +202,7 @@ public final class TowerStructure {
         while (H < maxH && TowerPoleBlock.isMast(level.getBlockState(pole(core, H + 1)))) H++;
         if (H == 0) return null;
         List<Layout.Boom> booms = new ArrayList<>();
-        for (int k = 1; k <= H; k++) {
+        for (int k = 0; k <= H; k++) {      // k 0: the core's top block (booms may start there, Baughn)
             BlockPos m = pole(core, k);
             for (int d = 0; d < 4; d++) {
                 Direction dir = dir(d);
@@ -232,12 +232,17 @@ public final class TowerStructure {
             p = p.relative(dir.getOpposite());
             len++;
         }
-        if (!TowerPoleBlock.isMast(level.getBlockState(p))) return null;      // not a boom on a mast: no tower rule
         int below = 0, above = 0;
-        BlockPos q = p.below();
-        while (below < 200 && TowerPoleBlock.isMast(level.getBlockState(q))) { below++; q = q.below(); }
-        BlockState base = level.getBlockState(q);
-        if (!base.is(StasisRegistry.TOWER.get())) return null;                 // no core under the mast
+        BlockPos q;
+        if (TowerBlock.isCoreTop(level.getBlockState(p))) {
+            below = -1;                                                        // a boom off the core's top block: k 0
+            q = p;
+        } else {
+            if (!TowerPoleBlock.isMast(level.getBlockState(p))) return null;  // not a boom on a mast: no tower rule
+            q = p.below();
+            while (below < 200 && TowerPoleBlock.isMast(level.getBlockState(q))) { below++; q = q.below(); }
+            if (!level.getBlockState(q).is(StasisRegistry.TOWER.get())) return null;   // no core under the mast
+        }
         q = p.above();
         while (above < 200 && TowerPoleBlock.isMast(level.getBlockState(q))) { above++; q = q.above(); }
         int k = below + 1, H = TowerBlock.HEIGHT + below + 1 + above, y = k + TowerBlock.HEIGHT;

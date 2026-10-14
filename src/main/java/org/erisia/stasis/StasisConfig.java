@@ -41,8 +41,9 @@ public final class StasisConfig {
         TOWER_DRAW_K = b.comment("Tower draw P = k * r^1.5 W (r = field radius). Default: r 48 draws about 590 W (Baughn "
             + "2026-10-14: twice the radius at half the power of the old k 10).")
             .defineInRange("towerDrawK", 1.77, 0.0, 1e6);
-        TOWER_STORE_C = b.comment("Tower store E = c * r^2 J. Default: a full store runs an r 24 field for 10 minutes.")
-            .defineInRange("towerStoreC", 1225.0, 1.0, 1e9);
+        TOWER_STORE_C = b.comment("Tower store E = c * r^2 J. Default (Baughn 2026-10-14: a quarter of the old 1225, so the "
+            + "doubled radius keeps the old energy): a full store runs an r 48 field for about 20 minutes.")
+            .defineInRange("towerStoreC", 306.25, 1.0, 1e9);
         TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 4 * (segments + 2)).")
             .defineInRange("towerMaxSegments", 30, 0, 254);
         TOWER_FIELD_RATE = b.comment("Tick rate a tower's field starts at, as a share of 20 TPS (0.6 = 12 TPS). Blocks inside and the",
@@ -58,7 +59,7 @@ public final class StasisConfig {
     static volatile int freezeTicks = 100;
     static volatile int graceTicks = 200;
     static volatile double towerDrawK = 1.77;
-    static volatile double towerStoreC = 1225.0;
+    static volatile double towerStoreC = 306.25;
     static volatile int towerMaxSegments = 30;
     static volatile double towerFieldRate = 0.6;
 

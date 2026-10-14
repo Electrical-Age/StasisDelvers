@@ -65,10 +65,9 @@ public final class TowerRenderer {
     /** Beyond this distance (blocks) the LOD without lacing is drawn. */
     static final double LOD_DIST = 48;
     static final int VERTEX_BYTES = 20;
-    /** The mesh draws the 3x3x2 core (the core blocks hide while the tower stands, Baughn). */
+    /** No drawn core: the girders reach the ground, as on towers.brage.info (the 1x1x2 core blocks hide while the tower stands). */
     static final VisualParams VP = VisualParams.fromJson(org.erisia.stasis.towergen.Json.parse(
-        "{\"drawCore\": true, \"coreWidth\": 3.0, \"coreHeight\": 2.0, \"colCore\": [0.46, 0.45, 0.42]}"));   // lighter than the
-    // generator's near-black default, which read as unlit in game (AdventurAgent)
+        "{\"drawCore\": false}"));
 
     private static final ExecutorService BUILD = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "stasis-towermesh");

@@ -32,7 +32,13 @@ public class PoleItem extends BlockItem {
         Level level = ctx.getLevel();
         BlockPos pos = ctx.getClickedPos();
         BlockState clicked = level.getBlockState(pos);
-        if (!clicked.is(getBlock())) return ctx;
+        if (!clicked.is(getBlock())) {
+            // on the side of a core's top block: a boom from the core (checked against the rules like any boom)
+            Direction f = ctx.getClickedFace();
+            BlockPos behind = pos.relative(f.getOpposite());
+            if (f.getAxis().isHorizontal() && TowerBlock.isCoreTop(level.getBlockState(behind)) && refused(ctx, pos, f)) return null;
+            return ctx;
+        }
         Direction.Axis axis = clicked.getValue(TowerPoleBlock.AXIS);
         Direction dir;
         if (ctx.isSecondaryUseActive()) dir = ctx.isInside() ? ctx.getClickedFace().getOpposite() : ctx.getClickedFace();
@@ -71,10 +77,15 @@ public class PoleItem extends BlockItem {
     static Direction outward(Level level, BlockPos pos, Direction.Axis axis, Direction facing) {
         Direction pos1 = Direction.get(Direction.AxisDirection.POSITIVE, axis);
         Direction neg = pos1.getOpposite();
-        boolean rootNeg = TowerPoleBlock.isMast(level.getBlockState(end(level, pos, neg).relative(neg)));
-        boolean rootPos = TowerPoleBlock.isMast(level.getBlockState(end(level, pos, pos1).relative(pos1)));
+        boolean rootNeg = root(level.getBlockState(end(level, pos, neg).relative(neg)));
+        boolean rootPos = root(level.getBlockState(end(level, pos, pos1).relative(pos1)));
         if (rootNeg != rootPos) return rootNeg ? pos1 : neg;
         return facing.getAxis() == axis ? facing : pos1;
+    }
+
+    /** What a boom grows from: a mast pole or the core's top block. */
+    static boolean root(BlockState s) {
+        return TowerPoleBlock.isMast(s) || TowerBlock.isCoreTop(s);
     }
 
     /** The last pole of the given axis from pos in direction d. */

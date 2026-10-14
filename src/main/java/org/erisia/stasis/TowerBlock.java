@@ -15,7 +15,8 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tower core blocks (Baughn): the player places 18 of them, 3x3 wide and 2 high; the moment the last one goes in they
+ * Tower core blocks (Baughn): the player places 2, one on the other (1x1x2; was 3x3x2 until 2026-10-14, when Baughn
+ * dropped it so booms can start as low as the core's top); the moment the second goes in they
  * form a core. Every core block carries a TowerBlockEntity (one type for all, so client and server always agree on
  * it); the bottom centre's (the master's) is the tower: it stores power (FE from EA's exporter) and keeps a field
  * running, and the energy capability of every cell resolves to it, so overlays (Jade) and cables see the store on every
@@ -23,10 +24,10 @@ import org.jspecify.annotations.Nullable;
  * stands on the top centre. Right-click a formed core to see the tower's state.
  */
 public class TowerBlock extends Block implements EntityBlock {
-    /** Which of the 18 cells of a formed core: ((dy * 3) + dz + 1) * 3 + dx + 1, offsets from the master (bottom
-     *  centre); LOOSE: a core block not (yet) part of a core. */
-    public static final IntegerProperty CELL = IntegerProperty.create("cell", 0, 18);
-    public static final int MASTER = 4, LOOSE = 18;
+    /** Which cell of a formed core: 0 the master (bottom), 1 the top; LOOSE: a core block not (yet) part of a core.
+     *  (States of the old 3x3x2 core, cells up to 18, load as the default: loose.) */
+    public static final IntegerProperty CELL = IntegerProperty.create("cell", 0, 2);
+    public static final int MASTER = 0, TOP = 1, LOOSE = 2, CELLS = 2;
     public static final int HEIGHT = 2;
     /** Set while a built tower stands on the core: the tower's mesh draws the core instead (Baughn). */
     public static final net.minecraft.world.level.block.state.properties.BooleanProperty HIDDEN =
@@ -42,20 +43,21 @@ public class TowerBlock extends Block implements EntityBlock {
         builder.add(CELL, HIDDEN);
     }
 
-    static int cell(int dx, int dy, int dz) {
-        return (dy * 3 + dz + 1) * 3 + dx + 1;
-    }
-
     static int dx(int cell) {
-        return cell % 3 - 1;
+        return 0;
     }
 
     static int dz(int cell) {
-        return (cell / 3) % 3 - 1;
+        return 0;
     }
 
     static int dy(int cell) {
-        return cell / 9;
+        return cell;
+    }
+
+    /** The top block of a formed core (booms may start from its sides). */
+    public static boolean isCoreTop(BlockState s) {
+        return s.is(StasisRegistry.TOWER.get()) && s.getValue(CELL) == TOP;
     }
 
     public static boolean formed(BlockState s) {
@@ -73,9 +75,9 @@ public class TowerBlock extends Block implements EntityBlock {
         return state.getValue(HIDDEN) ? net.minecraft.world.level.block.RenderShape.INVISIBLE : net.minecraft.world.level.block.RenderShape.MODEL;
     }
 
-    /** Shows or hides a formed core's 18 blocks (collision and clicks stay). */
+    /** Shows or hides a formed core's blocks (collision and clicks stay). */
     public static void setHidden(Level level, BlockPos master, boolean hidden) {
-        for (int c = 0; c < 18; c++) {
+        for (int c = 0; c < CELLS; c++) {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
             BlockState s = level.getBlockState(p);
             if (s.is(StasisRegistry.TOWER.get()) && formed(s) && s.getValue(HIDDEN) != hidden)
@@ -83,14 +85,14 @@ public class TowerBlock extends Block implements EntityBlock {
         }
     }
 
-    /** Places a whole formed core with its master at pos, if all 18 places are free (tests, /stasis core). */
+    /** Places a whole formed core with its master at pos, if both places are free (tests, /stasis core). */
     public static boolean placeCore(Level level, BlockPos master, @Nullable Object unused) {
-        for (int c = 0; c < 18; c++) {
+        for (int c = 0; c < CELLS; c++) {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
             if (!level.isInWorldBounds(p) || !level.getBlockState(p).canBeReplaced()) return false;
         }
         BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
-        for (int c = 0; c < 18; c++) level.setBlock(master.offset(dx(c), dy(c), dz(c)), loose, Block.UPDATE_CLIENTS);
+        for (int c = 0; c < CELLS; c++) level.setBlock(master.offset(dx(c), dy(c), dz(c)), loose, Block.UPDATE_CLIENTS);
         form(level, master);
         return true;
     }
@@ -100,7 +102,7 @@ public class TowerBlock extends Block implements EntityBlock {
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState old, boolean moved) {
         super.onPlace(state, level, pos, old, moved);
         if (level.isClientSide() || old.is(this) || formed(state)) return;
-        for (int c = 0; c < 18; c++) {
+        for (int c = 0; c < CELLS; c++) {
             BlockPos m = pos.offset(-dx(c), -dy(c), -dz(c));
             if (complete(level, m)) {
                 form(level, m);
@@ -110,7 +112,7 @@ public class TowerBlock extends Block implements EntityBlock {
     }
 
     static boolean complete(Level level, BlockPos master) {
-        for (int c = 0; c < 18; c++) {
+        for (int c = 0; c < CELLS; c++) {
             BlockState s = level.getBlockState(master.offset(dx(c), dy(c), dz(c)));
             if (!s.is(StasisRegistry.TOWER.get()) || formed(s)) return false;
         }
@@ -119,7 +121,7 @@ public class TowerBlock extends Block implements EntityBlock {
 
     static void form(Level level, BlockPos master) {
         BlockState base = StasisRegistry.TOWER.get().defaultBlockState();
-        for (int c = 0; c < 18; c++) {
+        for (int c = 0; c < CELLS; c++) {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
             BlockState s = base.setValue(CELL, c);
             level.setBlock(p, s, Block.UPDATE_ALL);
@@ -145,7 +147,7 @@ public class TowerBlock extends Block implements EntityBlock {
         BlockPos master = master(pos, state);
         if (level.getBlockEntity(master) instanceof TowerBlockEntity t) t.unform();
         BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
-        for (int c = 0; c < 18; c++) {
+        for (int c = 0; c < CELLS; c++) {
             BlockPos p = master.offset(dx(c), dy(c), dz(c));
             BlockState s = level.getBlockState(p);
             if (!s.is(this) || !formed(s)) continue;
@@ -172,7 +174,7 @@ public class TowerBlock extends Block implements EntityBlock {
         if (level.isClientSide()) return net.minecraft.world.InteractionResult.SUCCESS;
         if (!formed(state)) {
             player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                "Stasis tower core block: place 18 of them, 3x3 wide and 2 high, to form a tower core."));
+                "Stasis tower core block: place two, one on the other, to form a tower core."));
         } else if (level.getBlockEntity(master(pos, state)) instanceof TowerBlockEntity t) player.sendSystemMessage(t.statusText());
         return net.minecraft.world.InteractionResult.SUCCESS_SERVER;
     }

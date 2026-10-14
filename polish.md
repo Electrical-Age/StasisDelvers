@@ -34,3 +34,7 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 - Lattice a bit too dense: stronger material would thin it.
 
 - Lattice-top cap (H14 E8 L4): big grey joint hulls at the top-ring corners where the cap struts meet (cosmetic).
+
+- Crafting a stasis-suit piece drops the Delver piece charge (AdventurAgent 2026-10-13). Could carry it over with a custom recipe.
+
+- Field collapse effect too predictable: some hexes never show, and it barely depends on charge (Baughn 2026-10-14, later).
