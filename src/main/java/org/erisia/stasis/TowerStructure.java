@@ -218,6 +218,34 @@ public final class TowerStructure {
         return new Layout(H + TowerBlock.HEIGHT, booms);
     }
 
+    /**
+     * Would a boom pole placed at pos (extending its boom in direction dir) break the tower's rules? The reason, or null.
+     * Refused at placement (Baughn: an invalid pole made the tower flicker). Rules (Layout.violations): a boom at y needs
+     * 2 <= y <= H - 2, and its length at most H - y.
+     */
+    public static String boomRefusal(Level level, BlockPos pos, Direction dir) {
+        BlockPos p = pos.relative(dir.getOpposite());
+        int len = 1;
+        while (len < 200) {
+            BlockState s = level.getBlockState(p);
+            if (!(s.is(StasisRegistry.TOWER_SEGMENT.get()) && s.getValue(TowerPoleBlock.AXIS) == dir.getAxis())) break;
+            p = p.relative(dir.getOpposite());
+            len++;
+        }
+        if (!TowerPoleBlock.isMast(level.getBlockState(p))) return null;      // not a boom on a mast: no tower rule
+        int below = 0, above = 0;
+        BlockPos q = p.below();
+        while (below < 200 && TowerPoleBlock.isMast(level.getBlockState(q))) { below++; q = q.below(); }
+        BlockState base = level.getBlockState(q);
+        if (!base.is(StasisRegistry.TOWER.get())) return null;                 // no core under the mast
+        q = p.above();
+        while (above < 200 && TowerPoleBlock.isMast(level.getBlockState(q))) { above++; q = q.above(); }
+        int k = below + 1, H = TowerBlock.HEIGHT + below + 1 + above, y = k + TowerBlock.HEIGHT;
+        if (y > H - 2) return "A boom here needs at least 2 mast poles above it: raise the mast first.";
+        if (len > H - y) return "Too long: a boom can be at most as long as the mast above it (" + (H - y) + " here).";
+        return null;
+    }
+
     /** Mast pole k (1-based) of the core whose master (bottom centre) is at core. */
     public static BlockPos pole(BlockPos core, int k) {
         return core.above(TowerBlock.HEIGHT - 1 + k);

@@ -48,11 +48,23 @@ public class PoleItem extends BlockItem {
             }
             BlockState s = level.getBlockState(p);
             // walk along poles of the line's own axis; anything else ends it
-            if (!(s.is(getBlock()) && s.getValue(TowerPoleBlock.AXIS) == dir.getAxis()))
-                return s.canBeReplaced(ctx) && !s.is(getBlock()) ? BlockPlaceContext.at(ctx, p.immutable(), dir) : null;
+            if (!(s.is(getBlock()) && s.getValue(TowerPoleBlock.AXIS) == dir.getAxis())) {
+                if (!s.canBeReplaced(ctx) || s.is(getBlock())) return null;
+                if (dir.getAxis().isHorizontal() && refused(ctx, p.immutable(), dir)) return null;
+                return BlockPlaceContext.at(ctx, p.immutable(), dir);
+            }
             p.move(dir);
         }
         return null;
+    }
+
+    /** A boom pole that would break the tower's rules is refused, with the reason in the action bar. */
+    static boolean refused(BlockPlaceContext ctx, BlockPos p, Direction dir) {
+        String why = TowerStructure.boomRefusal(ctx.getLevel(), p, dir);
+        if (why == null) return false;
+        if (ctx.getPlayer() != null && !ctx.getLevel().isClientSide())
+            ctx.getPlayer().sendOverlayMessage(net.minecraft.network.chat.Component.literal(why));
+        return true;
     }
 
     /** A boom's outer direction: away from the mast pole at its root. A free-floating boom extends the way the player faces. */

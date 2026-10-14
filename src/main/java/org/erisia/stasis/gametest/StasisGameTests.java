@@ -240,7 +240,7 @@ public final class StasisGameTests {
         // towers: height sets the radius; half a store starts the field; an empty store collapses it over 15 s
         // survey poles extend like scaffolding: the mast from anywhere on it, booms outward, sneaking starts a boom
         CASES.put("poles_extend_like_scaffolding", new Spec(25, (h, c) -> {
-            var t = tower(h, new BlockPos(3, 1, 4), 2);
+            var t = tower(h, new BlockPos(3, 1, 4), 6);   // poles y3..y8
             var player = h.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
             var pole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get();
             java.util.function.BiConsumer<BlockPos, net.minecraft.core.Direction> use = (local, face) -> {
@@ -256,20 +256,23 @@ public final class StasisGameTests {
             var Y = net.minecraft.core.Direction.Axis.Y;
             var X = net.minecraft.core.Direction.Axis.X;
             use.accept(new BlockPos(3, 3, 4), net.minecraft.core.Direction.NORTH);
-            c.check("side of the lowest mast pole: the mast grows at its top", at.test(new BlockPos(3, 5, 4), Y) && h.getBlockState(new BlockPos(3, 3, 3)).isAir());
+            c.check("side of the lowest mast pole: the mast grows at its top", at.test(new BlockPos(3, 9, 4), Y) && h.getBlockState(new BlockPos(3, 3, 3)).isAir());
             player.setShiftKeyDown(true);
-            use.accept(new BlockPos(3, 5, 4), net.minecraft.core.Direction.EAST);
-            c.check("sneaking on the mast's side: a boom starts", at.test(new BlockPos(4, 5, 4), X));
+            use.accept(new BlockPos(3, 3, 4), net.minecraft.core.Direction.EAST);
+            c.check("sneaking on the mast's side: a boom starts", at.test(new BlockPos(4, 3, 4), X));
             player.setShiftKeyDown(false);
-            use.accept(new BlockPos(4, 5, 4), net.minecraft.core.Direction.UP);
-            use.accept(new BlockPos(4, 5, 4), net.minecraft.core.Direction.UP);
-            c.check("on the boom: it grows outward, away from the mast", at.test(new BlockPos(5, 5, 4), X) && at.test(new BlockPos(6, 5, 4), X)
-                && !h.getBlockState(new BlockPos(4, 6, 4)).is(pole));
+            use.accept(new BlockPos(4, 3, 4), net.minecraft.core.Direction.UP);
+            use.accept(new BlockPos(4, 3, 4), net.minecraft.core.Direction.UP);
+            c.check("on the boom: it grows outward, away from the mast", at.test(new BlockPos(5, 3, 4), X) && at.test(new BlockPos(6, 3, 4), X)
+                && !h.getBlockState(new BlockPos(4, 4, 4)).is(pole));
             player.setShiftKeyDown(true);
-            use.accept(new BlockPos(3, 5, 4), net.minecraft.core.Direction.EAST);
-            c.check("sneaking on the mast's side again: that boom grows", at.test(new BlockPos(7, 5, 4), X));
+            use.accept(new BlockPos(3, 3, 4), net.minecraft.core.Direction.EAST);
+            c.check("sneaking on the mast's side again: that boom grows", at.test(new BlockPos(7, 3, 4), X));
+            // a boom at the top is against the rules (it needs 2 mast poles above it): refused at placement
+            use.accept(new BlockPos(3, 9, 4), net.minecraft.core.Direction.EAST);
+            c.check("a boom at the mast top is refused", !h.getBlockState(new BlockPos(4, 9, 4)).is(pole));
             player.setShiftKeyDown(false);
-            return () -> c.check("only the mast counts as segments", t.segments() == 3, "segments " + t.segments());
+            return () -> c.check("only the mast counts as segments", t.segments() == 7, "segments " + t.segments());
         }));
         // P3d: the core reads its poles into a layout, builds it off-thread, then turns the poles into ladder / hidden
         CASES.put("tower_reads_poles", new Spec(1, (h, c) -> {
@@ -503,32 +506,32 @@ public final class StasisGameTests {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(20) * 0.4 * 4 / 3), tx);
+                store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(40) * 0.4 * 4 / 3), tx);
                 tx.commit();
             }
             h.runAfterDelay(3, () -> c.check("40% charged: still off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name()));
             h.runAfterDelay(4, () -> {
                 try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(20) * 0.2 * 4 / 3), tx);
+                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(40) * 0.2 * 4 / 3), tx);
                     tx.commit();
                 }
             });
             return () -> {
-                c.check("three segments: radius 20", t.radius() == 20.0, "r " + t.radius());
+                c.check("three segments: radius 40", t.radius() == 40.0, "r " + t.radius());
                 c.check("over half charged: running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name()
                     + " stored " + t.storedJ() + " of " + t.storeMaxJ() + " J, ticks " + t.ticks + ", same BE " + (h.getLevel().getBlockEntity(h.absolutePos(new BlockPos(3, 1, 4))) == t));
                 var fields = FieldData.get(h.getLevel()).fields();
-                c.check("its field is up, r 20", fields.stream().anyMatch(f -> f.radius() == 20.0
+                c.check("its field is up, r 40", fields.stream().anyMatch(f -> f.radius() == 40.0
                     && f.containsPoint(h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).x, h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).y, h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).z)), fields.toString());
                 c.check("time runs next to the tower", Stasis.isRunning(h.getLevel(), h.absolutePos(new BlockPos(6, 1, 4))));
                 t.setRemoved();   // breaking the tower takes its field down
-                c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 20.0));
+                c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 40.0));
             };
         }, false, true));
         CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(8) * 0.6 * 4 / 3), tx);
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.6 * 4 / 3), tx);
                 tx.commit();
             }
             h.runAfterDelay(5, () -> {
@@ -537,12 +540,12 @@ public final class StasisGameTests {
             });
             h.runAfterDelay(160, () -> {
                 c.check("halfway through the collapse", t.state() == org.erisia.stasis.TowerBlockEntity.State.COLLAPSING, t.state().name());
-                var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.radius() == 8.0).findFirst();
+                var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.radius() == 16.0).findFirst();
                 c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.3 && f.get().collapse() < 0.7, f.toString());
             });
             return () -> {
                 c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());
-                c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 8.0));
+                c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 16.0));
             };
         }, false, true));
         // Electrical Age: nodes in stopped land leave the simulation; inside a field they run; cables and batteries in

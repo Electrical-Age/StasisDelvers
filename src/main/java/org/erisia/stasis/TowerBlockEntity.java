@@ -9,7 +9,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.transfer.energy.SimpleEnergyHandler;
 
 /**
- * A stasis tower. Its height (segments stacked on the base) sets the field radius r = 4 (segments + 2); its draw
+ * A stasis tower. Its height (segments stacked on the base) sets the field radius r = 8 (segments + 2); its draw
  * is P = k r^1.5 W and its store holds c r^2 J (Baughn: bigger bases get more time to fix: store/draw grows as
  * sqrt(r); r = 24 runs 10 minutes on a full store). States:
  * <ul>
@@ -119,7 +119,7 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     public static double radiusFor(int segments) {
-        return 4.0 * (segments + 2);
+        return 8.0 * (segments + 2);   // Baughn 2026-10-14: twice the old 4 (segments + 2)
     }
 
     /** Draw in W. */

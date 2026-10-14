@@ -38,8 +38,9 @@ public final class StasisConfig {
             .defineInRange("freezeTicks", 100, 60, 1200);
         GRACE_TICKS = b.comment("Ticks after login, respawn or a dimension change during which nobody freezes.")
             .defineInRange("graceTicks", 200, 100, 2400);
-        TOWER_DRAW_K = b.comment("Tower draw P = k * r^1.5 W (r = field radius). Default: r 24 draws about 1.2 kW.")
-            .defineInRange("towerDrawK", 10.0, 0.0, 1e6);
+        TOWER_DRAW_K = b.comment("Tower draw P = k * r^1.5 W (r = field radius). Default: r 48 draws about 590 W (Baughn "
+            + "2026-10-14: twice the radius at half the power of the old k 10).")
+            .defineInRange("towerDrawK", 1.77, 0.0, 1e6);
         TOWER_STORE_C = b.comment("Tower store E = c * r^2 J. Default: a full store runs an r 24 field for 10 minutes.")
             .defineInRange("towerStoreC", 1225.0, 1.0, 1e9);
         TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 4 * (segments + 2)).")
@@ -56,7 +57,7 @@ public final class StasisConfig {
     static volatile int spawnRadius = 1;
     static volatile int freezeTicks = 100;
     static volatile int graceTicks = 200;
-    static volatile double towerDrawK = 10.0;
+    static volatile double towerDrawK = 1.77;
     static volatile double towerStoreC = 1225.0;
     static volatile int towerMaxSegments = 30;
     static volatile double towerFieldRate = 0.6;
