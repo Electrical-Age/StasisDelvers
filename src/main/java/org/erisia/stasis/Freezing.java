@@ -70,7 +70,8 @@ public final class Freezing {
         // full freeze there holds the player for a minute instead of making a statue (the deep is passing weather)
         int zone = stopped ? StaticDeeps.zone(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) : 0;
         boolean deep = stopped && !eddy && (zone > 0 || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
-        boolean held = level.getGameTime() < s.heldUntil;
+        // a hold lasts while the deep is over the player (Baughn: it crosses in a minute at worst), 2 min at most
+        boolean held = level.getGameTime() < s.heldUntil && deep;
         if (s.heldUntil != 0 && !held) {   // the hold is over: start fresh
             s.heldUntil = 0;
             s.ticks = 0;
@@ -90,8 +91,8 @@ public final class Freezing {
             if (zone == 1) {
                 // (falls through to the statue check below)
             } else if (s.ticks >= StasisConfig.freezeTicks - 1) {
-                s.heldUntil = level.getGameTime() + 1200;
-                if (StasisConfig.debugMessages) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("(debug) held by a deep for 60 s"));
+                s.heldUntil = level.getGameTime() + 2400;
+                if (StasisConfig.debugMessages) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("(debug) held by a deep while it passes"));
             }
         } else s.ticks = Math.max(0, s.ticks - 3);
         // a suited player digs slowly in stopped land (Mining Fatigue I; the EA mining drill ignores it: onBreakSpeed)
@@ -226,7 +227,7 @@ public final class Freezing {
     public static String describe(ServerPlayer p) {
         State s = state(p);
         long hold = Math.max(0, s.heldUntil - p.level().getGameTime());
-        return "freeze " + s.ticks + "/" + StasisConfig.freezeTicks + (hold > 0 ? ", held by a deep for " + hold / 20 + " s more" : "")
+        return "freeze " + s.ticks + "/" + StasisConfig.freezeTicks + (hold > 0 ? ", held by a deep (at most " + hold / 20 + " s more)" : "")
             + (p.level().getGameTime() < s.graceUntil ? ", in grace" : "");
     }
 

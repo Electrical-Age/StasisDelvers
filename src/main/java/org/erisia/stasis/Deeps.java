@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * Deeps (Baughn, design v3): where the stasis is stronger than in the ordinary Grey. This is the drifting kind,
  * surface weather: about 1.4 within a 192-block radius anywhere (a 256-block grid, 80% occupied), radius 20-48,
- * breathing, carried by a per-world wind of about 0.5 blocks/s that bends over hours, each one forming and fading
+ * breathing, carried by a per-world wind of about 2 blocks/s (the biggest crosses a spot in a minute) that bends over hours, each one forming and fading
  * over a 20-60 minute cycle (and re-forming somewhere else). Vertically from 6 below the local surface to 64 above
  * it, so caves under one are safe.
  * <p>
@@ -32,7 +32,7 @@ public final class Deeps {
     /** How far the wind has carried everything by time t (seconds, Eddies.time base). */
     static float[] drift(float t, int seed) {
         float ang = Noise.hash32(seed, 21, 0, 0) * 6.2831853f;
-        float s = 0.5f;
+        float s = 2.0f;   // Baughn: the biggest deep (~115 blocks across) crosses a player in about a minute
         return new float[]{
             (float) (s * t * Math.cos(ang) + 600 * Math.sin(t / 5400.0)),
             (float) (s * t * Math.sin(ang) + 600 * Math.cos(t / 7200.0))};
