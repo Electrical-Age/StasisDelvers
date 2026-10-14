@@ -43,13 +43,14 @@ public final class NodeFreezer {
         Set<NodeBase> present = Collections.newSetFromMap(new IdentityHashMap<>());
         for (NodeBase n : nodes) {
             present.add(n);
-            if (n.isDestructing() || !(n.coordonate.world() instanceof ServerLevel level)) continue;
-            BlockPos pos = n.coordonate.pos();
-            boolean runs = Stasis.isRunning(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
-            if (!runs && FROZEN.add(n)) {
+            if (n.isDestructing() || !(n.coordonate.world() instanceof ServerLevel)) continue;
+            // work from EA's own state (isAdded), not a list of our own: EA reconnects nodes from many places
+            boolean runs = runs(n);
+            if (runs) FROZEN.remove(n); else FROZEN.add(n);
+            if (!runs && n.isAdded()) {
                 n.disconnect();
                 n.visualConnect();
-            } else if (runs && FROZEN.remove(n)) {
+            } else if (runs && !n.isAdded()) {
                 n.connect();
             } else if (!runs) {
                 // frozen cables still show their connections (to frozen neighbours too); republished only on change
@@ -57,6 +58,18 @@ public final class NodeFreezer {
             }
         }
         FROZEN.retainAll(present);   // destroyed nodes
+    }
+
+    /** Does this node belong in the simulation now? (Also EA's veto: NodeBase.simulationVeto, set in install.) */
+    static boolean runs(NodeBase n) {
+        if (!(n.coordonate.world() instanceof ServerLevel level)) return true;
+        BlockPos pos = n.coordonate.pos();
+        return Stasis.isRunning(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
+    }
+
+    /** EA asks before it puts a node into the simulation, so a frozen node never slips back in (Baughn). */
+    static void install() {
+        NodeBase.simulationVeto = n -> !runs(n);
     }
 
     /** Is the node only cables, a battery or an EA-to-FE exporter? */
@@ -67,7 +80,10 @@ public final class NodeFreezer {
             boolean any = false;
             for (SixNodeElement el : s.sideElementList) {
                 if (el == null) continue;
-                if (!(el instanceof ElectricalCableElement)) return false;
+                // wiring: cables, and the passive line parts in them (switches, relays, fuses, diodes, ground)
+                if (!(el instanceof ElectricalCableElement || el instanceof mods.eln.sixnode.electricalswitch.ElectricalSwitchElement
+                    || el instanceof mods.eln.sixnode.electricalrelay.ElectricalRelayElement || el instanceof mods.eln.sixnode.ElectricalFuseHolderElement
+                    || el instanceof mods.eln.sixnode.diode.DiodeElement || el instanceof mods.eln.sixnode.groundcable.GroundCableElement)) return false;
                 any = true;
             }
             return any;

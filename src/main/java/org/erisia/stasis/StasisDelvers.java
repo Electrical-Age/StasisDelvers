@@ -44,6 +44,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(PlayerRates::logout);
         NeoForge.EVENT_BUS.addListener(Freezing::onBreakSpeed);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, NodeFreezer::tick);
+        NodeFreezer.install();
         org.erisia.stasis.gametest.StasisGameTests.register(modBus);
     }
 }

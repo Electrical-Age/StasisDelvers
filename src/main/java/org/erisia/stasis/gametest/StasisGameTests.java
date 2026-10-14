@@ -581,6 +581,9 @@ public final class StasisGameTests {
                     && nb.lrduElementMask.get(mods.eln.misc.Direction.YN).mask != 0,
                     na.lrduElementMask.get(mods.eln.misc.Direction.YN).mask + " / " + nb.lrduElementMask.get(mods.eln.misc.Direction.YN).mask);
                 c.check("no electrical link", na.nodeConnectionList.isEmpty() && nb.nodeConnectionList.isEmpty());
+                na.reconnect();   // as EA does when a device is added, toggled, burnt or repaired
+                c.check("an EA reconnect keeps a frozen node out of the simulation (the veto)", !na.isAdded()
+                    && na.lrduElementMask.get(mods.eln.misc.Direction.YN).mask != 0);
             };
         }, false, true));
         // EA infrastructure within 6 blocks of a tower core runs in stopped land (a battery can start the tower)
