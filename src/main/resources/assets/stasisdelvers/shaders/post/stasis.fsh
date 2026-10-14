@@ -110,10 +110,18 @@ vec4 shieldAt(vec2 cell, vec3 n, vec3 view, float r, float failing, float time, 
     float a = 0.02 + 0.07 * fres + rim * (0.14 + 0.22 * wave);
     a *= 1.0 - 0.8 * gap;
     if (farSide) a *= 0.5;
-    // a failing shield: cells flicker, then go dark; the colour warms to amber
-    float soon = failing - (1.0 - rnd) * 0.9;
-    if (failing > 0.0 && soon > -0.25 && hash13(vec3(rnd * 97.0, floor(time * 14.0), 3.3)) < 0.45) a *= 0.15;
-    a *= 1.0 - clamp(soon * 5.0, 0.0, 1.0);
+    // a failing shield (failing = 1 - charge while the store drains): a share of the cells is dark, growing from
+    // none at 60% charge to 90% when empty. Which cells changes all the time (Baughn: the same ones always went first):
+    // each cell's level wanders on its own slow noise; cells near the threshold flicker before they go
+    if (failing > 0.0) {
+        float p = 0.9 * smoothstep(0.4, 1.0, failing);
+        float tt = time * (0.35 + 0.5 * rnd) + rnd * 61.0;
+        float k = floor(tt), fr = smoothstep(0.0, 1.0, fract(tt));
+        float lvl = mix(hash13(vec3(rnd * 131.0, k, 7.1)), hash13(vec3(rnd * 131.0, k + 1.0, 7.1)), fr);
+        float m = lvl - p;
+        if (m < 0.0) a *= 0.0;
+        else if (m < 0.06 && hash13(vec3(rnd * 97.0, floor(time * 14.0), 3.3)) < 0.5) a *= 0.15;
+    }
     vec3 tint = mix(vec3(0.62, 0.84, 1.0), vec3(1.0, 0.55, 0.2), min(1.0, failing * 2.0));
     return vec4(tint * (0.8 + 0.4 * wave), clamp(a, 0.0, 0.9));
 }
