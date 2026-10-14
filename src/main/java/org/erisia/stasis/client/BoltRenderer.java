@@ -29,7 +29,7 @@ public final class BoltRenderer {
     }
 
     static final List<Live> LIVE = new ArrayList<>();
-    static boolean loggedDraw;
+    static int drawLogs;
 
     static void receive(StasisNet.Bolt b) {
         List<Vector3d[]> strokes = new ArrayList<>();
@@ -78,8 +78,8 @@ public final class BoltRenderer {
             if (LIVE.isEmpty()) return;
             live = new ArrayList<>(LIVE);
         }
-        if (!loggedDraw) {
-            loggedDraw = true;
+        if (drawLogs < 3) {
+            drawLogs++;
             org.erisia.stasis.StasisDelvers.LOG.info("bolt drawn ({} live)", live.size());
         }
         Vec3 cam = e.getLevelRenderState().cameraRenderState.pos;
@@ -106,10 +106,16 @@ public final class BoltRenderer {
             Vector3d seg = new Vector3d(q).sub(p);
             Vector3d side = new Vector3d(seg).cross(new Vector3d(p).sub(c)).normalize().mul(width / 2);
             if (!Double.isFinite(side.x)) continue;
-            vertex(vc, pose, new Vector3d(p).sub(side), cam, col);
-            vertex(vc, pose, new Vector3d(p).add(side), cam, col);
-            vertex(vc, pose, new Vector3d(q).add(side), cam, col);
-            vertex(vc, pose, new Vector3d(q).sub(side), cam, col);
+            // both windings: the pipeline culls back faces
+            Vector3d a = new Vector3d(p).sub(side), b = new Vector3d(p).add(side), cc = new Vector3d(q).add(side), d = new Vector3d(q).sub(side);
+            vertex(vc, pose, a, cam, col);
+            vertex(vc, pose, b, cam, col);
+            vertex(vc, pose, cc, cam, col);
+            vertex(vc, pose, d, cam, col);
+            vertex(vc, pose, d, cam, col);
+            vertex(vc, pose, cc, cam, col);
+            vertex(vc, pose, b, cam, col);
+            vertex(vc, pose, a, cam, col);
         }
     }
 

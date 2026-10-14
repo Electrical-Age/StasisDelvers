@@ -5,7 +5,8 @@
 // creeping in from the screen edges). Field data comes in a 256x1 texture of packed floats (StasisPost.java):
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
-// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
+// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] deep count; [168 + 6i ..] drifting deep i:
+// centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id; [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
@@ -87,6 +88,26 @@ float eddy(vec3 w, float t, int seed) {
 float eddyShare(float collapse, float failing) {
     if (collapse > 0.0) return 0.35 + 0.25 * collapse;
     return 0.15 + 0.3 * min(1.0, (failing - 0.7) / 0.3);
+}
+
+// Deeps.horizontal plus the height band: intensity 0..1 of the drifting deeps at q (= world - floor(camera));
+// camI = floor(camera) for the edge noise (world coordinates)
+float deepAt(vec3 q, vec3 camI) {
+    int nd = int(data(31));
+    float best = 0.0;
+    vec3 w = q + camI;
+    for (int i = 0; i < nd && i < 8; i++) {
+        int o = 168 + 6 * i;
+        vec2 c = vec2(data(o), data(o + 1));
+        float R = data(o + 2), st = data(o + 3), yb = data(o + 4);
+        float d = length(q.xz - c);
+        if (d > R + 6.0 || st <= 0.0) continue;
+        // the ragged edge (noise) only near the rim: the inside and far outside skip it
+        if (d > R - 8.0) d += 3.0 * (value32(vec3(w.x / 7.0, 0.5, w.z / 7.0), int(data(o + 5))) - 0.5) * 2.0;
+        float band = smoothstep(yb - 8.0, yb - 6.0, q.y) * (1.0 - smoothstep(yb + 60.0, yb + 64.0, q.y));
+        best = max(best, smoothstep(0.0, 1.0, (R - d) / 4.0) * min(1.0, st * 1.5) * band);
+    }
+    return best;
 }
 
 
@@ -230,8 +251,22 @@ void main() {
             run = max(run, inside);
         }
         float l = dot(c, vec3(0.299, 0.587, 0.114));
-        vec3 grey = mix(vec3(l), c, 0.18) * vec3(0.96, 0.99, 1.04);
+        // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast
+        float deep = data(31) > 0.0 ? deepAt(depth > 0.0 ? p : camFrac, camInt) * (1.0 - run) : 0.0;
+        vec3 grey = mix(vec3(l), c, 0.18 * (1.0 - deep)) * mix(vec3(0.96, 0.99, 1.04), vec3(0.62, 0.6, 0.74), deep);
         c = mix(grey, c, run);
+        if (data(31) > 0.0) {
+            // deep mist along the view ray (10 steps, up to 96 blocks)
+            float tEnd = depth > 0.0 ? min(length(rel), 96.0) : 96.0;
+            vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
+            vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
+            float mist = 0.0, sl = tEnd / 10.0;
+            for (int m = 0; m < 10; m++) {
+                float dn = deepAt(camFrac + dir * (float(m) + 0.5) * sl, camInt);
+                mist += (1.0 - mist) * dn * min(1.0, sl * 0.03);
+            }
+            c = mix(c, vec3(0.55, 0.53, 0.64), mist * 0.8);
+        }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }
     // the shields, over the (desaturated) scene: every sphere surface the view ray crosses before the scene
@@ -313,6 +348,12 @@ void main() {
                 // warm colour as the dropout starts (failing 0.4 = 60% charge), full amber in a collapse
                 float warm = collapse > 0.0 ? 1.0 : smoothstep(0.35, 0.9, failing);
                 vec4 sh = shieldAt(cell, nn, -v, r, collapse > 0.0 ? 0.0 : failing, warm, time, h2 == 0 && !inside);
+                if (data(31) > 0.0) {
+                    // weather: where a deep crosses the field the hexes brighten (the opposite of dropout), pulsing
+                    float dp = deepAt(fc + centre * r, vec3(data(16), data(17), data(18)));
+                    if (dp > 0.05) sh = vec4(mix(sh.rgb, vec3(0.92, 0.96, 1.0), 0.6 * dp),
+                        min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(time * 3.0 + cell.y * 6.0)))));
+                }
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 // about to die: the rim crackles white-gold (rim only, flickering; ~0.4 s in a real collapse)
                 if (brk < 0.015) {

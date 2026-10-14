@@ -97,6 +97,28 @@ public final class StasisPost {
                 ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;
         }
         d[24] = n;
+        // drifting deeps near the camera (Deeps): centre - floor(camera) (x, z), radius, strength, local surface y -
+        // floor(camera y), edge-noise id; at most 8
+        int nd = 0;
+        if (Stasis.stops(mc.level)) {
+            float t = d[30];
+            for (var dp : org.erisia.stasis.Deeps.near((float) cam.x, (float) cam.z, t, ClientFields.deepSeed())) {
+                if (nd == 8) break;
+                double dist = Math.hypot(dp.x() - cam.x, dp.z() - cam.z);
+                if (dist - dp.radius() > 320) continue;
+                int bx = (int) Math.floor(dp.x()), bz = (int) Math.floor(dp.z());
+                double surface = mc.level.hasChunkAt(new net.minecraft.core.BlockPos(bx, 0, bz))
+                    ? mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz) : cam.y - 10;
+                int o = 168 + 6 * nd++;
+                d[o] = (float) (dp.x() - fx);
+                d[o + 1] = (float) (dp.z() - fz);
+                d[o + 2] = dp.radius();
+                d[o + 3] = dp.strength();
+                d[o + 4] = (float) (surface - fy);
+                d[o + 5] = dp.id() & 0xFFFFFF;
+            }
+        }
+        d[31] = nd;
         var img = texture.getPixels();
         if (img == null) return;
         for (int i = 0; i < 256; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));

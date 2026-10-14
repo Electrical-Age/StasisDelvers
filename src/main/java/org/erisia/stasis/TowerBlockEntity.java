@@ -33,6 +33,8 @@ public class TowerBlockEntity extends BlockEntity {
     int collapseTicks;
     /** Net power (in - draw, J per tick), averaged over about 3 s; draining with hysteresis (Baughn: no flicker). */
     double netAvg;
+    /** Share of the field in a drifting deep ("weather": up to +50% draw, more lightning); updated every second. */
+    float weather;
     /** Game time the field started (for the lock-on sound; not saved). */
     long startedAt = -1;
     boolean draining;
@@ -191,7 +193,10 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity((int) (storeFor(r) * FE_PER_J));
         double in = received / FE_PER_J;
         received = 0;
-        double perTick = drawFor(r) * testDrawFactor / 20.0;
+        if (state == State.RUNNING && level.getGameTime() % 20 == 0)
+            weather = FieldData.get(sl).get(fieldId).map(f -> Deeps.overlap(sl, f)).orElse(0f);
+        else if (state != State.RUNNING) weather = 0;
+        double perTick = drawFor(r) * testDrawFactor * (1 + 0.5 * weather) / 20.0;
         switch (state) {
             case OFF -> {
                 if (storedJ() >= 0.5 * storeFor(r)) start(sl);
@@ -208,6 +213,7 @@ public class TowerBlockEntity extends BlockEntity {
                 }
                 // a failing shield sparks now and then (about every 25 s when empty)
                 if (failing > 0.1 && sl.getRandom().nextDouble() < 0.002 * failing * failing) bolt(sl);
+                if (weather > 0 && sl.getRandom().nextDouble() < 0.003 * weather) bolt(sl);   // a deep crossing the field
                 store.take((int) Math.ceil(perTick * FE_PER_J));
                 netAvg += (in - perTick - netAvg) / 60.0;
                 if (netAvg < -0.02 * perTick) draining = true;
@@ -343,7 +349,8 @@ public class TowerBlockEntity extends BlockEntity {
             case COLLAPSING -> "COLLAPSING";
         });
         sb.append(String.format(". Store %.0f%% (%.0f of %.0f kJ), draw %.0f W", 100 * stored / Math.max(1, max), stored / 1000,
-            max / 1000, drawFor(r)));
+            max / 1000, drawFor(r) * (1 + 0.5 * weather)));
+        if (weather > 0) sb.append(String.format(" (a deep is crossing the field: +%.0f%%)", 50 * weather));
         sb.append(". ");
         TowerStructure s = structure;
         sb.append(switch (s.status) {
