@@ -48,8 +48,12 @@ public final class NodeFreezer {
             boolean runs = Stasis.isRunning(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
             if (!runs && FROZEN.add(n)) {
                 n.disconnect();
+                n.visualConnect();
             } else if (runs && FROZEN.remove(n)) {
                 n.connect();
+            } else if (!runs) {
+                // frozen cables still show their connections (to frozen neighbours too); republished only on change
+                n.visualConnect();
             }
         }
         FROZEN.retainAll(present);   // destroyed nodes

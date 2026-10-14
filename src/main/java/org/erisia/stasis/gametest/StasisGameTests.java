@@ -568,6 +568,21 @@ public final class StasisGameTests {
             return () -> c.check("a field arrived: the source runs again", !org.erisia.stasis.NodeFreezer.isFrozen(outSrc.sixNode)
                 && outSrc.electricalLoadList.get(0).getSubSystem() != null);
         }, true, true));
+        // frozen cables still show their connections (Baughn: they looked cut), while staying out of the simulation
+        CASES.put("ea_frozen_cables_look_connected", new Spec(20, (h, c) -> {
+            var a = eaSix(h, new BlockPos(12, 1, 2), 4 + (32 << 6));
+            var b = eaSix(h, new BlockPos(12, 1, 3), 4 + (32 << 6));
+            return () -> {
+                org.erisia.stasis.NodeFreezer.pass();
+                var na = (mods.eln.node.six.SixNode) a.sixNode;
+                var nb = (mods.eln.node.six.SixNode) b.sixNode;
+                c.check("both frozen", org.erisia.stasis.NodeFreezer.isFrozen(na) && org.erisia.stasis.NodeFreezer.isFrozen(nb));
+                c.check("both show a connection", na.lrduElementMask.get(mods.eln.misc.Direction.YN).mask != 0
+                    && nb.lrduElementMask.get(mods.eln.misc.Direction.YN).mask != 0,
+                    na.lrduElementMask.get(mods.eln.misc.Direction.YN).mask + " / " + nb.lrduElementMask.get(mods.eln.misc.Direction.YN).mask);
+                c.check("no electrical link", na.nodeConnectionList.isEmpty() && nb.nodeConnectionList.isEmpty());
+            };
+        }, false, true));
         // EA infrastructure within 6 blocks of a tower core runs in stopped land (a battery can start the tower)
         CASES.put("ea_tower_yard_keeps_cables", new Spec(30, (h, c) -> {
             tower(h, new BlockPos(12, 1, 6), 0);                                   // unpowered: no field
