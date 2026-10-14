@@ -29,6 +29,7 @@ public final class BoltRenderer {
     }
 
     static final List<Live> LIVE = new ArrayList<>();
+    static boolean loggedDraw;
 
     static void receive(StasisNet.Bolt b) {
         List<Vector3d[]> strokes = new ArrayList<>();
@@ -47,6 +48,7 @@ public final class BoltRenderer {
         synchronized (LIVE) {
             LIVE.add(new Live(strokes, System.nanoTime()));
         }
+        org.erisia.stasis.StasisDelvers.LOG.info("bolt received: {} points, {} strokes", trunk.length, strokes.size());
     }
 
     /** Midpoint displacement: 2^depth segments, sideways jitter of `rough` x the segment length. */
@@ -76,6 +78,10 @@ public final class BoltRenderer {
             if (LIVE.isEmpty()) return;
             live = new ArrayList<>(LIVE);
         }
+        if (!loggedDraw) {
+            loggedDraw = true;
+            org.erisia.stasis.StasisDelvers.LOG.info("bolt drawn ({} live)", live.size());
+        }
         Vec3 cam = e.getLevelRenderState().cameraRenderState.pos;
         PoseStack ps = e.getPoseStack();
         e.getSubmitNodeCollector().submitCustomGeometry(ps, RenderTypes.lightning(), (pose, vc) -> {
@@ -84,7 +90,7 @@ public final class BoltRenderer {
                 // flash for ~0.12 s (with a flicker), then fade
                 float a = age < 0.12 ? (((int) (age * 60)) % 2 == 0 ? 1f : 0.6f) : (float) Math.max(0, 1 - (age - 0.12) / (LIFE - 0.12)) * 0.5f;
                 for (int s = 0; s < l.strokes().size(); s++) {
-                    float w = s == 0 ? 0.18f : 0.09f;
+                    float w = s == 0 ? 0.35f : 0.18f;
                     ribbon(vc, pose, l.strokes().get(s), cam, w * 2.5f, a * 0.35f);   // glow
                     ribbon(vc, pose, l.strokes().get(s), cam, w, a);                 // core
                 }

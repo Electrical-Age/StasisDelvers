@@ -35,10 +35,10 @@ public final class StasisNet {
         buf -> new Field(buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(),
             buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong()));
 
-    public record Fields(List<Field> fields) implements CustomPacketPayload {
+    public record Fields(List<Field> fields, int deepSeed) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));
-        public static final StreamCodec<RegistryFriendlyByteBuf, Fields> CODEC =
-            FIELD.apply(ByteBufCodecs.list()).map(Fields::new, Fields::fields);
+        public static final StreamCodec<RegistryFriendlyByteBuf, Fields> CODEC = StreamCodec.composite(
+            FIELD.apply(ByteBufCodecs.list()), Fields::fields, ByteBufCodecs.INT, Fields::deepSeed, Fields::new);
 
         @Override
         public Type<Fields> type() {
@@ -171,8 +171,11 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("5");
-            r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> ClientFields.set(p.fields(), ctx.player().level()));
+            var r = e.registrar("6");
+            r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> {
+                ClientFields.deepSeed(p.deepSeed());
+                ClientFields.set(p.fields(), ctx.player().level());
+            });
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
@@ -187,11 +190,13 @@ public final class StasisNet {
     }
 
     public static void sendFields(ServerPlayer player) {
-        send(player, new Fields(FieldData.get(player.level()).fields()));
+        FieldData d = FieldData.get(player.level());
+        send(player, new Fields(d.fields(), d.deepSeed()));
     }
 
     public static void sendFields(ServerLevel level) {
-        Fields f = new Fields(FieldData.get(level).fields());
+        FieldData d = FieldData.get(level);
+        Fields f = new Fields(d.fields(), d.deepSeed());
         for (ServerPlayer p : level.players()) send(p, f);
     }
 

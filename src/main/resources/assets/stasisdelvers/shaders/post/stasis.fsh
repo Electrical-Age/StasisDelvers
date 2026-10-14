@@ -157,7 +157,7 @@ vec2 hexColumn(vec3 d, float worldY, float r) {
 }
 
 // One shield surface hit: colour (rgb) and coverage (a). cell: (gap to the cell edge in blocks, random per cell).
-vec4 shieldAt(vec2 cell, vec3 n, vec3 view, float r, float failing, float time, bool farSide) {
+vec4 shieldAt(vec2 cell, vec3 n, vec3 view, float r, float failing, float warm, float time, bool farSide) {
     float edge = cell.x;                  // blocks from the cell edge, roughly x2
     float rnd = cell.y;
     float wave = 0.5 + 0.5 * sin(time * 1.3 - n.y * r * 0.18 + rnd * 1.5);
@@ -179,7 +179,7 @@ vec4 shieldAt(vec2 cell, vec3 n, vec3 view, float r, float failing, float time, 
         if (m < 0.0) a *= 0.0;
         else if (m < 0.06 && hash13(vec3(rnd * 97.0, floor(time * 14.0), 3.3)) < 0.5) a *= 0.15;
     }
-    vec3 tint = mix(vec3(0.62, 0.84, 1.0), vec3(1.0, 0.55, 0.2), min(1.0, failing * 2.0));
+    vec3 tint = mix(vec3(0.62, 0.84, 1.0), vec3(1.0, 0.55, 0.2), warm);
     return vec4(tint * (0.8 + 0.4 * wave), clamp(a, 0.0, 0.9));
 }
 
@@ -310,7 +310,9 @@ void main() {
                     if (age < at) continue;
                     pop = age - at;
                 }
-                vec4 sh = shieldAt(cell, nn, -v, r, collapse > 0.0 ? 0.0 : failing, time, h2 == 0 && !inside);
+                // warm colour as the dropout starts (failing 0.4 = 60% charge), full amber in a collapse
+                float warm = collapse > 0.0 ? 1.0 : smoothstep(0.35, 0.9, failing);
+                vec4 sh = shieldAt(cell, nn, -v, r, collapse > 0.0 ? 0.0 : failing, warm, time, h2 == 0 && !inside);
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 // about to die: the rim crackles white-gold (rim only, flickering; ~0.4 s in a real collapse)
                 if (brk < 0.015) {

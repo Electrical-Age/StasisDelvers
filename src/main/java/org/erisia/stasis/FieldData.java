@@ -16,6 +16,7 @@ public final class FieldData extends SavedData {
         Codec.INT.fieldOf("next_id").forGetter(d -> d.nextId),
         Field.CODEC.listOf().fieldOf("fields").forGetter(d -> d.fields),
         Codec.BOOL.optionalFieldOf("cottage", false).forGetter(d -> d.cottage),
+        Codec.INT.optionalFieldOf("deep_seed", 0).forGetter(d -> d.deepSeed),
         Codec.unboundedMap(Codec.STRING, Codec.DOUBLE).optionalFieldOf("clocks", java.util.Map.of()).forGetter(d -> {
             java.util.Map<String, Double> m = new java.util.HashMap<>();
             d.clocks.forEach((k, v) -> m.put(Integer.toString(k), v));
@@ -35,10 +36,22 @@ public final class FieldData extends SavedData {
     final java.util.Map<Integer, Double> clocks = new java.util.HashMap<>();
 
     public FieldData() {
-        this(1, List.of(), false, java.util.Map.of());
+        this(1, List.of(), false, 0, java.util.Map.of());
     }
 
-    private FieldData(int nextId, List<Field> fields, boolean cottage, java.util.Map<String, Double> clocks) {
+    /** The level's deep seed (Deeps), 24 bits; made at first use. Clients get it with the fields. */
+    private int deepSeed;
+
+    public int deepSeed() {
+        if (deepSeed == 0) {
+            deepSeed = 1 + new java.util.Random().nextInt(0xFFFFFE);
+            setDirty();
+        }
+        return deepSeed;
+    }
+
+    private FieldData(int nextId, List<Field> fields, boolean cottage, int deepSeed, java.util.Map<String, Double> clocks) {
+        this.deepSeed = deepSeed;
         this.nextId = nextId;
         this.fields = new ArrayList<>(fields);
         this.snapshot = List.copyOf(fields);

@@ -30,6 +30,8 @@ public final class Freezing {
         int ticks;
         int counted;
         long graceUntil;
+        /** Held by a deep until this game time (a full freeze in a drifting deep: no statue, Baughn). */
+        long heldUntil;
         float sent;
     }
 
@@ -41,7 +43,11 @@ public final class Freezing {
 
     /** Can this player stand in stopped land? Creative/spectator, or a charged suit (Suits, T2b). */
     static boolean isProtected(ServerPlayer p) {
-        return p.isCreative() || p.isSpectator() || Suits.protect(p);
+        return isProtected(p, 1);
+    }
+
+    static boolean isProtected(ServerPlayer p, double drawFactor) {
+        return p.isCreative() || p.isSpectator() || Suits.protect(p, drawFactor);
     }
 
     static void tick(PlayerTickEvent.Post e) {
@@ -60,8 +66,25 @@ public final class Freezing {
         // in an eddy (a pocket drifting through a weak field) an unsuited player is held, never made a statue: the
         // pocket moves on within seconds (Baughn)
         boolean eddy = stopped && Stasis.isRunningSteady(level, p.blockPosition());
-        if (stopped && !grace && !(suited = isProtected(p))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
-        else s.ticks = Math.max(0, s.ticks - 3);
+        // in a deep (Deeps): suits drain twice as fast; a Delver suit only slows the freeze (a quarter rate), and a
+        // full freeze there holds the player for a minute instead of making a statue (the deep is passing weather)
+        boolean deep = stopped && !eddy && Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f;
+        boolean held = level.getGameTime() < s.heldUntil;
+        if (s.heldUntil != 0 && !held) {   // the hold is over: start fresh
+            s.heldUntil = 0;
+            s.ticks = 0;
+        }
+        if (held) {
+            s.ticks = StasisConfig.freezeTicks - 1;
+            suited = true;
+        } else if (stopped && !grace && !(suited = isProtected(p, deep ? 2 : 1))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
+        else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && Suits.delverOnly(p)) {
+            if (s.counted % 4 == 0) s.ticks++;
+            if (s.ticks >= StasisConfig.freezeTicks - 1) {
+                s.heldUntil = level.getGameTime() + 1200;
+                p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The deep holds you").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE));
+            }
+        } else s.ticks = Math.max(0, s.ticks - 3);
         // a suited player digs slowly in stopped land (Mining Fatigue I; the EA mining drill ignores it: onBreakSpeed)
         if (stopped && suited && !p.isCreative() && !p.isSpectator()) {
             var fatigue = p.getEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE);

@@ -111,17 +111,27 @@ final class Suits {
         return true;
     }
 
-    /** Is the player wearing a full charged suit? If so, draw one tick's power from each piece. */
     static boolean protect(ServerPlayer p) {
+        return protect(p, 1);
+    }
+
+    /** Only Delver pieces (no stasis suit piece): the weaker suit, not fully protective in a deep (Deeps). */
+    static boolean delverOnly(ServerPlayer p) {
+        for (EquipmentSlot slot : ARMOR) if (p.getItemBySlot(slot).getItem() instanceof StasisArmorItem) return false;
+        return true;
+    }
+
+    /** Is the player wearing a full charged suit? If so, draw one tick's power (x factor: deeps) from each piece. */
+    static boolean protect(ServerPlayer p, double factor) {
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
             if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) return false;
-            if (b.getEnergy(s) < t.stasisDraw(s) / 20.0) return false;
+            if (b.getEnergy(s) < factor * t.stasisDraw(s) / 20.0) return false;
         }
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
             IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
-            b.setEnergy(s, b.getEnergy(s) - ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0);
+            b.setEnergy(s, b.getEnergy(s) - factor * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0);
         }
         return true;
     }
