@@ -23,6 +23,9 @@ public final class StasisClient {
         // flames' light in chunk meshes (smooth lighting) depends on where they are
         org.erisia.stasis.Flames.clientResolver = g -> g instanceof org.erisia.stasis.mixin.client.RenderSectionRegionAccessor r ? r.stasis$level() : null;
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);
+        // EA flashlight beams, per pixel (Baughn)
+        NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, FlashlightPost::frame);
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, FlashlightPost::tick);
         // a suited player's first-person arm is the suit (sleeve and glove); drawn after the desaturation in stopped
         // land (mixin/client/GameRendererMixin)
         NeoForge.EVENT_BUS.addListener(RenderArmEvent.class, SuitArm::renderArm);

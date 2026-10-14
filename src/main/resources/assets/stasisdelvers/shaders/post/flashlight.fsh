@@ -1,0 +1,70 @@
+#version 330
+#extension GL_ARB_separate_shader_objects : require
+
+// Stasis Delvers: flashlight beams (EA flashlights), drawn per pixel so they follow the view with no lag (Baughn).
+// Data in a 64x1 texture of packed floats (FlashlightPost.java): [0..15] inverse(projection * view rotation);
+// [16] beam count; [17] strength; [18..20] tint; [21] near cut (m: the hand's depth is merged into the main buffer);
+// [24 + 8i ..] beam i: origin - camera (3), direction (3), length (blocks), cos of the cone's half angle.
+// The scene's albedo isn't known here, so the beam multiplies what is there, guarded by luminance: dark surfaces
+// brighten a lot, lit ones hardly change.
+
+uniform sampler2D InSampler;
+uniform sampler2D DepthSampler;
+uniform sampler2D DataSampler;
+
+layout(std140) uniform SamplerInfo {
+    vec2 OutSize;
+    vec2 InSize;
+};
+
+layout(location = 0) in vec2 texCoord;
+layout(location = 0) out vec4 fragColor;
+
+float data(int i) {
+    uvec4 b = uvec4(round(texelFetch(DataSampler, ivec2(i, 0), 0) * 255.0));
+    return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
+}
+
+void main() {
+    vec3 c = texture(InSampler, texCoord).rgb;
+    float depth = texture(DepthSampler, texCoord).r;
+    int n = int(data(16));
+    // 26.3: reversed Z, the sky is depth 0
+    if (n == 0 || depth <= 0.0) {
+        fragColor = vec4(c, 1.0);
+        return;
+    }
+    mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
+                    data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
+    vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
+    vec3 p = h.xyz / h.w;                                   // world position minus the camera
+    if (length(p) < data(21)) {
+        fragColor = vec4(c, 1.0);
+        return;
+    }
+    // the surface normal from the neighbouring pixels' positions (facing the camera)
+    vec3 nrm = cross(dFdx(p), dFdy(p));
+    float nl = length(nrm);
+    nrm = nl > 1e-6 ? nrm / nl : -normalize(p);
+    if (dot(nrm, p) > 0.0) nrm = -nrm;
+    float light = 0.0;
+    for (int i = 0; i < n && i < 5; i++) {
+        int o = 24 + 8 * i;
+        vec3 org = vec3(data(o), data(o + 1), data(o + 2));
+        vec3 dir = vec3(data(o + 3), data(o + 4), data(o + 5));
+        float len = data(o + 6), cosHalf = data(o + 7);
+        vec3 l = p - org;
+        float d = length(l);
+        if (d > len || d < 1e-3) continue;
+        vec3 ld = l / d;
+        float cone = smoothstep(cosHalf, mix(cosHalf, 1.0, 0.6), dot(ld, dir));
+        float fall = (1.0 - smoothstep(0.6 * len, len, d)) / (1.0 + 0.012 * d * d);
+        // facing the beam: Lambert, with some wrap so grazing walls still catch light
+        float lambert = clamp(dot(nrm, -ld) * 0.75 + 0.25, 0.0, 1.0);
+        light += cone * fall * lambert;
+    }
+    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+    float gain = data(17) * light * (1.0 - smoothstep(0.05, 0.6, lum));
+    vec3 tint = vec3(data(18), data(19), data(20));
+    fragColor = vec4(min(c * (1.0 + gain * tint), vec3(1.0)), 1.0);
+}

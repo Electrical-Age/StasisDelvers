@@ -48,6 +48,8 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Flames::tick);
         NeoForge.EVENT_BUS.addListener(Flames::chunkLoad);
         NeoForge.EVENT_BUS.addListener(Flames::watch);
+        // clients draw flashlight beams (client/FlashlightPost): EA lights only the holder's block, not a trail
+        mods.eln.item.electricalitem.LampItem.clientBeam = e -> true;
         NodeFreezer.install();
         org.erisia.stasis.gametest.StasisGameTests.register(modBus);
     }
