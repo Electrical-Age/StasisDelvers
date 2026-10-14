@@ -8,8 +8,9 @@ import java.util.List;
 
 /**
  * Deeps (Baughn, design v3): where the stasis is stronger than in the ordinary Grey. This is the drifting kind,
- * surface weather: about 1.4 within a 192-block radius anywhere (a 256-block grid, 80% occupied), radius 20-48,
- * breathing, carried by a per-world wind of about 2 blocks/s (the biggest crosses a spot in a minute) that bends over hours, each one forming and fading
+ * surface weather: about 1.4 within a 192-block radius anywhere (a 256-block grid, 80% occupied), radius 20-42,
+ * breathing, carried by a per-world wind of 0.65-1.35 blocks/s (plus ±0.12 per deep) that bends over hours: about a
+ * minute to pass a spot on average, 3 at worst (Baughn), each one forming and fading
  * over a 20-60 minute cycle (and re-forming somewhere else). Vertically from 6 below the local surface to 64 above
  * it, so caves under one are safe.
  * <p>
@@ -30,22 +31,31 @@ public final class Deeps {
     }
 
     /** How far the wind has carried everything by time t (seconds, Eddies.time base). */
+    /**
+     * How far the wind has carried everything by time t (seconds, Eddies.time base). Baughn: a deep takes about a
+     * minute to pass on average, 3 at worst, with size and speed varying: the wind runs 0.65-1.35 blocks/s over a
+     * 3-hour swell (plus a slow bend sideways), and each deep adds its own ±0.12 (cell()).
+     */
     static float[] drift(float t, int seed) {
-        float ang = Noise.hash32(seed, 21, 0, 0) * 6.2831853f;
-        float s = 2.0f;   // Baughn: the biggest deep (~115 blocks across) crosses a player in about a minute
+        float ang = windAngle(seed);
+        double along = 1.0 * t + 3780 * Math.sin(t / 10800.0);   // speed 1 + 0.35 cos(t / 3 h)
         return new float[]{
-            (float) (s * t * Math.cos(ang) + 600 * Math.sin(t / 5400.0)),
-            (float) (s * t * Math.sin(ang) + 600 * Math.cos(t / 7200.0))};
+            (float) (along * Math.cos(ang) + 600 * Math.sin(t / 5400.0)),
+            (float) (along * Math.sin(ang) + 600 * Math.cos(t / 7200.0))};
     }
 
-    /** The drifting deeps whose grid cells are around (x, z): at most 9, only those present now. */
+    static float windAngle(int seed) {
+        return Noise.hash32(seed, 21, 0, 0) * 6.2831853f;
+    }
+
+    /** The drifting deeps whose grid cells are around (x, z) (5 x 5: deeps stray up to ~430 blocks), present now. */
     public static List<Deep> near(float x, float z, float t, int seed) {
         List<Deep> out = new ArrayList<>(4);
         float[] d = drift(t, seed);
         float qx = x - d[0], qz = z - d[1];
         int cx = (int) Math.floor(qx / CELL), cz = (int) Math.floor(qz / CELL);
-        for (int i = cx - 1; i <= cx + 1; i++)
-            for (int k = cz - 1; k <= cz + 1; k++) {
+        for (int i = cx - 2; i <= cx + 2; i++)
+            for (int k = cz - 2; k <= cz + 2; k++) {
                 Deep deep = cell(i, k, t, seed, d);
                 if (deep != null) out.add(deep);
             }
@@ -62,9 +72,14 @@ public final class Deeps {
         float env = smooth(u / 0.15f) * smooth((1 - u) / 0.15f);
         if (env <= 0.01f) return null;
         float ox = 32 + 192 * Noise.hash32(i, k, cycle, seed ^ 0x2D33), oz = 32 + 192 * Noise.hash32(i, k, cycle, seed ^ 0x3D33);
-        float r0 = 20 + 28 * Noise.hash32(i, k, cycle, seed ^ 0x4D33);
-        float breathe = 1 + 0.2f * (float) Math.sin(t / 150.0 + Noise.hash32(i, k, cycle, seed ^ 0x5D33) * 6.2831853);
-        return new Deep(i * CELL + ox + drift[0], k * CELL + oz + drift[1], r0 * breathe * (0.4f + 0.6f * env), env,
+        // radius 20-42, breathing ±15%: the widest (~97 across) at the slowest (0.53 b/s) passes in ~3 min
+        float r0 = 20 + 22 * Noise.hash32(i, k, cycle, seed ^ 0x4D33);
+        float breathe = 1 + 0.15f * (float) Math.sin(t / 150.0 + Noise.hash32(i, k, cycle, seed ^ 0x5D33) * 6.2831853);
+        // its own speed: ±0.12 blocks/s along the wind, over its cycle (at most ~430 blocks: near() looks 2 cells out)
+        float own = (Noise.hash32(i, k, cycle, seed ^ 0x6D33) * 2 - 1) * 0.12f * (t + phase - cycle * period);
+        float ang = windAngle(seed);
+        return new Deep(i * CELL + ox + drift[0] + own * (float) Math.cos(ang), k * CELL + oz + drift[1] + own * (float) Math.sin(ang),
+            r0 * breathe * (0.4f + 0.6f * env), env,
             ((i * 73856093) ^ (k * 19349663) ^ cycle) & 0xFFFFFF);
     }
 
