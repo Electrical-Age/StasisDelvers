@@ -18,6 +18,7 @@ public final class StasisConfig {
     static final ModConfigSpec SPEC;
     static final ModConfigSpec.BooleanValue ENABLED;
     static final ModConfigSpec.ConfigValue<List<? extends String>> STOPPED_DIMENSIONS;
+    static final ModConfigSpec.BooleanValue SPAWN_AREA;
     static final ModConfigSpec.IntValue SPAWN_RADIUS;
     static final ModConfigSpec.IntValue FREEZE_TICKS;
     static final ModConfigSpec.IntValue GRACE_TICKS;
@@ -35,6 +36,9 @@ public final class StasisConfig {
         STOPPED_DIMENSIONS = b.comment("Dimensions where time is stopped outside fields.")
             .defineListAllowEmpty("stoppedDimensions", List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"),
                 () -> "minecraft:overworld", o -> o instanceof String s && Identifier.tryParse(s) != null);
+        SPAWN_AREA = b.comment("Does time always run around world spawn (spawnRadiusChunks)? Off by default (Baughn): the plan",
+                "is a spawn structure with a solar-powered tower. Without it, new players start in stopped land.")
+            .define("spawnArea", false);
         SPAWN_RADIUS = b.comment("Chunks around world spawn that always run, in each direction (1 = 3x3 chunks). -1: none.")
             .defineInRange("spawnRadiusChunks", 1, -1, 64);
         FREEZE_TICKS = b.comment("Ticks a player without a suit lasts in stopped land before freezing into a statue.")
@@ -63,7 +67,7 @@ public final class StasisConfig {
     // cached values (read on every tick check)
     static volatile boolean enabled = true;
     static volatile Set<ResourceKey<Level>> stopped = Set.of(Level.OVERWORLD, Level.NETHER, Level.END);
-    static volatile int spawnRadius = 1;
+    static volatile int spawnRadius = -1;
     static volatile int freezeTicks = 100;
     static volatile int graceTicks = 200;
     static volatile double towerDrawK = 1.77;
@@ -92,7 +96,7 @@ public final class StasisConfig {
         enabled = ENABLED.get();
         stopped = STOPPED_DIMENSIONS.get().stream()
             .map(s -> ResourceKey.create(Registries.DIMENSION, Identifier.parse(s))).collect(Collectors.toUnmodifiableSet());
-        spawnRadius = NO_SPAWN_AREA ? -1 : SPAWN_RADIUS.get();
+        spawnRadius = NO_SPAWN_AREA || !SPAWN_AREA.get() ? -1 : SPAWN_RADIUS.get();
         freezeTicks = FREEZE_TICKS.get();
         graceTicks = GRACE_TICKS.get();
         towerDrawK = TOWER_DRAW_K.get();
