@@ -205,11 +205,12 @@ public final class Flames {
         }
     }
 
-    /** Client: gutters from the server (0 = recovered). */
-    static void clientGutters(Map<Long, Byte> m) {
+    /** Client: gutters from the server (0 = recovered); the client relights them itself. */
+    static void clientGutters(Map<Long, Byte> m, Level level) {
         m.forEach((k, v) -> {
             if (v == 0) CLIENT.remove(k);
             else CLIENT.put(k, v);
+            if (level != null) level.getChunkSource().getLightEngine().checkBlock(BlockPos.of(k));
         });
     }
 
@@ -217,12 +218,18 @@ public final class Flames {
 
     private static final Map<Level, List<Field>> LAST = new WeakHashMap<>();
 
-    /** The fields of a level changed (FieldData): relight the flames where running land changed shape. */
-    static void fieldsChanged(ServerLevel level) {
+    /**
+     * The fields of a level changed (FieldData on the server, ClientFields on the client): relight the flames where
+     * running land changed shape. Both sides: the client's light engine only relights on its own block changes.
+     */
+    static void fieldsChanged(Level level) {
         if (!Stasis.stops(level)) return;
         List<Field> now = Stasis.fields(level);
-        List<Field> old = LAST.getOrDefault(level, List.of());
-        LAST.put(level, now);
+        List<Field> old;
+        synchronized (LAST) {
+            old = LAST.getOrDefault(level, List.of());
+            LAST.put(level, now);
+        }
         Map<Integer, Field> before = new HashMap<>();
         for (Field f : old) before.put(f.id(), f);
         List<Field> regions = new ArrayList<>();
@@ -243,7 +250,7 @@ public final class Flames {
         return f.withFailing(0).withRate(1.0);
     }
 
-    private static void relight(ServerLevel level, Field f) {
+    private static void relight(Level level, Field f) {
         int x0 = (int) Math.floor(f.x() - f.radius()) >> 4, x1 = (int) Math.floor(f.x() + f.radius()) >> 4;
         int z0 = (int) Math.floor(f.z() - f.radius()) >> 4, z1 = (int) Math.floor(f.z() + f.radius()) >> 4;
         int[] ys = f.column() ? null : new int[]{(int) Math.floor(f.y() - f.radius()), (int) Math.floor(f.y() + f.radius())};
@@ -252,7 +259,7 @@ public final class Flames {
     }
 
     /** checkBlock every flame in a loaded chunk (within the y range {min, max} if given). */
-    static int relightChunk(ServerLevel level, int cx, int cz, int[] ys) {
+    static int relightChunk(Level level, int cx, int cz, int[] ys) {
         LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
         if (chunk == null) return 0;
         LevelChunkSection[] sections = chunk.getSections();
