@@ -190,6 +190,9 @@ public final class Stasis {
         if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
         // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
+        // EA's light blocks (lamps, flashlights) time out in their tick: frozen, a flashlight sweep would leave its
+        // light behind for good. Their sources refresh them only while they run, so stopped lamps go dark.
+        if (be instanceof mods.eln.sixnode.lampsocket.LightBlockEntity) return true;
         return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && nearTower(level, pos);
     }
 

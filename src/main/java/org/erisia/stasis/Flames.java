@@ -39,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  * <li><b>The Grey:</b> in stopped land a flame gives no light (the fire doesn't move either). EA lamps still do.</li>
  * <li><b>Guttering:</b> where time runs, a random tick sometimes dims a flame to 4-7 for 5-30 s, each on its own
- * timer, so a few torches on a spawner rarely dip together. With the overworld's monster_spawn_block_light_limit at 7
+ * timer, so a few torches on a spawner rarely dip together; and not while two or more flames right next to it gutter. With the overworld's monster_spawn_block_light_limit at 7
  * (data/minecraft/dimension_type/overworld.json) a dip can let a mob spawn.</li>
  * </ul>
  * The light is position-dependent through NeoForge's getLightEmission(state, level, pos) (BlockMixin), so vanilla
@@ -83,10 +83,22 @@ public final class Flames {
 
     /** A random tick on a flame (in running land: stopped land has none). */
     public static void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        if (!state.is(TAG) || random.nextDouble() >= StasisConfig.gutterChance) return;
+        tryGutter(state, level, pos, random, StasisConfig.gutterChance);
+    }
+
+    /** Gutter with this chance (public for tests). */
+    public static void tryGutter(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, double chance) {
+        // fire random-ticks anyway (spreading): it goes dark in the Grey but doesn't gutter
+        if (!state.is(TAG) || state.is(net.minecraft.tags.BlockTags.FIRE) || random.nextDouble() >= chance) return;
         Data d = Data.get(level);
         long k = pos.asLong();
         if (d.until.containsKey(k)) return;
+        // Baughn: not if two or more flames right next to it (diagonals too) are guttering already
+        int near = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++)
+                    if ((dx | dy | dz) != 0 && d.until.containsKey(BlockPos.offset(k, dx, dy, dz)) && ++near >= 2) return;
         int light = 4 + random.nextInt(4);
         int min = StasisConfig.gutterMinTicks, max = Math.max(min, StasisConfig.gutterMaxTicks);
         long until = level.getGameTime() + min + random.nextInt(max - min + 1);

@@ -641,6 +641,23 @@ public final class StasisGameTests {
                 c.check("after the gutter it gives 14 again", l == 14 && !Flames.guttering(h.getLevel(), h.absolutePos(local)), "" + l);
             };
         }, true, true));
+        // Baughn: a flame doesn't gutter while two or more right next to it (diagonals too) do; one is fine
+        CASES.put("flames_gutter_not_beside_two", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            // a and b gutter; z touches only a (diagonally), x touches both
+            BlockPos a = new BlockPos(2, 1, 3), b = new BlockPos(3, 1, 4), x = new BlockPos(2, 1, 4), z = new BlockPos(1, 1, 2);
+            for (BlockPos p : List.of(a, b, x, z)) h.setBlock(p, Blocks.TORCH);
+            return () -> {
+                var rnd = net.minecraft.util.RandomSource.create(1);
+                Flames.gutter(level, h.absolutePos(a), 5, 200);
+                Flames.gutter(level, h.absolutePos(b), 5, 200);
+                Flames.tryGutter(level.getBlockState(h.absolutePos(z)), level, h.absolutePos(z), rnd, 1.0);
+                Flames.tryGutter(level.getBlockState(h.absolutePos(x)), level, h.absolutePos(x), rnd, 1.0);
+                c.check("beside one guttering torch it gutters", Flames.guttering(level, h.absolutePos(z)));
+                c.check("beside two guttering torches it doesn't", !Flames.guttering(level, h.absolutePos(x)));
+                for (BlockPos p : List.of(a, b, x, z)) c.cleanup.add(() -> Flames.gutter(level, h.absolutePos(p), 5, 0));
+            };
+        }, true, true));
         // random ticks gutter flames where time runs (here: very fast random ticks), never in stopped land
         CASES.put("flames_gutter_on_random_ticks", new Spec(60, (h, c) -> {
             ServerLevel level = h.getLevel();
