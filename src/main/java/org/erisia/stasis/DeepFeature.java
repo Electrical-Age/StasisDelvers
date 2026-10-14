@@ -100,7 +100,7 @@ public record DeepFeature() implements Feature {
                         }
                         continue;
                     }
-                    if (s <= 1.0f && !st.isAir() && Noise.hash32(x, y, z, id ^ 0xD15) < 0.004f) {   // a lifted dislocation
+                    if (s <= 1.0f && !st.isAir() && Noise.hash32(x, y, z, id ^ 0xD15) < 0.012f) {   // a lifted dislocation
                         BlockPos up = p.above(2 + (int) (Noise.hash32(x, y, z, id ^ 0xD16) * 4));
                         if (level.getBlockState(up).isAir() && up.getY() < maxY) {
                             level.setBlock(up, st, 2);
@@ -123,7 +123,7 @@ public record DeepFeature() implements Feature {
                 }
                 // stalagmites and stalactites in the outer zone's open spaces
                 for (int y = yLo + 1; y < top - 1; y++) {
-                    if (Noise.hash32(x, y, z, id ^ 0x57A) >= 0.03f) continue;
+                    if (Noise.hash32(x, y, z, id ^ 0x57A) >= 0.08f) continue;
                     float s = StaticDeeps.shape(d, x + 0.5f, y + 0.5f, z + 0.5f);
                     if (s < 0.45f || s > 1.0f) continue;
                     p.set(x, y, z);
