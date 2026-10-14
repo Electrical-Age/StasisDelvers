@@ -210,6 +210,9 @@ public final class Flames {
 
     /** Client: gutters from the server (0 = recovered); the client relights them itself. */
     static void clientGutters(Map<Long, Byte> m, Level level) {
+        // a new level must be noticed here too: at login the gutters can come before the fields, and the fields'
+        // "new level" would then drop them (AdventurAgent: after a relog most dim flames were full again)
+        clientLevel(level);
         m.forEach((k, v) -> {
             if (v == 0) CLIENT.remove(k);
             else CLIENT.put(k, v);
