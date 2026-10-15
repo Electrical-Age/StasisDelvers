@@ -25,6 +25,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelLoad);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelUnload);
+        NeoForge.EVENT_BUS.addListener(NewChunkGrace::chunkLoad);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> StasisCommands.register(e.getDispatcher()));
         StasisRegistry.register(modBus);
         StasisNet.register(modBus);

@@ -119,7 +119,7 @@ public final class Stasis {
     static double rateAt(Level level, int x, int y, int z, boolean eddies) {
         if (!stops(level)) return 1.0;
         int cx = x >> 4, cz = z >> 4;
-        if (inSpawn(level, cx, cz)) return 1.0;
+        if (inSpawn(level, cx, cz) || NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
         if (fs == null) return 0.0;
         double rate = 0.0;
@@ -196,7 +196,7 @@ public final class Stasis {
     public static boolean mayRunInColumn(Level level, long chunkKey) {
         if (!stops(level)) return true;
         int cx = ChunkPos.getX(chunkKey), cz = ChunkPos.getZ(chunkKey);
-        return inSpawn(level, cx, cz) || index(level).columns.containsKey(chunkKey);
+        return inSpawn(level, cx, cz) || NewChunkGrace.active(level, chunkKey) || index(level).columns.containsKey(chunkKey);
     }
 
     /**

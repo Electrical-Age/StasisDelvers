@@ -102,6 +102,21 @@ public final class StasisGameTests {
                 c.check("outside: the sand hangs", h.getBlockState(new BlockPos(12, 3, 4)).is(Blocks.SAND));
             };
         }));
+        // Baughn: a newly generated chunk runs a few seconds before it stops (mobs generated on top of each other
+        // walk apart): sand in its grace falls; once the grace is over, new sand hangs
+        CASES.put("new_chunk_grace", new Spec(60, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos a = new BlockPos(12, 3, 4), b = new BlockPos(13, 3, 4);
+            long key = net.minecraft.world.level.ChunkPos.pack(h.absolutePos(a).getX() >> 4, h.absolutePos(a).getZ() >> 4);
+            org.erisia.stasis.NewChunkGrace.grant(level, key, 25);
+            h.setBlock(a, Blocks.SAND);
+            h.runAfterDelay(30, () -> h.setBlock(b, Blocks.SAND));
+            return () -> {
+                c.check("in its grace, the new chunk ran: the sand fell", h.getBlockState(a).isAir() && h.getBlockState(new BlockPos(12, 1, 4)).is(Blocks.SAND),
+                    h.getBlockState(a).toString());
+                c.check("after the grace it stopped: new sand hangs", h.getBlockState(b).is(Blocks.SAND));
+            };
+        }, false));
         // scheduled fluid ticks
         CASES.put("water_flows_only_inside", new Spec(30, (h, c) -> {
             h.setBlock(new BlockPos(3, 1, 4), Blocks.WATER);
@@ -1379,6 +1394,8 @@ public final class StasisGameTests {
 
     static void run(GameTestHelper h, String id, Spec spec) {
         ServerLevel level = h.getLevel();
+        // test areas are new chunks: no grace for them (new_chunk_grace grants its own)
+        org.erisia.stasis.NewChunkGrace.testsStarted(level);
         // the stone floor (the structure template only gives the empty box)
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 8; z++) h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
