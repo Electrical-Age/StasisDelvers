@@ -633,21 +633,30 @@ void main() {
             float tEnd = depth > 0.0 ? length(rel) : 200.0;
             vec4 hs2 = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
             vec3 dir2 = depth > 0.0 ? normalize(rel) : normalize(hs2.xyz / hs2.w);
+            // in open air the rift is a dark body that tapers off through a violet border (Baughn: the hard black blob
+            // looked wrong floating in the air; as a hole in the ground it works): absorption falls off from the core
+            // (shape 0.22) to the rift's edge (0.36), and the border glows violet out to ~0.5
             float trans = 1.0;
+            vec3 glow = vec3(0.0);
+            float jit2 = ign(gl_FragCoord.xy + 17.0);
             for (int i = 0; i < nsd && i < 4; i++) {
                 vec3 sc = vec3(data(220 + 5 * i), data(221 + 5 * i), data(222 + 5 * i)) - camFrac;
-                float sR = data(223 + 5 * i) * 0.6;          // the rift lies within ~0.5 r (warp included)
+                float sR = data(223 + 5 * i) * 0.8 + 8.0;    // the border lies within ~0.65 r + 8 (warp included)
                 float b = dot(sc, dir2), cc = dot(sc, sc) - sR * sR, disc = b * b - cc;
                 if (disc <= 0.0) continue;
                 float sq = sqrt(disc), ta = max(b - sq, 0.0), tb = min(b + sq, tEnd);
                 if (tb <= ta) continue;
-                float sl = (tb - ta) / 10.0;
-                for (int m = 0; m < 10; m++) {
-                    vec3 qq = camFrac + dir2 * (ta + (float(m) + 0.5) * sl);
-                    if (staticShape(i, qq + camInt, camInt) < 0.35) trans *= exp(-sl * 0.6);
+                float sl = (tb - ta) / 14.0;
+                for (int m = 0; m < 14; m++) {
+                    vec3 qq = camFrac + dir2 * (ta + (float(m) + jit2) * sl);
+                    float sh = staticShape(i, qq + camInt, camInt);
+                    float core = 1.0 - smoothstep(0.22, 0.36, sh);
+                    float border = smoothstep(0.26, 0.36, sh) * (1.0 - smoothstep(0.36, 0.5, sh));
+                    glow += trans * border * sl * 0.035 * vec3(0.3, 0.12, 0.5);
+                    trans *= exp(-sl * 0.6 * core);
                 }
             }
-            c *= trans;
+            c = c * trans + glow;
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }
