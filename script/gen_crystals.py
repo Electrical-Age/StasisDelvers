@@ -34,9 +34,9 @@ def texture(rng):
         streak += a * np.exp(-((x - c + TEX / 2) % TEX - TEX / 2) ** 2 / (2 * w * w))
     img *= (1 + streak)[None, :, None]
     # inclusions: dark spots, black-violet cores with a soft violet halo
-    for _ in range(int(rng.integers(7, 10))):
+    for _ in range(int(rng.integers(16, 22))):
         cx, cy = rng.uniform(0, TEX), rng.uniform(TEX * 0.08, TEX * 0.8)
-        r = rng.uniform(1.4, 3.4)
+        r = rng.uniform(0.7, 1.5)
         yy, xx = np.mgrid[0:TEX, 0:TEX]
         dx = (xx - cx + TEX / 2) % TEX - TEX / 2
         d = np.sqrt(dx ** 2 + ((yy - cy) * 1.4) ** 2)
