@@ -225,13 +225,15 @@ float groundAt(int base, vec3 g, vec2 q) {
 // octave, cut by a coverage remap into patches with holes (Guerrilla's cloud shaping, Schneider 2015), the patches
 // shrinking and thinning upwards (1/e per H blocks, with a ragged top). phase: how far the warp has evolved (the
 // patches churn in place). Tuned with tools/mist/preview.py (LabAgent's workdir).
-float mistAt(vec3 p, float h, float H, float cover, float phase) {
+float mistAt(vec3 p, float h, float H, float cover, float phase, bool detail) {
     if (h < -8.0) return 0.0;
     vec4 wv = mistTex(p * 0.5 + vec3(phase, 11.0, 0.7 * phase));
     vec3 q = p + (wv.rgb - 0.5) * 9.0;
     vec4 n0 = mistTex(q);
     float n = 0.6 * n0.a + 0.4 * n0.r;
-    n = 0.78 * n + 0.22 * mistTex(q * 2.03 + vec3(5.1, 9.7, 13.3)).g;
+    // the finer octave only up close (it's lost in the distance anyway): a third of the fetches
+    if (detail) n = 0.78 * n + 0.22 * mistTex(q * 2.03 + vec3(5.1, 9.7, 13.3)).g;
+    else n = 0.78 * n + 0.11;
     float top = max(h - 6.0 * (wv.a - 0.5), 0.0);
     float cv = cover * (1.0 - 0.5 * min(1.0, top / (3.0 * H)));
     return clamp((n - (1.0 - cv)) / cv, 0.0, 1.0) * exp(-top / H) * smoothstep(-8.0, -5.0, h);
@@ -258,7 +260,7 @@ float mistTime;
 const float STATIC_REACH = 1.3, STATIC_REACH_ADD = 10.0;   // the mist's reach around a static deep (StasisPost too)
 
 // mist density of hit k at q (= world - floor(camera)): inside the gameplay envelope only
-float mistDensity(vec3 q, int k) {
+float mistDensity(vec3 q, int k, bool detail) {
     Hit hk = hits[k];
     float id = float(hk.id & 1023);
     if (hk.kind == 0) {
@@ -269,9 +271,10 @@ float mistDensity(vec3 q, int k) {
         float h = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
         vec3 p = vec3(q.x - hk.c.x + 0.4 * mistTime, q.y + hitCamI.y, q.z - hk.c.z + 0.25 * mistTime) * (32.0 / 96.0);
         p.y *= 1.5;
-        return env * mistAt(p + id, h, 11.0, 0.55, mistTime * 0.02);
+        return env * mistAt(p + id, h, 11.0, 0.55, mistTime * 0.02, detail);
     }
-    // static: anchored, breathing (density, height and coverage swell and ebb over ~16 s, out of step per deep)
+    // static: anchored, breathing (density, height and coverage swell and ebb over ~16 s, out of step per deep; AdventurAgent
+    // found a 30% swing too subtle to see)
     vec3 dv = q - hk.c;
     dv.y *= 1.4;
     float s = length(dv) / (hk.R * 1.15);
@@ -281,7 +284,7 @@ float mistDensity(vec3 q, int k) {
     float h = q.y - groundAt(STATIC_GROUND + 64 * hk.idx, hk.g, q.xz);
     vec3 p = (q + hitCamI) * (32.0 / 96.0);
     p.y *= 1.5;
-    return env * (0.7 + 0.3 * br) * mistAt(p + id, h, 7.0 + 5.0 * br, 0.45 + 0.15 * br, mistTime * 0.015);
+    return env * (0.4 + 0.6 * br) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, mistTime * 0.015, detail);
 }
 
 void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
@@ -325,12 +328,12 @@ float ign(vec2 px) {
     return fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
 }
 
-const int MIST_STEPS = 40;                 // per pixel, all spans
+const int MIST_STEPS = 28;                 // per pixel, all spans (40 cost up to 1.1 ms on a 4090 at 720p)
 const float MIST_SIGMA = 0.07;             // extinction per block at density 1
 
 // The deep mist along the ray, 0..tEnd (the hits from findDeeps), front to back: rgb = the light it scatters to the
 // eye, a = 1 - transmittance (Beer-Lambert). Overlapping spans are merged and marched together (the density there is
-// the densest deep's); each up to 16 jittered steps, nearest first, MIST_STEPS in all. The mist is darker and more
+// the densest deep's); each up to 12 jittered steps, nearest first, MIST_STEPS in all. The mist is darker and more
 // violet low down, paler where it thins out on top (a cheap height-dependent in-scatter).
 vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
     int ord[MAX_HITS];
@@ -360,14 +363,14 @@ vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
             k2++;
         }
         if (b > a) {
-            int n = min(clamp(int(ceil((b - a) / 2.5)), 6, 16), MIST_STEPS - used);
+            int n = min(clamp(int(ceil((b - a) / 3.0)), 5, 12), MIST_STEPS - used);
             float dt = (b - a) / float(n);
-            for (int m = 0; m < 16; m++) {
+            for (int m = 0; m < 12; m++) {
                 if (m >= n) break;
                 float t = a + (float(m) + jit) * dt;
                 vec3 q = o + dir * t;
                 float dn = 0.0;
-                for (int j = k; j < k2; j++) dn = max(dn, mistDensity(q, ord[j]));
+                for (int j = k; j < k2; j++) dn = max(dn, mistDensity(q, ord[j], t < 80.0));
                 if (dn > 0.0) {
                     float alpha = 1.0 - exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
                     // thin mist reads paler (lit through), dense cores darker
