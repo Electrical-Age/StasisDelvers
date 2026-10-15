@@ -69,6 +69,11 @@ public final class StasisClient {
             for (int i = 0; i < 3; i++)
                 e.getToolTip().add(net.minecraft.network.chat.Component.translatable(key + "." + i).withStyle(net.minecraft.ChatFormatting.GRAY));
         });
+        // still textures in stopped land (Baughn: lava, water and campfires kept animating)
+        modBus.addListener(net.neoforged.neoforge.client.event.RegisterSpriteSourcesEvent.class, FrozenSprites::registerSource);
+        modBus.addListener(net.neoforged.neoforge.client.event.TextureAtlasStitchedEvent.class, FrozenSprites::stitched);
+        org.erisia.stasis.ClientFields.onChange = FrozenSprites::fieldsChanged;
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> FrozenSprites.tick(net.minecraft.client.Minecraft.getInstance()));
         org.erisia.stasis.TowerClientHooks.onUpdate = TowerRenderer::updated;
         org.erisia.stasis.TowerClientHooks.onRemove = TowerRenderer::removed;
     }

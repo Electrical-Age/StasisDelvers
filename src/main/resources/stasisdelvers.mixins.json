@@ -19,7 +19,9 @@
     "client.ClientClockManagerMixin",
     "client.ClientClockInstanceMixin",
     "client.ParticleAccessor",
-    "client.ParticleGroupMixin"
+    "client.ParticleGroupMixin",
+    "client.SectionCompilerMixin",
+    "client.FluidRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

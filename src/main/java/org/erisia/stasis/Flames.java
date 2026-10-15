@@ -278,7 +278,7 @@ public final class Flames {
     }
 
     /** What decides which blocks run (failing is visual; a rate is always above 0). */
-    private static Field shape(Field f) {
+    static Field shape(Field f) {
         return f.withFailing(0).withRate(1.0);
     }
 

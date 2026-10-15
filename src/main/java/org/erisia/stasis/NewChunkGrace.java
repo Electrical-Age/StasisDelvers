@@ -50,6 +50,7 @@ public final class NewChunkGrace {
 
     /** Is this chunk column still in its first seconds? */
     public static boolean active(Level level, long chunkKey) {
+        if (level.isClientSide()) return false;   // grace is the server's (and of() locks: chunk meshing asks off-thread)
         Map<Long, Long> m = of(level, false);
         if (m == null || m.isEmpty()) return false;
         Long end = m.get(chunkKey);

@@ -613,6 +613,53 @@ public final class StasisGameTests {
                 t.setRemoved();   // take its field down (other tower tests look for an r 16 field)
             };
         }, false, true));
+        // frozen textures (client): the still copies' names and the UV move onto them
+        CASES.put("frozen_texture_math", new Spec(1, (h, c) -> () -> {
+            var id = net.minecraft.resources.Identifier.withDefaultNamespace("block/lava_still");
+            c.check("frozen id", org.erisia.stasis.FrozenTextures.frozenId(id).toString().equals("stasisdelvers:frozen/minecraft/block/lava_still"),
+                org.erisia.stasis.FrozenTextures.frozenId(id).toString());
+            long uv = org.erisia.stasis.FrozenTextures.packUV(0.25f, 0.75f);
+            c.check("UV packing as UVPair (u high, v low)", uv == ((long) Float.floatToIntBits(0.25f) << 32 | (Float.floatToIntBits(0.75f) & 0xFFFFFFFFL))
+                && org.erisia.stasis.FrozenTextures.unpackU(uv) == 0.25f && org.erisia.stasis.FrozenTextures.unpackV(uv) == 0.75f);
+            // a quad corner a quarter into a sprite at (0.5..0.5625, 0.25..0.3125) lands a quarter into (0.125..0.1875, 0.0..0.0625)
+            long in = org.erisia.stasis.FrozenTextures.packUV(0.515625f, 0.265625f);
+            long out = org.erisia.stasis.FrozenTextures.remapUV(in, 0.5f, 0.25f, 0.5625f, 0.3125f, 0.125f, 0f, 0.1875f, 0.0625f);
+            float u = org.erisia.stasis.FrozenTextures.unpackU(out), v = org.erisia.stasis.FrozenTextures.unpackV(out);
+            c.check("UV remap keeps the place in the sprite", Math.abs(u - 0.140625f) < 1e-6 && Math.abs(v - 0.015625f) < 1e-6, u + "," + v);
+            long corner = org.erisia.stasis.FrozenTextures.remapUV(org.erisia.stasis.FrozenTextures.packUV(0.5625f, 0.25f), 0.5f, 0.25f, 0.5625f, 0.3125f, 0.125f, 0f, 0.1875f, 0.0625f);
+            c.check("corners map to corners", org.erisia.stasis.FrozenTextures.unpackU(corner) == 0.1875f && org.erisia.stasis.FrozenTextures.unpackV(corner) == 0f);
+            Field a = new Field(1, 0, 0, 0, 10), b = new Field(2, 50, 0, 0, 10);
+            var changed = org.erisia.stasis.FrozenTextures.changed(List.of(a, b), List.of(a.withFailing(0.5), b.withRadius(12), new Field(3, 0, 50, 0, 5)));
+            c.check("re-mesh: shape changes and new fields count, failing doesn't", changed.size() == 3
+                && changed.stream().noneMatch(f -> f.id() == 1), changed.toString());
+        }, false));
+        // frozen textures mesh per section where they can: a section said to be all stopped / all running must be
+        CASES.put("section_state_matches_blocks", new Spec(1, (h, c) -> {
+            Field f = field(h, c, new Vec3(3.5, 2.5, 4.5), 30, 1.0);
+            return () -> {
+                ServerLevel level = h.getLevel();
+                int sx = (int) Math.floor(f.x()) >> 4, sy = (int) Math.floor(f.y()) >> 4, sz = (int) Math.floor(f.z()) >> 4;
+                int[] n = new int[3];
+                int wrong = 0;
+                String first = "";
+                for (int x = sx - 3; x <= sx + 3; x++)
+                    for (int y = sy - 3; y <= sy + 3; y++)
+                        for (int z = sz - 3; z <= sz + 3; z++) {
+                            int st = Stasis.sectionState(level, x, y, z);
+                            n[st]++;
+                            if (st == Stasis.SECTION_MIXED) continue;
+                            for (int bx = x << 4; bx < (x << 4) + 16; bx++)
+                                for (int by = y << 4; by < (y << 4) + 16; by++)
+                                    for (int bz = z << 4; bz < (z << 4) + 16; bz++)
+                                        if ((Stasis.rateAtSteady(level, bx, by, bz) > 0) != (st == Stasis.SECTION_RUNNING)) {
+                                            if (wrong++ == 0) first = "section " + x + "," + y + "," + z + " state " + st + " block " + bx + "," + by + "," + bz;
+                                        }
+                        }
+                c.check("whole-section answers agree with every block", wrong == 0, wrong + " blocks; first " + first);
+                c.check("stopped, running and mixed sections all occur", n[0] > 0 && n[1] > 0 && n[2] > 0,
+                    "stopped " + n[0] + " running " + n[1] + " mixed " + n[2]);
+            };
+        }, false, true));
         // Baughn: no two collapses alike; the outside still tends to go first
         CASES.put("collapse_differs_by_seed", new Spec(1, (h, c) -> () -> {
             Field a = new Field(1, 0.5, 0.5, 0.5, 20).withSeed(12345).withCollapse(0.5), b = a.withSeed(987654);

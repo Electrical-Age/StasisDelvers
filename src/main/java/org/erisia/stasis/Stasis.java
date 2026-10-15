@@ -40,8 +40,27 @@ public final class Stasis {
 
     private static final Map<Level, Index> INDEX = new WeakHashMap<>();
 
+    /**
+     * The client level's index, readable without the lock: chunk meshing asks from its worker threads for every block
+     * with an animated texture (FrozenTextures), and they shouldn't queue up on index().
+     */
+    private record ClientIndex(Level level, Index index) {
+    }
+
+    private static volatile ClientIndex clientIndex;
+
+    /** Counts invalidations: whatever caches an answer of rateAt (chunk meshing per section) compares this. */
+    private static volatile int version;
+
+    public static int version() {
+        return version;
+    }
+
     public static synchronized void invalidate(Level level) {
         INDEX.remove(level);
+        ClientIndex c = clientIndex;
+        if (c != null && c.level() == level) clientIndex = null;
+        version++;
     }
 
     /** The fields of a level: saved data on the server, the last sync on the client. */
@@ -49,7 +68,13 @@ public final class Stasis {
         return level instanceof ServerLevel sl ? FieldData.get(sl).fields() : ClientFields.fields();
     }
 
-    private static synchronized Index index(Level level) {
+    private static Index index(Level level) {
+        ClientIndex c = clientIndex;
+        if (c != null && c.level() == level) return c.index();
+        return indexLocked(level);
+    }
+
+    private static synchronized Index indexLocked(Level level) {
         Index idx = INDEX.get(level);
         if (idx == null) {
             // off the main thread (the light engine) the server's saved data can't be loaded: use what's loaded
@@ -72,6 +97,7 @@ public final class Stasis {
             }
             for (var e : lists.long2ObjectEntrySet()) idx.columns.put(e.getLongKey(), e.getValue().toArray(NONE));
         }
+        if (level.isClientSide()) clientIndex = new ClientIndex(level, idx);
         return idx;
     }
 
@@ -132,6 +158,39 @@ public final class Stasis {
         // no field holds a rift (Baughn): a stopped, dark hole through it
         if (rate > 0 && StaticDeeps.inRift(level, x, y, z)) return 0.0;
         return rate;
+    }
+
+    /** sectionState: every block of the section is stopped (rateAtSteady 0), every one runs, or it varies. */
+    public static final int SECTION_STOPPED = 0, SECTION_RUNNING = 1, SECTION_MIXED = 2;
+
+    /**
+     * Does time run (rateAtSteady above 0) in all, none or some of the 16-block section (sx, sy, sz)? A cheap
+     * conservative test (MIXED when unsure) so chunk meshing only asks per block where a field's edge, a collapse or a
+     * rift may cross the section.
+     */
+    public static int sectionState(Level level, int sx, int sy, int sz) {
+        if (!stops(level)) return SECTION_RUNNING;
+        if (inSpawn(level, sx, sz) || NewChunkGrace.active(level, ChunkPos.pack(sx, sz))) return SECTION_RUNNING;
+        Field[] fs = index(level).columns.get(ChunkPos.pack(sx, sz));
+        if (fs == null) return SECTION_STOPPED;
+        double x0 = sx << 4, y0 = sy << 4, z0 = sz << 4, x1 = x0 + 16, y1 = y0 + 16, z1 = z0 + 16;
+        boolean touched = false;
+        for (Field f : fs) {
+            double r2 = f.radius() * f.radius();
+            // nearest and farthest point of the section's box from the centre (a column field ignores y)
+            double nx = Math.max(Math.max(x0 - f.x(), f.x() - x1), 0), fx = Math.max(Math.abs(x0 - f.x()), Math.abs(x1 - f.x()));
+            double ny = Math.max(Math.max(y0 - f.y(), f.y() - y1), 0), fy = Math.max(Math.abs(y0 - f.y()), Math.abs(y1 - f.y()));
+            double nz = Math.max(Math.max(z0 - f.z(), f.z() - z1), 0), fz = Math.max(Math.abs(z0 - f.z()), Math.abs(z1 - f.z()));
+            if (f.column()) ny = fy = 0;
+            if (nx * nx + ny * ny + nz * nz > r2) continue;   // no block of the section can be whole inside
+            touched = true;
+            // every block's farthest corner is inside: the whole section runs, unless a collapse or a rift cuts it
+            if (fx * fx + fy * fy + fz * fz <= r2 && f.collapse() <= 0) {
+                int seed = Deeps.seed(level);
+                if (seed == 0 || !StaticDeeps.sectionMayHave(seed, sx, sy, sz)) return SECTION_RUNNING;
+            }
+        }
+        return touched ? SECTION_MIXED : SECTION_STOPPED;
     }
 
     public static boolean isRunningSteady(Level level, BlockPos pos) {
