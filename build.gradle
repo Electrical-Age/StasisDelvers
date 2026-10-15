@@ -96,3 +96,12 @@ neoForge.ideSyncTask generateModMetadata
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+// The deep mist's reduced-resolution pass (post_effect/stasis.json) is stasis.fsh compiled with MIST_PASS defined
+tasks.named('processResources', ProcessResources) {
+    from('src/main/resources/assets/stasisdelvers/shaders/post/stasis.fsh') {
+        into 'assets/stasisdelvers/shaders/post'
+        rename { 'stasis_mist.fsh' }
+        filter { String line -> line.startsWith('#version') ? line + '\n#define MIST_PASS' : line }
+    }
+}

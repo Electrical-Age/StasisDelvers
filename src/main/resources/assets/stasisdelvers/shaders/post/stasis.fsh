@@ -20,10 +20,15 @@
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
 // lattice on each icosahedron face; the nearest lattice point is the cell, the gap to the second nearest its rim).
 
+#ifndef MIST_PASS
 uniform sampler2D InSampler;
+#endif
 uniform sampler2D DepthSampler;
 uniform sampler2D DataSampler;
 uniform sampler2D MistSampler;
+#ifndef MIST_PASS
+uniform sampler2D MistBufSampler;
+#endif
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
@@ -332,14 +337,17 @@ float ign(vec2 px) {
     return fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
 }
 
-const int MIST_STEPS = 28;                 // per pixel, all spans (40 cost up to 1.1 ms on a 4090 at 720p)
+const int MIST_STEPS = 32;                 // per (reduced-resolution) pixel, all spans
 const float MIST_SIGMA = 0.07;             // extinction per block at density 1
 
-// The deep mist along the ray, 0..tEnd (the hits from findDeeps), front to back: rgb = the light it scatters to the
-// eye, a = 1 - transmittance (Beer-Lambert). Overlapping spans are merged and marched together (the density there is
-// the densest deep's); each up to 12 jittered steps, nearest first, MIST_STEPS in all. The mist is darker and more
-// violet low down, paler where it thins out on top (a cheap height-dependent in-scatter).
-vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
+// The mist's colour: thin mist reads paler (lit through), dense cores darker and more violet
+const vec3 MIST_THIN = vec3(0.66, 0.65, 0.75), MIST_DENSE = vec3(0.47, 0.45, 0.57);
+
+// The deep mist along the ray, 0..tEnd (the hits from findDeeps), front to back: x = 1 - transmittance
+// (Beer-Lambert), y = the share of the scattered light that has MIST_DENSE's colour (the light is
+// (x - y) MIST_THIN + y MIST_DENSE). Overlapping spans are merged and marched together (the density there is the
+// densest deep's); each up to 12 jittered steps, nearest first, MIST_STEPS in all.
+vec2 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
     int ord[MAX_HITS];
     for (int i = 0; i < MAX_HITS; i++) ord[i] = i;
     // by entry (insertion sort)
@@ -354,7 +362,7 @@ vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
     }
     float jit = ign(gl_FragCoord.xy);
     float T = 1.0;
-    vec3 L = vec3(0.0);
+    float B = 0.0;
     int used = 0;
     int k = 0;
     for (int g = 0; g < MAX_HITS; g++) {
@@ -377,9 +385,7 @@ vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
                 for (int j = k; j < k2; j++) dn = max(dn, mistDensity(q, ord[j], t < 80.0));
                 if (dn > 0.0) {
                     float alpha = 1.0 - exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
-                    // thin mist reads paler (lit through), dense cores darker
-                    vec3 col = mix(vec3(0.66, 0.65, 0.75), vec3(0.47, 0.45, 0.57), dn);
-                    L += T * alpha * col;
+                    B += T * alpha * dn;
                     T *= 1.0 - alpha;
                 }
             }
@@ -387,7 +393,7 @@ vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
         }
         k = k2;
     }
-    return vec4(L, 1.0 - T);
+    return vec2(1.0 - T, B);
 }
 
 const vec3 ICO[12] = vec3[12](
@@ -483,6 +489,61 @@ vec4 shieldAt(vec2 cell, vec3 n, vec3 view, float r, float failing, float warm, 
     return vec4(tint * (0.8 + 0.4 * wave), clamp(a, 0.0, 0.9));
 }
 
+// The scene distance as the mist pass stores it (b, a: 16 bits): 0..1 over 0..1.5 render distances, 1 for the sky
+float mistDepthCode(float tScene, float rd) {
+    return tScene < 0.0 ? 1.0 : clamp(tScene / (rd * 1.5), 0.0, 1.0);
+}
+
+#ifdef MIST_PASS
+// The mist pass (post_effect/stasis.json; this file again, with MIST_PASS defined by the build): the mist march at
+// the reduced resolution of the "mist" target. Out: r, g = deepMist; b, a = the scene distance (mistDepthCode).
+void main() {
+    fragColor = vec4(0.0, 0.0, 1.0, 1.0);
+    if (data(22) < 0.5 || (data(31) <= 0.0 && data(218) <= 0.0)) return;
+    float depth = texture(DepthSampler, texCoord).r;
+    mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
+                    data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
+    vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
+    vec3 rel = depth > 0.0 ? h.xyz / h.w : vec3(0.0);
+    vec3 camFrac = vec3(data(19), data(20), data(21));
+    vec3 camInt = vec3(data(16), data(17), data(18));
+    float rd = max(data(216), 32.0);
+    vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
+    vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
+    float tScene = depth > 0.0 ? length(rel) : -1.0;
+    float tEnd = depth > 0.0 ? min(tScene, rd * 1.415) : rd * 1.415;
+    float dc = floor(mistDepthCode(tScene, rd) * 65535.0 + 0.5);
+    float hi = floor(dc / 256.0);
+    vec2 m = vec2(0.0);
+    findDeeps(camFrac, dir, tEnd, camInt);
+    if (hitCount > 0) m = deepMist(camFrac, dir, tEnd, rd);
+    fragColor = vec4(m, hi / 255.0, (dc - hi * 256.0) / 255.0);
+}
+#else
+// The mist pass's result at this pixel: a depth-aware (joint bilateral) upsample of the 4 nearest mist texels, so
+// mist behind a near tree doesn't bleed onto it. tScene < 0: the sky.
+vec2 mistUp(float tScene, float rd) {
+    ivec2 sz = textureSize(MistBufSampler, 0);
+    vec2 f = texCoord * vec2(sz) - 0.5;
+    vec2 fl = floor(f), fr = f - fl;
+    float me = mistDepthCode(tScene, rd), tol = 0.03 * me + 0.002;
+    vec2 acc = vec2(0.0), best = vec2(0.0);
+    float wsum = 0.0, bestd = 1e9;
+    for (int j = 0; j < 4; j++) {
+        ivec2 o = ivec2(j & 1, j >> 1);
+        vec4 s = texelFetch(MistBufSampler, clamp(ivec2(fl) + o, ivec2(0), sz - 1), 0);
+        float dd = abs((s.b * 255.0 * 256.0 + s.a * 255.0) / 65535.0 - me);
+        float w = (o.x == 1 ? fr.x : 1.0 - fr.x) * (o.y == 1 ? fr.y : 1.0 - fr.y) * exp(-dd / tol);
+        acc += w * s.rg;
+        wsum += w;
+        if (dd < bestd) {
+            bestd = dd;
+            best = s.rg;
+        }
+    }
+    return wsum > 1e-4 ? acc / wsum : best;
+}
+
 void main() {
     vec3 c = texture(InSampler, texCoord).rgb;
     float stops = data(22);
@@ -559,10 +620,11 @@ void main() {
         }
         vec3 grey = mix(vec3(l), c, 0.18 * (1.0 - deep)) * mix(vec3(0.96, 0.99, 1.04), vec3(0.62, 0.6, 0.74), deep);
         c = mix(grey, c, run);
-        if (hitCount > 0) {
-            // deep mist along the view ray, out to the render distance (fading with the terrain there)
-            vec4 mist = deepMist(camFrac, dir, tEnd, rd);
-            c = c * (1.0 - 0.85 * mist.a) + 0.85 * mist.rgb;
+        if (data(31) > 0.0 || data(218) > 0.0) {
+            // deep mist along the view ray, out to the render distance (fading with the terrain there): marched at a
+            // reduced resolution by the mist pass, upsampled here
+            vec2 mist = mistUp(depth > 0.0 ? tScene : -1.0, rd);
+            c = c * (1.0 - 0.85 * mist.x) + 0.85 * ((mist.x - mist.y) * MIST_THIN + mist.y * MIST_DENSE);
         }
         if (nsd > 0) {
             // rifts: no light at all, a faint violet fringe at the edge, and they swallow what lies behind them
@@ -717,3 +779,4 @@ void main() {
     }
     fragColor = vec4(c, 1.0);
 }
+#endif
