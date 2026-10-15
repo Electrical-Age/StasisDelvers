@@ -296,6 +296,10 @@ void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
         int o8 = DEEP_BASE + DEEP_STRIDE * i;
         vec2 c = vec2(data(o8), data(o8 + 1));
         float R = data(o8 + 2);
+        // the ray must pass the circle (3 fetches) before the rest is read
+        vec2 oc = o.xz - c;
+        float cb = dot(oc, dir.xz), cr = R + DEEP_EDGE;
+        if (dot(oc, oc) > cr * cr && (cb > 0.0 || cb * cb < dot(dir.xz, dir.xz) * (dot(oc, oc) - cr * cr))) continue;
         vec2 span;
         if (!cylSpan(c, R + DEEP_EDGE, data(o8 + 6) - DEEP_BELOW, data(o8 + 7) + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
         hits[hitCount] = Hit(0, i, vec3(c.x, data(o8 + 4), c.y), R, data(o8 + 3), vec3(data(o8 + 8), data(o8 + 9), data(o8 + 10)), int(data(o8 + 5)));
@@ -536,7 +540,10 @@ void main() {
         // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast; fades
         // with distance like the mist
         float deep = 0.0;
-        if (data(31) > 0.0) deep = deepAt(depth > 0.0 ? p : camFrac, camInt);
+        // (only the drifting deeps whose ray span reaches the scene: a loop over all of them costs every pixel)
+        for (int i = 0; i < hitCount; i++)
+            if (hits[i].kind == 0 && hitSpan[i].x <= tScene + 0.05 && hitSpan[i].y >= tScene - 0.05)
+                deep = max(deep, deepShape(loadDeep(hits[i].idx), depth > 0.0 ? p : camFrac, camInt));
         deep *= (1.0 - run) * viewFade(rel, rd);
         int nsd = int(data(218));
         float riftHere = 0.0, fringe = 0.0;
