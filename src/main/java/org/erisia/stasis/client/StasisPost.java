@@ -85,6 +85,7 @@ public final class StasisPost {
         // all time-driven visuals on the smoothed clock: in a slow field the client ticks slowly and the server's time
         // packet steps its game time every second (AdventurAgent: the whole screen stepped once a second)
         double clock = weatherClock(mc);
+        debugFrame++;
         d[29] = (float) ((clock % 1200.0));
         // eddy time (Eddies.time), with the partial tick so the mist drifts smoothly
         d[30] = (float) (clock % (1048576 / 20.0));
@@ -146,6 +147,9 @@ public final class StasisPost {
                 d[o + 8] = (float) (g.ox() - fx);
                 d[o + 9] = (float) (g.oz() - fz);
                 d[o + 10] = (float) g.step();
+                if (DEBUG_DEEPS) StasisDelvers.LOG.info("deep frame={} clock={} id={} x={} z={} r={} st={} surface={} gmin={} gmax={} complete={}",
+                    debugFrame, String.format("%.3f", t), dp.id(), String.format("%.2f", dp.x()), String.format("%.2f", dp.z()),
+                    String.format("%.2f", dp.radius()), String.format("%.3f", dp.strength()), surface, g.min(), g.max(), g.complete());
                 d[o] = (float) (dp.x() - fx);
                 d[o + 1] = (float) (dp.z() - fz);
                 d[o + 2] = dp.radius();
@@ -196,6 +200,9 @@ public final class StasisPost {
         texture.upload();
     }
 
+    /** -Dstasisdelvers.debugDeeps=true: log every deep sent to the shader, every frame (for AdventurAgent's tests). */
+    static final boolean DEBUG_DEEPS = Boolean.getBoolean("stasisdelvers.debugDeeps");
+    static long debugFrame;
     static double smoothClock = Double.NaN;
     static long smoothNanos;
 
