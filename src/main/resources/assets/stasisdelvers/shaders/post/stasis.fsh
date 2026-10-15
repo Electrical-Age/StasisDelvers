@@ -132,8 +132,11 @@ float deepShape(Deep dp, vec3 q, vec3 camI) {
     vec3 w = q + camI;
     // the ragged edge (noise) only near the rim: the inside and far outside skip it
     if (d > dp.R - 8.0) d += 3.0 * (value32(vec3(w.x / 7.0, 0.5, w.z / 7.0), dp.id) - 0.5) * 2.0;
-    float band = smoothstep(dp.yb - DEEP_BELOW, dp.yb - DEEP_BELOW + 2.0, q.y) * (1.0 - smoothstep(dp.yb + DEEP_ABOVE - 4.0, dp.yb + DEEP_ABOVE, q.y));
-    return smoothstep(0.0, 1.0, (dp.R - d) / 4.0) * min(1.0, dp.st * 1.5) * band;
+    // seen from afar a flat-topped, straight-sided cylinder read as a box in the sky (AdventurAgent): the mist thins
+    // upwards (dense near the ground, ~1/e every 18 blocks above surface + 6) and fades over ~12 blocks at the rim
+    float band = smoothstep(dp.yb - DEEP_BELOW, dp.yb - DEEP_BELOW + 2.0, q.y) * (1.0 - smoothstep(dp.yb + DEEP_ABOVE - 24.0, dp.yb + DEEP_ABOVE, q.y));
+    band *= exp(-max(0.0, q.y - dp.yb - 6.0) / 18.0);
+    return smoothstep(-4.0, 8.0, dp.R - d) * min(1.0, dp.st * 1.5) * band;
 }
 
 // all drifting deeps at q (the strongest): for the shields, a few pixels
