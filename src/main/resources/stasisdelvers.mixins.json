@@ -17,7 +17,9 @@
     "client.RenderSectionRegionAccessor",
     "client.ClientLevelMixin",
     "client.ClientClockManagerMixin",
-    "client.ClientClockInstanceMixin"
+    "client.ClientClockInstanceMixin",
+    "client.ParticleAccessor",
+    "client.ParticleGroupMixin"
   ],
   "injectors": {
     "defaultRequire": 1
