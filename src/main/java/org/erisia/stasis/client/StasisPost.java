@@ -118,7 +118,7 @@ public final class StasisPost {
         // strength, local surface y - floor(camera y), edge-noise id; at most MAX_DEEPS
         int nd = 0;
         if (Stasis.stops(mc.level)) {
-            double t = (mc.level.getGameTime() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20.0;
+            double t = weatherClock(mc);
             List<org.erisia.stasis.Deeps.Deep> deeps = new ArrayList<>();
             List<Double> gaps = new ArrayList<>();
             for (var dp : org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed())) {
@@ -153,7 +153,7 @@ public final class StasisPost {
         }
         d[31] = nd;
         // the mist's clocks (stasis.fsh mistWind ..), wrapped here in double where each is seamless
-        double mt = (mc.level.getGameTime() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20.0;
+        double mt = weatherClock(mc);
         d[176] = (float) ((0.4 * mt) % 96.0);
         d[177] = (float) ((0.25 * mt) % 96.0);
         d[178] = (float) ((0.02 * mt) % 32.0);
@@ -191,6 +191,27 @@ public final class StasisPost {
         if (img == null) return;
         for (int i = 0; i < SLOTS; i++) img.setPixelABGR(i % WIDTH, i / WIDTH, Float.floatToRawIntBits(d[i]));
         texture.upload();
+    }
+
+    static double smoothClock = Double.NaN;
+    static long smoothNanos;
+
+    /**
+     * The weather's clock on the client (Deeps.time, s), smoothed: it runs on real time and slews gently towards the
+     * game time. The client's game time steps whenever the server's time packet corrects it (and the client's tick
+     * rate changes in fields), and the whole mist jumped with it (AdventurAgent). More than 5 s off: snap.
+     */
+    static double weatherClock(Minecraft mc) {
+        double target = (mc.level.getGameTime() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20.0;
+        long now = System.nanoTime();
+        double dt = Math.min(0.25, (now - smoothNanos) / 1e9);
+        smoothNanos = now;
+        if (Double.isNaN(smoothClock) || Math.abs(target - smoothClock) > 5) smoothClock = target;
+        else {
+            smoothClock += dt;
+            smoothClock += (target - smoothClock) * Math.min(1, dt * 0.5);
+        }
+        return smoothClock;
     }
 
     /** The surface (top of motion-blocking blocks, not leaves) at a column, or the fallback where it isn't loaded. */
