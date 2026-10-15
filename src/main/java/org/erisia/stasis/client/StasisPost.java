@@ -36,11 +36,13 @@ public final class StasisPost {
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
     /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
     static final int G = 8, GROUND_BASE = 2048, STATIC_GROUND_BASE = GROUND_BASE + G * G * MAX_DEEPS;
-    /** A deep's ground grid, absolute surface y; refreshed every GRID_TICKS game ticks (drifting deeps move slowly). */
+    /** A deep's ground grid, absolute surface y (grid()). */
     record Grid(double ox, double oz, double step, float[] h, float min, float max, boolean complete, long made) {
     }
     static final java.util.Map<Integer, Grid> grids = new java.util.HashMap<>();
     static final int GRID_TICKS = 10;
+    /** A drifting deep's ground lattice spacing: G - 1 steps cover radius + 6 (at most ~54) on both sides plus a step of slack. */
+    static final double MOVING_STEP = 19;
 
     /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
@@ -190,24 +192,29 @@ public final class StasisPost {
     }
 
     /**
-     * The ground grid of a deep (cached by key): G x G surface heights over the square centre +- reach (unloaded
-     * columns take the fallback). A drifting deep's grid is remade every GRID_TICKS; a static one while it has
-     * unloaded columns.
+     * The ground grid of a deep (cached by key): G x G surface heights covering the square centre +- reach (unloaded
+     * columns take the fallback). A drifting deep's grid lies on a fixed world lattice (MOVING_STEP), so as the deep
+     * moves the samples stay put and the mist's ground doesn't jump (Baughn saw it snap a few times a second when the
+     * grid moved with the deep); it's remade when the deep crosses a lattice line. A static one is remade while it
+     * has unloaded columns.
      */
     static Grid grid(Minecraft mc, int key, double cx, double cz, double reach, float fallback, boolean moving) {
         long now = mc.level.getGameTime();
+        double step = moving ? MOVING_STEP : 2 * reach / (G - 1);
+        double ox = moving ? Math.floor((cx - reach) / step) * step : cx - reach;
+        double oz = moving ? Math.floor((cz - reach) / step) * step : cz - reach;
         Grid g = grids.get(key);
-        if (g != null && (moving ? now - g.made() < GRID_TICKS : g.complete())) {
-            if (!moving) grids.put(key, g = new Grid(g.ox(), g.oz(), g.step(), g.h(), g.min(), g.max(), true, now));
+        if (g != null && g.ox() == ox && g.oz() == oz && g.step() == step && (g.complete() || moving && now - g.made() < GRID_TICKS)) {
+            // (a complete grid's clock is only for the eviction of unused grids; an incomplete one is redone after GRID_TICKS)
+            if (g.complete()) grids.put(key, g = new Grid(g.ox(), g.oz(), g.step(), g.h(), g.min(), g.max(), true, now));
             return g;
         }
-        double step = 2 * reach / (G - 1);
         float[] h = new float[G * G];
         float min = Float.MAX_VALUE, max = -Float.MAX_VALUE;
         boolean complete = true;
         for (int j = 0; j < G; j++)
             for (int i = 0; i < G; i++) {
-                double y = surface(mc, cx - reach + i * step, cz - reach + j * step, Double.NaN);
+                double y = surface(mc, ox + i * step, oz + j * step, Double.NaN);
                 if (Double.isNaN(y)) {
                     complete = false;
                     y = fallback;
@@ -216,7 +223,7 @@ public final class StasisPost {
                 min = Math.min(min, (float) y);
                 max = Math.max(max, (float) y);
             }
-        g = new Grid(cx - reach, cz - reach, step, h, min, max, complete, now);
+        g = new Grid(ox, oz, step, h, min, max, complete, now);
         grids.put(key, g);
         return g;
     }
