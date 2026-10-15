@@ -90,6 +90,37 @@ public final class StasisRegistry {
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TowerCellBlockEntity>> TOWER_CELL_ENTITY =
         BLOCK_ENTITIES.register("stasis_tower_cell", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TowerCellBlockEntity::new, TOWER.get()));
 
+    // ---- the strata around rifts (Strata, DeepFeature): riftstone, its brighter veins, and rift crystals (budding
+    // walls and four growth stages, like amethyst; Baughn: violet with dark spots, script/gen_crystals.py)
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> RIFTSTONE = BLOCKS.registerSimpleBlock("riftstone",
+        p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(2.5f, 9f).requiresCorrectToolForDrops()
+            .sound(net.minecraft.world.level.block.SoundType.DEEPSLATE));
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> RIFTSTONE_VEIN = BLOCKS.registerSimpleBlock("riftstone_vein",
+        p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_MAGENTA).strength(2.5f, 9f).requiresCorrectToolForDrops()
+            .sound(net.minecraft.world.level.block.SoundType.DEEPSLATE).lightLevel(st -> 2));
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> BUDDING_RIFT_CRYSTAL = BLOCKS.registerSimpleBlock("budding_rift_crystal",
+        p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(2.5f, 9f).requiresCorrectToolForDrops()
+            .sound(net.minecraft.world.level.block.SoundType.AMETHYST));
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.AmethystClusterBlock> RIFT_CRYSTAL_SMALL = crystal("rift_crystal_small", 5, 8, 1);
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.AmethystClusterBlock> RIFT_CRYSTAL_MEDIUM = crystal("rift_crystal_medium", 7, 10, 2);
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.AmethystClusterBlock> RIFT_CRYSTAL_LARGE = crystal("rift_crystal_large", 10, 12, 4);
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.AmethystClusterBlock> RIFT_CRYSTAL_CLUSTER = crystal("rift_crystal_cluster", 14, 12, 5);
+
+    static net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.AmethystClusterBlock> crystal(String name, float height, float width, int light) {
+        return BLOCKS.registerBlock(name, p -> new net.minecraft.world.level.block.AmethystClusterBlock(height, width, p),
+            p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).forceSolidOn().noOcclusion().strength(1.5f)
+                .sound(net.minecraft.world.level.block.SoundType.AMETHYST_CLUSTER).lightLevel(st -> light)
+                .pushReaction(net.minecraft.world.level.material.PushReaction.POPPED));
+    }
+
+    static {
+        for (var b : java.util.List.of(RIFTSTONE, RIFTSTONE_VEIN, BUDDING_RIFT_CRYSTAL, RIFT_CRYSTAL_SMALL, RIFT_CRYSTAL_MEDIUM, RIFT_CRYSTAL_LARGE, RIFT_CRYSTAL_CLUSTER))
+            ITEMS.registerSimpleBlockItem(b);
+    }
+
+    /** A rift crystal shard (placeholder for the dust / shard / charged grades). */
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_SHARD = ITEMS.registerSimpleItem("rift_shard");
+
     static final DeferredRegister<net.minecraft.sounds.SoundEvent> SOUNDS = DeferredRegister.create(Registries.SOUND_EVENT, StasisDelvers.MODID);
     /** Music for stopped land: a melancholic/eldritch subset of the vanilla tracks (assets/stasisdelvers/sounds.json). */
     public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> MUSIC_STOPPED = SOUNDS.register("music.stopped",

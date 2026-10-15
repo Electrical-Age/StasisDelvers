@@ -1,0 +1,9 @@
+{
+  "loader": "neoforge:obj",
+  "model": "stasisdelvers:models/block/rift_crystal_cluster.obj",
+  "flip_v": true,
+  "textures": {
+    "crystal": "stasisdelvers:block/rift_crystal",
+    "particle": "stasisdelvers:block/rift_crystal"
+  }
+}

@@ -30,6 +30,9 @@ public final class StasisConfig {
     static final ModConfigSpec.BooleanValue DEBUG_MESSAGES;
     static final ModConfigSpec.IntValue GUTTER_MIN_TICKS;
     static final ModConfigSpec.IntValue GUTTER_MAX_TICKS;
+    static final ModConfigSpec.ConfigValue<List<? extends String>> STRATA_SHAPES;
+    static final ModConfigSpec.BooleanValue RIFT_ORES;
+    static final ModConfigSpec.DoubleValue RIFT_ORE_RATE;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -65,6 +68,11 @@ public final class StasisConfig {
             .defineInRange("gutterChance", 0.25, 0.0, 1.0);
         GUTTER_MIN_TICKS = b.comment("Shortest gutter, in ticks.").defineInRange("gutterMinTicks", 100, 1, 72000);
         GUTTER_MAX_TICKS = b.comment("Longest gutter, in ticks.").defineInRange("gutterMaxTicks", 600, 1, 72000);
+        STRATA_SHAPES = b.comment("Strata shapes around static deeps' rifts, as name:weight (saddle, staircase, splash, pods); each",
+                "rift picks one from its id. Worldgen only: changes reach newly generated chunks.")
+            .defineListAllowEmpty("strataShapes", List.of("saddle:1", "staircase:1", "splash:1", "pods:1"), () -> "saddle:1", o -> o instanceof String);
+        RIFT_ORES = b.comment("Ores in rift walls and strata, from the overworld ore tags, at any depth (Baughn).").define("riftOres", true);
+        RIFT_ORE_RATE = b.comment("Share of rift wall and strata rock that becomes ore.").defineInRange("riftOreRate", 0.006, 0.0, 0.2);
         SPEC = b.build();
     }
 
@@ -82,6 +90,8 @@ public final class StasisConfig {
     static volatile boolean debugMessages = false;
     static volatile int gutterMinTicks = 100;
     static volatile int gutterMaxTicks = 600;
+    static volatile boolean riftOres = true;
+    static volatile double riftOreRate = 0.006;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -116,5 +126,8 @@ public final class StasisConfig {
         debugMessages = DEBUG_MESSAGES.get();
         gutterMinTicks = GUTTER_MIN_TICKS.get();
         gutterMaxTicks = GUTTER_MAX_TICKS.get();
+        Strata.setWeights(STRATA_SHAPES.get());
+        riftOres = RIFT_ORES.get();
+        riftOreRate = RIFT_ORE_RATE.get();
     }
 }

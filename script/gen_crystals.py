@@ -195,7 +195,7 @@ def main():
     tex = texture(rng)
     Image.fromarray((tex * 255).astype(np.uint8), 'RGBA').save(os.path.join(out, 'rift_crystal.png'))
     with open(os.path.join(out, 'rift_crystal.mtl'), 'w') as f:
-        f.write('newmtl crystal\nmap_Kd stasisdelvers:block/rift_crystal\n')
+        f.write('newmtl crystal\nmap_Kd #crystal\n')
     tiles = []
     for name in STAGES:
         V, UV, F = stage_mesh(np.random.default_rng([seed, len(name), ord(name[0])]), name)

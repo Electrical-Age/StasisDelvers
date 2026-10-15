@@ -133,9 +133,24 @@ final class StasisCommands {
                 src.sendSuccess(() -> Component.literal(list.size() + " static deep(s) within ~1 km; here: zone "
                     + StaticDeeps.zone(level, (int) Math.floor(pos.x), (int) Math.floor(pos.y), (int) Math.floor(pos.z))), false);
                 for (var sd : list.subList(0, Math.min(8, list.size())))
-                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f %.0f, radius %.0f (rift ~%.0f), %.0f blocks away",
-                        sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z))), false);
+                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f %.0f, radius %.0f (rift ~%.0f), %.0f blocks away, strata %s",
+                        sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z), Strata.shapeOf(sd).id())), false);
                 return list.size();
+            }))
+            .then(Commands.literal("strata").executes(c -> {
+                // what the strata is here (each static deep nearby), and the worldgen time spent on rift chunks
+                var src = c.getSource();
+                var pos = src.getPosition();
+                int x = (int) Math.floor(pos.x), y = (int) Math.floor(pos.y), z = (int) Math.floor(pos.z);
+                String[] names = {"out", "body", "cavity", "vent", "vein", "spire"};
+                StringBuilder sb = new StringBuilder();
+                for (var sd : StaticDeeps.near((float) pos.x, (float) pos.y, (float) pos.z, 300, Deeps.seed(src.getLevel())))
+                    sb.append(String.format("%s %s; ", Strata.shapeOf(sd).id(), names[Strata.at(sd, x, y, z)]));
+                long n = DeepFeature.Stats.CHUNKS.get();
+                String stats = String.format("rift worldgen: %d chunks, mean %.2f ms, max %.2f ms", n,
+                    n == 0 ? 0 : DeepFeature.Stats.NANOS.get() / 1e6 / n, DeepFeature.Stats.MAX.get() / 1e6);
+                src.sendSuccess(() -> Component.literal((sb.length() == 0 ? "no static deep near; " : sb.toString()) + stats), false);
+                return 1;
             }))
             .then(Commands.literal("tower")
                 .then(Commands.literal("charge").then(Commands.argument("pos", BlockPosArgument.blockPos())

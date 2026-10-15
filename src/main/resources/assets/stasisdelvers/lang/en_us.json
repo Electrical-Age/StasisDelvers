@@ -18,5 +18,13 @@
   "tooltip.stasisdelvers.stasis_tower.2": "Stack Stasis Tower Poles on top; booms may start from the core's top block. Right-click: status.",
   "tooltip.stasisdelvers.stasis_tower_segment.0": "Survey pole: stack on the tower core's top centre to raise the mast (a wider field).",
   "tooltip.stasisdelvers.stasis_tower_segment.1": "Use a pole on the mast to extend it upward; sneak-use on its side to start a boom.",
-  "tooltip.stasisdelvers.stasis_tower_segment.2": "Climbable like scaffolding. The tower takes shape around the poles."
+  "tooltip.stasisdelvers.stasis_tower_segment.2": "Climbable like scaffolding. The tower takes shape around the poles.",
+  "block.stasisdelvers.riftstone": "Riftstone",
+  "block.stasisdelvers.riftstone_vein": "Riftstone Vein",
+  "block.stasisdelvers.budding_rift_crystal": "Budding Rift Crystal",
+  "block.stasisdelvers.rift_crystal_small": "Small Rift Crystal",
+  "block.stasisdelvers.rift_crystal_medium": "Medium Rift Crystal",
+  "block.stasisdelvers.rift_crystal_large": "Large Rift Crystal",
+  "block.stasisdelvers.rift_crystal_cluster": "Rift Crystal Cluster",
+  "item.stasisdelvers.rift_shard": "Rift Shard"
 }

@@ -51,11 +51,21 @@ public record DeepFeature() implements Feature {
                 for (int k = Math.floorDiv(z0 + 8, StaticDeeps.CZ) - 1; k <= Math.floorDiv(z0 + 8, StaticDeeps.CZ) + 1; k++) {
                     StaticDeeps.Deep d = StaticDeeps.cell(i, j, k, seed);
                     if (d == null) continue;
-                    double reach = d.radius() * 1.5 + 24;
+                    double reach = Math.max(d.radius() * 1.5 + 24, Strata.bounds(d).radius() + 2);
                     double dx = Math.max(0, Math.max(x0 - d.x(), d.x() - (x0 + 16))), dz = Math.max(0, Math.max(z0 - d.z(), d.z() - (z0 + 16)));
                     if (dx * dx + dz * dz <= reach * reach) deeps.add(d);
                 }
+        long t0 = System.nanoTime();
         for (StaticDeeps.Deep d : deeps) any |= carve(level, d, x0, z0, minY, maxY);
+        for (StaticDeeps.Deep d : deeps) any |= strata(level, d, x0, z0, minY, maxY);
+        if (any) {
+            // vents, spires and sinkholes change the top: the chunk's heightmaps (rain, spawning, sky light, later
+            // features) must follow, as for EA's oil outcrops (2caba052)
+            Heightmap.primeHeightmaps(level.getChunk(x0 >> 4, z0 >> 4), java.util.EnumSet.of(Heightmap.Types.MOTION_BLOCKING,
+                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Heightmap.Types.WORLD_SURFACE, Heightmap.Types.OCEAN_FLOOR,
+                Heightmap.Types.WORLD_SURFACE_WG, Heightmap.Types.OCEAN_FLOOR_WG));
+            Stats.record(System.nanoTime() - t0);
+        }
         return any;
     }
 
@@ -94,6 +104,8 @@ public record DeepFeature() implements Feature {
                         float h = Noise.hash32(x, y, z, id);
                         BlockState shell = h < 0.08f ? Blocks.CRYING_OBSIDIAN.defaultBlockState()
                             : h < 0.45f ? Blocks.BLACKSTONE.defaultBlockState() : h < 0.6f ? Blocks.TUFF.defaultBlockState() : null;
+                        BlockState ore = ore(x, y, z, id ^ 0x0BE);
+                        if (ore != null) shell = ore;
                         if (shell != null) {
                             level.setBlock(p, shell, 2);
                             changed = true;
@@ -136,6 +148,138 @@ public record DeepFeature() implements Feature {
                 }
             }
         return changed;
+    }
+
+    /** Rock the strata may replace: overworld stone, dirt, gravel (never fluids, bedrock, the rift's own shell or air). */
+    static boolean replaceable(BlockState st) {
+        return st.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || st.is(net.minecraft.tags.BlockTags.DIRT) || st.is(Blocks.GRAVEL)
+            || st.is(Blocks.SAND) || st.is(Blocks.CLAY) || st.is(Blocks.CALCITE) || st.is(Blocks.SMOOTH_BASALT)
+            || st.is(Blocks.SANDSTONE) || st.is(Blocks.TERRACOTTA) || st.is(net.minecraft.tags.BlockTags.TERRACOTTA);
+    }
+
+    /** May a cavity be carved here: rock we replace or air, and no fluid next to it (it would flow during the new-chunk grace). */
+    static boolean carvable(WorldGenLevel level, BlockPos.MutableBlockPos p, BlockState st) {
+        if (!st.isAir() && !replaceable(st)) return false;
+        for (Direction dir : Direction.values()) {
+            BlockPos n = p.relative(dir);
+            if (!level.getFluidState(n).isEmpty()) return false;
+        }
+        return true;
+    }
+
+    /** Is the wall block w a budding rift crystal: strata rock next to a cavity, at a hashed chance (pure: the same
+     * answer from every chunk). */
+    static boolean budding(StaticDeeps.Deep d, int x, int y, int z) {
+        if (Noise.hash32(x, y, z, d.id() ^ 0xB0D) >= 0.05f) return false;
+        int k = Strata.at(d, x, y, z);
+        if (k != Strata.BODY && k != Strata.VEIN) return false;
+        for (Direction dir : Direction.values())
+            if (Strata.at(d, x + dir.getStepX(), y + dir.getStepY(), z + dir.getStepZ()) == Strata.CAVITY) return true;
+        return false;
+    }
+
+    private static boolean strata(WorldGenLevel level, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
+        Strata.Bounds b = Strata.bounds(d);
+        int yLo = Math.max(minY + 1, b.minY()), yHi = Math.min(maxY - 1, b.maxY());
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        BlockState air = Blocks.AIR.defaultBlockState(), rock = StasisRegistry.RIFTSTONE.get().defaultBlockState();
+        BlockState vein = StasisRegistry.RIFTSTONE_VEIN.get().defaultBlockState(), bud = StasisRegistry.BUDDING_RIFT_CRYSTAL.get().defaultBlockState();
+        int id = d.id();
+        boolean changed = false;
+        java.util.List<BlockPos> cavities = new java.util.ArrayList<>();
+        for (int x = x0; x < x0 + 16; x++)
+            for (int z = z0; z < z0 + 16; z++) {
+                if (Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) > b.radius()) continue;
+                int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+                for (int y = yLo; y <= yHi; y++) {
+                    int k = Strata.at(d, x, y, z);
+                    if (k == Strata.OUT) continue;
+                    p.set(x, y, z);
+                    BlockState st = level.getBlockState(p);
+                    switch (k) {
+                        case Strata.BODY, Strata.VEIN, Strata.SPIRE -> {
+                            boolean ok = replaceable(st) || k == Strata.SPIRE && (st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty();
+                            if (!ok) continue;
+                            BlockState put = budding(d, x, y, z) ? bud : k == Strata.VEIN ? vein : rock;
+                            if (put == rock) {
+                                BlockState ore = ore(x, y, z, id ^ 0x5A0);
+                                if (ore != null) put = ore;
+                            }
+                            level.setBlock(p, put, 2);
+                            changed = true;
+                        }
+                        case Strata.CAVITY, Strata.VENT -> {
+                            if (y > surface + 1) continue;   // above ground it's open already
+                            if (!st.isAir() && carvable(level, p, st)) {
+                                level.setBlock(p, air, 2);
+                                changed = true;
+                            }
+                            if (k == Strata.CAVITY && level.getBlockState(p).isAir()) cavities.add(p.immutable());
+                        }
+                        default -> {
+                        }
+                    }
+                }
+            }
+        // crystal buds in the cavities, on faces of budding walls (the wall may sit in a neighbouring chunk: budding()
+        // is a pure function, so both chunks agree)
+        for (BlockPos c : cavities) {
+            if (Noise.hash32(c.getX(), c.getY(), c.getZ(), id ^ 0xB0E) >= 0.6f) continue;
+            for (Direction dir : Direction.values()) {
+                BlockPos w = c.relative(dir);
+                if (!budding(d, w.getX(), w.getY(), w.getZ())) continue;
+                float h = Noise.hash32(c.getX(), c.getY(), c.getZ(), id ^ 0xB0F);
+                var block = h < 0.35f ? StasisRegistry.RIFT_CRYSTAL_SMALL : h < 0.6f ? StasisRegistry.RIFT_CRYSTAL_MEDIUM
+                    : h < 0.85f ? StasisRegistry.RIFT_CRYSTAL_LARGE : StasisRegistry.RIFT_CRYSTAL_CLUSTER;
+                level.setBlock(c, block.get().defaultBlockState().setValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING, dir.getOpposite()), 2);
+                changed = true;
+                break;
+            }
+        }
+        return changed;
+    }
+
+    /** The overworld ores (NeoForge's c:ores_in_ground/stone and /deepslate tags; pack ores included), with weights:
+     * the rare ones rarer. Built once the tags are loaded. */
+    private static volatile java.util.List<BlockState> ORES;
+    private static volatile float[] ORE_CUM;
+
+    static BlockState ore(int x, int y, int z, int seed) {
+        if (!StasisConfig.riftOres || Noise.hash32(x, y, z, seed) >= StasisConfig.riftOreRate) return null;
+        java.util.List<BlockState> ores = ORES;
+        if (ores == null) {
+            java.util.List<BlockState> l = new java.util.ArrayList<>();
+            java.util.List<Float> w = new java.util.ArrayList<>();
+            for (String tag : java.util.List.of("ores_in_ground/stone", "ores_in_ground/deepslate"))
+                net.minecraft.core.registries.BuiltInRegistries.BLOCK.getTagOrEmpty(net.minecraft.tags.TagKey.create(
+                    net.minecraft.core.registries.Registries.BLOCK, net.minecraft.resources.Identifier.fromNamespaceAndPath("c", tag))).forEach(h -> {
+                    String n = h.value().getDescriptionId();
+                    l.add(h.value().defaultBlockState());
+                    w.add(n.contains("diamond") || n.contains("emerald") ? 0.15f : n.contains("gold") || n.contains("lapis") || n.contains("redstone") ? 0.5f : 1f);
+                });
+            float[] cum = new float[w.size()];
+            float t = 0;
+            for (int i = 0; i < cum.length; i++) cum[i] = t += w.get(i);
+            ORE_CUM = cum;
+            ORES = ores = l;
+        }
+        if (ores.isEmpty()) return null;
+        float[] cum = ORE_CUM;
+        float u = Noise.hash32(x, y, z, seed ^ 0x0F) * cum[cum.length - 1];
+        for (int i = 0; i < cum.length; i++) if (u < cum[i]) return ores.get(i);
+        return ores.get(ores.size() - 1);
+    }
+
+    /** Worldgen time of chunks the rift features touched (/stasis strata stats). */
+    public static final class Stats {
+        public static final java.util.concurrent.atomic.AtomicLong CHUNKS = new java.util.concurrent.atomic.AtomicLong(), NANOS = new java.util.concurrent.atomic.AtomicLong(),
+            MAX = new java.util.concurrent.atomic.AtomicLong();
+
+        static void record(long ns) {
+            CHUNKS.incrementAndGet();
+            NANOS.addAndGet(ns);
+            MAX.accumulateAndGet(ns, Math::max);
+        }
     }
 
     /** A pointed dripstone column of up to len blocks growing in dir (base, middle, frustum, tip), stopping at a block. */

@@ -679,6 +679,55 @@ public final class StasisGameTests {
             c.check("outer blocks stop more often than inner ones", outerA / (double) outerN > innerA / (double) Math.max(1, innerN),
                 outerA + "/" + outerN + " vs " + innerA + "/" + innerN);
         }, false));
+        // rift strata (Strata): every shape is a pure function, makes rock and open space inside its bounds at a small and
+        // a large radius, and nothing outside them; the weighted pick follows the config list
+        CASES.put("strata_shapes", new Spec(1, (h, c) -> () -> {
+            java.util.Random rng = new java.util.Random(7);
+            for (float R : new float[]{12, 40})
+                for (var shape : org.erisia.stasis.Strata.Shape.values()) {
+                    var d = new org.erisia.stasis.StaticDeeps.Deep(1000, 100, -2000, R, 4242);
+                    var b = org.erisia.stasis.Strata.bounds(shape, d);
+                    int[] count = new int[6];
+                    boolean pure = true;
+                    for (int i = 0; i < 20000; i++) {
+                        double a = rng.nextDouble() * 2 * Math.PI, r = Math.sqrt(rng.nextDouble()) * b.radius();
+                        int x = (int) Math.floor(d.x() + r * Math.cos(a)), z = (int) Math.floor(d.z() + r * Math.sin(a));
+                        int y = b.minY() + rng.nextInt(Math.max(1, b.maxY() - b.minY()));
+                        int k = org.erisia.stasis.Strata.at(shape, d, x, y, z);
+                        count[k]++;
+                        pure &= k == org.erisia.stasis.Strata.at(shape, d, x, y, z);
+                    }
+                    String tag = shape.id() + " r" + (int) R;
+                    c.check(tag + " deterministic", pure);
+                    c.check(tag + " has rock", count[1] + count[4] + count[5] > 0, java.util.Arrays.toString(count));
+                    c.check(tag + " has open space", count[2] + count[3] > 0, java.util.Arrays.toString(count));
+                    int outside = 0;
+                    for (int i = 0; i < 2000; i++) {
+                        double a = rng.nextDouble() * 2 * Math.PI, r = b.radius() + 1 + rng.nextDouble() * 50;
+                        int x = (int) Math.floor(d.x() + r * Math.cos(a)), z = (int) Math.floor(d.z() + r * Math.sin(a));
+                        int y = b.minY() - 40 + rng.nextInt(b.maxY() - b.minY() + 80);
+                        if (org.erisia.stasis.Strata.at(shape, d, x, y, z) != org.erisia.stasis.Strata.OUT) outside++;
+                        int y2 = rng.nextBoolean() ? b.minY() - 1 - rng.nextInt(30) : b.maxY() + 1 + rng.nextInt(30);
+                        if (org.erisia.stasis.Strata.at(shape, d, (int) d.x(), y2, (int) d.z()) != org.erisia.stasis.Strata.OUT) outside++;
+                    }
+                    c.check(tag + " nothing outside its bounds", outside == 0, outside + " hits");
+                }
+            try {
+                org.erisia.stasis.Strata.setWeights(java.util.List.of("pods:1"));
+                boolean all = true;
+                for (int i = 0; i < 200; i++)
+                    all &= org.erisia.stasis.Strata.shapeOf(new org.erisia.stasis.StaticDeeps.Deep(0, 0, 0, 30, i * 7919)) == org.erisia.stasis.Strata.Shape.PODS;
+                c.check("a one-entry list forces that shape", all);
+                org.erisia.stasis.Strata.setWeights(java.util.List.of("saddle:1", "staircase:1", "splash:1", "pods:1"));
+                int[] n = new int[4];
+                for (int i = 0; i < 4000; i++) n[org.erisia.stasis.Strata.shapeOf(new org.erisia.stasis.StaticDeeps.Deep(0, 0, 0, 30, i * 7919 & 0xFFFFFF)).ordinal()]++;
+                boolean even = true;
+                for (int v : n) even &= v > 800 && v < 1200;
+                c.check("equal weights pick about evenly", even, java.util.Arrays.toString(n));
+            } finally {
+                org.erisia.stasis.Strata.setWeights(java.util.List.of("saddle:1", "staircase:1", "splash:1", "pods:1"));
+            }
+        }, false));
         // the drifting deeps' clock never wraps: a deep moves smoothly (< 0.2 blocks in 0.05 s, but it moves) across the
         // old 14.5 h wrap of Eddies.time and weeks or a year into a world
         CASES.put("deeps_clock_continuous", new Spec(1, (h, c) -> () -> {

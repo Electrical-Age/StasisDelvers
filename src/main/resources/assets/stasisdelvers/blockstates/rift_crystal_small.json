@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "facing=up": {
+      "model": "stasisdelvers:block/rift_crystal_small"
+    },
+    "facing=down": {
+      "model": "stasisdelvers:block/rift_crystal_small",
+      "x": 180
+    },
+    "facing=north": {
+      "model": "stasisdelvers:block/rift_crystal_small",
+      "x": 90
+    },
+    "facing=south": {
+      "model": "stasisdelvers:block/rift_crystal_small",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west": {
+      "model": "stasisdelvers:block/rift_crystal_small",
+      "x": 90,
+      "y": 270
+    },
+    "facing=east": {
+      "model": "stasisdelvers:block/rift_crystal_small",
+      "x": 90,
+      "y": 90
+    }
+  }
+}
