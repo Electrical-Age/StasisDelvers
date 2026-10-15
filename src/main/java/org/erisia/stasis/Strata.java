@@ -253,13 +253,20 @@ public final class Strata {
             double pad = s.r + 1.5;
             int x0 = (int) Math.floor((Math.min(s.ax, s.bx) - pad)) >> 4, x1 = (int) Math.floor((Math.max(s.ax, s.bx) + pad)) >> 4;
             int z0 = (int) Math.floor((Math.min(s.az, s.bz) - pad)) >> 4, z1 = (int) Math.floor((Math.max(s.az, s.bz) + pad)) >> 4;
+            int y0 = (int) Math.floor((Math.min(s.ay, s.by) - pad)) >> 4, y1 = (int) Math.floor((Math.max(s.ay, s.by) + pad)) >> 4;
             for (int cx = x0; cx <= x1; cx++)
-                for (int cz = z0; cz <= z1; cz++) byColumn.computeIfAbsent((long) cx << 32 | (cz & 0xFFFFFFFFL), k -> new ArrayList<>()).add(s);
+                for (int cz = z0; cz <= z1; cz++)
+                    for (int cy = y0; cy <= y1; cy++) byColumn.computeIfAbsent(key(cx, cy, cz), k -> new ArrayList<>()).add(s);
+        }
+
+        /** The index key of a 16-block cell (sections: a point only tests the segments near it). */
+        static long key(int cx, int cy, int cz) {
+            return ((long) cx & 0x3FFFFF) << 42 | ((long) cy & 0xFFFFF) << 22 | ((long) cz & 0x3FFFFF);
         }
 
         /** VENT inside a root tube, BODY in its lining (one block of riftstone around it), OUT elsewhere. */
         int at(int x, int y, int z) {
-            List<Seg> l = byColumn.get((long) (x >> 4) << 32 | ((z >> 4) & 0xFFFFFFFFL));
+            List<Seg> l = byColumn.get(key(x >> 4, y >> 4, z >> 4));
             if (l == null) return OUT;
             double px = x + 0.5, py = y + 0.5, pz = z + 0.5;
             int best = OUT;
