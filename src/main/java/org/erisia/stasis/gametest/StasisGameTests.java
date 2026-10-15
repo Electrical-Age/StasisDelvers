@@ -679,6 +679,27 @@ public final class StasisGameTests {
             c.check("outer blocks stop more often than inner ones", outerA / (double) outerN > innerA / (double) Math.max(1, innerN),
                 outerA + "/" + outerN + " vs " + innerA + "/" + innerN);
         }, false));
+        // the drifting deeps' clock never wraps: a deep moves smoothly (< 0.2 blocks in 0.05 s, but it moves) across the
+        // old 14.5 h wrap of Eddies.time and weeks or a year into a world
+        CASES.put("deeps_clock_continuous", new Spec(1, (h, c) -> () -> {
+            for (double t : new double[]{1048576 / 20.0, 3.0e6, 3.0e7}) {
+                var a = org.erisia.stasis.Deeps.near(0, 0, t - 0.025, 777);
+                var b = org.erisia.stasis.Deeps.near(0, 0, t + 0.025, 777);
+                int matched = 0;
+                double worst = 0, moved = 0;
+                for (var da : a)
+                    for (var db : b)
+                        if (da.id() == db.id()) {
+                            matched++;
+                            double m = Math.hypot(db.x() - da.x(), db.z() - da.z());
+                            worst = Math.max(worst, m);
+                            moved = Math.max(moved, m);
+                        }
+                c.check("deeps found at t=" + t, matched > 0, a.size() + "/" + b.size());
+                c.check("smooth at t=" + t, worst < 0.2, String.format("%.3f blocks", worst));
+                c.check("moving at t=" + t, moved > 0.005, String.format("%.4f blocks", moved));
+            }
+        }, false));
         // static deeps (Baughn): about a quarter of grid cells; organic; a rift core at the centre, outer zone around
         CASES.put("static_deeps_shape", new Spec(1, (h, c) -> () -> {
             int seed = 4242, found = 0, cells = 0;
@@ -730,8 +751,7 @@ public final class StasisGameTests {
                 org.erisia.stasis.Deeps.testDeeps = true;
                 try {
                     FieldData.get(level).testDeepSeed(777);
-                    float tm = (level.getGameTime() % 1048576L) / 20f;
-                    var near = org.erisia.stasis.Deeps.near(0, 0, tm, 777);
+                    var near = org.erisia.stasis.Deeps.near(0, 0, org.erisia.stasis.Deeps.time(level), 777);
                     var d = near.stream().filter(x -> x.strength() > 0.9f && x.radius() > 20).findFirst();
                     if (d.isEmpty()) c.check("found a strong deep to measure", false, near.toString());
                     else {

@@ -106,7 +106,7 @@ final class StasisCommands {
                 var src = c.getSource();
                 var level = src.getLevel();
                 var pos = src.getPosition();
-                var list = Deeps.near((float) pos.x, (float) pos.z, Eddies.time(level), Deeps.seed(level));
+                var list = Deeps.near((float) pos.x, (float) pos.z, Deeps.time(level), Deeps.seed(level));
                 src.sendSuccess(() -> Component.literal(list.size() + " drifting deep(s) around; here: "
                     + String.format("%.2f", Deeps.at(level, (int) Math.floor(pos.x), (int) Math.floor(pos.y), (int) Math.floor(pos.z)))), false);
                 for (var dp : list)

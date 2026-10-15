@@ -7,7 +7,7 @@
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
 // min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] drifting deep count; [168 + 2i, 169 + 2i] static
-// deep i's lowest and highest ground - floor(camera y); [176..215] unused; [216] render distance (blocks);
+// deep i's lowest and highest ground - floor(camera y); [176..182] the mist's clocks (mistWind ..); [183..215] unused; [216] render distance (blocks);
 // [1024 + 12i ..] drifting deep i (i < MAX_DEEPS, nearest first): centre - floor(camera) (x, z), radius, strength,
 // surface y - floor(camera y), edge-noise id, lowest and highest ground - floor(camera y), ground grid corner -
 // floor(camera) (x, z) and spacing, 1 unused; [2048 + 64i ..] drifting deep i's ground grid (8 x 8 surface y -
@@ -230,9 +230,9 @@ float groundAt(int base, vec3 g, vec2 q) {
 // octave, cut by a coverage remap into patches with holes (Guerrilla's cloud shaping, Schneider 2015), the patches
 // shrinking and thinning upwards (1/e per H blocks, with a ragged top). phase: how far the warp has evolved (the
 // patches churn in place). Tuned with tools/mist/preview.py (LabAgent's workdir).
-float mistAt(vec3 p, float h, float H, float cover, float phase, bool detail) {
+float mistAt(vec3 p, float h, float H, float cover, vec2 phase, bool detail) {
     if (h < -8.0) return 0.0;
-    vec4 wv = mistTex(p * 0.5 + vec3(phase, 11.0, 0.7 * phase));
+    vec4 wv = mistTex(p * 0.5 + vec3(phase.x, 11.0, phase.y));
     vec3 q = p + (wv.rgb - 0.5) * 9.0;
     vec4 n0 = mistTex(q);
     float n = 0.6 * n0.a + 0.4 * n0.r;
@@ -260,7 +260,11 @@ Hit hits[MAX_HITS];
 vec2 hitSpan[MAX_HITS];
 int hitCount = 0;
 vec3 hitCamI;
-float mistTime;
+// the mist's clocks, wrapped on the CPU where each is seamless (StasisPost; a float of game time loses precision
+// after days): drifting wind offset (x, z blocks, mod 96 = the noise period), warp phases (mod 32 voxels) of the
+// drifting and the static mist, and the static breathing angle (mod 2 pi)
+vec2 mistWind, mistPhase, staticPhase;
+float breathAngle;
 
 const float STATIC_REACH = 1.3, STATIC_REACH_ADD = 10.0;   // the mist's reach around a static deep (StasisPost too)
 
@@ -274,9 +278,9 @@ float mistDensity(vec3 q, int k, bool detail) {
         float env = smoothstep(-4.0, 10.0, hk.R - d) * min(1.0, hk.st * 1.5);
         if (env <= 0.0) return 0.0;
         float h = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
-        vec3 p = vec3(q.x - hk.c.x + 0.4 * mistTime, q.y + hitCamI.y, q.z - hk.c.z + 0.25 * mistTime) * (32.0 / 96.0);
+        vec3 p = vec3(q.x - hk.c.x + mistWind.x, q.y + hitCamI.y, q.z - hk.c.z + mistWind.y) * (32.0 / 96.0);
         p.y *= 1.5;
-        return env * mistAt(p + id, h, 11.0, 0.55, mistTime * 0.02, detail);
+        return env * mistAt(p + id, h, 11.0, 0.55, mistPhase, detail);
     }
     // static: anchored, breathing (density, height and coverage swell and ebb over ~16 s, out of step per deep; AdventurAgent
     // found a 30% swing too subtle to see)
@@ -285,16 +289,19 @@ float mistDensity(vec3 q, int k, bool detail) {
     float s = length(dv) / (hk.R * 1.15);
     float env = 1.0 - smoothstep(0.8, 1.15, s);
     if (env <= 0.0) return 0.0;
-    float br = 0.5 + 0.5 * sin(mistTime * 0.39 + id);
+    float br = 0.5 + 0.5 * sin(breathAngle + id);
     float h = q.y - groundAt(STATIC_GROUND + 64 * hk.idx, hk.g, q.xz);
     vec3 p = (q + hitCamI) * (32.0 / 96.0);
     p.y *= 1.5;
-    return env * (0.4 + 0.6 * br) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, mistTime * 0.015, detail);
+    return env * (0.4 + 0.6 * br) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, staticPhase, detail);
 }
 
 void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
     hitCamI = camI;
-    mistTime = data(30);
+    mistWind = vec2(data(176), data(177));
+    mistPhase = vec2(data(178), data(179));
+    staticPhase = vec2(data(180), data(181));
+    breathAngle = data(182);
     hitCount = 0;
     int nd = int(data(31));
     for (int i = 0; i < nd && i < MAX_DEEPS; i++) {

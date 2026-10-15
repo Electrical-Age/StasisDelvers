@@ -118,7 +118,7 @@ public final class StasisPost {
         // strength, local surface y - floor(camera y), edge-noise id; at most MAX_DEEPS
         int nd = 0;
         if (Stasis.stops(mc.level)) {
-            float t = d[30];
+            double t = (mc.level.getGameTime() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20.0;
             List<org.erisia.stasis.Deeps.Deep> deeps = new ArrayList<>();
             List<Double> gaps = new ArrayList<>();
             for (var dp : org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed())) {
@@ -152,6 +152,15 @@ public final class StasisPost {
             }
         }
         d[31] = nd;
+        // the mist's clocks (stasis.fsh mistWind ..), wrapped here in double where each is seamless
+        double mt = (mc.level.getGameTime() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20.0;
+        d[176] = (float) ((0.4 * mt) % 96.0);
+        d[177] = (float) ((0.25 * mt) % 96.0);
+        d[178] = (float) ((0.02 * mt) % 32.0);
+        d[179] = (float) ((0.014 * mt) % 32.0);
+        d[180] = (float) ((0.015 * mt) % 32.0);
+        d[181] = (float) ((0.0105 * mt) % 32.0);
+        d[182] = (float) ((0.39 * mt) % (2 * Math.PI));
         // static deeps near the camera (StaticDeeps): centre - floor(camera), radius, shape id; at most 4
         int ns = 0;
         if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {

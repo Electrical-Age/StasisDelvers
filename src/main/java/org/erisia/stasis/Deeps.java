@@ -30,18 +30,25 @@ public final class Deeps {
     public record Deep(float x, float z, float radius, float strength, int id) {
     }
 
-    /** How far the wind has carried everything by time t (seconds, Eddies.time base). */
     /**
-     * How far the wind has carried everything by time t (seconds, Eddies.time base). Baughn: a deep takes about a
+     * The deeps' clock (s): game time / 20, never wrapping (Eddies.time wraps every ~14.5 h, and every deep jumped
+     * then). Double: after weeks a float can't hold the drift to a fraction of a block.
+     */
+    public static double time(Level level) {
+        return level.getGameTime() / 20.0;
+    }
+
+    /**
+     * How far the wind has carried everything by time t (seconds, Deeps.time). Baughn: a deep takes about a
      * minute to pass on average, 3 at worst, with size and speed varying: the wind runs 0.65-1.35 blocks/s over a
      * 3-hour swell (plus a slow bend sideways), and each deep adds its own ±0.12 (cell()).
      */
-    static float[] drift(float t, int seed) {
+    static double[] drift(double t, int seed) {
         float ang = windAngle(seed);
         double along = 1.0 * t + 3780 * Math.sin(t / 10800.0);   // speed 1 + 0.35 cos(t / 3 h)
-        return new float[]{
-            (float) (along * Math.cos(ang) + 600 * Math.sin(t / 5400.0)),
-            (float) (along * Math.sin(ang) + 600 * Math.cos(t / 7200.0))};
+        return new double[]{
+            along * Math.cos(ang) + 600 * Math.sin(t / 5400.0),
+            along * Math.sin(ang) + 600 * Math.cos(t / 7200.0)};
     }
 
     static float windAngle(int seed) {
@@ -49,10 +56,10 @@ public final class Deeps {
     }
 
     /** The drifting deeps whose grid cells are around (x, z) (5 x 5: deeps stray up to ~430 blocks), present now. */
-    public static List<Deep> near(float x, float z, float t, int seed) {
+    public static List<Deep> near(float x, float z, double t, int seed) {
         List<Deep> out = new ArrayList<>(4);
-        float[] d = drift(t, seed);
-        float qx = x - d[0], qz = z - d[1];
+        double[] d = drift(t, seed);
+        double qx = x - d[0], qz = z - d[1];
         int cx = (int) Math.floor(qx / CELL), cz = (int) Math.floor(qz / CELL);
         for (int i = cx - 2; i <= cx + 2; i++)
             for (int k = cz - 2; k <= cz + 2; k++) {
@@ -67,10 +74,10 @@ public final class Deeps {
      * now: the cells a deep can come from (offset 32-224 in its cell, plus up to ~432 blocks of its own drift). For the
      * client's render distance (StasisPost); near() is the point query.
      */
-    public static List<Deep> within(float x, float z, float range, float t, int seed) {
+    public static List<Deep> within(float x, float z, float range, double t, int seed) {
         List<Deep> out = new ArrayList<>(16);
-        float[] d = drift(t, seed);
-        float qx = x - d[0], qz = z - d[1];
+        double[] d = drift(t, seed);
+        double qx = x - d[0], qz = z - d[1];
         int x0 = (int) Math.floor((qx - range - 224 - 440) / CELL), x1 = (int) Math.floor((qx + range - 32 + 440) / CELL);
         int z0 = (int) Math.floor((qz - range - 224 - 440) / CELL), z1 = (int) Math.floor((qz + range - 32 + 440) / CELL);
         for (int i = x0; i <= x1; i++)
@@ -81,12 +88,13 @@ public final class Deeps {
         return out;
     }
 
-    static Deep cell(int i, int k, float t, int seed, float[] drift) {
+    static Deep cell(int i, int k, double t, int seed, double[] drift) {
         // its own life cycle: 20-60 min, phase-shifted per cell; each cycle is a new deep (occupancy, place, size)
         float period = 1200f + 2400f * Noise.hash32(i, k, 31, seed);
         float phase = Noise.hash32(i, k, 32, seed) * period;
-        int cycle = (int) Math.floor((t + phase) / period);
-        float u = (t + phase) / period - cycle;
+        long cyc = (long) Math.floor((t + phase) / period);
+        int cycle = (int) cyc;
+        float u = (float) ((t + phase) / period - cyc);
         if (Noise.hash32(i, k, cycle, seed ^ 0x1D33) >= OCCUPANCY) return null;
         float env = smooth(u / 0.15f) * smooth((1 - u) / 0.15f);
         if (env <= 0.01f) return null;
@@ -95,9 +103,9 @@ public final class Deeps {
         float r0 = 20 + 22 * Noise.hash32(i, k, cycle, seed ^ 0x4D33);
         float breathe = 1 + 0.15f * (float) Math.sin(t / 150.0 + Noise.hash32(i, k, cycle, seed ^ 0x5D33) * 6.2831853);
         // its own speed: ±0.12 blocks/s along the wind, over its cycle (at most ~430 blocks: near() looks 2 cells out)
-        float own = (Noise.hash32(i, k, cycle, seed ^ 0x6D33) * 2 - 1) * 0.12f * (t + phase - cycle * period);
+        float own = (Noise.hash32(i, k, cycle, seed ^ 0x6D33) * 2 - 1) * 0.12f * (float) (t + phase - cyc * (double) period);
         float ang = windAngle(seed);
-        return new Deep(i * CELL + ox + drift[0] + own * (float) Math.cos(ang), k * CELL + oz + drift[1] + own * (float) Math.sin(ang),
+        return new Deep((float) (i * (double) CELL + ox + drift[0] + own * Math.cos(ang)), (float) (k * (double) CELL + oz + drift[1] + own * Math.sin(ang)),
             r0 * breathe * (0.4f + 0.6f * env), env,
             ((i * 73856093) ^ (k * 19349663) ^ cycle) & 0xFFFFFF);
     }
@@ -108,7 +116,7 @@ public final class Deeps {
     }
 
     /** Horizontal intensity 0..1 of the drifting deeps at (x, z): soft over the last 4 blocks, with a ragged edge. */
-    public static float horizontal(float x, float z, float t, int seed) {
+    public static float horizontal(float x, float z, double t, int seed) {
         float best = 0;
         for (Deep d : near(x, z, t, seed)) {
             float dx = x - d.x(), dz = z - d.z();
@@ -131,7 +139,7 @@ public final class Deeps {
         if (!Stasis.stops(level)) return 0;
         int seed = seed(level);
         if (seed == 0) return 0;
-        float h = horizontal(x + 0.5f, z + 0.5f, Eddies.time(level), seed);
+        float h = horizontal(x + 0.5f, z + 0.5f, time(level), seed);
         return h > 0 && inBand(level, x, y, z) ? h : 0;
     }
 
