@@ -2,11 +2,13 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // Stasis Delvers: drain the colour of everything where time is stopped, and the player's freeze warning (grey
-// creeping in from the screen edges). Field data comes in a 1024x1 texture of packed floats (StasisPost.java):
+// creeping in from the screen edges). Field data comes in a 1024x2 texture of packed floats (StasisPost.java; slot i
+// at (i % 1024, i / 1024)):
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
-// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] deep count; [168 + 6i ..] drifting deep i:
-// centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id; [256] bolt point
+// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] drifting deep count; [168..215] unused;
+// [216] render distance (blocks); [1024 + 8i ..] drifting deep i (i < MAX_DEEPS, nearest first):
+// centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id, 2 unused; [256] bolt point
 // count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius, shape id;
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
@@ -27,7 +29,7 @@ layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
 float data(int i) {
-    uvec4 b = uvec4(round(texelFetch(DataSampler, ivec2(i, 0), 0) * 255.0));
+    uvec4 b = uvec4(round(texelFetch(DataSampler, ivec2(i & 1023, i >> 10), 0) * 255.0));
     return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
 }
 
@@ -92,8 +94,6 @@ float eddyShare(float collapse, float failing) {
     return 0.15 + 0.3 * min(1.0, (failing - 0.7) / 0.3);
 }
 
-// Deeps.horizontal plus the height band: intensity 0..1 of the drifting deeps at q (= world - floor(camera));
-// camI = floor(camera) for the edge noise (world coordinates)
 // StaticDeeps.shape: the organic distance of world point w to static deep i (<= 0.35 rift, <= 1 outer zone)
 float staticShape(int i, vec3 w, vec3 camI) {
     int o = 220 + 5 * i;
@@ -107,24 +107,160 @@ float staticShape(int i, vec3 w, vec3 camI) {
     return length(dv) / (R * rough);
 }
 
+// Drifting deeps (Deeps): [DEEP_BASE + DEEP_STRIDE * i ..], i < MAX_DEEPS (StasisPost has the same constants)
+const int DEEP_BASE = 1024, DEEP_STRIDE = 8, MAX_DEEPS = 24;
+const float DEEP_EDGE = 6.0;                         // nothing past radius + 6 (ragged edge +-3)
+const float DEEP_BELOW = 8.0, DEEP_ABOVE = 64.0;     // height band: surface - 8 .. surface + 64 (soft at both ends)
+
+struct Deep {
+    vec2 c;      // centre - floor(camera) (x, z)
+    float R, st, yb;
+    int id;      // edge noise
+};
+
+Deep loadDeep(int i) {
+    int o = DEEP_BASE + DEEP_STRIDE * i;
+    return Deep(vec2(data(o), data(o + 1)), data(o + 2), data(o + 3), data(o + 4), int(data(o + 5)));
+}
+
+// Deeps.horizontal plus the height band, for one deep: intensity 0..1 at q (= world - floor(camera)); camI =
+// floor(camera) for the edge noise (world coordinates). Zero outside the cylinder radius + DEEP_EDGE and the band
+// (deepSpan relies on that). The mist's shape: swap this for another density later.
+float deepShape(Deep dp, vec3 q, vec3 camI) {
+    float d = length(q.xz - dp.c);
+    if (d > dp.R + DEEP_EDGE || dp.st <= 0.0) return 0.0;
+    vec3 w = q + camI;
+    // the ragged edge (noise) only near the rim: the inside and far outside skip it
+    if (d > dp.R - 8.0) d += 3.0 * (value32(vec3(w.x / 7.0, 0.5, w.z / 7.0), dp.id) - 0.5) * 2.0;
+    float band = smoothstep(dp.yb - DEEP_BELOW, dp.yb - DEEP_BELOW + 2.0, q.y) * (1.0 - smoothstep(dp.yb + DEEP_ABOVE - 4.0, dp.yb + DEEP_ABOVE, q.y));
+    return smoothstep(0.0, 1.0, (dp.R - d) / 4.0) * min(1.0, dp.st * 1.5) * band;
+}
+
+// all drifting deeps at q (the strongest): for the shields, a few pixels
 float deepAt(vec3 q, vec3 camI) {
     int nd = int(data(31));
     float best = 0.0;
-    vec3 w = q + camI;
-    for (int i = 0; i < nd && i < 8; i++) {
-        int o = 168 + 6 * i;
-        vec2 c = vec2(data(o), data(o + 1));
-        float R = data(o + 2), st = data(o + 3), yb = data(o + 4);
-        float d = length(q.xz - c);
-        if (d > R + 6.0 || st <= 0.0) continue;
-        // the ragged edge (noise) only near the rim: the inside and far outside skip it
-        if (d > R - 8.0) d += 3.0 * (value32(vec3(w.x / 7.0, 0.5, w.z / 7.0), int(data(o + 5))) - 0.5) * 2.0;
-        float band = smoothstep(yb - 8.0, yb - 6.0, q.y) * (1.0 - smoothstep(yb + 60.0, yb + 64.0, q.y));
-        best = max(best, smoothstep(0.0, 1.0, (R - d) / 4.0) * min(1.0, st * 1.5) * band);
-    }
+    for (int i = 0; i < nd && i < MAX_DEEPS; i++) best = max(best, deepShape(loadDeep(i), q, camI));
     return best;
 }
 
+// t interval of the ray o + t dir (dir normalised) inside a deep's cylinder (radius + DEEP_EDGE) and height band
+bool deepSpan(vec2 c, float R, float yb, vec3 o, vec3 dir, out vec2 span) {
+    float t0 = -1e9, t1 = 1e9;
+    vec2 oc = o.xz - c;
+    float rr = R + DEEP_EDGE;
+    float a = dot(dir.xz, dir.xz), b = dot(oc, dir.xz), cc = dot(oc, oc) - rr * rr;
+    if (a < 1e-8) {
+        if (cc > 0.0) return false;          // straight up or down, outside the cylinder
+    } else {
+        float disc = b * b - a * cc;
+        if (disc <= 0.0) return false;
+        float sq = sqrt(disc);
+        t0 = (-b - sq) / a;
+        t1 = (-b + sq) / a;
+    }
+    float y0 = yb - DEEP_BELOW, y1 = yb + DEEP_ABOVE;
+    if (abs(dir.y) < 1e-6) {
+        if (o.y < y0 || o.y > y1) return false;
+    } else {
+        float ta = (y0 - o.y) / dir.y, tb = (y1 - o.y) / dir.y;
+        t0 = max(t0, min(ta, tb));
+        t1 = min(t1, max(ta, tb));
+    }
+    span = vec2(max(t0, 0.0), t1);
+    return t1 >= span.x;                      // (span.x >= 0: not behind the camera)
+}
+
+// The deeps this pixel's view ray crosses (up to MAX_HITS, read once per pixel), and their t spans (from 0, not
+// clipped at the far end)
+const int MAX_HITS = 8;
+Deep hitDeep[MAX_HITS];
+vec2 hitSpan[MAX_HITS];
+int hitCount = 0;
+vec3 hitCamI;
+
+// density of hit deep k at q: the mist's shape (deepShape) for now
+float deepDensity(vec3 q, int k) {
+    return deepShape(hitDeep[k], q, hitCamI);
+}
+
+void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
+    hitCamI = camI;
+    hitCount = 0;
+    int nd = int(data(31));
+    for (int i = 0; i < nd && i < MAX_DEEPS; i++) {
+        int o8 = DEEP_BASE + DEEP_STRIDE * i;
+        vec2 c = vec2(data(o8), data(o8 + 1));
+        float R = data(o8 + 2), yb = data(o8 + 4);
+        vec2 span;
+        if (!deepSpan(c, R, yb, o, dir, span) || span.x > tEnd) continue;
+        hitDeep[hitCount] = Deep(c, R, data(o8 + 3), yb, int(data(o8 + 5)));
+        hitSpan[hitCount] = span;
+        if (++hitCount == MAX_HITS) break;       // nearest first: the farthest are dropped
+    }
+}
+
+// vanilla's render-distance fog (FogRenderer, fog.glsl): linear in cylindrical distance from rd - clamp(rd / 10, 4,
+// 64) to rd. 1 where terrain is unfogged, 0 past the render distance: the mist fades out with the terrain.
+float viewFade(vec3 rel, float rd) {
+    float start = rd - clamp(rd / 10.0, 4.0, 64.0);
+    float cyl = max(length(rel.xz), abs(rel.y));
+    return 1.0 - clamp((cyl - start) / (rd - start), 0.0, 1.0);
+}
+
+// interleaved gradient noise (Jimenez): a per-pixel jitter for the mist steps, stable over time
+float ign(vec2 px) {
+    return fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
+}
+
+const int MIST_STEPS = 32;                 // per pixel, all spans
+const float MIST_SIGMA = 0.0305;           // extinction per block at density 1 (the old 3% per block)
+
+// Transmittance of the deep mist along the ray, 0..tEnd (the hits from findDeeps): overlapping spans are merged and
+// marched together (the density there is the strongest deep's, as on the ground); each up to 14 jittered steps,
+// nearest first, MIST_STEPS in all.
+float deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
+    int ord[MAX_HITS];
+    for (int i = 0; i < MAX_HITS; i++) ord[i] = i;
+    // by entry (insertion sort)
+    for (int i = 1; i < hitCount; i++) {
+        int k = ord[i];
+        int j = i - 1;
+        while (j >= 0 && hitSpan[ord[j]].x > hitSpan[k].x) {
+            ord[j + 1] = ord[j];
+            j--;
+        }
+        ord[j + 1] = k;
+    }
+    float jit = ign(gl_FragCoord.xy);
+    float T = 1.0;
+    int used = 0;
+    int k = 0;
+    for (int g = 0; g < MAX_HITS; g++) {
+        if (k >= hitCount || used >= MIST_STEPS || T < 0.005) break;
+        float a = hitSpan[ord[k]].x, b = min(hitSpan[ord[k]].y, tEnd);
+        int k2 = k + 1;
+        for (int j = 0; j < MAX_HITS; j++) {
+            if (k2 >= hitCount || hitSpan[ord[k2]].x > b) break;
+            b = max(b, min(hitSpan[ord[k2]].y, tEnd));
+            k2++;
+        }
+        if (b > a) {
+            int n = min(clamp(int(ceil((b - a) / 3.0)), 4, 14), MIST_STEPS - used);
+            float dt = (b - a) / float(n);
+            for (int m = 0; m < 14; m++) {
+                if (m >= n) break;
+                float t = a + (float(m) + jit) * dt;
+                float dn = 0.0;
+                for (int j = k; j < k2; j++) dn = max(dn, deepDensity(o + dir * t, ord[j]));
+                if (dn > 0.0) T *= exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
+            }
+            used += n;
+        }
+        k = k2;
+    }
+    return T;
+}
 
 const vec3 ICO[12] = vec3[12](
     vec3(-0.5257311, 0.8506508, 0.0), vec3(0.5257311, 0.8506508, 0.0), vec3(-0.5257311, -0.8506508, 0.0), vec3(0.5257311, -0.8506508, 0.0),
@@ -266,8 +402,20 @@ void main() {
             run = max(run, inside);
         }
         float l = dot(c, vec3(0.299, 0.587, 0.114));
-        // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast
-        float deep = data(31) > 0.0 ? deepAt(depth > 0.0 ? p : camFrac, camInt) * (1.0 - run) : 0.0;
+        // drifting deeps along the view ray, up to the scene or as far as terrain renders (cylindrical: rd sqrt 2)
+        float rd = max(data(216), 32.0);
+        vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
+        vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
+        float tScene = depth > 0.0 ? length(rel) : 0.0;     // the sky: where the camera is
+        float tEnd = depth > 0.0 ? min(tScene, rd * 1.415) : rd * 1.415;
+        if (data(31) > 0.0) findDeeps(camFrac, dir, tEnd, camInt);
+        // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast; fades
+        // with distance like the mist
+        float deep = 0.0;
+        for (int i = 0; i < hitCount; i++)
+            if (hitSpan[i].x <= tScene + 0.05 && hitSpan[i].y >= tScene - 0.05)
+                deep = max(deep, deepDensity(depth > 0.0 ? p : camFrac, i));
+        deep *= (1.0 - run) * viewFade(rel, rd);
         int nsd = int(data(218));
         float riftHere = 0.0, fringe = 0.0;
         for (int i = 0; i < nsd && i < 4; i++) {
@@ -282,16 +430,9 @@ void main() {
         }
         vec3 grey = mix(vec3(l), c, 0.18 * (1.0 - deep)) * mix(vec3(0.96, 0.99, 1.04), vec3(0.62, 0.6, 0.74), deep);
         c = mix(grey, c, run);
-        if (data(31) > 0.0) {
-            // deep mist along the view ray (10 steps, up to 96 blocks)
-            float tEnd = depth > 0.0 ? min(length(rel), 96.0) : 96.0;
-            vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
-            vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
-            float mist = 0.0, sl = tEnd / 10.0;
-            for (int m = 0; m < 10; m++) {
-                float dn = deepAt(camFrac + dir * (float(m) + 0.5) * sl, camInt);
-                mist += (1.0 - mist) * dn * min(1.0, sl * 0.03);
-            }
+        if (hitCount > 0) {
+            // deep mist along the view ray, out to the render distance (fading with the terrain there)
+            float mist = 1.0 - deepMist(camFrac, dir, tEnd, rd);
             c = mix(c, vec3(0.55, 0.53, 0.64), mist * 0.8);
         }
         if (nsd > 0) {

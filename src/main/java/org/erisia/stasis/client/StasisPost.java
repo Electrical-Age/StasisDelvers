@@ -17,8 +17,9 @@ import java.util.List;
 
 /**
  * The desaturation of stopped land and the freeze warning: a post effect (assets/stasisdelvers/post_effect/stasis.json)
- * that reads the depth buffer. It learns where the fields are from a 1024x1 texture of packed floats, refreshed every
- * frame (the layout is in shaders/post/stasis.fsh). Requested through the player's active post effects while the
+ * that reads the depth buffer. It learns where the fields are from a 1024x2 texture of packed floats (slot i at
+ * (i % 1024, i / 1024)), refreshed every frame (the layout is in shaders/post/stasis.fsh; its size also in
+ * post_effect/stasis.json). Requested through the player's active post effects while the
  * player is in a dimension where time stops.
  */
 public final class StasisPost {
@@ -29,10 +30,14 @@ public final class StasisPost {
     /** Post chains look textures up at textures/effect/&lt;path&gt;.png. */
     static final Identifier DATA = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/fielddata.png");
     static DynamicTexture texture;
+    /** Data texture size: 1024 x 2 (GL 3.3 only promises 1024-wide textures). */
+    static final int WIDTH = 1024, ROWS = 2, SLOTS = WIDTH * ROWS;
+    /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
+    static final int DEEP_BASE = 1024, DEEP_STRIDE = 8, MAX_DEEPS = 24;
 
     /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
-        texture = new DynamicTexture(() -> "stasisdelvers field data", 1024, 1, true);
+        texture = new DynamicTexture(() -> "stasisdelvers field data", WIDTH, ROWS, true);
         Minecraft.getInstance().getTextureManager().register(DATA, texture);
     }
 
@@ -55,7 +60,7 @@ public final class StasisPost {
         if (mc.level == null) return;
         if (texture == null) init();
         var camState = e.getCameraState();
-        float[] d = new float[1024];
+        float[] d = new float[SLOTS];
         Matrix4f vp = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix).invert();
         vp.get(d, 0);   // column-major
         var cam = camState.pos;
@@ -97,19 +102,33 @@ public final class StasisPost {
                 ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;
         }
         d[24] = n;
-        // drifting deeps near the camera (Deeps): centre - floor(camera) (x, z), radius, strength, local surface y -
-        // floor(camera y), edge-noise id; at most 8
+        // the client's render distance in blocks (terrain ends, and vanilla's render-distance fog with it, there)
+        float view = mc.options.getEffectiveRenderDistance() * 16f;
+        d[216] = view;
+        // drifting deeps within the render distance (Deeps), nearest first: centre - floor(camera) (x, z), radius,
+        // strength, local surface y - floor(camera y), edge-noise id; at most MAX_DEEPS
         int nd = 0;
         if (Stasis.stops(mc.level)) {
             float t = d[30];
-            for (var dp : org.erisia.stasis.Deeps.near((float) cam.x, (float) cam.z, t, ClientFields.deepSeed())) {
-                if (nd == 8) break;
-                double dist = Math.hypot(dp.x() - cam.x, dp.z() - cam.z);
-                if (dist - dp.radius() > 320) continue;
+            List<org.erisia.stasis.Deeps.Deep> deeps = new ArrayList<>();
+            List<Double> gaps = new ArrayList<>();
+            for (var dp : org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed())) {
+                // the shader's cylinder is radius + 6 (ragged edge); past the render distance it's fogged away
+                double gap = Math.hypot(dp.x() - cam.x, dp.z() - cam.z) - dp.radius();
+                if (gap - 6 > view || dp.strength() <= 0) continue;
+                deeps.add(dp);
+                gaps.add(gap);
+            }
+            Integer[] order = new Integer[deeps.size()];
+            for (int i = 0; i < order.length; i++) order[i] = i;
+            java.util.Arrays.sort(order, java.util.Comparator.comparingDouble(gaps::get));
+            for (int i : order) {
+                if (nd == MAX_DEEPS) break;
+                var dp = deeps.get(i);
                 int bx = (int) Math.floor(dp.x()), bz = (int) Math.floor(dp.z());
                 double surface = mc.level.hasChunkAt(new net.minecraft.core.BlockPos(bx, 0, bz))
                     ? mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz) : cam.y - 10;
-                int o = 168 + 6 * nd++;
+                int o = DEEP_BASE + DEEP_STRIDE * nd++;
                 d[o] = (float) (dp.x() - fx);
                 d[o + 1] = (float) (dp.z() - fz);
                 d[o + 2] = dp.radius();
@@ -140,7 +159,7 @@ public final class StasisPost {
         d[256] = BoltRenderer.fill(d, 260, 150, fwd, cam, 1.0);
         var img = texture.getPixels();
         if (img == null) return;
-        for (int i = 0; i < 1024; i++) img.setPixelABGR(i, 0, Float.floatToRawIntBits(d[i]));
+        for (int i = 0; i < SLOTS; i++) img.setPixelABGR(i % WIDTH, i / WIDTH, Float.floatToRawIntBits(d[i]));
         texture.upload();
     }
 }

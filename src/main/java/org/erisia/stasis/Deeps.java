@@ -62,6 +62,25 @@ public final class Deeps {
         return out;
     }
 
+    /**
+     * The drifting deeps whose centres may lie within {@code range} blocks of (x, z) (x and z separately), present
+     * now: the cells a deep can come from (offset 32-224 in its cell, plus up to ~432 blocks of its own drift). For the
+     * client's render distance (StasisPost); near() is the point query.
+     */
+    public static List<Deep> within(float x, float z, float range, float t, int seed) {
+        List<Deep> out = new ArrayList<>(16);
+        float[] d = drift(t, seed);
+        float qx = x - d[0], qz = z - d[1];
+        int x0 = (int) Math.floor((qx - range - 224 - 440) / CELL), x1 = (int) Math.floor((qx + range - 32 + 440) / CELL);
+        int z0 = (int) Math.floor((qz - range - 224 - 440) / CELL), z1 = (int) Math.floor((qz + range - 32 + 440) / CELL);
+        for (int i = x0; i <= x1; i++)
+            for (int k = z0; k <= z1; k++) {
+                Deep deep = cell(i, k, t, seed, d);
+                if (deep != null) out.add(deep);
+            }
+        return out;
+    }
+
     static Deep cell(int i, int k, float t, int seed, float[] drift) {
         // its own life cycle: 20-60 min, phase-shifted per cell; each cycle is a new deep (occupancy, place, size)
         float period = 1200f + 2400f * Noise.hash32(i, k, 31, seed);
