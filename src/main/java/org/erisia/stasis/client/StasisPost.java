@@ -38,6 +38,14 @@ public final class StasisPost {
     static final int G = 8, GROUND_BASE = 2048, STATIC_GROUND_BASE = GROUND_BASE + G * G * MAX_DEEPS;
     /** A deep's ground grid, absolute surface y (grid()). */
     record Grid(double ox, double oz, double step, float[] h, float min, float max, boolean complete, long made) {
+        /** The bilinear ground at (x, z), clamped to the grid (stasis.fsh groundAt). */
+        double at(double x, double z) {
+            double lx = Math.max(0, Math.min(G - 1 - 1e-3, (x - ox) / step)), lz = Math.max(0, Math.min(G - 1 - 1e-3, (z - oz) / step));
+            int i = (int) lx, j = (int) lz;
+            double fx = lx - i, fz = lz - j;
+            double a = h[j * G + i] * (1 - fx) + h[j * G + i + 1] * fx, b = h[(j + 1) * G + i] * (1 - fx) + h[(j + 1) * G + i + 1] * fx;
+            return a * (1 - fz) + b * fz;
+        }
     }
     static final java.util.Map<Integer, Grid> grids = new java.util.HashMap<>();
     static final int GRID_TICKS = 10;
@@ -141,6 +149,9 @@ public final class StasisPost {
                 double surface = surface(mc, dp.x(), dp.z(), cam.y - 10);
                 Grid g = grid(mc, dp.id(), dp.x(), dp.z(), dp.radius() + 6, (float) surface, true);
                 packGrid(d, GROUND_BASE + G * G * nd, g, fy);
+                // the deep's surface for the shader: the ground grid at the centre (bilinear on the fixed lattice), not
+                // the centre column itself, which hops onto trunks and back as the deep moves (the tint blinked off)
+                surface = g.at(dp.x(), dp.z());
                 int o = DEEP_BASE + DEEP_STRIDE * nd++;
                 d[o + 6] = (float) (g.min() - fy);
                 d[o + 7] = (float) (g.max() - fy);

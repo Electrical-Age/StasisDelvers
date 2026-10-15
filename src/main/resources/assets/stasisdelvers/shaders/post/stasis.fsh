@@ -610,8 +610,13 @@ void main() {
         float deep = 0.0;
         // (only the drifting deeps whose ray span reaches the scene: a loop over all of them costs every pixel)
         for (int i = 0; i < hitCount; i++)
-            if (hits[i].kind == 0 && hitSpan[i].x <= tScene + 0.05 && hitSpan[i].y >= tScene - 0.05)
-                deep = max(deep, deepShape(loadDeep(hits[i].idx), depth > 0.0 ? p : camFrac, camInt));
+            if (hits[i].kind == 0 && hitSpan[i].x <= tScene + 0.05 && hitSpan[i].y >= tScene - 0.05) {
+                // the ground band from the deep's ground grid under this point (not one height for the whole deep)
+                Deep dp = loadDeep(hits[i].idx);
+                vec3 q = depth > 0.0 ? p : camFrac;
+                dp.yb = groundAt(GROUND_BASE + 64 * hits[i].idx, hits[i].g, q.xz);
+                deep = max(deep, deepShape(dp, q, camInt));
+            }
         deep *= (1.0 - run) * viewFade(rel, rd);
         int nsd = int(data(218));
         float riftHere = 0.0, fringe = 0.0;
