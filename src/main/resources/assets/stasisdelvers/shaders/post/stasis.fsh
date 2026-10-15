@@ -2,14 +2,18 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // Stasis Delvers: drain the colour of everything where time is stopped, and the player's freeze warning (grey
-// creeping in from the screen edges). Field data comes in a 1024x2 texture of packed floats (StasisPost.java; slot i
+// creeping in from the screen edges). Field data comes in a 1024x4 texture of packed floats (StasisPost.java; slot i
 // at (i % 1024, i / 1024)):
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
-// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] drifting deep count; [168..215] unused;
-// [216] render distance (blocks); [1024 + 8i ..] drifting deep i (i < MAX_DEEPS, nearest first):
-// centre - floor(camera) (x, z), radius, strength, surface y - floor(camera y), edge-noise id, 2 unused; [256] bolt point
-// count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius, shape id;
+// min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] drifting deep count; [168 + 2i, 169 + 2i] static
+// deep i's lowest and highest ground - floor(camera y); [176..215] unused; [216] render distance (blocks);
+// [1024 + 12i ..] drifting deep i (i < MAX_DEEPS, nearest first): centre - floor(camera) (x, z), radius, strength,
+// surface y - floor(camera y), edge-noise id, lowest and highest ground - floor(camera y), ground grid corner -
+// floor(camera) (x, z) and spacing, 1 unused; [2048 + 64i ..] drifting deep i's ground grid (8 x 8 surface y -
+// floor(camera y), row = z); [3584 + 64i ..] static deep i's (corner centre - (1.3 r + 10), spacing 2 (1.3 r + 10) / 7);
+// [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
+// shape id;
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
@@ -19,6 +23,7 @@
 uniform sampler2D InSampler;
 uniform sampler2D DepthSampler;
 uniform sampler2D DataSampler;
+uniform sampler2D MistSampler;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
@@ -108,9 +113,10 @@ float staticShape(int i, vec3 w, vec3 camI) {
 }
 
 // Drifting deeps (Deeps): [DEEP_BASE + DEEP_STRIDE * i ..], i < MAX_DEEPS (StasisPost has the same constants)
-const int DEEP_BASE = 1024, DEEP_STRIDE = 8, MAX_DEEPS = 24;
+const int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24, GROUND_BASE = 2048;
 const float DEEP_EDGE = 6.0;                         // nothing past radius + 6 (ragged edge +-3)
 const float DEEP_BELOW = 8.0, DEEP_ABOVE = 64.0;     // height band: surface - 8 .. surface + 64 (soft at both ends)
+const float MIST_ABOVE = 40.0;                       // the mist: lowest ground - 8 .. highest ground + 40
 
 struct Deep {
     vec2 c;      // centre - floor(camera) (x, z)
@@ -147,11 +153,11 @@ float deepAt(vec3 q, vec3 camI) {
     return best;
 }
 
-// t interval of the ray o + t dir (dir normalised) inside a deep's cylinder (radius + DEEP_EDGE) and height band
-bool deepSpan(vec2 c, float R, float yb, vec3 o, vec3 dir, out vec2 span) {
+// t interval of the ray o + t dir (dir normalised) inside a vertical cylinder (centre c, radius rr) and the height
+// band y0..y1
+bool cylSpan(vec2 c, float rr, float y0, float y1, vec3 o, vec3 dir, out vec2 span) {
     float t0 = -1e9, t1 = 1e9;
     vec2 oc = o.xz - c;
-    float rr = R + DEEP_EDGE;
     float a = dot(dir.xz, dir.xz), b = dot(oc, dir.xz), cc = dot(oc, oc) - rr * rr;
     if (a < 1e-8) {
         if (cc > 0.0) return false;          // straight up or down, outside the cylinder
@@ -162,7 +168,6 @@ bool deepSpan(vec2 c, float R, float yb, vec3 o, vec3 dir, out vec2 span) {
         t0 = (-b - sq) / a;
         t1 = (-b + sq) / a;
     }
-    float y0 = yb - DEEP_BELOW, y1 = yb + DEEP_ABOVE;
     if (abs(dir.y) < 1e-6) {
         if (o.y < y0 || o.y > y1) return false;
     } else {
@@ -174,32 +179,136 @@ bool deepSpan(vec2 c, float R, float yb, vec3 o, vec3 dir, out vec2 span) {
     return t1 >= span.x;                      // (span.x >= 0: not behind the camera)
 }
 
-// The deeps this pixel's view ray crosses (up to MAX_HITS, read once per pixel), and their t spans (from 0, not
-// clipped at the far end)
+// the same for a sphere (centre c, radius rr) cut to the height band y0..y1
+bool sphereSpan(vec3 c, float rr, float y0, float y1, vec3 o, vec3 dir, out vec2 span) {
+    vec3 oc = o - c;
+    float b = dot(oc, dir), cc = dot(oc, oc) - rr * rr, disc = b * b - cc;
+    if (disc <= 0.0) return false;
+    float sq = sqrt(disc), t0 = -b - sq, t1 = -b + sq;
+    if (abs(dir.y) < 1e-6) {
+        if (o.y < y0 || o.y > y1) return false;
+    } else {
+        float ta = (y0 - o.y) / dir.y, tb = (y1 - o.y) / dir.y;
+        t0 = max(t0, min(ta, tb));
+        t1 = min(t1, max(ta, tb));
+    }
+    span = vec2(max(t0, 0.0), t1);
+    return t1 >= span.x;
+}
+
+// The mist volume (MistSampler, textures/effect/mistnoise.png from script/gen_mistnoise.py): a tileable 32^3 noise,
+// 32 z slices of 34 x 34 texels (each slice with a 1-texel wrapped border, so bilinear filtering wraps inside it), 8
+// across and 4 down. p in voxels (period 32). r, g, b: gradient noises; a: inverted Worley (billows). 2 fetches.
+vec4 mistTex(vec3 p) {
+    p = mod(p, 32.0);
+    float z = p.z - 0.5, z0 = floor(z);
+    int s0 = int(mod(z0, 32.0)), s1 = (s0 + 1) & 31;
+    vec2 xy = p.xy + 1.0;
+    const vec2 INV = vec2(1.0 / 272.0, 1.0 / 136.0);
+    vec4 a = texture(MistSampler, (vec2(float((s0 & 7) * 34), float((s0 >> 3) * 34)) + xy) * INV);
+    vec4 b = texture(MistSampler, (vec2(float((s1 & 7) * 34), float((s1 >> 3) * 34)) + xy) * INV);
+    return mix(a, b, z - z0);
+}
+
+// The surface under a deep's mist: a G x G grid of heights (StasisPost.grid; y - floor(camera)) from slot base, the
+// grid's corner at org (x, z, relative to floor(camera)) with spacing step. Bilinear; clamped at the grid's edge.
+const int GG = 8;
+float groundAt(int base, vec3 g, vec2 q) {
+    vec2 l = clamp((q - g.xy) / g.z, 0.0, float(GG - 1) - 0.001);
+    vec2 f0 = floor(l);
+    vec2 f = l - f0;
+    int o = base + int(f0.y) * GG + int(f0.x);
+    return mix(mix(data(o), data(o + 1), f.x), mix(data(o + GG), data(o + GG + 1), f.x), f.y);
+}
+
+// Mist density 0..1 at noise point p (voxels) and height h above the ground: domain-warped billows plus a finer
+// octave, cut by a coverage remap into patches with holes (Guerrilla's cloud shaping, Schneider 2015), the patches
+// shrinking and thinning upwards (1/e per H blocks, with a ragged top). phase: how far the warp has evolved (the
+// patches churn in place). Tuned with tools/mist/preview.py (LabAgent's workdir).
+float mistAt(vec3 p, float h, float H, float cover, float phase) {
+    if (h < -8.0) return 0.0;
+    vec4 wv = mistTex(p * 0.5 + vec3(phase, 11.0, 0.7 * phase));
+    vec3 q = p + (wv.rgb - 0.5) * 9.0;
+    vec4 n0 = mistTex(q);
+    float n = 0.6 * n0.a + 0.4 * n0.r;
+    n = 0.78 * n + 0.22 * mistTex(q * 2.03 + vec3(5.1, 9.7, 13.3)).g;
+    float top = max(h - 6.0 * (wv.a - 0.5), 0.0);
+    float cv = cover * (1.0 - 0.5 * min(1.0, top / (3.0 * H)));
+    return clamp((n - (1.0 - cv)) / cv, 0.0, 1.0) * exp(-top / H) * smoothstep(-8.0, -5.0, h);
+}
+
+// The deeps (drifting and static) this pixel's view ray crosses (up to MAX_HITS, read once per pixel), and their t
+// spans (from 0, not clipped at the far end)
 const int MAX_HITS = 8;
-Deep hitDeep[MAX_HITS];
+const int STATIC_GROUND = 2048 + 64 * MAX_DEEPS;     // StasisPost.STATIC_GROUND_BASE
+struct Hit {
+    int kind;        // 0 drifting deep, 1 static deep
+    int idx;
+    vec3 c;          // centre - floor(camera) (drifting: y = surface at the centre)
+    float R, st;
+    vec3 g;          // ground grid corner (x, z) and spacing
+    int id;
+};
+Hit hits[MAX_HITS];
 vec2 hitSpan[MAX_HITS];
 int hitCount = 0;
 vec3 hitCamI;
+float mistTime;
 
-// density of hit deep k at q: the mist's shape (deepShape) for now
-float deepDensity(vec3 q, int k) {
-    return deepShape(hitDeep[k], q, hitCamI);
+const float STATIC_REACH = 1.3, STATIC_REACH_ADD = 10.0;   // the mist's reach around a static deep (StasisPost too)
+
+// mist density of hit k at q (= world - floor(camera)): inside the gameplay envelope only
+float mistDensity(vec3 q, int k) {
+    Hit hk = hits[k];
+    float id = float(hk.id & 1023);
+    if (hk.kind == 0) {
+        // drifting: patches carried along with the deep, plus a slow wind of their own through it
+        float d = length(q.xz - hk.c.xz);
+        float env = smoothstep(-4.0, 10.0, hk.R - d) * min(1.0, hk.st * 1.5);
+        if (env <= 0.0) return 0.0;
+        float h = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
+        vec3 p = vec3(q.x - hk.c.x + 0.4 * mistTime, q.y + hitCamI.y, q.z - hk.c.z + 0.25 * mistTime) * (32.0 / 96.0);
+        p.y *= 1.5;
+        return env * mistAt(p + id, h, 11.0, 0.55, mistTime * 0.02);
+    }
+    // static: anchored, breathing (density, height and coverage swell and ebb over ~16 s, out of step per deep)
+    vec3 dv = q - hk.c;
+    dv.y *= 1.4;
+    float s = length(dv) / (hk.R * 1.15);
+    float env = 1.0 - smoothstep(0.8, 1.15, s);
+    if (env <= 0.0) return 0.0;
+    float br = 0.5 + 0.5 * sin(mistTime * 0.39 + id);
+    float h = q.y - groundAt(STATIC_GROUND + 64 * hk.idx, hk.g, q.xz);
+    vec3 p = (q + hitCamI) * (32.0 / 96.0);
+    p.y *= 1.5;
+    return env * (0.7 + 0.3 * br) * mistAt(p + id, h, 7.0 + 5.0 * br, 0.45 + 0.15 * br, mistTime * 0.015);
 }
 
 void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
     hitCamI = camI;
+    mistTime = data(30);
     hitCount = 0;
     int nd = int(data(31));
     for (int i = 0; i < nd && i < MAX_DEEPS; i++) {
         int o8 = DEEP_BASE + DEEP_STRIDE * i;
         vec2 c = vec2(data(o8), data(o8 + 1));
-        float R = data(o8 + 2), yb = data(o8 + 4);
+        float R = data(o8 + 2);
         vec2 span;
-        if (!deepSpan(c, R, yb, o, dir, span) || span.x > tEnd) continue;
-        hitDeep[hitCount] = Deep(c, R, data(o8 + 3), yb, int(data(o8 + 5)));
+        if (!cylSpan(c, R + DEEP_EDGE, data(o8 + 6) - DEEP_BELOW, data(o8 + 7) + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
+        hits[hitCount] = Hit(0, i, vec3(c.x, data(o8 + 4), c.y), R, data(o8 + 3), vec3(data(o8 + 8), data(o8 + 9), data(o8 + 10)), int(data(o8 + 5)));
         hitSpan[hitCount] = span;
-        if (++hitCount == MAX_HITS) break;       // nearest first: the farthest are dropped
+        if (++hitCount == MAX_HITS) return;       // nearest first: the farthest are dropped
+    }
+    int ns = int(data(218));
+    for (int i = 0; i < ns && i < 4; i++) {
+        int o5 = 220 + 5 * i;
+        vec3 c = vec3(data(o5), data(o5 + 1), data(o5 + 2));
+        float R = data(o5 + 3), E = R * STATIC_REACH + STATIC_REACH_ADD;
+        vec2 span;
+        if (!sphereSpan(c, E, data(168 + 2 * i) - DEEP_BELOW, data(169 + 2 * i) + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
+        hits[hitCount] = Hit(1, i, c, R, 1.0, vec3(c.x - E, c.z - E, 2.0 * E / float(GG - 1)), int(data(o5 + 4)));
+        hitSpan[hitCount] = span;
+        if (++hitCount == MAX_HITS) return;
     }
 }
 
@@ -216,13 +325,14 @@ float ign(vec2 px) {
     return fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
 }
 
-const int MIST_STEPS = 32;                 // per pixel, all spans
-const float MIST_SIGMA = 0.0305;           // extinction per block at density 1 (the old 3% per block)
+const int MIST_STEPS = 40;                 // per pixel, all spans
+const float MIST_SIGMA = 0.07;             // extinction per block at density 1
 
-// Transmittance of the deep mist along the ray, 0..tEnd (the hits from findDeeps): overlapping spans are merged and
-// marched together (the density there is the strongest deep's, as on the ground); each up to 14 jittered steps,
-// nearest first, MIST_STEPS in all.
-float deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
+// The deep mist along the ray, 0..tEnd (the hits from findDeeps), front to back: rgb = the light it scatters to the
+// eye, a = 1 - transmittance (Beer-Lambert). Overlapping spans are merged and marched together (the density there is
+// the densest deep's); each up to 16 jittered steps, nearest first, MIST_STEPS in all. The mist is darker and more
+// violet low down, paler where it thins out on top (a cheap height-dependent in-scatter).
+vec4 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
     int ord[MAX_HITS];
     for (int i = 0; i < MAX_HITS; i++) ord[i] = i;
     // by entry (insertion sort)
@@ -237,6 +347,7 @@ float deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
     }
     float jit = ign(gl_FragCoord.xy);
     float T = 1.0;
+    vec3 L = vec3(0.0);
     int used = 0;
     int k = 0;
     for (int g = 0; g < MAX_HITS; g++) {
@@ -249,20 +360,27 @@ float deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
             k2++;
         }
         if (b > a) {
-            int n = min(clamp(int(ceil((b - a) / 3.0)), 4, 14), MIST_STEPS - used);
+            int n = min(clamp(int(ceil((b - a) / 2.5)), 6, 16), MIST_STEPS - used);
             float dt = (b - a) / float(n);
-            for (int m = 0; m < 14; m++) {
+            for (int m = 0; m < 16; m++) {
                 if (m >= n) break;
                 float t = a + (float(m) + jit) * dt;
+                vec3 q = o + dir * t;
                 float dn = 0.0;
-                for (int j = k; j < k2; j++) dn = max(dn, deepDensity(o + dir * t, ord[j]));
-                if (dn > 0.0) T *= exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
+                for (int j = k; j < k2; j++) dn = max(dn, mistDensity(q, ord[j]));
+                if (dn > 0.0) {
+                    float alpha = 1.0 - exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
+                    // thin mist reads paler (lit through), dense cores darker
+                    vec3 col = mix(vec3(0.66, 0.65, 0.75), vec3(0.47, 0.45, 0.57), dn);
+                    L += T * alpha * col;
+                    T *= 1.0 - alpha;
+                }
             }
             used += n;
         }
         k = k2;
     }
-    return T;
+    return vec4(L, 1.0 - T);
 }
 
 const vec3 ICO[12] = vec3[12](
@@ -411,13 +529,11 @@ void main() {
         vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
         float tScene = depth > 0.0 ? length(rel) : 0.0;     // the sky: where the camera is
         float tEnd = depth > 0.0 ? min(tScene, rd * 1.415) : rd * 1.415;
-        if (data(31) > 0.0) findDeeps(camFrac, dir, tEnd, camInt);
+        if (data(31) > 0.0 || data(218) > 0.0) findDeeps(camFrac, dir, tEnd, camInt);
         // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast; fades
         // with distance like the mist
         float deep = 0.0;
-        for (int i = 0; i < hitCount; i++)
-            if (hitSpan[i].x <= tScene + 0.05 && hitSpan[i].y >= tScene - 0.05)
-                deep = max(deep, deepDensity(depth > 0.0 ? p : camFrac, i));
+        if (data(31) > 0.0) deep = deepAt(depth > 0.0 ? p : camFrac, camInt);
         deep *= (1.0 - run) * viewFade(rel, rd);
         int nsd = int(data(218));
         float riftHere = 0.0, fringe = 0.0;
@@ -435,8 +551,8 @@ void main() {
         c = mix(grey, c, run);
         if (hitCount > 0) {
             // deep mist along the view ray, out to the render distance (fading with the terrain there)
-            float mist = 1.0 - deepMist(camFrac, dir, tEnd, rd);
-            c = mix(c, vec3(0.55, 0.53, 0.64), mist * 0.8);
+            vec4 mist = deepMist(camFrac, dir, tEnd, rd);
+            c = c * (1.0 - 0.85 * mist.a) + 0.85 * mist.rgb;
         }
         if (nsd > 0) {
             // rifts: no light at all, a faint violet fringe at the edge, and they swallow what lies behind them

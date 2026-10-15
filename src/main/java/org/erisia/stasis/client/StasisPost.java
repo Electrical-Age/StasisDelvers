@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * The desaturation of stopped land and the freeze warning: a post effect (assets/stasisdelvers/post_effect/stasis.json)
- * that reads the depth buffer. It learns where the fields are from a 1024x2 texture of packed floats (slot i at
+ * that reads the depth buffer. It learns where the fields are from a 1024x4 texture of packed floats (slot i at
  * (i % 1024, i / 1024)), refreshed every frame (the layout is in shaders/post/stasis.fsh; its size also in
  * post_effect/stasis.json). Requested through the player's active post effects while the
  * player is in a dimension where time stops.
@@ -30,10 +30,17 @@ public final class StasisPost {
     /** Post chains look textures up at textures/effect/&lt;path&gt;.png. */
     static final Identifier DATA = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/fielddata.png");
     static DynamicTexture texture;
-    /** Data texture size: 1024 x 2 (GL 3.3 only promises 1024-wide textures). */
-    static final int WIDTH = 1024, ROWS = 2, SLOTS = WIDTH * ROWS;
+    /** Data texture size: 1024 x 4 (GL 3.3 only promises 1024-wide textures). */
+    static final int WIDTH = 1024, ROWS = 4, SLOTS = WIDTH * ROWS;
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
-    static final int DEEP_BASE = 1024, DEEP_STRIDE = 8, MAX_DEEPS = 24;
+    static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
+    /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
+    static final int G = 8, GROUND_BASE = 2048, STATIC_GROUND_BASE = GROUND_BASE + G * G * MAX_DEEPS;
+    /** A deep's ground grid, absolute surface y; refreshed every GRID_TICKS game ticks (drifting deeps move slowly). */
+    record Grid(double ox, double oz, double step, float[] h, float min, float max, boolean complete, long made) {
+    }
+    static final java.util.Map<Integer, Grid> grids = new java.util.HashMap<>();
+    static final int GRID_TICKS = 10;
 
     /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
@@ -125,10 +132,15 @@ public final class StasisPost {
             for (int i : order) {
                 if (nd == MAX_DEEPS) break;
                 var dp = deeps.get(i);
-                int bx = (int) Math.floor(dp.x()), bz = (int) Math.floor(dp.z());
-                double surface = mc.level.hasChunkAt(new net.minecraft.core.BlockPos(bx, 0, bz))
-                    ? mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz) : cam.y - 10;
+                double surface = surface(mc, dp.x(), dp.z(), cam.y - 10);
+                Grid g = grid(mc, dp.id(), dp.x(), dp.z(), dp.radius() + 6, (float) surface, true);
+                packGrid(d, GROUND_BASE + G * G * nd, g, fy);
                 int o = DEEP_BASE + DEEP_STRIDE * nd++;
+                d[o + 6] = (float) (g.min() - fy);
+                d[o + 7] = (float) (g.max() - fy);
+                d[o + 8] = (float) (g.ox() - fx);
+                d[o + 9] = (float) (g.oz() - fz);
+                d[o + 10] = (float) g.step();
                 d[o] = (float) (dp.x() - fx);
                 d[o + 1] = (float) (dp.z() - fz);
                 d[o + 2] = dp.radius();
@@ -145,6 +157,11 @@ public final class StasisPost {
                 if (ns == 4) break;
                 double dist = Math.sqrt(Math.pow(sd.x() - cam.x, 2) + Math.pow(sd.y() - cam.y, 2) + Math.pow(sd.z() - cam.z, 2));
                 if (dist - sd.radius() * 1.5 > 200) continue;
+                // the mist's reach (stasis.fsh STATIC_REACH): the warped, roughened shape stays within ~1.3 r + 8
+                Grid g = grid(mc, ~sd.id(), sd.x(), sd.z(), sd.radius() * 1.3f + 10, sd.y(), false);
+                packGrid(d, STATIC_GROUND_BASE + G * G * ns, g, fy);
+                d[168 + 2 * ns] = (float) (g.min() - fy);
+                d[169 + 2 * ns] = (float) (g.max() - fy);
                 int o = 220 + 5 * ns++;
                 d[o] = (float) (sd.x() - fx);
                 d[o + 1] = (float) (sd.y() - fy);
@@ -154,6 +171,8 @@ public final class StasisPost {
             }
         }
         d[218] = ns;
+        long now = mc.level.getGameTime();
+        grids.values().removeIf(g -> now - g.made() > 200);
         // lightning bolts (BoltRenderer), projected to the screen
         Matrix4f fwd = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
         d[256] = BoltRenderer.fill(d, 260, 150, fwd, cam, 1.0);
@@ -161,5 +180,49 @@ public final class StasisPost {
         if (img == null) return;
         for (int i = 0; i < SLOTS; i++) img.setPixelABGR(i % WIDTH, i / WIDTH, Float.floatToRawIntBits(d[i]));
         texture.upload();
+    }
+
+    /** The surface (top of motion-blocking blocks, not leaves) at a column, or the fallback where it isn't loaded. */
+    static double surface(Minecraft mc, double x, double z, double fallback) {
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
+        return mc.level.hasChunkAt(new net.minecraft.core.BlockPos(bx, 0, bz))
+            ? mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz) : fallback;
+    }
+
+    /**
+     * The ground grid of a deep (cached by key): G x G surface heights over the square centre +- reach (unloaded
+     * columns take the fallback). A drifting deep's grid is remade every GRID_TICKS; a static one while it has
+     * unloaded columns.
+     */
+    static Grid grid(Minecraft mc, int key, double cx, double cz, double reach, float fallback, boolean moving) {
+        long now = mc.level.getGameTime();
+        Grid g = grids.get(key);
+        if (g != null && (moving ? now - g.made() < GRID_TICKS : g.complete())) {
+            if (!moving) grids.put(key, g = new Grid(g.ox(), g.oz(), g.step(), g.h(), g.min(), g.max(), true, now));
+            return g;
+        }
+        double step = 2 * reach / (G - 1);
+        float[] h = new float[G * G];
+        float min = Float.MAX_VALUE, max = -Float.MAX_VALUE;
+        boolean complete = true;
+        for (int j = 0; j < G; j++)
+            for (int i = 0; i < G; i++) {
+                double y = surface(mc, cx - reach + i * step, cz - reach + j * step, Double.NaN);
+                if (Double.isNaN(y)) {
+                    complete = false;
+                    y = fallback;
+                }
+                h[j * G + i] = (float) y;
+                min = Math.min(min, (float) y);
+                max = Math.max(max, (float) y);
+            }
+        g = new Grid(cx - reach, cz - reach, step, h, min, max, complete, now);
+        grids.put(key, g);
+        return g;
+    }
+
+    static void packGrid(float[] d, int base, Grid g, double fy) {
+        float[] h = g.h();
+        for (int i = 0; i < G * G; i++) d[base + i] = (float) (h[i] - fy);
     }
 }

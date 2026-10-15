@@ -9,7 +9,8 @@
             "inputs": [
                 { "sampler_name": "In", "target": "minecraft:main" },
                 { "sampler_name": "Depth", "target": "minecraft:main", "use_depth_buffer": true },
-                { "sampler_name": "Data", "location": "stasisdelvers:fielddata", "width": 1024, "height": 2 }
+                { "sampler_name": "Data", "location": "stasisdelvers:fielddata", "width": 1024, "height": 4 },
+                { "sampler_name": "Mist", "location": "stasisdelvers:mistnoise", "width": 272, "height": 136, "bilinear": true }
             ],
             "output": "swap"
         },
