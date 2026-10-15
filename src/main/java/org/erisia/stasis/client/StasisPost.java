@@ -82,9 +82,12 @@ public final class StasisPost {
         d[21] = (float) (cam.z - fz);
         d[22] = Stasis.stops(mc.level) ? 1 : 0;
         d[23] = StasisNet.clientFreeze;
-        d[29] = (float) ((mc.level.getGameTime() % 24000L) / 20.0);
+        // all time-driven visuals on the smoothed clock: in a slow field the client ticks slowly and the server's time
+        // packet steps its game time every second (AdventurAgent: the whole screen stepped once a second)
+        double clock = weatherClock(mc);
+        d[29] = (float) ((clock % 1200.0));
         // eddy time (Eddies.time), with the partial tick so the mist drifts smoothly
-        d[30] = ((mc.level.getGameTime() % 1048576L) + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f;
+        d[30] = (float) (clock % (1048576 / 20.0));
         int[] spawn = Stasis.spawnArea(mc.level);
         if (spawn != null) {
             d[25] = spawn[0];
@@ -118,7 +121,7 @@ public final class StasisPost {
         // strength, local surface y - floor(camera y), edge-noise id; at most MAX_DEEPS
         int nd = 0;
         if (Stasis.stops(mc.level)) {
-            double t = weatherClock(mc);
+            double t = clock;
             List<org.erisia.stasis.Deeps.Deep> deeps = new ArrayList<>();
             List<Double> gaps = new ArrayList<>();
             for (var dp : org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed())) {
@@ -153,7 +156,7 @@ public final class StasisPost {
         }
         d[31] = nd;
         // the mist's clocks (stasis.fsh mistWind ..), wrapped here in double where each is seamless
-        double mt = weatherClock(mc);
+        double mt = clock;
         d[176] = (float) ((0.4 * mt) % 96.0);
         d[177] = (float) ((0.25 * mt) % 96.0);
         d[178] = (float) ((0.02 * mt) % 32.0);
@@ -217,9 +220,23 @@ public final class StasisPost {
     /** The surface (top of motion-blocking blocks, not leaves) at a column, or the fallback where it isn't loaded. */
     static double surface(Minecraft mc, double x, double z, double fallback) {
         int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
-        return mc.level.hasChunkAt(new net.minecraft.core.BlockPos(bx, 0, bz))
-            ? mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz) : fallback;
+        long key = (long) bx << 32 | (bz & 0xFFFFFFFFL);
+        if (mc.level.hasChunkAt(new net.minecraft.core.BlockPos(bx, 0, bz))) {
+            int h = mc.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
+            // an empty or not yet filled chunk reads as the bottom of the world: not a surface
+            if (h > mc.level.getMinY()) {
+                if (SURFACES.size() > 50_000) SURFACES.clear();
+                SURFACES.put(key, h);
+                return h;
+            }
+        }
+        // a column we saw before keeps its height while its chunk is away (a deep's tint and mist blinked off when
+        // its centre column read as unloaded for a moment: AdventurAgent)
+        Integer seen = SURFACES.get(key);
+        return seen != null ? seen : fallback;
     }
+
+    static final java.util.Map<Long, Integer> SURFACES = new java.util.HashMap<>();
 
     /**
      * The ground grid of a deep (cached by key): G x G surface heights covering the square centre +- reach (unloaded
