@@ -247,7 +247,7 @@ public record DeepFeature() implements Feature {
     static BlockState ore(int x, int y, int z, int seed) {
         if (!StasisConfig.riftOres || Noise.hash32(x, y, z, seed) >= StasisConfig.riftOreRate) return null;
         java.util.List<BlockState> ores = ORES;
-        if (ores == null) {
+        if (ores == null || ores.isEmpty()) {   // (empty: resolved before the tags were bound; try again)
             java.util.List<BlockState> l = new java.util.ArrayList<>();
             java.util.List<Float> w = new java.util.ArrayList<>();
             for (String tag : java.util.List.of("ores_in_ground/stone", "ores_in_ground/deepslate"))

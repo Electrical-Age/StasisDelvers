@@ -135,7 +135,8 @@ public final class Strata {
             double sheet = -0.8 * R + (lx * lx - lz * lz) / (7 * R), dd = ly - sheet;
             double T = (2.6 + 0.04 * R) * clamp(1.15 - (r / rim) * (r / rim), 0, 1);
             if (r < rim && Math.abs(dd) < T) {
-                if (Math.abs(dd) < 0.45 * T && r > 0.3 * R && noisy(d, x, y, z, 9, 0.45f, 0x5AD1)) return CAVITY;
+                // (only where the sheet is thick enough for a cave a player fits in: 1-high runs were a fifth of the floor)
+                if (T >= 3.2 && Math.abs(dd) < 0.6 * T && r > 0.3 * R && noisy(d, x, y, z, 9, 0.45f, 0x5AD1)) return CAVITY;
                 return BODY;
             }
             // veins: 24 radial lines on the sheet's upper face, from near the pupil out across the rim
