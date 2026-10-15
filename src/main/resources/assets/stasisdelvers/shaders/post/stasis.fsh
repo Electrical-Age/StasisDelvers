@@ -313,7 +313,10 @@ void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
         float cb = dot(oc, dir.xz), cr = R + DEEP_EDGE;
         if (dot(oc, oc) > cr * cr && (cb > 0.0 || cb * cb < dot(dir.xz, dir.xz) * (dot(oc, oc) - cr * cr))) continue;
         vec2 span;
-        if (!cylSpan(c, R + DEEP_EDGE, data(o8 + 6) - DEEP_BELOW, data(o8 + 7) + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
+        // the height band from the deep's (smooth) surface, not the grid's min and max: those change when the grid
+        // moves on to the next lattice cell, and the march's samples moved with them (the mist re-formed in one frame)
+        float yb = data(o8 + 4);
+        if (!cylSpan(c, R + DEEP_EDGE, yb - 32.0 - DEEP_BELOW, yb + 24.0 + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
         hits[hitCount] = Hit(0, i, vec3(c.x, data(o8 + 4), c.y), R, data(o8 + 3), vec3(data(o8 + 8), data(o8 + 9), data(o8 + 10)), int(data(o8 + 5)));
         hitSpan[hitCount] = span;
         if (++hitCount == MAX_HITS) return;       // nearest first: the farthest are dropped
