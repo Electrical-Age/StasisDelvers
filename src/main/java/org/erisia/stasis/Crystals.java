@@ -215,7 +215,7 @@ public final class Crystals {
                 int id = Pockets.strataId(level, pos.getX(), pos.getY(), pos.getZ());
                 if (id >= 0) {
                     int px = Math.floorDiv(pos.getX(), Pockets.POCKET), py = Math.floorDiv(pos.getY(), Pockets.POCKET), pz = Math.floorDiv(pos.getZ(), Pockets.POCKET);
-                    b.e += Pockets.exposure(id, px, py, pz, t) - Pockets.exposure(id, px, py, pz, b.t);
+                    b.e += Pockets.exposure(id, px, py, pz, b.t, t);
                 }
             }
             b.t = t;

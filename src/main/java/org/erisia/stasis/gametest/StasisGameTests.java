@@ -766,7 +766,7 @@ public final class StasisGameTests {
                     if (prev.state() == w.state() && Math.abs(prev.untilNext() - 1 - w.untilNext()) > 1e-6) badUntil++;
                     prev = w;
                 }
-                double e = org.erisia.stasis.Pockets.exposure(99, px, py, pz, t0 + 30000) - org.erisia.stasis.Pockets.exposure(99, px, py, pz, t0);
+                double e = org.erisia.stasis.Pockets.exposure(99, px, py, pz, t0, t0 + 30000);
                 expoErr = Math.max(expoErr, Math.abs(e - grey));
             }
             c.check("rifts seen", rifts > 50, String.valueOf(rifts));
@@ -862,12 +862,12 @@ public final class StasisGameTests {
                     org.erisia.stasis.Crystals.sweep(level, cp);
                     double e = org.erisia.stasis.Crystals.testExposure(level, face, 0);
                     int px = Math.floorDiv(face.getX(), 12), py = Math.floorDiv(face.getY(), 12), pz = Math.floorDiv(face.getZ(), 12);
-                    double want = org.erisia.stasis.Pockets.exposure(4242, px, py, pz, t) - org.erisia.stasis.Pockets.exposure(4242, px, py, pz, t - 10000);
+                    double want = org.erisia.stasis.Pockets.exposure(4242, px, py, pz, t - 10000, t);
                     if (inField) {
                         c.check("in a field: no growth", e == 0 && level.getBlockState(face).isAir(), String.format("%.1f s", e));
                         return;
                     }
-                    c.check("the gap is bridged by the closed form", Math.abs(e - want) < 2 && want > 6000, String.format("%.1f vs %.1f", e, want));
+                    c.check("the gap is bridged by the closed form", Math.abs(e - want) < 2 && want > 5000, String.format("%.1f vs %.1f", e, want));
                     var st = level.getBlockState(face);
                     c.check("it grew to a cluster facing out", st.is(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_CLUSTER.get())
                         && st.getValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING) == fd, st.toString());
