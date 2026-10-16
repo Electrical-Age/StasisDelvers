@@ -32,7 +32,8 @@ final class Tickets {
         int[] old = FORCED.remove(key);
         if (old != null) force(level, pos, old[0], false);
         if (t.state() != TowerBlockEntity.State.OFF) {
-            int cr = (int) Math.ceil(t.radius() / 16.0);
+            // (the larger of now and the target: tickets don't follow the retreat cycle in and out)
+            int cr = (int) Math.ceil(Math.max(t.radius(), t.target()) / 16.0);
             force(level, pos, cr, true);
             FORCED.put(key, new int[]{cr});
         }

@@ -124,9 +124,12 @@ public final class ConsoleScreen extends Screen {
         double share = v(1) / Math.max(1, v(2));
         int by = y + 16;
         g.fill(x, by, x + 300, by + 10, 0xFF202028);
-        g.fill(x, by, x + (int) (300 * Math.max(0, Math.min(1, share))), by + 10, share < 0.25 ? 0xFFD05030 : share < 0.6 ? 0xFFD0A030 : 0xFF50A0D0);
-        g.fill(x + 180, by - 2, x + 181, by + 12, 0xFFFFFFFF);
-        g.text(font, "60%", x + 172, by - 10, 0xFFB0B0B0);
+        g.fill(x, by, x + (int) (300 * Math.max(0, Math.min(1, share))), by + 10, share < 0.15 ? 0xFFD05030 : share < 0.5 ? 0xFFD0A030 : 0xFF50A0D0);
+        // the safety's marks: the last ditch (15%) and where a retreated field grows back (80%)
+        g.fill(x + 45, by - 2, x + 46, by + 12, 0xFFFF8060);
+        g.fill(x + 240, by - 2, x + 241, by + 12, 0xFFFFFFFF);
+        g.text(font, "15%", x + 37, by - 10, 0xFFB0B0B0);
+        g.text(font, "80%", x + 232, by - 10, 0xFFB0B0B0);
         g.text(font, String.format("Charge %.0f%%  (%.0f of %.0f kJ)", 100 * share, v(1) / 1000, v(2) / 1000), x, by + 14, 0xFFE0E0E0);
         double in = v(3), draw = s == 1 ? v(4) : 0, net = in - draw;
         g.text(font, String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" (x%.2f)", v(5)) : "", net),
@@ -138,12 +141,17 @@ public final class ConsoleScreen extends Screen {
         boolean on = v(12) > 0;
         boolean armed = System.currentTimeMillis() < armedUntil;
         // (wrapped to the panel: long lines ran off its edge, AdventurAgent)
-        String safety = on ? "SAFETY OFF (OVERRIDE): no shrinking; it collapses when the store runs dry"
+        boolean retreat = st.v().size() > 14 && v(14) > 0;
+        double carry = st.v().size() > 15 ? v(15) : -1, strainNow = st.v().size() > 16 ? v(16) : 0;
+        String sustain = carry > 0 ? String.format("its power carries r %.0f", carry) : "its power carries none of it";
+        String safety = on ? "SAFETY OFF (OVERRIDE): no retreat; it collapses when the store runs dry"
             : armed ? "Confirm: the field will not save itself and collapses when the store runs dry"
-            : share < 0.6 ? "Safety: shrinking to save power" : "Safety: on (shrinks below 60%)";
+            : retreat ? String.format("SAFETY RETREAT to r %.0f to recharge; back to r %.0f at 80%% (lower the target or add power to hold)", v(11), v(9))
+            : strainNow > 0.05 ? String.format("FAILING (strain %.0f%%): %s", 100 * strainNow, sustain)
+            : "Safety: on (retreats when failing)";
         int ly = by + 68;
         for (var line : font.split(Component.literal(safety), 300)) {
-            g.text(font, line, x, ly, on || armed ? 0xFFFF4040 : share < 0.6 ? 0xFFE0C060 : 0xFF70C070);
+            g.text(font, line, x, ly, on || armed ? 0xFFFF4040 : retreat || strainNow > 0.05 ? 0xFFE0A040 : 0xFF70C070);
             ly += 10;
         }
         var lines = font.split(Component.literal(st.text()), 300);

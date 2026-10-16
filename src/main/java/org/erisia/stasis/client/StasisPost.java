@@ -117,7 +117,7 @@ public final class StasisPost {
             d[o] = (float) (f.x() - fx);
             d[o + 1] = (float) (f.y() - fy);
             d[o + 2] = (float) (f.z() - fz);
-            d[o + 3] = (float) f.radius();
+            d[o + 3] = (float) shownRadius(f);
             d[o + 4] = (float) f.collapse();
             d[o + 5] = (float) f.failing();
             d[o + 6] = f.column() ? 1 : 0;
@@ -310,6 +310,22 @@ public final class StasisPost {
     static double facing(double[] e, double clock) {
         double u = Math.min(1, Math.max(0, (clock - e[1]) / 0.12));
         return e[0] + (e[2] - e[0]) * (u * u * (3 - 2 * u));
+    }
+
+    /** The shield's radius as drawn: eased towards the field's (the server steps it coarsely; Baughn: a size change
+     *  should play over a second or two). Shrinking ~1.5 s, growing slower. */
+    static final java.util.Map<Integer, double[]> SHOWN = new java.util.HashMap<>();
+
+    static double shownRadius(Field f) {
+        long now = System.nanoTime();
+        double[] e = SHOWN.computeIfAbsent(f.id(), k -> new double[]{f.radius(), now});
+        double dt = Math.min(0.25, (now - e[1]) / 1e9);
+        e[1] = now;
+        double tc = f.radius() < e[0] ? 0.45 : 2.0;
+        e[0] += (f.radius() - e[0]) * Math.min(1, dt / tc);
+        if (Math.abs(f.radius() - e[0]) < 0.01) e[0] = f.radius();
+        if (SHOWN.size() > 64) SHOWN.keySet().removeIf(id -> ClientFields.fields().stream().noneMatch(x -> x.id() == id));
+        return e[0];
     }
 
     /** The strain on reality near a rift core, 0..1 (for the HUD's flicker, SuitGauge). */

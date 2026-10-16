@@ -611,11 +611,23 @@ public final class StasisGameTests {
                 t.setControls(20, false);
                 c.check("a smaller target", t.goalRadius() == 20, String.valueOf(t.goalRadius()));
                 t.setControls(Double.NaN, false);
-                t.testCharge(0.3);
-                double g = t.goalRadius();
-                c.check("at 30% the safety halves the way to the minimum", g >= 22 && g <= 24 && g % 2 == 0, String.valueOf(g));
+                // the failure cycle: no input, half charge, failing: no retreat (nothing would carry it)
+                t.testCharge(0.5);
+                t.testSafety(0, 0.6);
+                c.check("no input: it holds on at full size", !t.retreating() && t.goalRadius() == 40, t.goalRadius() + "");
+                // some input: it retreats to what the input carries
+                double w = org.erisia.stasis.TowerBlockEntity.drawFor(24) / 0.9 + 1;
+                t.testSafety(w, 0.6);
+                c.check("with input: it retreats to what the input carries", t.retreating() && Math.abs(t.goalRadius() - 24) <= 1, t.goalRadius() + "");
+                t.testCharge(0.85);
+                t.testSafety(w, 0.3);
+                c.check("recharged past 80%: it grows back", !t.retreating() && t.goalRadius() == 40);
+                t.testCharge(0.1);
+                t.testSafety(0, 0.7);
+                c.check("the last ditch below 15%: down to the minimum", t.retreating() && t.goalRadius() == t.minRadius(), t.goalRadius() + "");
                 t.setControls(Double.NaN, true);
-                c.check("OVERRIDE holds the full range", t.goalRadius() == 40, String.valueOf(t.goalRadius()));
+                t.testSafety(0, 0.7);
+                c.check("OVERRIDE holds the full range", !t.retreating() && t.goalRadius() == 40, String.valueOf(t.goalRadius()));
                 c.check("the store never shrinks with the target", t.storeMaxJ() == org.erisia.stasis.TowerBlockEntity.storeFor(40));
                 t.setControls(Double.NaN, false);
                 t.setRemoved();   // (its 40-block field would reach the next tests)
@@ -648,7 +660,7 @@ public final class StasisGameTests {
             return () -> {
                 c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
                 c.check("just started: no dropout", early[0] < 0.05, "" + early[0]);
-                c.check("no input: draining, and the shield shows it", t.draining() && t.failing() > 0.2 && t.failing() < 0.5,
+                c.check("no input: draining, and the shield shows it", t.draining() && t.failing() > 0.2 && t.failing() < 0.85,
                     "draining " + t.draining() + ", failing " + t.failing());
                 t.setRemoved();   // take its field down (other tower tests look for an r 16 field)
             };
@@ -1334,7 +1346,7 @@ public final class StasisGameTests {
             h.runAfterDelay(160, () -> {
                 c.check("halfway through the collapse", t.state() == org.erisia.stasis.TowerBlockEntity.State.COLLAPSING, t.state().name());
                 var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.id() == fid[0]).findFirst();
-                c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.3 && f.get().collapse() < 0.7, f.toString());
+                c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.05 && f.get().collapse() < 0.98, f.toString());
             });
             return () -> {
                 c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());

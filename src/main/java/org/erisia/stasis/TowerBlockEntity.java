@@ -185,11 +185,11 @@ public class TowerBlockEntity extends BlockEntity {
         return designRadius() * MAX_EXPAND;
     }
 
-    static final double MAX_EXPAND = 1.25, SAFETY_SHARE = 0.6, STEP = 2;
+    static final double MAX_EXPAND = 1.25, STEP = 2;
 
     /** The console's (or the signal port's) target; NaN: the preferred range. */
     double targetRadius = Double.NaN;
-    /** OVERRIDE: no automatic shrinking below SAFETY_SHARE charge (it runs at full size until it collapses). */
+    /** OVERRIDE: no safety retreat (it runs at full size until it collapses). */
     boolean override;
     /** The radius the field has now; 0 while off. */
     double effRadius;
@@ -212,16 +212,48 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     /**
-     * Where the field is heading: the target, or (safety on, below 60% charge) shrunk toward the minimum in proportion
-     * to charge, in whole steps (Gemini: continuous shrinking thrashes chunk re-meshing).
+     * The failure cycle (Baughn 2026-10-17, notes/timestop/FAILURE-PLAN.md A): failure shows first, at full size
+     * (failing, the strain); once it's well under way the safety retreats, only as far as the input can carry (with
+     * no input it holds on, and retreats to the minimum as a last ditch below 15%); at 80% it grows back to the target,
+     * overdraws, and fails again, until someone steers it. OVERRIDE: no retreat.
      */
+    boolean retreating;
+    double retreatRadius;
+
+    public boolean retreating() {
+        return retreating;
+    }
+
+    /** Where the field is heading: the target, or the retreat radius. */
     public double goalRadius() {
-        double t = target();
+        return retreating && !override ? Math.max(minRadius(), Math.min(target(), retreatRadius)) : target();
+    }
+
+    /** The largest radius (up to the target) whose draw the input carries with a margin, or -1 if none. */
+    public double carryRadius() {
+        double w = weatherFactor();
+        for (double r = Math.floor(target()); r >= minRadius(); r -= 1)
+            if (drawFor(r) * drawPenalty(r) * w <= 0.9 * inAvgW) return r;
+        return -1;
+    }
+
+    /** Once a second: retreat or regrow. */
+    void safety() {
         double share = storedJ() / Math.max(1, storeMaxJ());
-        if (override || share >= SAFETY_SHARE) return t;
-        double min = minRadius();
-        double g = min + (t - min) * Math.max(0, share) / SAFETY_SHARE;
-        return Math.max(min, Math.floor(g / STEP) * STEP);
+        if (override) {
+            retreating = false;
+            return;
+        }
+        if (!retreating && failing > 0.5) {
+            double carry = carryRadius();
+            if (carry > 0 && carry < effRadius - 2) {
+                retreating = true;
+                retreatRadius = carry;
+            } else if (share < 0.15) {   // nothing carries it: the last ditch
+                retreating = true;
+                retreatRadius = minRadius();
+            }
+        } else if (retreating && share >= 0.8) retreating = false;   // grow back (and fail again)
     }
 
     /** Above the preferred range the draw climbs steeply: (R / R_design)^6 (x3.8 at +25%). */
@@ -286,9 +318,13 @@ public class TowerBlockEntity extends BlockEntity {
         if (state == State.RUNNING && level.getGameTime() % 20 == 10) {
             if (effRadius <= 0)   // (a save from before the console: take the field as it is)
                 effRadius = stepGoal = FieldData.get(sl).get(fieldId).map(Field::radius).orElse(designRadius());
+            safety();
             double g = goalRadius();
-            if (stepGoal == 0 || Math.abs(g - stepGoal) >= STEP || g == target() || g == minRadius()) stepGoal = g;
-            double next = effRadius < stepGoal ? Math.min(stepGoal, effRadius + 1) : Math.max(stepGoal, effRadius - 1);
+            // coarse steps on the server (each one re-meshes the shell's chunks): a retreat in two jumps, growth
+            // a block or two a second; clients ease the shield between them (StasisPost)
+            double diff = g - effRadius;
+            double stepSize = diff < 0 ? Math.max(STEP, Math.ceil(-diff / 2)) : Math.max(1, Math.ceil(diff / 8));
+            double next = diff < 0 ? Math.max(g, effRadius - stepSize) : Math.min(g, effRadius + stepSize);
             if (next != effRadius) {
                 effRadius = next;
                 FieldData.get(sl).update(sl, fieldId, f -> f.withRadius(effRadius));
@@ -342,8 +378,11 @@ public class TowerBlockEntity extends BlockEntity {
                 netAvg += (in - perTick - netAvg) / 60.0;
                 if (netAvg < -0.02 * perTick) draining = true;
                 else if (netAvg > 0.02 * perTick) draining = false;
-                // the shield shows the charge only while the store drains (Baughn), eased over about 2 s
-                double target = draining ? 1 - storedJ() / storeMaxJ() : 0;
+                // the strain (Baughn: failure shows first, while there's charge): rising with the drain and as the charge
+                // falls; a retreated shield keeps a floor of it (the rim stays amber while it recharges)
+                double share = storedJ() / storeMaxJ();
+                double target = draining ? Math.min(1, (0.25 + 0.75 * (1 - share)) * Math.min(1, drain * 3)) : 0;
+                if (retreating) target = Math.max(target, 0.25);
                 failing += (target - failing) / 40.0;
                 if (level.getGameTime() % 5 == 0) FieldData.get(sl).update(sl, fieldId, f -> f.withFailing(failing));
                 if (store.amount() <= 0) {
@@ -398,6 +437,14 @@ public class TowerBlockEntity extends BlockEntity {
         stormRift = rift;
         weatherPinned = true;
         return weatherFactor();
+    }
+
+    /** Tests: set the input average (W) and the strain, and run the safety once. */
+    public void testSafety(double inW, double strain) {
+        inAvgW = inW;
+        failing = strain;
+        if (effRadius <= 0) effRadius = target();
+        safety();
     }
 
     public void testBolt() {
@@ -457,6 +504,7 @@ public class TowerBlockEntity extends BlockEntity {
         state = State.OFF;
         effRadius = 0;
         stepGoal = 0;
+        retreating = false;
         collapseTicks = 0;
         failing = 0;
         Tickets.update(sl, this);
@@ -498,6 +546,8 @@ public class TowerBlockEntity extends BlockEntity {
         if (!Double.isNaN(targetRadius)) out.putDouble("target", targetRadius);
         out.putBoolean("override", override);
         out.putDouble("radius", effRadius);
+        out.putBoolean("retreating", retreating);
+        out.putDouble("retreatRadius", retreatRadius);
         out.putString("facing", facing.getSerializedName());
         structure.save(out);
     }
@@ -522,6 +572,8 @@ public class TowerBlockEntity extends BlockEntity {
         var fd = net.minecraft.core.Direction.byName(in.getStringOr("facing", "south"));
         facing = fd != null && fd.getAxis().isHorizontal() ? fd : net.minecraft.core.Direction.SOUTH;
         stepGoal = effRadius;
+        retreating = in.getBooleanOr("retreating", false);
+        retreatRadius = in.getDoubleOr("retreatRadius", 0);
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
@@ -538,7 +590,8 @@ public class TowerBlockEntity extends BlockEntity {
         double r = radius();
         java.util.List<Double> v = java.util.List.of((double) state.ordinal(), storedJ(), storeMaxJ(), inAvgW,
             drawFor(r) * drawPenalty(r) * weatherFactor(), weatherFactor(), designRadius(), minRadius(), maxRadius(), target(),
-            state == State.OFF ? 0 : r, goalRadius(), override ? 1.0 : 0.0, signalSet ? 1.0 : 0.0);
+            state == State.OFF ? 0 : r, goalRadius(), override ? 1.0 : 0.0, signalSet ? 1.0 : 0.0, retreating ? 1.0 : 0.0, carryRadius(),
+            failing);
         return new StasisNet.ConsoleState(worldPosition, v, structureLine());
     }
 
