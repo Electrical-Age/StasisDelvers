@@ -477,8 +477,7 @@ public class TowerBlockEntity extends BlockEntity {
         double cx = worldPosition.getX() + 0.5, cy = worldPosition.getY() + 0.5, cz = worldPosition.getZ() + 0.5;
         double top = worldPosition.getY() + TowerBlock.HEIGHT + segments + 0.5;
         StasisNet.sendBolt(sl, new StasisNet.Bolt(cx + ux / ul * r * 0.97, cy + uy / ul * r * 0.97, cz + uz / ul * r * 0.97, cx, top, cz, rnd.nextInt()));
-        sl.playSound(null, worldPosition.getX(), top, worldPosition.getZ(), net.minecraft.sounds.SoundEvents.LIGHTNING_BOLT_IMPACT,
-            net.minecraft.sounds.SoundSource.WEATHER, 1.5F, 0.8F + rnd.nextFloat() * 0.4F);
+        // no sound: the client's anti-sound cuts every other sound for the crack (client.AntiSound)
     }
 
     /** A bolt from the mast top outwards, through the shield to the land beyond it (an overcharged tower). */
@@ -492,8 +491,6 @@ public class TowerBlockEntity extends BlockEntity {
         double ty = sl.hasChunkAt(new BlockPos(tx, 0, tz))
             ? sl.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, tx, tz) : worldPosition.getY();
         StasisNet.sendBolt(sl, new StasisNet.Bolt(cx, top, cz, tx + 0.5, ty, tz + 0.5, rnd.nextInt()));
-        sl.playSound(null, tx + 0.5, ty, tz + 0.5, net.minecraft.sounds.SoundEvents.LIGHTNING_BOLT_THUNDER,
-            net.minecraft.sounds.SoundSource.WEATHER, 1.2F, 1.2F + rnd.nextFloat() * 0.3F);
     }
 
     void start(ServerLevel sl) {

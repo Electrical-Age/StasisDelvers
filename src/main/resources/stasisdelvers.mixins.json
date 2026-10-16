@@ -26,7 +26,10 @@
     "client.ParticleAccessor",
     "client.ParticleGroupMixin",
     "client.SectionCompilerMixin",
-    "client.FluidRendererMixin"
+    "client.FluidRendererMixin",
+    "client.SoundManagerAccessor",
+    "client.ChannelAccessor",
+    "client.SoundEngineMixin"
   ],
   "injectors": {
     "defaultRequire": 1

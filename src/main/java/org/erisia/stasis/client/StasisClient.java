@@ -34,6 +34,8 @@ public final class StasisClient {
         });
         // lightning from the shield to the tower (visual only)
         BoltRenderer.init();
+        AntiSound.init();
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.RenderFrameEvent.Pre.class, e -> AntiSound.frame());
         ConsoleScreen.hook();
         // (drawn by the post shader from BoltRenderer.fill: the custom-geometry path showed nothing in a real client)
         // EA flashlight beams, per pixel (Baughn)
