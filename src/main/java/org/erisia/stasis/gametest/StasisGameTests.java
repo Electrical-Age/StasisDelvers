@@ -728,6 +728,105 @@ public final class StasisGameTests {
                 org.erisia.stasis.Strata.setWeights(java.util.List.of("saddle:1", "staircase:1", "splash:1", "pods:1"));
             }
         }, false));
+        // strata weather (Pockets): the cycle's shares, a 20 s violet warning before every rift, untilNext and exposure
+        // agree with a brute-force walk, and the mask is the strata's cells
+        CASES.put("strata_pockets", new Spec(1, (h, c) -> () -> {
+            double[] share = new double[4];
+            int samples = 0;
+            java.util.Random rng = new java.util.Random(11);
+            for (int i = 0; i < 200000; i++) {
+                var w = org.erisia.stasis.Pockets.weather(4242, rng.nextInt(200) - 100, rng.nextInt(20), rng.nextInt(200) - 100, rng.nextDouble() * 3.0e6);
+                share[w.state().ordinal()]++;
+                samples++;
+            }
+            for (int i = 0; i < 4; i++) share[i] /= samples;
+            String sh = String.format("clear %.3f mist %.3f violet %.3f rift %.3f", share[0], share[1], share[2], share[3]);
+            c.check("clear ~25%", Math.abs(share[0] - 0.25) < 0.01, sh);
+            c.check("rift ~15%", Math.abs(share[3] - 0.15) < 0.015, sh);
+            c.check("mist ~58%", share[1] > 0.54 && share[1] < 0.62, sh);
+            boolean det = org.erisia.stasis.Pockets.weather(77, 3, 4, 5, 123456.7).equals(org.erisia.stasis.Pockets.weather(77, 3, 4, 5, 123456.7));
+            c.check("deterministic", det);
+            // walk a few pockets second by second over many cycles
+            int rifts = 0, badWarn = 0, badUntil = 0;
+            double expoErr = 0;
+            for (int k = 0; k < 6; k++) {
+                int px = 10 * k - 7, py = k, pz = 3 - k;
+                double t0 = 5.0e6 + k * 777, grey = 0;
+                var prev = org.erisia.stasis.Pockets.weather(99, px, py, pz, t0);
+                double violetSince = -1;
+                for (int s = 1; s <= 30000; s++) {
+                    double t = t0 + s;
+                    var w = org.erisia.stasis.Pockets.weather(99, px, py, pz, t);
+                    if (prev.state() != org.erisia.stasis.Pockets.State.CLEAR) grey += 1;
+                    if (w.state() == org.erisia.stasis.Pockets.State.VIOLET && prev.state() != w.state()) violetSince = t;
+                    if (w.state() == org.erisia.stasis.Pockets.State.RIFT && prev.state() != w.state()) {
+                        rifts++;
+                        if (prev.state() != org.erisia.stasis.Pockets.State.VIOLET || Math.abs(t - violetSince - 20) > 1.01) badWarn++;
+                    }
+                    if (prev.state() == w.state() && Math.abs(prev.untilNext() - 1 - w.untilNext()) > 1e-6) badUntil++;
+                    prev = w;
+                }
+                double e = org.erisia.stasis.Pockets.exposure(99, px, py, pz, t0 + 30000) - org.erisia.stasis.Pockets.exposure(99, px, py, pz, t0);
+                expoErr = Math.max(expoErr, Math.abs(e - grey));
+            }
+            c.check("rifts seen", rifts > 50, String.valueOf(rifts));
+            c.check("every rift comes after 20 s of violet", badWarn == 0, badWarn + " of " + rifts);
+            c.check("untilNext counts down", badUntil == 0, String.valueOf(badUntil));
+            c.check("exposure matches the walk", expoErr <= 6, String.format("%.1f s", expoErr));
+            // the mask: strata blocks are masked; far outside the bounds nothing is
+            var d = new org.erisia.stasis.StaticDeeps.Deep(1000, 100, -2000, 40, 4242);
+            var b = org.erisia.stasis.Strata.bounds(d);
+            int hits = 0, missed = 0, outside = 0;
+            for (int i = 0; i < 20000; i++) {
+                double a = rng.nextDouble() * 2 * Math.PI, r = Math.sqrt(rng.nextDouble()) * b.radius();
+                int x = (int) Math.floor(d.x() + r * Math.cos(a)), z = (int) Math.floor(d.z() + r * Math.sin(a));
+                int y = b.minY() + rng.nextInt(b.maxY() - b.minY());
+                if (org.erisia.stasis.Strata.at(d, x, y, z) == org.erisia.stasis.Strata.OUT) continue;
+                hits++;
+                int cx = Math.floorDiv(x, 4) * 4, cy = Math.floorDiv(y, 4) * 4, cz = Math.floorDiv(z, 4) * 4;
+                // a strata block inside a cell is not always a corner, so check that most cells with strata are masked
+                if (!org.erisia.stasis.Pockets.masked(d, cx, cy, cz)) missed++;
+            }
+            for (int i = 0; i < 2000; i++) {
+                double a = rng.nextDouble() * 2 * Math.PI, r = b.radius() + 8 + rng.nextDouble() * 50;
+                if (org.erisia.stasis.Pockets.masked(d, (int) Math.floor(d.x() + r * Math.cos(a)) & ~3, b.minY() + rng.nextInt(b.maxY() - b.minY()) & ~3,
+                    (int) Math.floor(d.z() + r * Math.sin(a)) & ~3)) outside++;
+            }
+            c.check("strata cells are masked", hits > 100 && missed < hits / 10, missed + " of " + hits + " missed");
+            c.check("nothing masked outside the bounds", outside == 0, String.valueOf(outside));
+        }, false));
+        // a rift pocket (forced) freezes even a stasis-armoured player outside a field; a field holds it; mist drains
+        // a Delver suit at x2
+        CASES.put("strata_rift_pocket", new Spec(60, (h, c) -> {
+            var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
+            org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.RIFT, 1, 100));
+            ServerPlayer out = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true), in = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            for (ServerPlayer p : new ServerPlayer[]{out, in})
+                wear(p, true, org.erisia.stasis.StasisRegistry.STASIS_HELMET.get(), org.erisia.stasis.StasisRegistry.STASIS_CHEST.get(),
+                    org.erisia.stasis.StasisRegistry.STASIS_LEGS.get(), org.erisia.stasis.StasisRegistry.STASIS_BOOTS.get());
+            return () -> {
+                org.erisia.stasis.Pockets.TEST.remove(box);
+                c.check("a rift pocket: stasis armour doesn't help", !out.isAlive());
+                c.check("inside a field the rift pocket is held", in.isAlive() && Freezing.ticks(in) == 0, "ticks " + Freezing.ticks(in));
+                remove(h, out);
+                remove(h, in);
+            };
+        }));
+        CASES.put("strata_mist_pocket", new Spec(130, (h, c) -> {
+            var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
+            org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            return () -> {
+                org.erisia.stasis.Pockets.TEST.remove(box);
+                double e = ((org.erisia.stasis.DelverSuitItem) p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).getItem())
+                    .getEnergy(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
+                c.check("in a mist pocket the Delver suit freezes slowly", p.isAlive() && Freezing.ticks(p) > 0, "ticks " + Freezing.ticks(p));
+                c.check("and drains x2 (20 W per piece)", e < 40000 - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
+                remove(h, p);
+            };
+        }));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();

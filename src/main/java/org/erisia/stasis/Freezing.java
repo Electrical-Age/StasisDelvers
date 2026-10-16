@@ -66,10 +66,19 @@ public final class Freezing {
         // in an eddy (a pocket drifting through a weak field) an unsuited player is held, never made a statue: the
         // pocket moves on within seconds (Baughn)
         boolean eddy = stopped && Stasis.isRunningSteady(level, p.blockPosition());
+        boolean strataMist = false;
         // in a deep (Deeps): suits drain twice as fast; a Delver suit only slows the freeze (a quarter rate), and a
         // full freeze there holds the player for a minute instead of making a statue (the deep is passing weather)
         int zone = stopped ? StaticDeeps.zone(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) : 0;
-        boolean deep = stopped && !eddy && (zone > 0 || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
+        // strata weather (Pockets): a rift pocket is a rift; mist and its violet warning count as the static outer zone
+        // (x2 drain, and a Delver-only freeze ends as a statue: a mist spell lasts too long to hold someone). The worse
+        // of the static zone and the pocket wins.
+        if (stopped && zone < 2) {
+            Pockets.Weather w = Pockets.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ());
+            if (w != null && w.state() == Pockets.State.RIFT) zone = 2;
+            else if (w != null && w.state() != Pockets.State.CLEAR && zone == 0) strataMist = true;
+        }
+        boolean deep = stopped && !eddy && (zone > 0 || strataMist || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
         // a hold lasts while the deep is over the player (Baughn: it crosses in a minute at worst), 2 min at most
         boolean held = level.getGameTime() < s.heldUntil && deep;
         if (s.heldUntil != 0 && !held) {   // the hold is over: start fresh
@@ -88,7 +97,7 @@ public final class Freezing {
         else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && Suits.delverOnly(p)) {
             if (s.counted % 4 == 0) s.ticks++;
             // a static deep is no passing weather: there the Delver suit's freeze ends as a statue, as anywhere
-            if (zone == 1) {
+            if (zone == 1 || strataMist) {
                 // (falls through to the statue check below)
             } else if (s.ticks >= StasisConfig.freezeTicks - 1) {
                 s.heldUntil = level.getGameTime() + 2400;

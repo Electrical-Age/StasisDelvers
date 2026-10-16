@@ -150,6 +150,31 @@ final class StasisCommands {
                 String stats = String.format("rift worldgen: %d chunks, mean %.2f ms, max %.2f ms", n,
                     n == 0 ? 0 : DeepFeature.Stats.NANOS.get() / 1e6 / n, DeepFeature.Stats.MAX.get() / 1e6);
                 src.sendSuccess(() -> Component.literal((sb.length() == 0 ? "no static deep near; " : sb.toString()) + stats), false);
+                // the strata weather here, and the next violet within 2 pockets (for clips)
+                var level = src.getLevel();
+                double t = Deeps.time(level);
+                var w = Pockets.at(level, x, y, z);
+                String here = w == null ? "pocket: none here" : String.format("pocket %d %d %d: %s, density %.2f, %.0f s to the next change",
+                    Math.floorDiv(x, Pockets.POCKET), Math.floorDiv(y, Pockets.POCKET), Math.floorDiv(z, Pockets.POCKET),
+                    w.state().name().toLowerCase(), w.density(), w.untilNext());
+                String next = "";
+                double best = Double.MAX_VALUE;
+                for (int dx = -2; dx <= 2; dx++)
+                    for (int dy = -2; dy <= 2; dy++)
+                        for (int dz = -2; dz <= 2; dz++) {
+                            int bx = x + dx * Pockets.POCKET, by = y + dy * Pockets.POCKET, bz = z + dz * Pockets.POCKET;
+                            var sd = Pockets.strataAt(level, bx, by, bz);
+                            if (sd == null) continue;
+                            int px = Math.floorDiv(bx, Pockets.POCKET), py = Math.floorDiv(by, Pockets.POCKET), pz = Math.floorDiv(bz, Pockets.POCKET);
+                            var pw = Pockets.weather(sd.id(), px, py, pz, t);
+                            if (pw.state() == Pockets.State.MIST && pw.untilNext() < best
+                                && Pockets.weather(sd.id(), px, py, pz, t + pw.untilNext() + 0.01).state() == Pockets.State.VIOLET) {
+                                best = pw.untilNext();
+                                next = String.format("; next violet: pocket at %d %d %d in %.0f s", px * Pockets.POCKET + 6, py * Pockets.POCKET + 6, pz * Pockets.POCKET + 6, best);
+                            }
+                        }
+                String line = here + next;
+                src.sendSuccess(() -> Component.literal(line), false);
                 return 1;
             }))
             .then(Commands.literal("tower")
