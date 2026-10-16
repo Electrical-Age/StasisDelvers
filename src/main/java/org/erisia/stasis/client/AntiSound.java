@@ -33,7 +33,7 @@ public final class AntiSound {
 
     static long crackAt = Long.MIN_VALUE;
     static double strain;            // eased: the failing of the field the player is in
-    static long lastFrame;
+    static long lastFrame, lastLog;
     static float vol = 1, hf = 1, sag = 1;
     static float appliedVol = 1, appliedHf = 1;
     static int filter = -1;          // the EFX low-pass, -2 if EFX isn't available
@@ -57,12 +57,22 @@ public final class AntiSound {
     static void crack(StasisNet.Bolt b) {
         var mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        var p = mc.player.position();
+        var p = ears(mc);
         double d = Math.min(p.distanceToSqr(b.fx(), b.fy(), b.fz()), p.distanceToSqr(b.tx(), b.ty(), b.tz()));
-        if (d > 64 * 64) return;
         long now = System.nanoTime();
+        if ((now - lastLog) / 1e9 > 1) {   // (lab diagnostics, at most once a second)
+            lastLog = now;
+            org.slf4j.LoggerFactory.getLogger("stasis-antisound").info("crack at {} blocks{}; vol {} hf {} strain {} efx {}",
+                (int) Math.sqrt(d), d > 64 * 64 ? " (too far, ignored)" : "", appliedVol, appliedHf, String.format("%.2f", strain), filter);
+        }
+        if (d > 64 * 64) return;
         if ((now - crackAt) / 1e9 > CUT) mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.25F));
         crackAt = now;
+    }
+
+    /** Where the sound is heard (the camera, which a spectator or a detached camera can take away from the player). */
+    static net.minecraft.world.phys.Vec3 ears(Minecraft mc) {
+        return mc.getSoundManager().getListenerTransform().position();
     }
 
     static double smooth(double a, double b, double t) {
@@ -78,7 +88,7 @@ public final class AntiSound {
         lastFrame = now;
         double s = 0;
         if (mc.player != null && mc.level != null) {
-            var p = mc.player.position();
+            var p = ears(mc);
             for (Field f : ClientFields.fields()) {
                 double dx = p.x - f.x(), dy = p.y - f.y(), dz = p.z - f.z();
                 if (dx * dx + dy * dy + dz * dz < f.radius() * f.radius()) s = Math.max(s, f.failing());
