@@ -553,7 +553,8 @@ vec2 pocketWeather(int id, ivec3 p) {
             float f = (u - st) / VIOLET_S;
             return vec2(2.0, 0.6 + 0.4 * f * f);
         }
-        if (u < st + VIOLET_S + r) return vec2(3.0, 1.0);
+        // rift: y = how dark, fading in over 2 s and out over 4 s (a one-frame cut looked like a glitch: AdventurAgent)
+        if (u < st + VIOLET_S + r) return vec2(3.0, min(1.0, (u - st - VIOLET_S) / 2.0) * min(1.0, (st + VIOLET_S + r - u) / 4.0));
         st += VIOLET_S + r + mist * (i == 0 ? w1 : w2) / wsum;
     }
     return vec2(1.0, dens);
@@ -593,7 +594,9 @@ void main() {
         if (m >= n || T < 0.01) break;
         vec3 q = o + dir * (ta + (float(m) + jit) * dt);
         // the lookup is jittered a little, so the 4-block cells and 12-block pockets dither instead of showing planes
-        vec3 qj = q + (vec3(hash13(q * 1.7), hash13(q * 2.3 + 5.0), hash13(q * 3.1 + 9.0)) - 0.5) * 2.5;
+        // plus a slow warp of up to ~3 blocks, so pocket and cell borders wander instead of running straight
+        vec3 wq = (q + vec3(camI)) * (32.0 / 160.0);
+        vec3 qj = q + (mistTex(wq).rgb - 0.5) * 6.0 + (vec3(hash13(q * 1.7), hash13(q * 2.3 + 5.0), hash13(q * 3.1 + 9.0)) - 0.5) * 2.0;
         ivec3 cell = ivec3(floor((qj - mo) / 4.0));
         if (any(lessThan(cell, ivec3(0))) || any(greaterThan(cell, ivec3(63)))) continue;
         vec4 tx = texelFetch(StrataSampler, ivec2((cell.z & 7) * 64 + cell.x, (cell.z >> 3) * 64 + cell.y), 0);
@@ -611,13 +614,17 @@ void main() {
         vec3 wp = (q + vec3(camI)) * (32.0 / 40.0);
         float nz = 0.6 * mistTex(wp + vec3(data(178), 3.0, data(179))).a + 0.4 * mistTex(wp * 0.5 + 7.0).r;
         float sigma, e = 0.0;
-        if (w.x > 2.5) sigma = 0.9;                            // rift: black, swallows the light
-        else {
+        float riftK = 0.0;
+        if (w.x > 2.5) {
+            // rift: black, swallows the light (from the violet mist's density as it fades in)
+            riftK = w.y;
+            sigma = mix(0.22, 2.0, riftK);
+        } else {
             sigma = 0.22 * w.y * clamp(0.35 + 1.3 * (nz - 0.5) + 0.5, 0.15, 1.5);
             if (w.x > 1.5) e = (w.y - 0.6) / 0.4;              // violet: the warning glows, brighter as it nears rift
         }
         float alpha = 1.0 - exp(-sigma * dt);
-        if (w.x < 2.5) L += T * alpha;
+        L += T * alpha * (1.0 - riftK);
         V += T * (0.04 + 0.08 * e) * e * dt;
         T *= 1.0 - alpha;
     }
