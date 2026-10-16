@@ -127,6 +127,19 @@ public record DeepFeature() implements Feature {
                         }
                     }
                 }
+                // a rift in open air (Baughn chose floating islands): shattered shell drifts round it as floating shards
+                if (StasisConfig.skyIslands)
+                    for (int y = Math.max(yLo, surface + 3); y <= yHi; y++) {
+                        float s = StaticDeeps.shape(d, x + 0.5f, y + 0.5f, z + 0.5f);
+                        if (s < 0.36f || s > 0.75f) continue;
+                        if (Noise.fbm32(x / 7f, y / 5f, z / 7f, id ^ 0xF10) < 0.66f) continue;
+                        p.set(x, y, z);
+                        if (!level.getBlockState(p).isAir()) continue;
+                        float h = Noise.hash32(x, y, z, id ^ 0xF11);
+                        level.setBlock(p, (h < 0.1f ? Blocks.CRYING_OBSIDIAN : h < 0.55f ? Blocks.BLACKSTONE : h < 0.75f ? Blocks.TUFF
+                            : StasisRegistry.RIFTSTONE.get()).defaultBlockState(), 2);
+                        changed = true;
+                    }
                 // cracks and the sinkhole: from the surface down into the rift (only in the outer zone's columns)
                 if ((crack || sink) && riftTop != Integer.MIN_VALUE) {
                     for (int y = riftTop; y <= surface; y++) {
@@ -204,7 +217,10 @@ public record DeepFeature() implements Feature {
                     BlockState st = level.getBlockState(p);
                     switch (k) {
                         case Strata.BODY, Strata.VEIN, Strata.SPIRE -> {
-                            boolean ok = replaceable(st) || k == Strata.SPIRE && (st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty();
+                            // in open air above the ground (a sky rift's strata), the layer floats as broken islands
+                            boolean island = StasisConfig.skyIslands && y > surface + 2 && st.isAir()
+                                && Noise.fbm32(x / 11f, y / 6f, z / 11f, id ^ 0x15A) > 0.5f;
+                            boolean ok = island || replaceable(st) || k == Strata.SPIRE && (st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty();
                             if (!ok) continue;
                             BlockState put = budding(d, x, y, z) ? bud : k == Strata.VEIN ? vein : rock;
                             if (put == rock) {
@@ -219,7 +235,10 @@ public record DeepFeature() implements Feature {
                             changed = true;
                         }
                         case Strata.CAVITY, Strata.VENT -> {
-                            if (y > surface + 1) continue;   // above ground it's open already
+                            if (y > surface + 1) {   // above ground it's open already (islands' crystals grow into it)
+                                if (k == Strata.CAVITY && st.isAir()) cavities.add(p.immutable());
+                                continue;
+                            }
                             if (!st.isAir() && carvable(level, p, st)) {
                                 level.setBlock(p, air, 2);
                                 changed = true;

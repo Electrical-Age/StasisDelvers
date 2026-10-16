@@ -41,6 +41,7 @@ public final class StasisConfig {
     static final ModConfigSpec.BooleanValue STORMS;
     static final ModConfigSpec.BooleanValue TIME_SCARS;
     static final ModConfigSpec.BooleanValue RUINS;
+    static final ModConfigSpec.BooleanValue SKY_ISLANDS;
     static final ModConfigSpec.DoubleValue STORM_EVERY_HOURS;
     static final ModConfigSpec.IntValue STORM_MINUTES;
     static final ModConfigSpec.IntValue STORM_WARN_MINUTES;
@@ -99,6 +100,7 @@ public final class StasisConfig {
                 "Worldgen: new strongholds only.")
             .define("endPortalRifts", true);
         TIME_SCARS = b.comment("Time scars around rifts: falls frozen mid-air, hanging gravel, arrow volleys (worldgen: new chunks).").define("timeScars", true);
+        SKY_ISLANDS = b.comment("A rift in open air gets its strata as floating riftstone islands and shattered shards (Baughn; worldgen).").define("skyIslands", true);
         RUINS = b.comment("Swallowed ruins in rift strata: vanilla structure pieces half sunk in the rock (worldgen: new chunks).").define("ruins", true);
         STORMS = b.comment("Rift storms (stage 3): the drifting weather speeds up 10x and storm mist and rifts sweep the land.").define("storms", true);
         STORM_EVERY_HOURS = b.comment("Mean hours (of game time at 20 TPS) between storms; each falls at a random point in its block of this",
@@ -130,6 +132,7 @@ public final class StasisConfig {
     static volatile boolean storms = true;
     static volatile boolean timeScars = true;
     static volatile boolean ruins = true;
+    static volatile boolean skyIslands = true;
     static volatile double stormEveryHours = 10;
     static volatile int stormMinutes = 20, stormWarnMinutes = 60;
 
@@ -176,6 +179,7 @@ public final class StasisConfig {
         storms = STORMS.get();
         timeScars = TIME_SCARS.get();
         ruins = RUINS.get();
+        skyIslands = SKY_ISLANDS.get();
         stormEveryHours = STORM_EVERY_HOURS.get();
         stormMinutes = STORM_MINUTES.get();
         stormWarnMinutes = STORM_WARN_MINUTES.get();
