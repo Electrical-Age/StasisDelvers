@@ -55,32 +55,43 @@ public final class Ruins {
     record Ruin(Identifier id, BlockPos origin, Rotation rot, int salt) {
     }
 
-    /** Deep d's ruins: 1-2 spots in its strata (a body or cavity cell, away from the rift itself). */
+    /** Each deep's ruins, cached (every chunk of the rift asks). */
+    static final java.util.Map<Long, List<Ruin>> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Deep d's ruins: 1-2 spots in its strata rock (a body or cavity cell away from the rift), underground. */
     static List<Ruin> ruins(WorldGenLevel level, StaticDeeps.Deep d) {
         List<Identifier> pool = pool(level);
         if (pool.isEmpty() || StaticDeeps.isGate(d)) return List.of();
+        long key = (long) d.id() << 32 ^ level.getLevel().dimension().hashCode();
+        List<Ruin> cached = CACHE.get(key);
+        if (cached != null) return cached;
         List<Ruin> out = new java.util.ArrayList<>(2);
         int n = 1 + (Noise.hash32(d.id(), 1, 401, 0x7A1) < 0.4f ? 1 : 0);
         Strata.Bounds b = Strata.bounds(d);
+        var sl = level.getLevel();
+        int lo = Math.max(b.minY(), level.getMinY() + 8);
         for (int r = 0; r < n; r++)
-            for (int tryi = 0; tryi < 10; tryi++) {
+            for (int tryi = 0; tryi < 60; tryi++) {
                 double a = Noise.hash32(d.id(), r, 402 + tryi, 0x7A1) * 2 * Math.PI;
-                double rad = (0.55 + 0.4 * Noise.hash32(d.id(), r, 412 + tryi, 0x7A1)) * b.radius();
+                double rad = (0.45 + 0.5 * Noise.hash32(d.id(), r, 512 + tryi, 0x7A1)) * b.radius();
                 int x = (int) Math.floor(d.x() + Math.cos(a) * rad), z = (int) Math.floor(d.z() + Math.sin(a) * rad);
-                int y = (int) Math.floor(d.y() + (Noise.hash32(d.id(), r, 422 + tryi, 0x7A1) - 0.6) * d.radius());
+                int hi = Math.min(b.maxY(), (int) d.y() + (int) d.radius());
+                if (hi <= lo) break;
+                int y = lo + (int) (Noise.hash32(d.id(), r, 622 + tryi, 0x7A1) * (hi - lo));
                 int k = Strata.at(d, x, y, z);
                 if ((k != Strata.BODY && k != Strata.CAVITY) || StaticDeeps.shape(d, x, y, z) < 0.6f) continue;
                 // underground (the generator's own surface, the same from every chunk): a sky rift's strata is air
                 // there, and its ruins hung in the sky (AdventurAgent)
-                var sl = level.getLevel();
                 int surf = sl.getChunkSource().getGenerator().getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG,
                     sl, sl.getChunkSource().randomState());
-                if (y + 10 > surf || y - 10 < level.getMinY()) continue;
+                if (y + 10 > surf) continue;
                 Identifier id = pool.get((int) (Noise.hash32(d.id(), r, 432, 0x7A1) * pool.size()) % pool.size());
                 Rotation rot = Rotation.values()[(int) (Noise.hash32(d.id(), r, 433, 0x7A1) * 4) & 3];
                 out.add(new Ruin(id, new BlockPos(x, y, z), rot, d.id() * 31 + r));
                 break;
             }
+        if (CACHE.size() > 512) CACHE.clear();
+        CACHE.put(key, List.copyOf(out));
         return out;
     }
 
