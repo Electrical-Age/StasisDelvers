@@ -750,9 +750,11 @@ float segDist(vec2 p, vec2 a, vec2 b) {
 }
 
 // x, y in blocks on the disc (y up); the eye's colour (added) and the slit's cover (a)
-vec4 eyePattern(vec2 x, float time, int id) {
+vec4 eyePattern(vec2 x, float time, int id, float px) {
+    // px: a screen pixel's size here (blocks): lines keep at least ~1 px, so the eye still reads from afar
     float r = length(x);
-    vec3 col = EYE_RING * 0.9 * (1.0 - smoothstep(0.0, 0.025, abs(r - EYE_R)));
+    float rw = max(0.025, 1.5 * px);
+    vec3 col = EYE_RING * 1.4 * (1.0 - smoothstep(0.0, rw, abs(r - EYE_R)));
     // faint inner lines: short strokes on a jittered field, re-drawn about once a second, never reaching the rim
     if (r < EYE_R * 0.82) {
         float cyc = floor(time * 0.9);
@@ -772,7 +774,7 @@ vec4 eyePattern(vec2 x, float time, int id) {
         float P = 0.55 + 0.6 * hash32(k, 0, 1, id ^ 0x7E4);
         float ph = hash32(k, 0, 2, id ^ 0x7E4) * P;
         float cyc = floor((time + ph) / P);
-        float a = time + ph - cyc * P;
+        float a = max(0.0, time + ph - cyc * P);   // (float rounding gave a tiny negative: pow() NaN, a magenta disc)
         int ci = int(cyc);
         float outT = 0.12 + 0.13 * hash32(k, ci, 3, id);
         float life = outT + 0.35 + 0.35 * hash32(k, ci, 4, id);
@@ -798,7 +800,7 @@ vec4 eyePattern(vec2 x, float time, int id) {
             float bend = curl * s * s * sin(phase + a * 9.0) + 0.12 * sin(wave * s * 6.28 + phase + a * 14.0);
             vec2 p = st + d2 * s * len + perp * bend * 0.25 * s;
             p.x = PB * tanh(p.x / PB);
-            float w = 0.022 * (1.0 - 0.7 * float(m) / 8.0) * fore + 0.008;
+            float w = max(0.022 * (1.0 - 0.7 * float(m) / 8.0) * fore + 0.008, px);
             float dd = segDist(x, prev, p);
             tend = max(tend, fade * (1.0 - smoothstep(w * 0.5, w, dd)) * (fade < 1.0 ? 0.5 + 0.5 * float(m) / 8.0 : 1.0));
             prev = p;
@@ -807,7 +809,10 @@ vec4 eyePattern(vec2 x, float time, int id) {
     col += EYE_STRONG * tend * 1.3;
     // the slit: black, opaque
     vec2 sl = x / vec2(EYE_R * 0.98, EYE_R * 0.075);
-    float slit = 1.0 - smoothstep(0.85, 1.0, dot(sl, sl));
+    float e2 = dot(sl, sl);
+    float slit = 1.0 - smoothstep(0.85, 1.0, e2);
+    // a thin violet lip, so the slit reads on the dark disc (AdventurAgent: dark on dark)
+    col += EYE_STRONG * 0.55 * smoothstep(0.7, 1.0, e2) * (1.0 - smoothstep(1.0, 1.9, e2));
     return vec4(col, slit);
 }
 
@@ -951,7 +956,7 @@ void main() {
                 vec3 hp = dir2 * th - ec;
                 vec2 ex = vec2(dot(hp, rt), hp.y);
                 if (abs(ex.x) > 1.8 || abs(ex.y) > 1.8) continue;
-                vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)));
+                vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), th * 2.0 / InSize.y);
                 c = mix(c + ep.rgb, vec3(0.0), ep.a);
             }
         }
