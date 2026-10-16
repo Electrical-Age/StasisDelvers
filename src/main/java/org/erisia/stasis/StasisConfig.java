@@ -38,6 +38,10 @@ public final class StasisConfig {
     static final ModConfigSpec.ConfigValue<List<? extends String>> RIFT_SCATTER;
     static final ModConfigSpec.DoubleValue RIFT_SCATTER_RATE;
     static final ModConfigSpec.BooleanValue END_PORTAL_RIFTS;
+    static final ModConfigSpec.BooleanValue STORMS;
+    static final ModConfigSpec.DoubleValue STORM_EVERY_HOURS;
+    static final ModConfigSpec.IntValue STORM_MINUTES;
+    static final ModConfigSpec.IntValue STORM_WARN_MINUTES;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -92,6 +96,11 @@ public final class StasisConfig {
         END_PORTAL_RIFTS = b.comment("Stronghold portal rooms get a gate rift (to the End) instead of an End portal frame (Baughn).",
                 "Worldgen: new strongholds only.")
             .define("endPortalRifts", true);
+        STORMS = b.comment("Rift storms (stage 3): the drifting weather speeds up 10x and storm mist and rifts sweep the land.").define("storms", true);
+        STORM_EVERY_HOURS = b.comment("Mean hours (of game time at 20 TPS) between storms; each falls at a random point in its block of this",
+                "length (Baughn: about an in-game month, ~10 h).").defineInRange("stormEveryHours", 10.0, 0.25, 1000.0);
+        STORM_MINUTES = b.comment("A storm's length in minutes (Baughn: 20 for now).").defineInRange("stormMinutes", 20, 4, 600);
+        STORM_WARN_MINUTES = b.comment("Minutes before a storm that its violet glow shows on the upwind horizon.").defineInRange("stormWarnMinutes", 60, 0, 6000);
         SPEC = b.build();
     }
 
@@ -114,6 +123,9 @@ public final class StasisConfig {
     public static volatile int crystalStageSeconds = 1200;
     static volatile double riftScatterRate = 0.05;
     public static volatile boolean endPortalRifts = true;
+    static volatile boolean storms = true;
+    static volatile double stormEveryHours = 10;
+    static volatile int stormMinutes = 20, stormWarnMinutes = 60;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -155,5 +167,9 @@ public final class StasisConfig {
         Gates.configure(RIFT_DESTINATIONS.get(), RIFT_SCATTER.get());
         riftScatterRate = RIFT_SCATTER_RATE.get();
         endPortalRifts = END_PORTAL_RIFTS.get();
+        storms = STORMS.get();
+        stormEveryHours = STORM_EVERY_HOURS.get();
+        stormMinutes = STORM_MINUTES.get();
+        stormWarnMinutes = STORM_WARN_MINUTES.get();
     }
 }

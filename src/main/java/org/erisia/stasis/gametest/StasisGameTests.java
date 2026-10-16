@@ -841,11 +841,16 @@ public final class StasisGameTests {
                     BlockPos gen = bud0.relative(net.minecraft.core.Direction.EAST);
                     level.setBlockAndUpdate(gen, org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_MEDIUM.get().defaultBlockState()
                         .setValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING, net.minecraft.core.Direction.EAST));
-                    var cp = net.minecraft.world.level.ChunkPos.containing(bud0);
-                    org.erisia.stasis.Crystals.testForget(level, cp);
+                    // (the buds may lie in a neighbouring chunk: sweep all around)
+                    var cp0 = net.minecraft.world.level.ChunkPos.containing(bud0);
+                    java.util.List<net.minecraft.world.level.ChunkPos> cps = new java.util.ArrayList<>();
+                    for (int ddx = -1; ddx <= 1; ddx++)
+                        for (int ddz = -1; ddz <= 1; ddz++) cps.add(new net.minecraft.world.level.ChunkPos(cp0.x() + ddx, cp0.z() + ddz));
+                    Runnable sweepAll = () -> cps.forEach(k -> org.erisia.stasis.Crystals.sweep(level, k));
+                    cps.forEach(k -> org.erisia.stasis.Crystals.testForget(level, k));
                     org.erisia.stasis.Crystals.FACE_SHARE = 1f;
                     try {
-                        org.erisia.stasis.Crystals.sweep(level, cp);
+                        sweepAll.run();
                     } finally {
                         org.erisia.stasis.Crystals.FACE_SHARE = 0.6f;
                     }
@@ -864,7 +869,7 @@ public final class StasisGameTests {
                     if (face == null) return;
                     double t = org.erisia.stasis.Deeps.time(level);
                     org.erisia.stasis.Crystals.testExposure(level, face, 10000);
-                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    sweepAll.run();
                     double e = org.erisia.stasis.Crystals.testExposure(level, face, 0);
                     int px = Math.floorDiv(face.getX(), 12), py = Math.floorDiv(face.getY(), 12), pz = Math.floorDiv(face.getZ(), 12);
                     double want = org.erisia.stasis.Pockets.exposure(4242, px, py, pz, t - 10000, t);
@@ -877,10 +882,10 @@ public final class StasisGameTests {
                     c.check("it grew to a cluster facing out", st.is(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_CLUSTER.get())
                         && st.getValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING) == fd, st.toString());
                     level.setBlockAndUpdate(face, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
-                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    sweepAll.run();
                     c.check("mined: it starts over", org.erisia.stasis.Crystals.testExposure(level, face, 0) < 5 && level.getBlockState(face).isAir());
                     level.setBlockAndUpdate(bud0, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
-                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    sweepAll.run();
                     c.check("the budding block gone: its buds are forgotten", Double.isNaN(org.erisia.stasis.Crystals.testExposure(level, gen, 0)));
                 } finally {
                     org.erisia.stasis.Pockets.TEST_STRATA.remove(box);
@@ -1000,6 +1005,50 @@ public final class StasisGameTests {
             } finally {
                 org.erisia.stasis.StaticDeeps.setGates(seed, java.util.List.of());
             }
+        }, false));
+        // storms (stage 3): about one per block of stormEveryHours, 20 min, ramped; the warped clock is continuous,
+        // monotone and runs 10x at full intensity
+        CASES.put("storm_schedule", new Spec(1, (h, c) -> () -> {
+            int seed = 4242;
+            double B = 10 * 3600.0;
+            double gaps = 0, prev = -1;
+            int n = 0;
+            boolean inBlock = true;
+            for (long k = 0; k < 400; k++) {
+                var st = org.erisia.stasis.Storms.scheduled(seed, k);
+                inBlock &= st.start() >= k * B && st.start() + st.length() <= (k + 1) * B;
+                if (prev >= 0) {
+                    gaps += st.start() - prev;
+                    n++;
+                }
+                prev = st.start();
+            }
+            c.check("each storm lies in its block", inBlock);
+            c.check("mean gap ~10 h", Math.abs(gaps / n / 3600 - 10) < 0.6, String.format("%.2f h", gaps / n / 3600));
+            var s0 = org.erisia.stasis.Storms.scheduled(seed, 3);
+            double mid = s0.start() + s0.length() / 2;
+            c.check("full intensity mid-storm", org.erisia.stasis.Storms.intensity(seed, null, mid) > 0.999);
+            c.check("none before it", org.erisia.stasis.Storms.intensity(seed, null, s0.start() - 1) == 0);
+            double r = (org.erisia.stasis.Storms.tau(seed, null, mid + 0.5) - org.erisia.stasis.Storms.tau(seed, null, mid - 0.5));
+            c.check("10x mid-storm", Math.abs(r - 10) < 1e-6, String.format("%.4f", r));
+            double r2 = org.erisia.stasis.Storms.tau(seed, null, s0.start() - 100) - org.erisia.stasis.Storms.tau(seed, null, s0.start() - 101);
+            c.check("1x outside", Math.abs(r2 - 1) < 1e-6, String.format("%.4f", r2));
+            // continuous and monotone across many storms, and across block edges
+            double worst = 0, last = org.erisia.stasis.Storms.tau(seed, null, 0);
+            boolean mono = true;
+            for (double t = 1; t < 50 * B; t += 7.3) {
+                double v = org.erisia.stasis.Storms.tau(seed, null, t);
+                double d = v - last;
+                mono &= d > 0;
+                worst = Math.max(worst, d);
+                last = v;
+            }
+            c.check("tau monotone", mono);
+            c.check("tau continuous (a 7.3 s step moves at most 73 s)", worst <= 73.001, String.format("%.3f", worst));
+            // an override (test storm) adds to tau without jumps, also after it ends and is folded
+            double[] ov = {1000, 1000 + 1200, 0};
+            double a = org.erisia.stasis.Storms.tau(seed, ov, 1500), b = org.erisia.stasis.Storms.tau(seed, ov, 1501);
+            c.check("a test storm speeds the clock", b - a > 9.9, String.format("%.3f", b - a));
         }, false));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {

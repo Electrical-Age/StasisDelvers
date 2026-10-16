@@ -124,6 +124,31 @@ final class StasisCommands {
                 c.getSource().sendSuccess(() -> Component.literal(msg), false);
                 return 1;
             })))
+            .then(Commands.literal("storm").executes(c -> {
+                    // the storm schedule: now, the next one, and the warped clock
+                    var level = c.getSource().getLevel();
+                    int seed = Deeps.seed(level);
+                    double t = Deeps.realTime(level);
+                    double i = Storms.intensity(level);
+                    var next = Storms.next(seed, t);
+                    String msg = String.format("storm intensity %.2f, warning %.2f; %s; weather clock %.0f s ahead of real time",
+                        i, Storms.warning(seed, Storms.override(level), t),
+                        t >= next.start() ? String.format("this storm ends in %.0f min", (next.end() - t) / 60)
+                            : String.format("next storm in %.1f h (%.0f min long)", (next.start() - t) / 3600, next.length() / 60),
+                        Deeps.time(level) - t);
+                    c.getSource().sendSuccess(() -> Component.literal(msg), false);
+                    return 1;
+                })
+                .then(Commands.literal("start").executes(c -> {
+                    Storms.start(c.getSource().getLevel());
+                    c.getSource().sendSuccess(() -> Component.literal("A storm starts now (test override)"), true);
+                    return 1;
+                }))
+                .then(Commands.literal("stop").executes(c -> {
+                    Storms.stop(c.getSource().getLevel());
+                    c.getSource().sendSuccess(() -> Component.literal("The test storm ramps out"), true);
+                    return 1;
+                })))
             .then(Commands.literal("rifts").executes(c -> {
                 var src = c.getSource();
                 var level = src.getLevel();
@@ -154,7 +179,7 @@ final class StasisCommands {
                 src.sendSuccess(() -> Component.literal((sb.length() == 0 ? "no static deep near; " : sb.toString()) + stats), false);
                 // the strata weather here, and the next violet within 2 pockets (for clips)
                 var level = src.getLevel();
-                double t = Deeps.time(level);
+                double t = Deeps.realTime(level);
                 var w = Pockets.at(level, x, y, z);
                 String here = w == null ? "pocket: none here" : String.format("pocket %d %d %d: %s, density %.2f, %.0f s to the next change",
                     Math.floorDiv(x, Pockets.POCKET), Math.floorDiv(y, Pockets.POCKET), Math.floorDiv(z, Pockets.POCKET),

@@ -58,6 +58,19 @@ public final class StasisNet {
         }
     }
 
+    /** The storm test override (/stasis storm start|stop): active, start, end, earlier overrides' tau offset. */
+    public record StormOverride(boolean active, double start, double end, double folded) implements CustomPacketPayload {
+        public static final Type<StormOverride> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "storm_override"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, StormOverride> CODEC = StreamCodec.composite(
+            ByteBufCodecs.BOOL, StormOverride::active, ByteBufCodecs.DOUBLE, StormOverride::start, ByteBufCodecs.DOUBLE, StormOverride::end,
+            ByteBufCodecs.DOUBLE, StormOverride::folded, StormOverride::new);
+
+        @Override
+        public Type<StormOverride> type() {
+            return TYPE;
+        }
+    }
+
     /** 0: fine .. 1: frozen. */
     public record Freeze(float progress) implements CustomPacketPayload {
         public static final Type<Freeze> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "freeze"));
@@ -190,6 +203,8 @@ public final class StasisNet {
             });
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
             r.playToClient(GateRifts.TYPE, GateRifts.CODEC, (p, ctx) -> StaticDeeps.setGates(p.seed(), p.centres()));
+            r.playToClient(StormOverride.TYPE, StormOverride.CODEC, (p, ctx) ->
+                Storms.clientOverride = p.active() ? new double[]{p.start(), p.end(), p.folded()} : null);
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
@@ -208,7 +223,18 @@ public final class StasisNet {
         sendGates(player);
     }
 
+    static StormOverride stormPacket(ServerLevel level) {
+        Storms.Forced o = Storms.Forced.get(level);
+        return new StormOverride(o.active, o.start, o.end, o.folded);
+    }
+
+    static void sendStorm(ServerLevel level) {
+        StormOverride p = stormPacket(level);
+        for (ServerPlayer pl : level.players()) send(pl, p);
+    }
+
     static void sendGates(ServerPlayer player) {
+        send(player, stormPacket(player.level()));
         send(player, new GateRifts(FieldData.get(player.level()).deepSeed(), Gates.list(player.level())));
     }
 

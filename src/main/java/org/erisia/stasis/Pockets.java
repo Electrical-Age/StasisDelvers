@@ -186,6 +186,6 @@ public final class Pockets {
                 if (e.getKey().contains(x + 0.5, y + 0.5, z + 0.5)) return e.getValue();
         int id = strataId(level, x, y, z);
         if (id < 0) return null;
-        return weather(id, Math.floorDiv(x, POCKET), Math.floorDiv(y, POCKET), Math.floorDiv(z, POCKET), Deeps.time(level));
+        return weather(id, Math.floorDiv(x, POCKET), Math.floorDiv(y, POCKET), Math.floorDiv(z, POCKET), Deeps.realTime(level));
     }
 }

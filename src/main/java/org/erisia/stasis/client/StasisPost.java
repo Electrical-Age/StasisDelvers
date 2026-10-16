@@ -94,6 +94,8 @@ public final class StasisPost {
         // all time-driven visuals on the smoothed clock: in a slow field the client ticks slowly and the server's time
         // packet steps its game time every second (AdventurAgent: the whole screen stepped once a second)
         double clock = weatherClock(mc);
+        // the drifting weather's clock, warped by storms (Storms.tau: up to 10x); pockets and the eye keep real time
+        double wclock = org.erisia.stasis.Storms.tau(ClientFields.deepSeed(), org.erisia.stasis.Storms.clientOverrideForClient(), clock);
         debugFrame++;
         d[29] = (float) ((clock % 1200.0));
         // eddy time (Eddies.time), with the partial tick so the mist drifts smoothly
@@ -131,7 +133,7 @@ public final class StasisPost {
         // strength, local surface y - floor(camera y), edge-noise id; at most MAX_DEEPS
         int nd = 0;
         if (Stasis.stops(mc.level)) {
-            double t = clock;
+            double t = wclock;
             List<org.erisia.stasis.Deeps.Deep> deeps = new ArrayList<>();
             List<Double> gaps = new ArrayList<>();
             for (var dp : org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed())) {
@@ -172,7 +174,7 @@ public final class StasisPost {
         }
         d[31] = nd;
         // the mist's clocks (stasis.fsh mistWind ..), wrapped here in double where each is seamless
-        double mt = clock;
+        double mt = wclock;
         d[176] = (float) ((0.4 * mt) % 96.0);
         d[177] = (float) ((0.25 * mt) % 96.0);
         d[178] = (float) ((0.02 * mt) % 32.0);

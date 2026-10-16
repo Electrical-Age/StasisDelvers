@@ -34,10 +34,15 @@ public final class Deeps {
     }
 
     /**
-     * The deeps' clock (s): game time / 20, never wrapping (Eddies.time wraps every ~14.5 h, and every deep jumped
+     * The deeps' clock (s): game time / 20, warped by storms (Storms.tau: up to 10x faster), never wrapping (Eddies.time wraps every ~14.5 h, and every deep jumped
      * then). Double: after weeks a float can't hold the drift to a fraction of a block.
      */
     public static double time(Level level) {
+        return Storms.tau(level, realTime(level));
+    }
+
+    /** The real clock under Deeps.time (game time / 20): the strata pockets and crystal growth keep to it in storms. */
+    public static double realTime(Level level) {
         return level.getGameTime() / 20.0;
     }
 

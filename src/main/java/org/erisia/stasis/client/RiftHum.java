@@ -45,7 +45,7 @@ public final class RiftHum {
         int seed = ClientFields.deepSeed();
         target = 0;
         if (seed == 0 || !Stasis.stops(mc.level)) return;
-        double t = Double.isNaN(StasisPost.smoothClock) ? Deeps.time(mc.level) : StasisPost.smoothClock;
+        double t = Double.isNaN(StasisPost.smoothClock) ? Deeps.realTime(mc.level) : StasisPost.smoothClock;   // (pockets keep real time)
         var p = mc.player.position();
         int px = Math.floorDiv((int) Math.floor(p.x), Pockets.POCKET), py = Math.floorDiv((int) Math.floor(p.y), Pockets.POCKET),
             pz = Math.floorDiv((int) Math.floor(p.z), Pockets.POCKET);

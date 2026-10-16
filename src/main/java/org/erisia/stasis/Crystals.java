@@ -181,7 +181,7 @@ public final class Crystals {
         if (chunk == null) return;
         Data data = Data.get(level);
         long key = cp.pack();
-        double t = Deeps.time(level);
+        double t = Deeps.realTime(level);
         Map<Long, Bud> buds = data.buds.computeIfAbsent(key, k -> new HashMap<>());
         if (data.swept.add(key)) {
             stamp(level, chunk, buds, t);
