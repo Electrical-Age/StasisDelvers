@@ -625,9 +625,12 @@ void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout fl
         float band = smoothstep(-6.0, -3.0, h) * exp(-max(0.0, h - 4.0) / 22.0);
         // rifts: ragged in 3D (a 2D field alone made straight-walled slabs with flat bottoms: AdventurAgent), rising
         // from the ground and frayed at the top
-        float nr = nz + 0.05 * (fbm32((q + vec3(camIntS)) / 14.0, seed ^ 0x77) - 0.5);
+        // (and narrowing upwards to ragged tops of varying height: straight walls with flat tops looked like a bug
+        // against the night sky, AdventurAgent)
+        float nr = nz + 0.05 * (fbm32((q + vec3(camIntS)) / 14.0, seed ^ 0x77) - 0.5) - max(0.0, h) * 0.0012;
         if (nr >= thR) {
-            float rb = smoothstep(-8.0, 6.0, h + 6.0 * (hash13(floor(q * 0.5)) - 0.5)) * (1.0 - smoothstep(8.0, 36.0, h));
+            float top = 12.0 + 34.0 * fbm32(vec3((q.xz + camIntS.xz) / 23.0, 3.7).xzy, seed ^ 0x78);
+            float rb = smoothstep(-8.0, 6.0, h + 6.0 * (hash13(floor(q * 0.5)) - 0.5)) * (1.0 - smoothstep(top * 0.4, top, h));
             float k = smoothstep(thR, thR + 0.035, nr) * rb;
             float a = 1.0 - exp(-dt * 0.3 * k);
             V += T * (1.0 - k) * rb * 0.05 * dt;
