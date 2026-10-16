@@ -118,6 +118,14 @@ public final class StasisRegistry {
             ITEMS.registerSimpleBlockItem(b);
     }
 
+    /** Crystal uses: the rift compass (to the nearest rift; spins in storms) and the rift barometer (storm warning). */
+    public static final net.neoforged.neoforge.registries.DeferredItem<RiftCompassItem> RIFT_COMPASS = ITEMS.registerItem("rift_compass", RiftCompassItem::new,
+        p -> p.stacksTo(1));
+    public static final net.neoforged.neoforge.registries.DeferredBlock<RiftBarometerBlock> RIFT_BAROMETER_BLOCK = BLOCKS.registerBlock("rift_barometer",
+        RiftBarometerBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(2.5f, 9f)
+            .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> st.getValue(RiftBarometerBlock.POWER) / 3));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> RIFT_BAROMETER = ITEMS.registerSimpleBlockItem(RIFT_BAROMETER_BLOCK);
+
     /** Stilled liquids (StilledLiquids): taken with a shovel from stopped water and lava; they thaw where time runs. */
     public static final net.neoforged.neoforge.registries.DeferredBlock<StilledLiquids.StilledBlock> STILLED_WATER_BLOCK = BLOCKS.registerBlock("stilled_water",
         p -> new StilledLiquids.StilledBlock(p, false), p -> p.mapColor(net.minecraft.world.level.material.MapColor.WATER).strength(0.5f)

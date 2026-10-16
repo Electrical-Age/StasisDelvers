@@ -9,6 +9,7 @@
     "stasisdelvers:rift_crystal_small",
     "stasisdelvers:rift_crystal_medium",
     "stasisdelvers:rift_crystal_large",
-    "stasisdelvers:rift_crystal_cluster"
+    "stasisdelvers:rift_crystal_cluster",
+    "stasisdelvers:rift_barometer"
   ]
 }

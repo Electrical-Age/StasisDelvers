@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "R": "stasisdelvers:riftstone",
+    "S": "stasisdelvers:rift_shard",
+    "C": "stasisdelvers:charged_rift_shard"
+  },
+  "pattern": [
+    "RSR",
+    "SCS",
+    "RSR"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:rift_barometer"
+  }
+}
