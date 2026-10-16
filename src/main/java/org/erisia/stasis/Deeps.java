@@ -59,7 +59,7 @@ public final class Deeps {
             along * Math.sin(ang) + 600 * Math.cos(t / 7200.0)};
     }
 
-    static float windAngle(int seed) {
+    public static float windAngle(int seed) {
         return Noise.hash32(seed, 21, 0, 0) * 6.2831853f;
     }
 

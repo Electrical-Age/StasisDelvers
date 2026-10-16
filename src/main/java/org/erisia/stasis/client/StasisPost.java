@@ -224,6 +224,30 @@ public final class StasisPost {
         // strata weather (rift stage 2): the mask around the camera, and the weather clock per pocket epoch length
         // (wrapped here in double; the shader adds a pocket's phase and carries)
         if (Stasis.stops(mc.level)) StrataMask.frame(cam.x, cam.y, cam.z, ClientFields.deepSeed(), d, fx, fy, fz);
+        // storms (stage 3): intensity, warning, the upwind direction, the storm field's noise origin at floor(camera)
+        // and its thresholds, and a 16 x 16 ground grid (spacing 16) around the camera for the storm's height band
+        if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {
+            int seed = ClientFields.deepSeed();
+            double[] ov = org.erisia.stasis.Storms.clientOverrideForClient();
+            double si = org.erisia.stasis.Storms.intensity(seed, ov, clock);
+            d[1312] = (float) si;
+            d[1313] = (float) org.erisia.stasis.Storms.warning(seed, ov, clock);
+            d[1314] = org.erisia.stasis.Deeps.windAngle(seed);
+            if (si > 0) {
+                double[] dr = org.erisia.stasis.Deeps.drift(wclock, seed);
+                d[1315] = (float) ((fx - dr[0]) / org.erisia.stasis.Storms.SCALE);
+                d[1316] = (float) ((fz - dr[1]) / org.erisia.stasis.Storms.SCALE);
+                d[1317] = org.erisia.stasis.Storms.threshold(org.erisia.stasis.Storms.mistShare(si));
+                d[1318] = org.erisia.stasis.Storms.threshold(org.erisia.stasis.Storms.riftShare(si));
+                d[1319] = seed ^ 0x5701;
+                double gx = Math.floor(cam.x / 16) * 16 - 120, gz = Math.floor(cam.z / 16) * 16 - 120;
+                d[1576] = (float) (gx - fx);
+                d[1577] = (float) (gz - fz);
+                for (int j = 0; j < 16; j++)
+                    for (int i = 0; i < 16; i++)
+                        d[1320 + j * 16 + i] = (float) (surface(mc, gx + i * 16, gz + j * 16, cam.y - 10) - fy);
+            }
+        }
         int[] periods = {600, 900, 1200, 1800};
         for (int i = 0; i < 4; i++) {
             d[188 + i] = (float) (clock - Math.floor(clock / periods[i]) * periods[i]);

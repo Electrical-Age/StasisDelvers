@@ -11,7 +11,10 @@
 // mask's corner - floor(camera); [187] strata mask valid (0/1); [188..191] the weather clock mod each pocket epoch
 // length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196..199] unused; [200..203] static deep
 // i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
-// static deep i's eye centre (the warped core) - floor(camera); [216] render distance (blocks);
+// static deep i's eye centre (the warped core) - floor(camera); [216] render distance (blocks); [1312] storm
+// intensity; [1313] storm warning 0..1; [1314] wind angle; [1315, 1316] the storm field's noise coordinates at
+// floor(camera) (x, z); [1317, 1318] its mist and rift thresholds; [1319] its noise seed; [1320 + 16j + i] the ground
+// (y - floor(camera y)) on a 16 x 16 grid of spacing 16 from [1576, 1577] (corner - floor(camera));
 // [1024 + 12i ..] drifting deep i (i < MAX_DEEPS, nearest first): centre - floor(camera) (x, z), radius, strength,
 // surface y - floor(camera y), edge-noise id, lowest and highest ground - floor(camera y), ground grid corner -
 // floor(camera) (x, z) and spacing, 1 unused; [2048 + 64i ..] drifting deep i's ground grid (8 x 8 surface y -
@@ -591,13 +594,53 @@ vec2 pocketWeather(int id, ivec3 p) {
     return vec2(1.0, dens);
 }
 
+// ---- storms (Storms.java; rift stage 3): the storm field over the surface band, on the warped wind: lit grey mist
+// where it's over the mist threshold, black rift (with a violet edge) over the rift threshold. The ground from the
+// camera's 16 x 16 grid.
+float stormGround(vec2 q) {
+    vec2 l = clamp((q - vec2(data(1576), data(1577))) / 16.0, 0.0, 14.999);
+    vec2 f0 = floor(l), f = l - f0;
+    int o = 1320 + int(f0.y) * 16 + int(f0.x);
+    return mix(mix(data(o), data(o + 1), f.x), mix(data(o + 16), data(o + 17), f.x), f.y);
+}
+
+void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout float L, inout float V) {
+    float si = data(1312);
+    if (si <= 0.0) return;
+    vec2 no = vec2(data(1315), data(1316));
+    float thM = data(1317), thR = data(1318);
+    int seed = int(data(1319));
+    const int N = 28;
+    float dt = tEnd / float(N);
+    for (int m = 0; m < N; m++) {
+        if (T < 0.01) break;
+        vec3 q = o + dir * ((float(m) + jit) * dt);
+        float h = q.y - stormGround(q.xz);
+        if (h < -6.0 || h > 64.0) continue;
+        float nz = fbm32(vec3(no + q.xz / 90.0, 0.5).xzy, seed);
+        if (nz < thM) continue;
+        float band = smoothstep(-6.0, -3.0, h) * exp(-max(0.0, h - 4.0) / 22.0);
+        if (nz >= thR) {
+            float k = smoothstep(thR, thR + 0.015, nz);
+            float a = 1.0 - exp(-dt * 0.5 * k * band);
+            V += T * (1.0 - k) * 0.06 * dt * band;
+            T *= 1.0 - a;
+        } else {
+            float k = smoothstep(thM, thM + 0.04, nz) * si;
+            float a = 1.0 - exp(-dt * 0.035 * k * band);
+            L += T * a;
+            T *= 1.0 - a;
+        }
+    }
+}
+
 // The strata pass (post_effect/stasis.json; this file with STRATA_PASS): the strata weather along the view ray, at
 // the mist target's resolution. The strata mask (StrataSampler, client/StrataMask.java) is 64^3 cells of 4 blocks
 // around the camera, 8 x 8 tiles of 64 x 64 (x across, y down, a tile per z), each texel the deep id (rgb) and
 // a = strata. Out: r = 1 - transmittance, g = the lit mist in it (the rest is a rift's black), b = violet glow.
 void main() {
     fragColor = vec4(0.0);
-    if (data(22) < 0.5 || data(187) < 0.5) return;
+    if (data(22) < 0.5 || (data(187) < 0.5 && data(1312) <= 0.0)) return;
     float depth = texture(DepthSampler, texCoord).r;
     mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                     data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
@@ -608,16 +651,25 @@ void main() {
     vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
     vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
     float tEnd = depth > 0.0 ? min(length(rel), 180.0) : 180.0;
+    float T = 1.0, L = 0.0, V = 0.0;
+    float jit = ign(gl_FragCoord.xy + 31.0);
+    stormMarch(o, dir, depth > 0.0 ? min(length(rel), 200.0) : 200.0, jit, T, L, V);
+    if (data(187) < 0.5) {
+        fragColor = vec4(1.0 - T, L, clamp(V, 0.0, 1.0), 1.0);
+        return;
+    }
     vec3 mo = vec3(data(184), data(185), data(186));
     // the ray through the mask's box
     vec3 inv3 = 1.0 / (dir + vec3(equal(dir, vec3(0.0))) * 1e-6);
     vec3 ta3 = (mo - o) * inv3, tb3 = (mo + 256.0 - o) * inv3;
     vec3 tmin = min(ta3, tb3), tmax = max(ta3, tb3);
     float ta = max(max(tmin.x, tmin.y), max(tmin.z, 0.0)), tb = min(min(tmax.x, tmax.y), min(tmax.z, tEnd));
-    if (tb <= ta) return;
+    if (tb <= ta) {
+        fragColor = vec4(1.0 - T, L, clamp(V, 0.0, 1.0), 1.0);
+        return;
+    }
     int n = clamp(int(ceil((tb - ta) / 1.25)), 6, 40);
-    float dt = (tb - ta) / float(n), jit = ign(gl_FragCoord.xy + 31.0);
-    float T = 1.0, L = 0.0, V = 0.0;
+    float dt = (tb - ta) / float(n);
     ivec3 lastP = ivec3(-2147483647);
     int lastId = -1;
     vec2 w = vec2(0.0);
@@ -667,7 +719,7 @@ void main() {
 void main() {
     fragColor = vec4(0.0, 0.0, 1.0, 1.0);
     // (with only strata about, still the scene distance: the strata pass's upsample uses it)
-    if (data(22) < 0.5 || (data(31) <= 0.0 && data(218) <= 0.0 && data(187) < 0.5)) return;
+    if (data(22) < 0.5 || (data(31) <= 0.0 && data(218) <= 0.0 && data(187) < 0.5 && data(1312) <= 0.0)) return;
     float depth = texture(DepthSampler, texCoord).r;
     mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                     data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
@@ -931,8 +983,8 @@ void main() {
             vec2 mist = mistUp(depth > 0.0 ? tScene : -1.0, rd);
             c = c * (1.0 - 0.85 * mist.x) + 0.85 * ((mist.x - mist.y) * MIST_THIN + mist.y * MIST_DENSE);
         }
-        if (data(187) > 0.5) {
-            // strata weather (the strata pass): mist, the violet warning and black rift pockets in the strata caves
+        if (data(187) > 0.5 || data(1312) > 0.0) {
+            // strata weather and storms (the strata pass): mist, the violet warning and black rift pockets in the strata caves
             vec3 sm = strataUp(depth > 0.0 ? tScene : -1.0, rd);
             c = c * (1.0 - sm.r) + STRATA_MIST * sm.g + STRATA_VIOLET * sm.b;
         }
@@ -992,6 +1044,15 @@ void main() {
                 float vis = 0.12 + 0.88 * smoothstep(0.42, 0.72, veil);
                 c = mix(c + ep.rgb * vis, ep.rgb * vis, ep.a);
             }
+        }
+        // a storm's warning: a violet glow low on the upwind horizon, brightening as it comes (only on the sky)
+        if (depth <= 0.0 && data(1313) > 0.0) {
+            float wa = data(1314);
+            vec2 up = -vec2(cos(wa), sin(wa));
+            vec2 hd = normalize(dir.xz + vec2(1e-5));
+            float facing = max(0.0, dot(hd, up));
+            float low = exp(-max(0.0, dir.y + 0.02) * 9.0);
+            c += vec3(0.45, 0.2, 0.75) * data(1313) * pow(facing, 3.0) * low * 0.55;
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }

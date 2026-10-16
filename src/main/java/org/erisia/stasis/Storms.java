@@ -143,7 +143,7 @@ public final class Storms {
 
     // ---- the storm field: coverage over the surface band, carried on the warped wind
 
-    static final float SCALE = 90;
+    public static final float SCALE = 90;
 
     /** fbm32's quantiles (sampled once), so coverage shares come out right whatever the noise's distribution. */
     static final float[] QUANT;
@@ -156,7 +156,7 @@ public final class Storms {
     }
 
     /** The noise value above which a share `share` of the land lies. */
-    static float threshold(double share) {
+    public static float threshold(double share) {
         int i = (int) Math.round((1 - Math.max(0, Math.min(1, share))) * (QUANT.length - 1));
         return QUANT[i];
     }
