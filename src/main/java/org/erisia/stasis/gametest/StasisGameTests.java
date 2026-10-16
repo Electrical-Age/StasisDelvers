@@ -1631,7 +1631,8 @@ public final class StasisGameTests {
             return () -> {
                 double ratio = sums[1] / (double) Math.max(1, sums[0]);
                 c.check("full speed: random ticks (~216 expected)", sums[0] > 120, "ticks " + sums[0]);
-                c.check("0.5 field: about half", ratio > 0.3 && ratio < 0.7, sums[1] + " vs " + sums[0] + String.format(" (%.2f)", ratio));
+                // (random ticks are Poisson: ~150 samples a side wander; once 0.72 was seen)
+                c.check("0.5 field: about half", ratio > 0.28 && ratio < 0.78, sums[1] + " vs " + sums[0] + String.format(" (%.2f)", ratio));
                 c.check("stopped: none", sums[2] == 0, "ticks " + sums[2]);
             };
         }, true, true));

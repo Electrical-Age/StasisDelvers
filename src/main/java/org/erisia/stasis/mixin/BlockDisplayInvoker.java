@@ -10,4 +10,7 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 public interface BlockDisplayInvoker {
     @Invoker("setBlockState")
     void stasis$setBlockState(BlockState state);
+
+    @Invoker("getBlockState")
+    BlockState stasis$getBlockState();
 }

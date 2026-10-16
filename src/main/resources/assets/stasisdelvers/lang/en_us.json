@@ -31,5 +31,6 @@
   "item.stasisdelvers.charged_rift_shard": "Charged Rift Shard",
   "subtitles.stasisdelvers.rift.hum": "Low hum",
   "block.stasisdelvers.stilled_water": "Stilled Water",
-  "block.stasisdelvers.stilled_lava": "Stilled Lava"
+  "block.stasisdelvers.stilled_lava": "Stilled Lava",
+  "subtitles.stasisdelvers.storm.wind": "Storm wind"
 }

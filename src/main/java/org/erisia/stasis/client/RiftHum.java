@@ -25,9 +25,24 @@ public final class RiftHum {
     static float target, progress;
     static double sx, sy, sz;
 
+    static Wind wind;
+
     static void tick(ClientTickEvent.Post e) {
         var mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
+        // a storm's wind: rising through the warning, full in the storm (stage 3)
+        float w = 0;
+        if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {
+            double t = Double.isNaN(StasisPost.smoothClock) ? Deeps.realTime(mc.level) : StasisPost.smoothClock;
+            double[] ov = org.erisia.stasis.Storms.clientOverrideForClient();
+            w = (float) Math.max(0.85 * org.erisia.stasis.Storms.intensity(ClientFields.deepSeed(), ov, t),
+                0.12 * org.erisia.stasis.Storms.warning(ClientFields.deepSeed(), ov, t));
+        }
+        windTarget = w;
+        if (w > 0.01f && (wind == null || wind.isStopped())) {
+            wind = new Wind();
+            mc.getSoundManager().play(wind);
+        }
         if (mc.level.getGameTime() % 5 == 0) scan(mc);
         // each pocket's warning is its own hum (one hum carried from pocket to pocket and ran 34 s: AdventurAgent)
         if (playing != null && !playing.isStopped() && target > 0.01f && (playing.px != sx || playing.py != sy || playing.pz != sz)) {
@@ -59,7 +74,8 @@ public final class RiftHum {
                     if (w.state() != Pockets.State.VIOLET) continue;
                     float f = (float) (1 - w.untilNext() / Pockets.VIOLET);
                     double dist = Math.sqrt((cx - p.x) * (cx - p.x) + (cy - p.y) * (cy - p.y) + (cz - p.z) * (cz - p.z));
-                    float loud = (0.25f + 0.75f * f) * (float) Math.max(0, 1 - dist / 32);
+                    // (a gentler falloff: at 27 blocks a linear one left ~4% and the hum seemed to stop early, AdventurAgent)
+                    float loud = (0.3f + 0.7f * f) * (float) Math.sqrt(Math.max(0, 1 - dist / 40));
                     if (loud > target) {
                         target = loud;
                         progress = f;
@@ -93,6 +109,30 @@ public final class RiftHum {
             volume += (Math.max(0.0001f, target) - volume) * 0.15f;
             pitch = 0.8f + 0.45f * progress;
             if (target <= 0.01f && volume < 0.02f) stop();
+        }
+    }
+
+    static float windTarget;
+
+    static final class Wind extends AbstractTickableSoundInstance {
+        Wind() {
+            super(StasisRegistry.STORM_WIND.get(), SoundSource.WEATHER, RandomSource.create());
+            looping = true;
+            volume = 0.01f;
+            attenuation = SoundInstance.Attenuation.NONE;
+            relative = true;
+        }
+
+        @Override
+        public boolean canStartSilent() {
+            return true;
+        }
+
+        @Override
+        public void tick() {
+            volume += (Math.max(0.0001f, windTarget) - volume) * 0.02f;
+            pitch = 0.85f + 0.3f * windTarget;
+            if (windTarget <= 0.01f && volume < 0.02f) stop();
         }
     }
 }

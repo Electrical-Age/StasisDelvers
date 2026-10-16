@@ -80,8 +80,20 @@ public final class StormCrystals {
                         if (d.placed.contains(at.asLong()) || !level.getBlockState(at).isAir()
                             || !level.getBlockState(at.below()).isFaceSturdy(level, at.below(), Direction.UP)) continue;
                         if (Storms.at(level, at.getX(), at.getY(), at.getZ()) != 2) continue;
-                        level.setBlock(at, cluster.defaultBlockState().setValue(AmethystClusterBlock.FACING, Direction.UP), Block.UPDATE_CLIENTS);
-                        d.placed.add(at.asLong());
+                        // a little formation, not a lone cluster (one was hard to see from more than ~4 blocks:
+                        // AdventurAgent): 3-6 clusters and big buds within 2 blocks
+                        int n = 3 + (int) (Noise.hash32(cx, cz, 94, seed) * 4);
+                        for (int k = 0; k < n; k++) {
+                            int ox = k == 0 ? 0 : (int) (Noise.hash32(cx, cz, 95 + k, seed) * 5) - 2, oz = k == 0 ? 0 : (int) (Noise.hash32(cx, cz, 105 + k, seed) * 5) - 2;
+                            int px = s[0] + ox, pz = s[1] + oz;
+                            if (!level.hasChunkAt(new BlockPos(px, 0, pz))) continue;
+                            BlockPos q = new BlockPos(px, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, px, pz), pz);
+                            if (d.placed.contains(q.asLong()) || !level.getBlockState(q).isAir()
+                                || !level.getBlockState(q.below()).isFaceSturdy(level, q.below(), Direction.UP)) continue;
+                            Block b = k % 3 == 2 ? StasisRegistry.RIFT_CRYSTAL_LARGE.get() : cluster;
+                            level.setBlock(q, b.defaultBlockState().setValue(AmethystClusterBlock.FACING, Direction.UP), Block.UPDATE_CLIENTS);
+                            d.placed.add(q.asLong());
+                        }
                         d.setDirty();
                     }
             }
@@ -94,7 +106,7 @@ public final class StormCrystals {
         while (it.hasNext()) {
             BlockPos at = BlockPos.of(it.next());
             if (!level.hasChunkAt(at)) continue;
-            if (level.getBlockState(at).is(StasisRegistry.RIFT_CRYSTAL_CLUSTER.get()))
+            if (level.getBlockState(at).is(StasisRegistry.RIFT_CRYSTAL_CLUSTER.get()) || level.getBlockState(at).is(StasisRegistry.RIFT_CRYSTAL_LARGE.get()))
                 level.setBlock(at, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
             it.remove();
         }

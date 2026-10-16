@@ -25,8 +25,6 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 - From inside a slow field, entities (which still run at 20 on the server) are drawn creeping at the client rate,
   then snap at the next position sync (arrow: drawn 5.7 b/s, jumps ~3.9 blocks; AdventurAgent). Idea: client-side,
   interpolate non-player entities on real time rather than the slowed client tick.
-- An unpowered (0 energy, e.g. /give'n) Delver suit doesn't protect and gives no warning: show "suit unpowered"
-  before freezing.
 - Not yet checked: mob AI near/in slow fields; fields above or below the player.
 
 ## Later (Baughn 2026-10-13, msg 1559534246849282069)
@@ -35,6 +33,5 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 
 - Lattice-top cap (H14 E8 L4): big grey joint hulls at the top-ring corners where the cap struts meet (cosmetic).
 
-- Crafting a stasis-suit piece drops the Delver piece charge (AdventurAgent 2026-10-13). Could carry it over with a custom recipe.
 
 - Field collapse effect too predictable: some hexes never show, and it barely depends on charge (Baughn 2026-10-14, later).

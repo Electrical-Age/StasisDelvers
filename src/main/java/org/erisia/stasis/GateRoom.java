@@ -38,6 +38,34 @@ public final class GateRoom {
     private GateRoom() {
     }
 
+    /** The tag on the frame's shards: when a field covers them, time resumes and they fall (fallDebris). */
+    public static final String DEBRIS = "stasis_gate_debris";
+
+    /**
+     * Every 2 s: shards a running field covers fall (time resumes for them). They land as blocks; the frame's become
+     * end stone bricks (frames must stay unobtainable).
+     */
+    static void fallDebris(net.neoforged.neoforge.event.tick.ServerTickEvent.Post e) {
+        if (e.getServer().getTickCount() % 40 != 7) return;
+        for (var level : e.getServer().getAllLevels()) {
+            var fields = FieldData.get(level).fields();
+            if (fields.isEmpty()) continue;
+            for (Field f : fields) {
+                var box = new net.minecraft.world.phys.AABB(f.x() - f.radius(), f.y() - f.radius(), f.z() - f.radius(),
+                    f.x() + f.radius(), f.y() + f.radius(), f.z() + f.radius());
+                for (Display.BlockDisplay d : level.getEntitiesOfClass(Display.BlockDisplay.class, box, x -> x.entityTags().contains(DEBRIS))) {
+                    BlockPos bp = d.blockPosition();
+                    if (!Stasis.isRunning(level, bp)) continue;
+                    BlockState st = ((BlockDisplayInvoker) d).stasis$getBlockState();
+                    if (st.is(Blocks.END_PORTAL_FRAME)) st = Blocks.END_STONE_BRICKS.defaultBlockState();
+                    d.discard();
+                    if (level.getBlockState(bp).isAir())
+                        net.minecraft.world.entity.item.FallingBlockEntity.fall(level, bp, st);
+                }
+            }
+        }
+    }
+
     /** Room-local coordinates of the gate's centre (over the old frame platform). */
     static final int CX = 5, CY = 4, CZ = 10;
 
@@ -148,6 +176,7 @@ public final class GateRoom {
             e.setPos(pos.x, pos.y, pos.z);
             ((BlockDisplayInvoker) e).stasis$setBlockState(shard);
             ((DisplayInvoker) e).stasis$setTransformation(new Transformation(new Matrix4f().rotate(q).scale(scale).translate(-0.5f, -0.5f, -0.5f)));
+            e.addTag(DEBRIS);
             level.addFreshEntity(e);
         }
         // the spawner's silverfish, mid-leap away from the blast

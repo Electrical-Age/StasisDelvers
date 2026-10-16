@@ -146,6 +146,9 @@ public final class StasisRegistry {
     public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> MUSIC_STOPPED = SOUNDS.register("music.stopped",
         () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "music.stopped")));
     /** A strata pocket about to turn rift hums (client/RiftHum; sounds/rift_hum.ogg, made with sox). */
+    /** A storm's wind (client/RiftHum.StormWind; sounds/storm_wind.ogg, made with sox). */
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> STORM_WIND = SOUNDS.register("storm.wind",
+        () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "storm.wind")));
     public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> RIFT_HUM = SOUNDS.register("rift.hum",
         () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "rift.hum")));
 

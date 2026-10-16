@@ -133,5 +133,15 @@
    }
   ],
   "subtitle": "subtitles.stasisdelvers.rift.hum"
+ },
+ "storm.wind": {
+  "category": "weather",
+  "subtitle": "subtitles.stasisdelvers.storm.wind",
+  "sounds": [
+   {
+    "name": "stasisdelvers:storm_wind",
+    "stream": false
+   }
+  ]
  }
 }
