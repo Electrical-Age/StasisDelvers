@@ -21,6 +21,10 @@ public final class ConsoleScreen extends Screen {
     int ticks;
     long armedUntil;
     Button overrideButton;
+    final java.util.List<Button> targetButtons = new java.util.ArrayList<>();
+    /** The last target we asked for, until the server's readout catches up (a quick second +5 was lost). */
+    double pending = Double.NaN;
+    long pendingUntil;
 
     ConsoleScreen(BlockPos pos) {
         super(Component.literal("Stasis tower console"));
@@ -47,22 +51,26 @@ public final class ConsoleScreen extends Screen {
     }
 
     void set(double target, boolean override) {
+        if (!Double.isNaN(target)) target = Math.max(v(7), Math.min(v(8), target));
+        pending = target;
+        pendingUntil = System.currentTimeMillis() + 1500;
         ClientPacketDistributor.sendToServer(new StasisNet.ConsoleSet(pos, target, override));
     }
 
     double target() {
-        return v(9);
+        return System.currentTimeMillis() < pendingUntil && !Double.isNaN(pending) ? pending : v(9);
     }
 
     @Override
     protected void init() {
         int x = width / 2 - 150, y = height / 2 + 30;
-        addRenderableWidget(Button.builder(Component.literal("-5"), b -> set(target() - 5, v(12) > 0)).bounds(x, y, 30, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("-1"), b -> set(target() - 1, v(12) > 0)).bounds(x + 34, y, 30, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("+1"), b -> set(target() + 1, v(12) > 0)).bounds(x + 68, y, 30, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("+5"), b -> set(target() + 5, v(12) > 0)).bounds(x + 102, y, 30, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Preferred"), b -> set(Double.NaN, v(12) > 0)).bounds(x + 136, y, 70, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Minimum"), b -> set(v(7), v(12) > 0)).bounds(x + 210, y, 90, 20).build());
+        targetButtons.clear();
+        targetButtons.add(addRenderableWidget(Button.builder(Component.literal("-5"), b -> set(target() - 5, v(12) > 0)).bounds(x, y, 30, 20).build()));
+        targetButtons.add(addRenderableWidget(Button.builder(Component.literal("-1"), b -> set(target() - 1, v(12) > 0)).bounds(x + 34, y, 30, 20).build()));
+        targetButtons.add(addRenderableWidget(Button.builder(Component.literal("+1"), b -> set(target() + 1, v(12) > 0)).bounds(x + 68, y, 30, 20).build()));
+        targetButtons.add(addRenderableWidget(Button.builder(Component.literal("+5"), b -> set(target() + 5, v(12) > 0)).bounds(x + 102, y, 30, 20).build()));
+        targetButtons.add(addRenderableWidget(Button.builder(Component.literal("Preferred"), b -> set(Double.NaN, v(12) > 0)).bounds(x + 136, y, 70, 20).build()));
+        targetButtons.add(addRenderableWidget(Button.builder(Component.literal("Minimum"), b -> set(v(7), v(12) > 0)).bounds(x + 210, y, 90, 20).build()));
         overrideButton = addRenderableWidget(Button.builder(Component.literal("OVERRIDE"), b -> pressOverride())
             .bounds(x, y + 28, 300, 20).build());
     }
@@ -76,7 +84,7 @@ public final class ConsoleScreen extends Screen {
         if (now < armedUntil) {
             set(target(), true);
             armedUntil = 0;
-        } else armedUntil = now + 5000;
+        } else armedUntil = now + 8000;
     }
 
     @Override
@@ -86,10 +94,11 @@ public final class ConsoleScreen extends Screen {
         if (mc.player == null || mc.player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(pos)) > 8 * 8) onClose();
         if (overrideButton != null) {
             boolean on = v(12) > 0, armed = System.currentTimeMillis() < armedUntil;
-            overrideButton.setMessage(Component.literal(on ? "OVERRIDE IS ON: the safety will not shrink the field (press to restore)"
-                : armed ? "CONFIRM OVERRIDE: the field will not save itself and collapses when the store runs dry"
-                : "OVERRIDE (disables the automatic safety)"));
+            overrideButton.setMessage(Component.literal(on ? "OVERRIDE ON - press to restore the safety"
+                : armed ? "CONFIRM OVERRIDE (press again)" : "OVERRIDE (disable the safety)"));
         }
+        // a signal sets the target: the buttons step aside (they were silently ignored)
+        for (Button b : targetButtons) b.active = v(13) <= 0;
     }
 
     @Override
@@ -117,6 +126,7 @@ public final class ConsoleScreen extends Screen {
         g.fill(x, by, x + 300, by + 10, 0xFF202028);
         g.fill(x, by, x + (int) (300 * Math.max(0, Math.min(1, share))), by + 10, share < 0.25 ? 0xFFD05030 : share < 0.6 ? 0xFFD0A030 : 0xFF50A0D0);
         g.fill(x + 180, by - 2, x + 181, by + 12, 0xFFFFFFFF);
+        g.text(font, "60%", x + 172, by - 10, 0xFFB0B0B0);
         g.text(font, String.format("Charge %.0f%%  (%.0f of %.0f kJ)", 100 * share, v(1) / 1000, v(2) / 1000), x, by + 14, 0xFFE0E0E0);
         double in = v(3), draw = s == 1 ? v(4) : 0, net = in - draw;
         g.text(font, String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" (x%.2f)", v(5)) : "", net),
@@ -124,10 +134,13 @@ public final class ConsoleScreen extends Screen {
         if (net < 0 && s == 1) g.text(font, String.format("Empty in %s", time(v(1) / -net)), x + 220, by + 26, 0xFFE0A060);
         g.text(font, String.format("Radius %.0f now, goal %.0f, target %.0f", v(10), v(11), v(9)), x, by + 42, 0xFFE0E0E0);
         g.text(font, String.format("Preferred %.0f, range %.0f to %.0f (above %.0f: ruinous draw)", v(6), v(7), v(8), v(6)), x, by + 54, 0xFFA0A0B0);
-        if (v(13) > 0) g.text(font, "Target set by signal", x + 200, by + 42, 0xFF80C0FF);
+        if (v(13) > 0) g.text(font, "Target set by signal (left side)", x + 160, by + 42, 0xFF80C0FF);
         boolean on = v(12) > 0;
-        g.text(font, on ? "SAFETY OFF (OVERRIDE)" : share < 0.6 ? "Safety: shrinking to save power" : "Safety: on (shrinks below 60%)",
-            x, by + 68, on ? 0xFFFF4040 : share < 0.6 ? 0xFFE0C060 : 0xFF70C070);
+        boolean armed = System.currentTimeMillis() < armedUntil;
+        g.text(font, on ? "SAFETY OFF (OVERRIDE): no shrinking; it collapses when the store runs dry"
+            : armed ? "Confirm: the field will not save itself and collapses when the store runs dry"
+            : share < 0.6 ? "Safety: shrinking to save power" : "Safety: on (shrinks below 60%)",
+            x, by + 68, on || armed ? 0xFFFF4040 : share < 0.6 ? 0xFFE0C060 : 0xFF70C070);
         g.text(font, st.text().length() > 60 ? st.text().substring(0, 60) + "..." : st.text(), x, by + 80, 0xFF909098);
     }
 
