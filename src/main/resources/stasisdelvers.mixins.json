@@ -12,7 +12,9 @@
     "ServerPlayerGameModeMixin",
     "ItemEntityAccessor",
     "StructurePieceInvoker",
-    "StrongholdPortalRoomMixin"
+    "StrongholdPortalRoomMixin",
+    "DisplayInvoker",
+    "BlockDisplayInvoker"
   ],
   "client": [
     "client.GameRendererMixin",

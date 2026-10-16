@@ -18,8 +18,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Vanilla End portals are gone (Baughn, rift stage 1b): a stronghold portal room keeps its stairs, lava and spawner,
- * but its frame and portal are cleared, and a gate rift to the End stands there instead (Gates).
+ * Vanilla End portals are gone (Baughn, rift stage 1b): a stronghold portal room's frame and portal are cleared, a gate
+ * rift to the End stands there instead (Gates), and the room is caught mid-collapse around it (GateRoom).
  */
 @Mixin(targets = "net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces$PortalRoom")
 public abstract class StrongholdPortalRoomMixin {
@@ -37,7 +37,10 @@ public abstract class StrongholdPortalRoomMixin {
                 var st = level.getBlockState(p);
                 if (st.is(Blocks.END_PORTAL_FRAME) || st.is(Blocks.END_PORTAL)) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             }
-        BlockPos centre = piece.stasis$worldPos(5, 4, 10).immutable();
-        if (chunkBB.isInside(centre)) Gates.portalRoom(sl, centre);
+        // caught mid-collapse (GateRoom); no new-chunk grace here, or the lava and debris would settle first
+        org.erisia.stasis.GateRoom.shatter(level, piece, chunkBB);
+        org.erisia.stasis.NewChunkGrace.exempt(sl, chunkPos.pack());
+        // recorded from whichever of the room's chunks comes first (Gates dedupes)
+        Gates.portalRoom(sl, piece.stasis$worldPos(5, 4, 10).immutable());
     }
 }

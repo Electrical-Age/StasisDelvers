@@ -38,8 +38,22 @@ public final class NewChunkGrace {
         return m;
     }
 
+    /** Chunks that get no grace (GateRoom: a frozen collapse must not settle), per level; consumed on load. */
+    private static final Map<Level, java.util.Set<Long>> EXEMPT = new java.util.WeakHashMap<>();
+
+    /** From worldgen (any thread): this new chunk gets no grace when it loads. */
+    public static synchronized void exempt(Level level, long chunkKey) {
+        EXEMPT.computeIfAbsent(level, l -> ConcurrentHashMap.newKeySet()).add(chunkKey);
+    }
+
+    private static synchronized boolean takeExempt(Level level, long chunkKey) {
+        java.util.Set<Long> s = EXEMPT.get(level);
+        return s != null && s.remove(chunkKey);
+    }
+
     static void chunkLoad(ChunkEvent.Load e) {
         if (!onLoad || !e.isNewChunk() || !(e.getLevel() instanceof ServerLevel level) || !Stasis.stops(level)) return;
+        if (takeExempt(level, e.getChunk().getPos().pack())) return;
         grant(level, e.getChunk().getPos().pack(), TICKS);
     }
 
