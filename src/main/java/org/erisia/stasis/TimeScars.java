@@ -69,7 +69,8 @@ public final class TimeScars {
                     BlockState src = (lava ? Blocks.LAVA : Blocks.WATER).defaultBlockState();
                     BlockState fall = src.setValue(LiquidBlock.LEVEL, 8);
                     level.setBlock(new BlockPos(x, ceil + 1, z), src, 2);
-                    int len = 2 + (int) (Noise.hash32(cx, cz, 350 + k, id) * (gap - 4));
+                    // short: frozen mid-fall, not a pillar (long columns from sky islands read as pillars: AdventurAgent)
+                    int len = 2 + (int) (Noise.hash32(cx, cz, 350 + k, id) * Math.min(6, gap - 4));
                     for (int i = 0; i < len; i++) level.setBlock(new BlockPos(x, ceil - i, z), fall, 2);
                     FALLS.incrementAndGet();
                     any = true;

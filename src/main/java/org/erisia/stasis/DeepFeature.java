@@ -170,6 +170,12 @@ public record DeepFeature() implements Feature {
     }
 
     /** Rock the strata may replace: overworld stone, dirt, gravel (never fluids, bedrock, the rift's own shell or air). */
+    /** Sky islands' noise threshold: islands cluster round the rift and thin out with distance and near the ground. */
+    static float islandThreshold(StaticDeeps.Deep d, int x, int z, int aboveGround) {
+        double dist = Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) / d.radius();
+        return 0.56f + 0.2f * (float) Math.max(0, Math.min(1, (dist - 0.8) / 0.9)) + 0.25f * Math.max(0, 1 - (aboveGround - 6) / 14f);
+    }
+
     static boolean replaceable(BlockState st) {
         return st.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || st.is(net.minecraft.tags.BlockTags.DIRT) || st.is(Blocks.GRAVEL)
             || st.is(Blocks.SAND) || st.is(Blocks.CLAY) || st.is(Blocks.CALCITE) || st.is(Blocks.SMOOTH_BASALT)
@@ -219,14 +225,16 @@ public record DeepFeature() implements Feature {
                         case Strata.BODY, Strata.VEIN, Strata.SPIRE -> {
                             // in open air above the ground (a sky rift's strata), the layer floats as broken islands
                             // (thinning out towards the ground: a dark overhang down to it shaded the land, AdventurAgent)
+                            // (smaller and sparser further out: the staircase's slabs roofed the land with flat 100-block
+                            // layers, AdventurAgent; the islands cluster round the core)
                             boolean island = StasisConfig.skyIslands && y > surface + 6 && st.isAir()
-                                && Noise.fbm32(x / 11f, y / 6f, z / 11f, id ^ 0x15A) > 0.5f + 0.25f * Math.max(0, 1 - (y - surface - 6) / 14f);
+                                && Noise.fbm32(x / 7f, y / 5f, z / 7f, id ^ 0x15A) > islandThreshold(d, x, z, y - surface);
                             boolean ok = island || replaceable(st) || k == Strata.SPIRE && (st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty();
                             if (!ok) continue;
                             BlockState put = budding(d, x, y, z) ? bud : k == Strata.VEIN ? vein : rock;
                             // islands' tops grow crystals (cavities above ground are open sky: budding() rarely fires)
                             if (island && put != bud && Noise.hash32(x, y, z, id ^ 0x15B) < 0.06f && level.getBlockState(p.above()).isAir()
-                                && !(Noise.fbm32(x / 11f, (y + 1) / 6f, z / 11f, id ^ 0x15A) > 0.5f) && ((p.getY() + 1) < maxY)) {
+                                && !(Noise.fbm32(x / 7f, (y + 1) / 5f, z / 7f, id ^ 0x15A) > islandThreshold(d, x, z, y + 1 - surface)) && ((p.getY() + 1) < maxY)) {
                                 level.setBlock(p, bud, 2);
                                 float hb = Noise.hash32(x, y, z, id ^ 0x15C);
                                 var cb = hb < 0.35f ? StasisRegistry.RIFT_CRYSTAL_SMALL : hb < 0.6f ? StasisRegistry.RIFT_CRYSTAL_MEDIUM
