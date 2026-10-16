@@ -621,6 +621,21 @@ public final class StasisGameTests {
                 t.setRemoved();   // (its 40-block field would reach the next tests)
             };
         }, false, true));
+        // the console answers players at the tower (within 8 blocks), not from afar; its readout has the radii
+        CASES.put("tower_console_access", new Spec(5, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 2);
+            ServerPlayer near = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), true), far = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            return () -> {
+                far.setPos(far.getX() + 20, far.getY(), far.getZ());
+                c.check("near: the console answers", org.erisia.stasis.StasisNet.consoleTower(near, t.getBlockPos()) == t);
+                c.check("20 blocks off: refused", org.erisia.stasis.StasisNet.consoleTower(far, t.getBlockPos()) == null);
+                var st = t.consoleState();
+                c.check("the readout has the preferred range", st.v().get(6) == 32.0, st.v().toString());
+                remove(h, near);
+                remove(h, far);
+                t.setRemoved();
+            };
+        }, false, true));
         // Baughn: the shield shows the charge only while the store drains, averaged (no flicker at break-even)
         CASES.put("tower_shield_shows_drain", new Spec(120, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);

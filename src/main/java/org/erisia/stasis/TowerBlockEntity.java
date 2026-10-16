@@ -299,6 +299,7 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
         double in = received / FE_PER_J;
         received = 0;
+        inAvgW += (in * 20 - inAvgW) / 40.0;
         if (weatherPinned) {
             // (test)
         } else if (state == State.RUNNING && level.getGameTime() % 20 == 0) {
@@ -482,6 +483,35 @@ public class TowerBlockEntity extends BlockEntity {
         stepGoal = effRadius;
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
+    }
+
+    /** Power coming in, W (an average over a few seconds), for the console. */
+    double inAvgW;
+
+    /** The console's readout (StasisNet.ConsoleState). */
+    public StasisNet.ConsoleState consoleState() {
+        double r = radius();
+        java.util.List<Double> v = java.util.List.of((double) state.ordinal(), storedJ(), storeMaxJ(), inAvgW,
+            drawFor(r) * drawPenalty(r) * weatherFactor(), weatherFactor(), designRadius(), minRadius(), maxRadius(), target(),
+            state == State.OFF ? 0 : r, goalRadius(), override ? 1.0 : 0.0, signalSet ? 1.0 : 0.0);
+        return new StasisNet.ConsoleState(worldPosition, v, structureLine());
+    }
+
+    /** Set by a signal port this tick (the console's target buttons yield to it). */
+    boolean signalSet;
+
+    String structureLine() {
+        TowerStructure s = structure;
+        return switch (s.status) {
+            case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top centre (each one widens the field); poles off "
+                + "the mast's side make booms. Feed power (FE, e.g. EA's exporter) into any face.";
+            case WAITING, BUILDING -> "Building the tower...";
+            case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
+                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ".";
+            case INVALID -> "Tower layout not allowed: " + s.message;
+            case REFUSED -> "Tower refused: " + s.message;
+            case FAILED -> "Tower could not be built (see the server log).";
+        };
     }
 
     /** What right-clicking the core says: the field, the store, the structure, and what to do next. */

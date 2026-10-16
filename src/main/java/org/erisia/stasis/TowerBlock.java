@@ -171,7 +171,12 @@ public class TowerBlock extends Block implements EntityBlock {
     @Override
     protected net.minecraft.world.InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
                                                                    net.minecraft.world.phys.BlockHitResult hit) {
-        if (level.isClientSide()) return net.minecraft.world.InteractionResult.SUCCESS;
+        // the console (CONSOLE-PLAN.md C) on a formed core; sneaking: the old status line in chat
+        if (level.isClientSide()) {
+            if (formed(state) && !player.isShiftKeyDown()) StasisNet.consoleOpener.accept(master(pos, state));
+            return net.minecraft.world.InteractionResult.SUCCESS;
+        }
+        if (formed(state) && !player.isShiftKeyDown()) return net.minecraft.world.InteractionResult.SUCCESS_SERVER;
         if (!formed(state)) {
             player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
                 "Stasis tower core block: place two, one on the other, to form a tower core."));

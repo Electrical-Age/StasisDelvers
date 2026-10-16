@@ -71,6 +71,60 @@ public final class StasisNet {
         }
     }
 
+    // ---- the tower console (CONSOLE-PLAN.md C): the open screen asks for the state twice a second; buttons set
+    // the target radius (NaN: the preferred range) and OVERRIDE
+
+    public record ConsoleQuery(net.minecraft.core.BlockPos pos) implements CustomPacketPayload {
+        public static final Type<ConsoleQuery> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_query"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleQuery> CODEC = StreamCodec.composite(
+            net.minecraft.core.BlockPos.STREAM_CODEC, ConsoleQuery::pos, ConsoleQuery::new);
+
+        @Override
+        public Type<ConsoleQuery> type() {
+            return TYPE;
+        }
+    }
+
+    public record ConsoleSet(net.minecraft.core.BlockPos pos, double target, boolean override) implements CustomPacketPayload {
+        public static final Type<ConsoleSet> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_set"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleSet> CODEC = StreamCodec.composite(
+            net.minecraft.core.BlockPos.STREAM_CODEC, ConsoleSet::pos, ByteBufCodecs.DOUBLE, ConsoleSet::target, ByteBufCodecs.BOOL, ConsoleSet::override,
+            ConsoleSet::new);
+
+        @Override
+        public Type<ConsoleSet> type() {
+            return TYPE;
+        }
+    }
+
+    /** The console's readout: v = {state, stored J, max J, in W, draw W, weather factor, preferred, min, max, target,
+     *  radius now, goal, override (0/1), target set by signal (0/1)}; text = the structure line. */
+    public record ConsoleState(net.minecraft.core.BlockPos pos, List<Double> v, String text) implements CustomPacketPayload {
+        public static final Type<ConsoleState> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_state"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleState> CODEC = StreamCodec.composite(
+            net.minecraft.core.BlockPos.STREAM_CODEC, ConsoleState::pos, ByteBufCodecs.DOUBLE.apply(ByteBufCodecs.list()), ConsoleState::v,
+            ByteBufCodecs.STRING_UTF8, ConsoleState::text, ConsoleState::new);
+
+        @Override
+        public Type<ConsoleState> type() {
+            return TYPE;
+        }
+    }
+
+    /** Client: where console states go (client/ConsoleScreen), and how a right-click opens it. */
+    public static volatile java.util.function.Consumer<ConsoleState> consoleSink = c -> {
+    };
+    public static volatile java.util.function.Consumer<net.minecraft.core.BlockPos> consoleOpener = p -> {
+    };
+
+    /** The tower a player may work the console of: a formed master within 8 blocks, and theirs to touch. */
+    public static TowerBlockEntity consoleTower(ServerPlayer p, net.minecraft.core.BlockPos pos) {
+        if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(pos)) > 8 * 8) return null;
+        if (!(p.level().getBlockEntity(pos) instanceof TowerBlockEntity t) || !t.isMaster()) return null;
+        if (!p.level().mayInteract(p, pos)) return null;
+        return t;
+    }
+
     /** 0: fine .. 1: frozen. */
     public record Freeze(float progress) implements CustomPacketPayload {
         public static final Type<Freeze> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "freeze"));
@@ -196,7 +250,24 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("6");
+            var r = e.registrar("7");
+            r.playToServer(ConsoleQuery.TYPE, ConsoleQuery.CODEC, (p, ctx) -> {
+                if (ctx.player() instanceof ServerPlayer sp) {
+                    TowerBlockEntity t = consoleTower(sp, p.pos());
+                    if (t != null) send(sp, t.consoleState());
+                }
+            });
+            r.playToServer(ConsoleSet.TYPE, ConsoleSet.CODEC, (p, ctx) -> {
+                if (ctx.player() instanceof ServerPlayer sp) {
+                    TowerBlockEntity t = consoleTower(sp, p.pos());
+                    if (t == null) return;
+                    if (p.override() != t.override())
+                        StasisDelvers.LOG.info("{} turned the tower at {} OVERRIDE {}", sp.getName().getString(), p.pos().toShortString(), p.override() ? "ON" : "off");
+                    t.setControls(p.target(), p.override());
+                    send(sp, t.consoleState());
+                }
+            });
+            r.playToClient(ConsoleState.TYPE, ConsoleState.CODEC, (p, ctx) -> consoleSink.accept(p));
             r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> {
                 ClientFields.deepSeed(p.deepSeed());
                 ClientFields.set(p.fields(), ctx.player().level());
