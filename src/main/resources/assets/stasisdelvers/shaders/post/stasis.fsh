@@ -762,15 +762,16 @@ float eyeClock(float t, int id) {
 
 // the far side through the hole, by view direction (so it sits at infinity); dest 0 the End, 1 the Nether
 vec3 farSide(vec3 dir, float t, int dest) {
-    vec2 uv = vec2(atan(dir.x, dir.z), asin(clamp(dir.y, -1.0, 1.0))) * 16.0;
-    vec2 cell = floor(uv * 4.0);
+    // (in direction space, no angles: atan's wrap made a seam in the Nether's embers, AdventurAgent)
+    vec3 q = dir * 18.0;
     if (dest == 1) {
-        float g = 0.5 + 0.5 * sin(uv.x * 0.9 + t * 0.4) * sin(uv.y * 0.8 - t * 0.3);
+        float g = 0.5 + 0.5 * sin(q.x * 0.9 + t * 0.4) * sin(q.y * 0.8 - t * 0.3) * sin(q.z * 0.7 + 1.3);
         return vec3(0.18, 0.03, 0.01) + vec3(0.5, 0.15, 0.03) * g * g;
     }
-    float haze = 0.5 + 0.5 * sin(uv.x * 0.7 + 0.3 * sin(uv.y * 0.9 + t * 0.2)) * cos(uv.y * 0.55 - t * 0.15);
+    float haze = 0.5 + 0.5 * sin(q.x * 0.7 + 0.3 * sin(q.y * 0.9 + t * 0.2)) * cos(q.y * 0.55 - t * 0.15) * cos(q.z * 0.6);
     vec3 c = vec3(0.07, 0.04, 0.13) + vec3(0.3, 0.16, 0.5) * haze * haze;
-    float st = hash32(int(cell.x), int(cell.y), 5, 0x57A2);
+    ivec3 cell = ivec3(floor(dir * 72.0));
+    float st = hash32(cell.x, cell.y, cell.z, 0x57A2);
     if (st > 0.93) c = max(c, vec3(0.85, 0.85, 1.0) * (st - 0.93) / 0.07);
     return c;
 }
@@ -796,7 +797,7 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
     // light leaking past the lips (no outline): here and there, flickering in steps
     if (abs(x.x) < W * 1.02 && abs(x.y) <= edge + 1.0 / 16.0) {
         float leak = hash32(int(floor(x.x * 16.0)), x.y > 0.0 ? 1 : 0, int(floor(lt * 6.0)), id ^ 9);
-        if (leak < 0.45) return vec4(EYE_RIM * (0.35 + 0.65 * leak / 0.45), 1.0);
+        if (leak < 0.45) return vec4((dest == 1 ? vec3(0.85, 0.35, 0.12) : EYE_RIM) * (0.35 + 0.65 * leak / 0.45), 1.0);
     }
     // cracks: jagged fissures from the lips, growing in 0.08 s steps, holding, healing back
     for (int k = 0; k < 6; k++) {
@@ -817,7 +818,7 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
             if (i >= n) break;
             ang += (hash32(k, ci, 10 + i, id) - 0.5) * 1.2;
             vec2 nx = p + vec2(cos(ang), sin(ang)) * 0.125;
-            if (segDist(x, p, nx) < 0.5 / 16.0) return vec4(EYE_CRACK, 1.0);
+            if (segDist(x, p, nx) < 0.5 / 16.0) return vec4(dest == 1 ? vec3(0.8, 0.3, 0.1) : EYE_CRACK, 1.0);
             p = nx;
         }
     }
