@@ -135,6 +135,12 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHARGED_RIFT_SHARD = ITEMS.registerSimpleItem("charged_rift_shard",
         p -> p.rarity(net.minecraft.world.item.Rarity.UNCOMMON));
 
+    static final DeferredRegister<net.minecraft.world.item.crafting.RecipeSerializer<?>> RECIPE_SERIALIZERS =
+        DeferredRegister.create(Registries.RECIPE_SERIALIZER, StasisDelvers.MODID);
+    static {
+        RECIPE_SERIALIZERS.register("suit_upgrade", () -> SuitUpgradeRecipe.SERIALIZER);
+    }
+
     static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.storage.loot.predicates.LootItemCondition>> LOOT_CONDITIONS =
         DeferredRegister.create(Registries.LOOT_CONDITION_TYPE, StasisDelvers.MODID);
     static {
@@ -175,6 +181,7 @@ public final class StasisRegistry {
         FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);
         LOOT_CONDITIONS.register(modBus);
+        RECIPE_SERIALIZERS.register(modBus);
         ITEMS.register(modBus);
         BLOCKS.register(modBus);
         BLOCK_ENTITIES.register(modBus);

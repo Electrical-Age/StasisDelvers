@@ -102,20 +102,4 @@ final class StasisEvents {
             le.blockPosition().toShortString(), src.getMsgId(), src.getDirectEntity(), src.getEntity(), trace);
     }
 
-    /**
-     * Crafting a stasis-suit piece from a Delver piece keeps the Delver's charge (AdventurAgent 2026-10-13: it was
-     * lost), up to the new piece's capacity.
-     */
-    static void crafted(net.neoforged.neoforge.event.entity.player.PlayerEvent.ItemCraftedEvent e) {
-        var result = e.getCrafting();
-        if (!(result.getItem() instanceof StasisArmorItem armor)) return;
-        var inv = e.getInventory();
-        for (int i = 0; i < inv.getContainerSize(); i++) {
-            var in = inv.getItem(i);
-            if (in.getItem() instanceof DelverSuitItem d) {
-                armor.setEnergy(result, Math.min(armor.getEnergyMax(result), d.getEnergy(in)));
-                return;
-            }
-        }
-    }
 }

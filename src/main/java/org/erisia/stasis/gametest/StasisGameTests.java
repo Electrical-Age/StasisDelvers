@@ -1148,6 +1148,24 @@ public final class StasisGameTests {
                 c.check("crops at every stage", ages.size() == wheat.getMaxAge() + 1, ages.toString());
             };
         }));
+        // crafting a stasis-suit piece from a charged Delver piece keeps the charge
+        CASES.put("suit_craft_keeps_charge", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            var key = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.RECIPE,
+                net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "stasis_helmet"));
+            var holder = level.getServer().getRecipeManager().byKey(key);
+            c.check("the stasis helmet recipe is a suit upgrade", holder.isPresent() && holder.get().value() instanceof org.erisia.stasis.SuitUpgradeRecipe,
+                holder.map(r -> r.value().getClass().getSimpleName()).orElse("missing"));
+            if (holder.isEmpty()) return;
+            ItemStack delver = new ItemStack(org.erisia.stasis.StasisRegistry.DELVER_HELMET.get());
+            ((org.erisia.stasis.DelverSuitItem) delver.getItem()).setEnergy(delver, 5000);
+            java.util.List<ItemStack> items = new java.util.ArrayList<>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
+            items.set(7, delver);
+            ItemStack result = ((net.minecraft.world.item.crafting.CraftingRecipe) holder.get().value()).assemble(
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, items));
+            double e = result.getItem() instanceof org.erisia.stasis.StasisArmorItem a ? a.getEnergy(result) : -1;
+            c.check("the charge carried over", Math.abs(e - 5000) < 1e-6, String.valueOf(e));
+        }, false));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();
