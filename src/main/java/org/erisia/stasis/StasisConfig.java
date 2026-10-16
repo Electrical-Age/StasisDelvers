@@ -40,6 +40,7 @@ public final class StasisConfig {
     static final ModConfigSpec.BooleanValue END_PORTAL_RIFTS;
     static final ModConfigSpec.BooleanValue STORMS;
     static final ModConfigSpec.BooleanValue TIME_SCARS;
+    static final ModConfigSpec.BooleanValue RUINS;
     static final ModConfigSpec.DoubleValue STORM_EVERY_HOURS;
     static final ModConfigSpec.IntValue STORM_MINUTES;
     static final ModConfigSpec.IntValue STORM_WARN_MINUTES;
@@ -98,6 +99,7 @@ public final class StasisConfig {
                 "Worldgen: new strongholds only.")
             .define("endPortalRifts", true);
         TIME_SCARS = b.comment("Time scars around rifts: falls frozen mid-air, hanging gravel, arrow volleys (worldgen: new chunks).").define("timeScars", true);
+        RUINS = b.comment("Swallowed ruins in rift strata: vanilla structure pieces half sunk in the rock (worldgen: new chunks).").define("ruins", true);
         STORMS = b.comment("Rift storms (stage 3): the drifting weather speeds up 10x and storm mist and rifts sweep the land.").define("storms", true);
         STORM_EVERY_HOURS = b.comment("Mean hours (of game time at 20 TPS) between storms; each falls at a random point in its block of this",
                 "length (Baughn: about an in-game month, ~10 h).").defineInRange("stormEveryHours", 10.0, 0.25, 1000.0);
@@ -127,6 +129,7 @@ public final class StasisConfig {
     public static volatile boolean endPortalRifts = true;
     static volatile boolean storms = true;
     static volatile boolean timeScars = true;
+    static volatile boolean ruins = true;
     static volatile double stormEveryHours = 10;
     static volatile int stormMinutes = 20, stormWarnMinutes = 60;
 
@@ -172,6 +175,7 @@ public final class StasisConfig {
         endPortalRifts = END_PORTAL_RIFTS.get();
         storms = STORMS.get();
         timeScars = TIME_SCARS.get();
+        ruins = RUINS.get();
         stormEveryHours = STORM_EVERY_HOURS.get();
         stormMinutes = STORM_MINUTES.get();
         stormWarnMinutes = STORM_WARN_MINUTES.get();

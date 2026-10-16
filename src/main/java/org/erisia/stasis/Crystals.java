@@ -182,11 +182,11 @@ public final class Crystals {
         Data data = Data.get(level);
         long key = cp.pack();
         double t = Deeps.realTime(level);
-        Map<Long, Bud> buds = data.buds.computeIfAbsent(key, k -> new HashMap<>());
         if (data.swept.add(key)) {
-            stamp(level, chunk, buds, t);
+            stamp(level, chunk, data, t);
             data.setDirty();
         }
+        Map<Long, Bud> buds = data.buds.computeIfAbsent(key, k -> new HashMap<>());
         if (buds.isEmpty()) {
             data.buds.remove(key);
             return;
@@ -200,7 +200,9 @@ public final class Crystals {
             BlockPos pos = BlockPos.of(en.getKey());
             Bud b = en.getValue();
             Direction dir = Direction.from3DDataValue(b.dir);
-            if (!level.getBlockState(m.setWithOffset(pos, dir.getOpposite())).is(budding)) {
+            m.setWithOffset(pos, dir.getOpposite());
+            if (!level.hasChunkAt(m)) continue;   // (its budding block's chunk isn't loaded: later)
+            if (!level.getBlockState(m).is(budding)) {
                 it.remove();   // the budding block is gone
                 data.setDirty();
                 continue;
@@ -246,7 +248,7 @@ public final class Crystals {
     }
 
     /** A chunk's first sweep: every budding block's open faces (a hashed 60%) and generated buds get an entry. */
-    private static void stamp(ServerLevel level, LevelChunk chunk, Map<Long, Bud> buds, double t) {
+    private static void stamp(ServerLevel level, LevelChunk chunk, Data data, double t) {
         Block budding = StasisRegistry.BUDDING_RIFT_CRYSTAL.get();
         LevelChunkSection[] sections = chunk.getSections();
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
@@ -262,9 +264,12 @@ public final class Crystals {
                         BlockPos bp = new BlockPos(x0 + lx, y0 + ly, z0 + lz);
                         for (Direction dir : Direction.values()) {
                             m.setWithOffset(bp, dir);
+                            if (!level.hasChunkAt(m)) continue;
                             BlockState n = level.getBlockState(m);
                             int st = stageOf(n, dir);
                             long k = m.asLong();
+                            // (keyed by the bud's own chunk: it may lie next door)
+                            Map<Long, Bud> buds = data.buds.computeIfAbsent(ChunkPos.containing(m).pack(), q -> new HashMap<>());
                             if (buds.containsKey(k)) continue;
                             if (st >= 0) buds.put(k, new Bud(dir.get3DDataValue(), t, (st + 1) * StasisConfig.crystalStageSeconds, st));
                             else if (n.isAir() && Noise.hash32(m.getX(), m.getY(), m.getZ(), dir.get3DDataValue() ^ 0xB0D) < FACE_SHARE)
