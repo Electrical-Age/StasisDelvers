@@ -276,6 +276,7 @@ vec3 hitCamI;
 vec2 mistWind, mistPhase, staticPhase;
 float breathAngle;
 
+float puffDark = 0.0;    // set by mistDensity for a young puff: how much darker than the dense mist (deepMist)
 const float STATIC_REACH = 1.3, STATIC_REACH_ADD = 10.0;   // the mist's reach around a static deep (StasisPost too)
 
 // mist density of hit k at q (= world - floor(camera)): inside the gameplay envelope only
@@ -292,10 +293,22 @@ float mistDensity(vec3 q, int k, bool detail) {
         float env = smoothstep(-4.0, 10.0, hk.R - d) * min(1.0, st * 1.5);
         if (env <= 0.0) return 0.0;
         if (puff) {
-            float hp = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
-            vec3 pp = vec3(q.x - hk.c.x + mistWind.x, q.y + hitCamI.y, q.z - hk.c.z + mistWind.y) * (32.0 / 64.0);
+            // a plume (second opinion, notes/rifts/second-opinion-a4.md): measured from the surface at its centre, not
+            // the ground grid (over the sinkhole that dropped into the pit); young (small) it's a column rising out of
+            // the hole, older a lifted billow that settles and spreads; its billows boil upwards; denser while small
+            // (the same mass spread out), and dark while young (puffDark: sooty, fresh out of the rift)
+            float age = clamp((hk.R - 10.0) / 22.0, 0.0, 1.0);
+            float hc = 4.0 + 18.0 * smoothstep(0.0, 0.5, age) - 6.0 * smoothstep(0.5, 1.0, age);
+            float thick = 7.0 + 0.45 * hk.R;
+            float hy = q.y - hk.c.y;
+            float vert = exp(-(hy - hc) * (hy - hc) / (thick * thick)) * smoothstep(-10.0, -2.0, hy);
             float core = 1.0 - smoothstep(0.0, 1.0, d / max(hk.R, 1.0));
-            return env * (0.5 + 1.2 * core) * mistAt(pp + id, hp - 4.0, 16.0, 0.85, mistPhase, detail);
+            vec3 pp = vec3(q.x - hk.c.x + mistWind.x, q.y + hitCamI.y - mod(data(29) * 0.8, 64.0), q.z - hk.c.z + mistWind.y) * (32.0 / 64.0);
+            vec4 n0 = mistTex(pp + id);
+            float n = 0.55 * n0.a + 0.45 * n0.r;
+            float dn = env * vert * (0.4 + 1.0 * core) * clamp((n - 0.25) / 0.5, 0.0, 1.0) * (32.0 / max(hk.R, 10.0));
+            if (dn > 0.0) puffDark = max(puffDark, 1.3 * (1.0 - age));
+            return dn;
         }
         float h = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
         vec3 p = vec3(q.x - hk.c.x + mistWind.x, q.y + hitCamI.y, q.z - hk.c.z + mistWind.y) * (32.0 / 96.0);
@@ -336,7 +349,10 @@ void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
         // the height band from the deep's (smooth) surface, not the grid's min and max: those change when the grid
         // moves on to the next lattice cell, and the march's samples moved with them (the mist re-formed in one frame)
         float yb = data(o8 + 4);
-        if (!cylSpan(c, R + DEEP_EDGE, yb - 32.0 - DEEP_BELOW, yb + 24.0 + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
+        // (a puff: a short column around its plume, so the march's steps aren't spent on empty sky)
+        bool isPuff = data(o8 + 3) > 1.5;
+        if (!cylSpan(c, R + DEEP_EDGE, isPuff ? yb - 12.0 : yb - 32.0 - DEEP_BELOW, isPuff ? yb + 48.0 : yb + 24.0 + MIST_ABOVE, o, dir, span)
+            || span.x > tEnd) continue;
         hits[hitCount] = Hit(0, i, vec3(c.x, data(o8 + 4), c.y), R, data(o8 + 3), vec3(data(o8 + 8), data(o8 + 9), data(o8 + 10)), int(data(o8 + 5)));
         hitSpan[hitCount] = span;
         if (++hitCount == MAX_HITS) return;       // nearest first: the farthest are dropped
@@ -412,10 +428,12 @@ vec2 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
                 float t = a + (float(m) + jit) * dt;
                 vec3 q = o + dir * t;
                 float dn = 0.0;
+                puffDark = 0.0;
                 for (int j = k; j < k2; j++) dn = max(dn, mistDensity(q, ord[j], t < 80.0));
                 if (dn > 0.0) {
                     float alpha = 1.0 - exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
-                    B += T * alpha * dn;
+                    // (a young puff weighs more than its share: (x - y) THIN + y DENSE turns sooty-violet past y = x)
+                    B += T * alpha * min(dn, 1.0) * (1.0 + puffDark);
                     T *= 1.0 - alpha;
                 }
             }

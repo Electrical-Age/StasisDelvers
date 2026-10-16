@@ -102,7 +102,9 @@ public final class Deeps {
     /** The puffs from the rifts within range (+ PUFF_REACH) of (x, z), alive now; added to near() and within(). */
     static void puffs(float x, float z, float range, double t, int seed, double[] drift, List<Deep> out) {
         for (StaticDeeps.Deep sd : StaticDeeps.near(x, 100, z, range + PUFF_REACH, seed)) {
-            if (sd.y() < -20 || StaticDeeps.isGate(sd)) continue;   // too deep to reach the surface; gates are in strongholds
+            // only rifts that come near the surface (DeepFeature opens a sinkhole when the rift is within 40 blocks of
+            // it; the surface isn't known here, so: rift top above y 30); gates are in strongholds
+            if (sd.y() + sd.radius() * 0.35f < 30 || StaticDeeps.isGate(sd)) continue;
             float interval = 60 + 60 * Noise.hash32(sd.id(), 0, 41, seed);
             float phase = Noise.hash32(sd.id(), 0, 42, seed) * interval;
             long now = (long) Math.floor((t + phase) / interval);
@@ -115,7 +117,8 @@ public final class Deeps {
                 double[] then = drift(t - age, seed);
                 float u = (float) (age / life);
                 float strength = Math.min(1f, (float) age / 12f) * (1 - u * u * u);
-                float ox = (Noise.hash32(sd.id(), jj, 45, seed) - 0.5f) * 0.6f * sd.radius(), oz = (Noise.hash32(sd.id(), jj, 46, seed) - 0.5f) * 0.6f * sd.radius();
+                // out of the sinkhole's throat (radius ~0.22 r): within 0.1 r of the centre
+                float ox = (Noise.hash32(sd.id(), jj, 45, seed) - 0.5f) * 0.2f * sd.radius(), oz = (Noise.hash32(sd.id(), jj, 46, seed) - 0.5f) * 0.2f * sd.radius();
                 out.add(new Deep((float) (sd.x() + ox + drift[0] - then[0]), (float) (sd.z() + oz + drift[1] - then[1]),
                     (float) (10 + 22 * Math.pow(u, 0.6)), strength, puffId(sd, jj), true));
             }
