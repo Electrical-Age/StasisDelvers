@@ -57,13 +57,13 @@ public final class GateRoom {
                     BlockState st = level.getBlockState(p);
                     float h = Noise.hash32(p.getX(), p.getY(), p.getZ(), seed);
                     float patch = Noise.value32(p.getX() / 3f, p.getY() / 3f, p.getZ() / 3f, seed ^ 0x6A1);
-                    if (d < 3.5) {   // swallowed
+                    if (d < 2.8) {   // swallowed
                         if (!st.isAir()) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
                         continue;
                     }
                     if (st.isAir() || st.is(Blocks.LAVA)) {
                         // debris hanging just outside the core, pulled in and up
-                        if (inside && d < 6.5 && ly >= 2 && h < 0.07f)
+                        if (inside && d > 3.2 && d < 6.5 && ly >= 2 && h < 0.08f)
                             level.setBlock(p, debris(h * 14.3f), 2);
                         continue;
                     }
@@ -73,6 +73,12 @@ public final class GateRoom {
                         continue;
                     }
                     boolean shell = !inside && lx >= 0 && lx <= 10 && ly >= 0 && ly <= 7 && lz >= 0 && lz <= 15;
+                    if (shell && d >= 5.0 && patch > 0.5f && patch <= 0.62f) {
+                        // bulged: the wall pushed out a block where the blast hit it (ragged, not a straight wall)
+                        BlockPos q = BlockPos.containing(Vec3.atCenterOf(p).add(v.normalize()));
+                        if (chunkBB.isInside(q) && level.getBlockState(q).isAir())
+                            level.setBlock(q, h < 0.5f ? Blocks.CRACKED_STONE_BRICKS.defaultBlockState() : st, 2);
+                    }
                     if (shell && d >= 6.0 && patch > 0.62f && h < 0.6f) {
                         // blasted outward: a hole in the wall, the block thrown into the rock behind it
                         level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
@@ -90,6 +96,17 @@ public final class GateRoom {
                     else if (d < 11 && st.is(Blocks.STONE_BRICKS) && h < 0.7f) level.setBlock(p, Blocks.CRACKED_STONE_BRICKS.defaultBlockState(), 2);
                     else if (st.is(Blocks.SPAWNER)) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
                 }
+        // debris thrown out through the walls: where open space lies outside (a cave), blocks hang along rays from the
+        // centre 2-7 blocks past the wall, flying away
+        for (int i = 0; i < 90; i++) {
+            double az = Noise.hash32(i, 20, 0, seed) * 2 * Math.PI, el = (Noise.hash32(i, 21, 0, seed) - 0.3) * 1.2;
+            double r = 8.5 + 7 * Noise.hash32(i, 22, 0, seed);
+            Vec3 q = cv.add(Math.cos(az) * Math.cos(el) * r, Math.sin(el) * r, Math.sin(az) * Math.cos(el) * r);
+            BlockPos bp = BlockPos.containing(q);
+            if (!chunkBB.isInside(bp) || !level.getBlockState(bp).isAir()) continue;
+            // only past the room (its inside stays as it is) and into open air
+            level.setBlock(bp, debris(Noise.hash32(i, 23, 0, seed)), 2);
+        }
         // the entrance grate (the door at local 4..6, 1..3, 0) blown out down the corridor
         for (int lx = 4; lx <= 6; lx++)
             for (int ly = 1; ly <= 3; ly++) {
@@ -118,7 +135,7 @@ public final class GateRoom {
         // the frame's shards, tilted towards the core, some still holding their eyes
         for (int i = 0; i < 16; i++) {
             double az = Noise.hash32(i, 3, 0, seed) * 2 * Math.PI, el = (Noise.hash32(i, 4, 0, seed) - 0.35) * 1.1;
-            double r = 4.0 + 2.2 * Noise.hash32(i, 5, 0, seed);
+            double r = 3.4 + 3.2 * Noise.hash32(i, 5, 0, seed);
             Vec3 pos = cv.add(Math.cos(az) * Math.cos(el) * r, Math.sin(el) * r, Math.sin(az) * Math.cos(el) * r);
             BlockPos bp = BlockPos.containing(pos);
             if (!chunkBB.isInside(bp) || !level.getBlockState(bp).isAir()) continue;
@@ -135,7 +152,7 @@ public final class GateRoom {
         }
         // the spawner's silverfish, mid-leap away from the blast
         for (int i = 0; i < 3; i++) {
-            Vec3 pos = Vec3.atCenterOf(piece.stasis$worldPos(4 + i, 4, 5)).add(0, Noise.hash32(i, 9, 0, seed) * 1.5, -Noise.hash32(i, 10, 0, seed) * 2);
+            Vec3 pos = Vec3.atCenterOf(piece.stasis$worldPos(3 + 2 * i, 3, 4)).add(0, Noise.hash32(i, 9, 0, seed) * 1.5, -Noise.hash32(i, 10, 0, seed) * 2);
             BlockPos bp = BlockPos.containing(pos);
             if (!chunkBB.isInside(bp) || !level.getBlockState(bp).isAir()) continue;
             var fish = EntityTypes.SILVERFISH.create(level.getLevel(), EntitySpawnReason.STRUCTURE);

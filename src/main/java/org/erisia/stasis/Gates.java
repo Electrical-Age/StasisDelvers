@@ -30,8 +30,9 @@ public final class Gates {
     private Gates() {
     }
 
-    /** A gate rift's radius: its core (0.35 r) fills the portal room's middle, its outer zone the corridors near it. */
-    static final float GATE_RADIUS = 16;
+    /** A gate rift's radius: its core (0.35 r, ~3 blocks) sits over the old frame, so the wrecked room around it shows
+     *  (at 16 the black swallowed most of it: AdventurAgent). */
+    static final float GATE_RADIUS = 9;
 
     // ---- destinations and scatter (config)
 
