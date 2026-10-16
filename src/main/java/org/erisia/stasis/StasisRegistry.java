@@ -120,6 +120,16 @@ public final class StasisRegistry {
 
     /** A rift crystal shard (placeholder for the dust / shard / charged grades). */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_SHARD = ITEMS.registerSimpleItem("rift_shard");
+    /** The crystal grades (Crystals): dust from small and medium buds, charged shards from a cluster broken in violet. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_DUST = ITEMS.registerSimpleItem("rift_dust");
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHARGED_RIFT_SHARD = ITEMS.registerSimpleItem("charged_rift_shard",
+        p -> p.rarity(net.minecraft.world.item.Rarity.UNCOMMON));
+
+    static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.storage.loot.predicates.LootItemCondition>> LOOT_CONDITIONS =
+        DeferredRegister.create(Registries.LOOT_CONDITION_TYPE, StasisDelvers.MODID);
+    static {
+        LOOT_CONDITIONS.register("pocket_violet", () -> Crystals.PocketViolet.CODEC);
+    }
 
     static final DeferredRegister<net.minecraft.sounds.SoundEvent> SOUNDS = DeferredRegister.create(Registries.SOUND_EVENT, StasisDelvers.MODID);
     /** Music for stopped land: a melancholic/eldritch subset of the vanilla tracks (assets/stasisdelvers/sounds.json). */
@@ -148,6 +158,7 @@ public final class StasisRegistry {
         ENTITY_TYPES.register(modBus);
         FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);
+        LOOT_CONDITIONS.register(modBus);
         ITEMS.register(modBus);
         BLOCKS.register(modBus);
         BLOCK_ENTITIES.register(modBus);

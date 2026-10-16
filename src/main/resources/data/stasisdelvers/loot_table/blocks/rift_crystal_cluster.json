@@ -4,19 +4,44 @@
     {
       "entries": [
         {
-          "type": "minecraft:item",
-          "name": "stasisdelvers:rift_shard",
-          "modifier": [
+          "type": "minecraft:alternatives",
+          "children": [
             {
-              "type": "minecraft:set_count",
-              "count": {
-                "type": "minecraft:uniform",
-                "min": 2,
-                "max": 4
+              "type": "minecraft:item",
+              "name": "stasisdelvers:charged_rift_shard",
+              "modifier": [
+                {
+                  "type": "minecraft:set_count",
+                  "count": {
+                    "type": "minecraft:uniform",
+                    "min": 2,
+                    "max": 4
+                  }
+                },
+                {
+                  "type": "minecraft:explosion_decay"
+                }
+              ],
+              "condition": {
+                "type": "stasisdelvers:pocket_violet"
               }
             },
             {
-              "type": "minecraft:explosion_decay"
+              "type": "minecraft:item",
+              "name": "stasisdelvers:rift_shard",
+              "modifier": [
+                {
+                  "type": "minecraft:set_count",
+                  "count": {
+                    "type": "minecraft:uniform",
+                    "min": 2,
+                    "max": 4
+                  }
+                },
+                {
+                  "type": "minecraft:explosion_decay"
+                }
+              ]
             }
           ]
         }

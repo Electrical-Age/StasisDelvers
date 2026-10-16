@@ -120,13 +120,25 @@ public final class Pockets {
     /** GameTests: boxes (world coordinates) with forced weather, so a test needs no real strata under it. */
     public static final java.util.Map<net.minecraft.world.phys.AABB, Weather> TEST = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** GameTests: boxes that count as strata of the given deep id. */
+    public static final java.util.Map<net.minecraft.world.phys.AABB, Integer> TEST_STRATA = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** The id of the deep whose strata mask covers block (x, y, z), or -1. */
+    public static int strataId(Level level, int x, int y, int z) {
+        if (!TEST_STRATA.isEmpty())
+            for (var e : TEST_STRATA.entrySet())
+                if (e.getKey().contains(x + 0.5, y + 0.5, z + 0.5)) return e.getValue();
+        StaticDeeps.Deep d = strataAt(level, x, y, z);
+        return d == null ? -1 : d.id();
+    }
+
     /** The strata weather at block (x, y, z) now, or null outside every strata mask. */
     public static Weather at(Level level, int x, int y, int z) {
         if (!TEST.isEmpty())
             for (var e : TEST.entrySet())
                 if (e.getKey().contains(x + 0.5, y + 0.5, z + 0.5)) return e.getValue();
-        StaticDeeps.Deep d = strataAt(level, x, y, z);
-        if (d == null) return null;
-        return weather(d.id(), Math.floorDiv(x, POCKET), Math.floorDiv(y, POCKET), Math.floorDiv(z, POCKET), Deeps.time(level));
+        int id = strataId(level, x, y, z);
+        if (id < 0) return null;
+        return weather(id, Math.floorDiv(x, POCKET), Math.floorDiv(y, POCKET), Math.floorDiv(z, POCKET), Deeps.time(level));
     }
 }

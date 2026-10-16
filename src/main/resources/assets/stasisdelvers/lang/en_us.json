@@ -26,5 +26,7 @@
   "block.stasisdelvers.rift_crystal_medium": "Medium Rift Crystal",
   "block.stasisdelvers.rift_crystal_large": "Large Rift Crystal",
   "block.stasisdelvers.rift_crystal_cluster": "Rift Crystal Cluster",
-  "item.stasisdelvers.rift_shard": "Rift Shard"
+  "item.stasisdelvers.rift_shard": "Rift Shard",
+  "item.stasisdelvers.rift_dust": "Rift Dust",
+  "item.stasisdelvers.charged_rift_shard": "Charged Rift Shard"
 }

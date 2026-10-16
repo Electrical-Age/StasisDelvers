@@ -797,7 +797,7 @@ public final class StasisGameTests {
         }, false));
         // a rift pocket (forced) freezes even a stasis-armoured player outside a field; a field holds it; mist drains
         // a Delver suit at x2
-        CASES.put("strata_rift_pocket", new Spec(60, (h, c) -> {
+        CASES.put("strata_rift_pocket", new Spec(100, (h, c) -> {
             var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
             org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.RIFT, 1, 100));
             ServerPlayer out = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true), in = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
@@ -827,6 +827,90 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // rift crystals grow from the strata weather (Crystals): a chunk's first sweep keeps generated buds; an unloaded
+        // gap is bridged by the closed form; a mined bud starts over; a field stops growth
+        for (boolean inField : new boolean[]{false, true})
+            CASES.put(inField ? "rift_crystals_no_growth_in_field" : "rift_crystals_grow", new Spec(1, (h, c) -> () -> {
+                var level = h.getLevel();
+                BlockPos bud0 = h.absolutePos(inField ? new BlockPos(3, 3, 4) : new BlockPos(12, 3, 4));
+                var box = new AABB(bud0).inflate(3);
+                org.erisia.stasis.Pockets.TEST_STRATA.put(box, 4242);
+                try {
+                    level.setBlockAndUpdate(bud0, org.erisia.stasis.StasisRegistry.BUDDING_RIFT_CRYSTAL.get().defaultBlockState());
+                    for (var dir : net.minecraft.core.Direction.values()) level.setBlockAndUpdate(bud0.relative(dir), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    BlockPos gen = bud0.relative(net.minecraft.core.Direction.EAST);
+                    level.setBlockAndUpdate(gen, org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_MEDIUM.get().defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING, net.minecraft.core.Direction.EAST));
+                    var cp = net.minecraft.world.level.ChunkPos.containing(bud0);
+                    org.erisia.stasis.Crystals.testForget(level, cp);
+                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    int stage = org.erisia.stasis.StasisConfig.crystalStageSeconds;
+                    c.check("a generated bud keeps its stage", level.getBlockState(gen).is(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_MEDIUM.get())
+                        && org.erisia.stasis.Crystals.testExposure(level, gen, 0) == 2.0 * stage, String.valueOf(org.erisia.stasis.Crystals.testExposure(level, gen, 0)));
+                    BlockPos face = null;
+                    net.minecraft.core.Direction fd = null;
+                    for (var dir : net.minecraft.core.Direction.values())
+                        if (dir != net.minecraft.core.Direction.EAST && !Double.isNaN(org.erisia.stasis.Crystals.testExposure(level, bud0.relative(dir), 0))) {
+                            face = bud0.relative(dir);
+                            fd = dir;
+                            break;
+                        }
+                    c.check("an open face can grow a bud", face != null);
+                    if (face == null) return;
+                    double t = org.erisia.stasis.Deeps.time(level);
+                    org.erisia.stasis.Crystals.testExposure(level, face, 10000);
+                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    double e = org.erisia.stasis.Crystals.testExposure(level, face, 0);
+                    int px = Math.floorDiv(face.getX(), 12), py = Math.floorDiv(face.getY(), 12), pz = Math.floorDiv(face.getZ(), 12);
+                    double want = org.erisia.stasis.Pockets.exposure(4242, px, py, pz, t) - org.erisia.stasis.Pockets.exposure(4242, px, py, pz, t - 10000);
+                    if (inField) {
+                        c.check("in a field: no growth", e == 0 && level.getBlockState(face).isAir(), String.format("%.1f s", e));
+                        return;
+                    }
+                    c.check("the gap is bridged by the closed form", Math.abs(e - want) < 2 && want > 6000, String.format("%.1f vs %.1f", e, want));
+                    var st = level.getBlockState(face);
+                    c.check("it grew to a cluster facing out", st.is(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_CLUSTER.get())
+                        && st.getValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING) == fd, st.toString());
+                    level.setBlockAndUpdate(face, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    c.check("mined: it starts over", org.erisia.stasis.Crystals.testExposure(level, face, 0) < 5 && level.getBlockState(face).isAir());
+                    level.setBlockAndUpdate(bud0, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    c.check("the budding block gone: its buds are forgotten", Double.isNaN(org.erisia.stasis.Crystals.testExposure(level, gen, 0)));
+                } finally {
+                    org.erisia.stasis.Pockets.TEST_STRATA.remove(box);
+                }
+            }, inField));
+        // grades: a cluster broken in a violet pocket gives charged shards, otherwise shards; small buds give dust
+        CASES.put("rift_crystal_grades", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            var pos = h.absolutePos(new net.minecraft.core.BlockPos(12, 2, 4));
+            var box = new AABB(pos).inflate(1);
+            var tool = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE);
+            var cluster = org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_CLUSTER.get().defaultBlockState();
+            try {
+                int charged = 0, plain = 0;
+                org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.VIOLET, 0.8f, 10));
+                for (var st : net.minecraft.world.level.block.Block.getDrops(cluster, level, pos, null, null, tool)) {
+                    if (st.is(org.erisia.stasis.StasisRegistry.CHARGED_RIFT_SHARD.get())) charged += st.getCount();
+                    if (st.is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())) plain += st.getCount();
+                }
+                c.check("violet: charged shards", charged >= 2 && plain == 0, charged + "/" + plain);
+                org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 10));
+                charged = plain = 0;
+                for (var st : net.minecraft.world.level.block.Block.getDrops(cluster, level, pos, null, null, tool)) {
+                    if (st.is(org.erisia.stasis.StasisRegistry.CHARGED_RIFT_SHARD.get())) charged += st.getCount();
+                    if (st.is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())) plain += st.getCount();
+                }
+                c.check("mist: plain shards", charged == 0 && plain >= 2, charged + "/" + plain);
+                int dust = 0;
+                for (var st : net.minecraft.world.level.block.Block.getDrops(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_SMALL.get().defaultBlockState(), level, pos, null, null, tool))
+                    if (st.is(org.erisia.stasis.StasisRegistry.RIFT_DUST.get())) dust += st.getCount();
+                c.check("a small bud gives dust", dust == 1, String.valueOf(dust));
+            } finally {
+                org.erisia.stasis.Pockets.TEST.remove(box);
+            }
+        }, false));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();

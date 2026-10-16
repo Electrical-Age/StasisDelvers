@@ -33,6 +33,7 @@ public final class StasisConfig {
     static final ModConfigSpec.ConfigValue<List<? extends String>> STRATA_SHAPES;
     static final ModConfigSpec.BooleanValue RIFT_ORES;
     static final ModConfigSpec.DoubleValue RIFT_ORE_RATE;
+    static final ModConfigSpec.IntValue CRYSTAL_STAGE_SECONDS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -73,6 +74,9 @@ public final class StasisConfig {
             .defineListAllowEmpty("strataShapes", List.of("saddle:1", "staircase:1", "splash:1", "pods:1"), () -> "saddle:1", o -> o instanceof String);
         RIFT_ORES = b.comment("Ores in rift walls and strata, from the overworld ore tags, at any depth (Baughn).").define("riftOres", true);
         RIFT_ORE_RATE = b.comment("Share of rift wall and strata rock that becomes ore.").defineInRange("riftOreRate", 0.006, 0.0, 0.2);
+        CRYSTAL_STAGE_SECONDS = b.comment("Seconds of strata weather (mist, violet or rift, outside fields) per rift crystal growth stage:",
+                "small after one, cluster after four. A pocket is in weather 75% of the time.")
+            .defineInRange("crystalStageSeconds", 1200, 10, 86400);
         SPEC = b.build();
     }
 
@@ -92,6 +96,7 @@ public final class StasisConfig {
     static volatile int gutterMaxTicks = 600;
     static volatile boolean riftOres = true;
     static volatile double riftOreRate = 0.006;
+    public static volatile int crystalStageSeconds = 1200;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -129,5 +134,6 @@ public final class StasisConfig {
         Strata.setWeights(STRATA_SHAPES.get());
         riftOres = RIFT_ORES.get();
         riftOreRate = RIFT_ORE_RATE.get();
+        crystalStageSeconds = CRYSTAL_STAGE_SECONDS.get();
     }
 }
