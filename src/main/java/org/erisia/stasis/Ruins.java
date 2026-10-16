@@ -99,6 +99,15 @@ public final class Ruins {
         }
     }
 
+    /** For /stasis rifts: ", ruins: template at x y z; ...". */
+    public static String describe(net.minecraft.server.level.ServerLevel level, StaticDeeps.Deep d) {
+        if (!StasisConfig.ruins) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Ruin r : ruins(level, d))
+            sb.append(sb.length() == 0 ? ", ruins: " : "; ").append(r.id().getPath()).append(" at ").append(r.origin().toShortString());
+        return sb.toString();
+    }
+
     /** Place this chunk's slice of deep d's ruins. */
     public static boolean place(WorldGenLevel level, StaticDeeps.Deep d, int x0, int z0) {
         boolean any = false;

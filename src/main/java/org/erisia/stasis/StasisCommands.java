@@ -166,7 +166,8 @@ final class StasisCommands {
                     src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f %.0f, radius %.0f (rift ~%.0f), %.0f blocks away, strata %s",
                         sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z),
                         StaticDeeps.isGate(sd) ? "none (gate rift)" : Strata.shapeOf(sd).id() + ", to " + Gates.destination(sd))
-                        + String.format(", eye at %.0f %.0f %.0f", StaticDeeps.core(sd)[0], StaticDeeps.core(sd)[1], StaticDeeps.core(sd)[2])), false);
+                        + String.format(", eye at %.0f %.0f %.0f", StaticDeeps.core(sd)[0], StaticDeeps.core(sd)[1], StaticDeeps.core(sd)[2])
+                        + Ruins.describe(level, sd)), false);
                 return list.size();
             }))
             .then(Commands.literal("strata").executes(c -> {
