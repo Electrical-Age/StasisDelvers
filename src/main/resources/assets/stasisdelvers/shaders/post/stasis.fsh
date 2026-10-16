@@ -988,7 +988,10 @@ void main() {
                 if (abs(ex.x) > W * 2.6 || abs(ex.y) > W * 2.6) continue;
                 ex = (floor(ex * 16.0) + 0.5) / 16.0;      // Minecraft's texel grid
                 vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), W, dir2, dest);
-                c = mix(c + ep.rgb, ep.rgb, ep.a);
+                // mostly hidden in black fog (Baughn): drifting veils thin to show parts of it now and then
+                float veil = value32(vec3(ex / W * 0.9 + vec2(eyeTime * 0.07, 0.0), eyeTime * 0.11), int(data(224 + 5 * i)) ^ 0xF06);
+                float vis = 0.12 + 0.88 * smoothstep(0.42, 0.72, veil);
+                c = mix(c + ep.rgb * vis, ep.rgb * vis, ep.a);
             }
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
