@@ -179,8 +179,9 @@ final class StasisCommands {
                 for (var sd : StaticDeeps.near((float) pos.x, (float) pos.y, (float) pos.z, 300, Deeps.seed(src.getLevel())))
                     sb.append(String.format("%s %s; ", Strata.shapeOf(sd).id(), names[Strata.at(sd, x, y, z)]));
                 long n = DeepFeature.Stats.CHUNKS.get();
-                String stats = String.format("rift worldgen: %d chunks, mean %.2f ms, max %.2f ms", n,
-                    n == 0 ? 0 : DeepFeature.Stats.NANOS.get() / 1e6 / n, DeepFeature.Stats.MAX.get() / 1e6);
+                String stats = String.format("rift worldgen: %d chunks, mean %.2f ms, max %.2f ms; time scars: %d falls, %d gravel, %d volleys", n,
+                    n == 0 ? 0 : DeepFeature.Stats.NANOS.get() / 1e6 / n, DeepFeature.Stats.MAX.get() / 1e6,
+                    TimeScars.FALLS.get(), TimeScars.GRAVEL.get(), TimeScars.VOLLEYS.get());
                 src.sendSuccess(() -> Component.literal((sb.length() == 0 ? "no static deep near; " : sb.toString()) + stats), false);
                 // the strata weather here, and the next violet within 2 pockets (for clips)
                 var level = src.getLevel();

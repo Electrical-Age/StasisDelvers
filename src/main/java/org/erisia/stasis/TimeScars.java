@@ -24,6 +24,10 @@ public final class TimeScars {
     private TimeScars() {
     }
 
+    /** Counts since start (falls, gravel, volleys), for /stasis strata. */
+    public static final java.util.concurrent.atomic.AtomicInteger FALLS = new java.util.concurrent.atomic.AtomicInteger(),
+        GRAVEL = new java.util.concurrent.atomic.AtomicInteger(), VOLLEYS = new java.util.concurrent.atomic.AtomicInteger();
+
     public static boolean place(WorldGenLevel level, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
         int id = d.id();
         int cx = x0 >> 4, cz = z0 >> 4;
@@ -65,6 +69,7 @@ public final class TimeScars {
                     level.setBlock(new BlockPos(x, ceil + 1, z), src, 2);
                     int len = 2 + (int) (Noise.hash32(cx, cz, 350 + k, id) * (gap - 4));
                     for (int i = 0; i < len; i++) level.setBlock(new BlockPos(x, ceil - i, z), fall, 2);
+                    FALLS.incrementAndGet();
                     any = true;
                 }
                 case 1 -> {
@@ -76,6 +81,7 @@ public final class TimeScars {
                         level.setBlock(new BlockPos(x, y, z), g, 2);
                         y -= 1 + (int) (Noise.hash32(cx, cz, 360 + k * 7 + i, id) * 3);
                     }
+                    GRAVEL.incrementAndGet();
                     any = true;
                 }
                 default -> {
@@ -95,6 +101,7 @@ public final class TimeScars {
                         a.pickup = net.minecraft.world.entity.projectile.arrow.AbstractArrow.Pickup.ALLOWED;
                         level.addFreshEntity(a);
                     }
+                    VOLLEYS.incrementAndGet();
                     any = true;
                 }
             }
