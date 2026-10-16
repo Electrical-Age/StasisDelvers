@@ -32,7 +32,7 @@ public final class StaticDeeps {
         float y = Math.max(-50, Math.min(280, j * CY + r * 0.6f + (CY - 1.2f * r) * Noise.hash32(i, j, k, seed ^ 0x57AA)));
         float z = k * CZ + r + (CZ - 2 * r) * Noise.hash32(i, j, k, seed ^ 0x57AB);
         // 24-bit id: the shader gets it as an exact float
-        return new Deep(x, y, z, r, ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ seed) & 0xFFFFFF);
+        return new Deep(x, y, z, r, Noise.hashInt(i, j, k, seed ^ 0x1D1D) & 0xFFFFFF);
     }
 
     /** Gate rifts (Gates: stronghold portal rooms), per deep seed (each level has its own): extra static deeps, known

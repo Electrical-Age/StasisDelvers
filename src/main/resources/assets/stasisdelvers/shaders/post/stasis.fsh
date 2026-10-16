@@ -65,7 +65,14 @@ float hash13(vec3 p) {
 
 // The 32-bit noise of Noise.java (hash32, value32, fbm32), for patterns the server uses too (collapse).
 float hash32(int x, int y, int z, int seed) {
-    uint h = uint(x) * 0x8da6b343u ^ uint(y) * 0xd8163841u ^ uint(z) * 0xcb1ab31fu ^ uint(seed) * 0x9e3779b9u;
+    // (Noise.hashInt: coordinates mixed in one after another, so mirrored cells don't collide)
+    uint h = uint(x) * 0x8da6b343u;
+    h ^= h >> 15;
+    h += uint(y) * 0xd8163841u;
+    h ^= h >> 13;
+    h += uint(z) * 0xcb1ab31fu;
+    h ^= h >> 16;
+    h += uint(seed) * 0x9e3779b9u;
     h ^= h >> 16;
     h *= 0x7feb352du;
     h ^= h >> 15;

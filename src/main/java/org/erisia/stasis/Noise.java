@@ -25,13 +25,29 @@ final class Noise {
     // the same way, and float maths agrees closely. Seeds are 24-bit (exact as floats in the shader's data texture).
 
     static float hash32(int x, int y, int z, int seed) {
-        int h = x * 0x8da6b343 ^ y * 0xd8163841 ^ z * 0xcb1ab31f ^ seed * 0x9e3779b9;
+        return (hashInt(x, y, z, seed) >>> 8) / 16777216f;
+    }
+
+    /**
+     * 32 hashed bits of (x, y, z, seed). The coordinates are mixed in one after another (not XORed together first: with
+     * odd multipliers x*a ^ z*c equals (-x)*a ^ (-z)*c whenever x and z are odd, so cells mirrored through the origin
+     * got the same hash, and rifts came in point-symmetric pairs with the same shape, ruins and timing: ErisiAgent saw
+     * two identical ruin sets on the fresh incognito). stasis.fsh has the same.
+     */
+    static int hashInt(int x, int y, int z, int seed) {
+        int h = x * 0x8da6b343;
+        h ^= h >>> 15;
+        h += y * 0xd8163841;
+        h ^= h >>> 13;
+        h += z * 0xcb1ab31f;
+        h ^= h >>> 16;
+        h += seed * 0x9e3779b9;
         h ^= h >>> 16;
         h *= 0x7feb352d;
         h ^= h >>> 15;
         h *= 0x846ca68b;
         h ^= h >>> 16;
-        return (h >>> 8) / 16777216f;
+        return h;
     }
 
     static float value32(float x, float y, float z, int seed) {

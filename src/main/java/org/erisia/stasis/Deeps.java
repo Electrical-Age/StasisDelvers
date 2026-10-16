@@ -154,7 +154,7 @@ public final class Deeps {
         float ang = windAngle(seed);
         return new Deep((float) (i * (double) CELL + ox + drift[0] + own * Math.cos(ang)), (float) (k * (double) CELL + oz + drift[1] + own * Math.sin(ang)),
             r0 * breathe * (0.4f + 0.6f * env), env,
-            ((i * 73856093) ^ (k * 19349663) ^ cycle) & 0xFFFFFF);
+            Noise.hashInt(i, k, cycle, seed ^ 0x1D1E) & 0xFFFFFF);
     }
 
     private static float smooth(float x) {
