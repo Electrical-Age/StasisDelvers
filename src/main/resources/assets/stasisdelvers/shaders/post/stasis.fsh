@@ -790,9 +790,8 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
     vec3 col = vec3(0.06, 0.03, 0.1) * exp(-dot(q, q) * 1.5);
     float cover = 0.0;
     if (inside) {
-        // (λ-Nero's side attempt, 2026-10-16: the End look's pupil was too big) inside, black at the lips going to
-        // grey towards the middle, and a small pupil: black on even rift ids, purple on odd ones (to compare both;
-        // the End look is 52afba1)
+        // (λ-Nero, 2026-10-16; the End-sky look is 52afba1) inside, black at the lips going to grey towards the
+        // middle, with radial lines and a small feline slit
         float depthIn = clamp(1.0 - abs(x.y) / max(edge, 1e-3), 0.0, 1.0) * clamp(1.0 - abs(x.x) / W, 0.0, 1.0);
         float g = pow(clamp(depthIn * 1.6, 0.0, 1.0), 1.3);
         float grain = hash32(int(floor(x.x * 16.0)), int(floor(x.y * 16.0)), int(floor(lt * 3.0)), id ^ 0x6A);
@@ -808,7 +807,7 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
         // a feline slit: wide, thin, pointed at the ends
         float sx = x.x / (W * 0.46);
         if (abs(sx) < 1.0 && abs(x.y) <= W * 0.075 * (1.0 - sx * sx))
-            return vec4((id & 1) == 0 ? vec3(0.0) : vec3(0.32, 0.1, 0.55), 1.0);
+            return vec4(0.32, 0.1, 0.55, 1.0);   // purple: it reads feline (black vanished into the dark lips)
         return vec4(inner, 1.0);
     }
     // light leaking past the lips (no outline): here and there, flickering in steps
