@@ -33,11 +33,13 @@ public final class TimeScars {
         int cx = x0 >> 4, cz = z0 >> 4;
         boolean any = false;
         // a few candidate columns per chunk
-        for (int k = 0; k < 6; k++) {
+        // a rift above the ground gets extra candidates for falls under its floating islands
+        int nk = d.y() - d.radius() * 0.35f > level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, x0 + 8, z0 + 8) ? 10 : 6;
+        for (int k = 0; k < nk; k++) {
             float h = Noise.hash32(cx, cz, 300 + k, id);
             int x = x0 + (int) (Noise.hash32(cx, cz, 310 + k, id) * 16), z = z0 + (int) (Noise.hash32(cx, cz, 320 + k, id) * 16);
             if (Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) > Math.max(d.radius() * 1.3 + 12, Strata.bounds(d).radius())) continue;
-            int type = k < 2 ? 0 : k < 4 ? 1 : 2;   // falls, gravel, arrows
+            int type = k < 2 || k >= 6 ? 0 : k < 4 ? 1 : 2;   // falls (and the sky extras), gravel, arrows
             float chance = type == 0 ? 0.35f : type == 1 ? 0.35f : 0.06f;
             if (h >= chance) continue;
             // a ceiling: air under solid stone, with at least 6 blocks of air below, top-down from the rift's height

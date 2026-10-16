@@ -129,7 +129,7 @@ public record DeepFeature() implements Feature {
                 }
                 // a rift in open air (Baughn chose floating islands): shattered shell drifts round it as floating shards
                 if (StasisConfig.skyIslands)
-                    for (int y = Math.max(yLo, surface + 3); y <= yHi; y++) {
+                    for (int y = Math.max(yLo, surface + 8); y <= yHi; y++) {
                         float s = StaticDeeps.shape(d, x + 0.5f, y + 0.5f, z + 0.5f);
                         if (s < 0.36f || s > 0.75f) continue;
                         if (Noise.fbm32(x / 7f, y / 5f, z / 7f, id ^ 0xF10) < 0.66f) continue;
@@ -218,11 +218,23 @@ public record DeepFeature() implements Feature {
                     switch (k) {
                         case Strata.BODY, Strata.VEIN, Strata.SPIRE -> {
                             // in open air above the ground (a sky rift's strata), the layer floats as broken islands
-                            boolean island = StasisConfig.skyIslands && y > surface + 2 && st.isAir()
-                                && Noise.fbm32(x / 11f, y / 6f, z / 11f, id ^ 0x15A) > 0.5f;
+                            // (thinning out towards the ground: a dark overhang down to it shaded the land, AdventurAgent)
+                            boolean island = StasisConfig.skyIslands && y > surface + 6 && st.isAir()
+                                && Noise.fbm32(x / 11f, y / 6f, z / 11f, id ^ 0x15A) > 0.5f + 0.25f * Math.max(0, 1 - (y - surface - 6) / 14f);
                             boolean ok = island || replaceable(st) || k == Strata.SPIRE && (st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty();
                             if (!ok) continue;
                             BlockState put = budding(d, x, y, z) ? bud : k == Strata.VEIN ? vein : rock;
+                            // islands' tops grow crystals (cavities above ground are open sky: budding() rarely fires)
+                            if (island && put != bud && Noise.hash32(x, y, z, id ^ 0x15B) < 0.06f && level.getBlockState(p.above()).isAir()
+                                && !(Noise.fbm32(x / 11f, (y + 1) / 6f, z / 11f, id ^ 0x15A) > 0.5f) && ((p.getY() + 1) < maxY)) {
+                                level.setBlock(p, bud, 2);
+                                float hb = Noise.hash32(x, y, z, id ^ 0x15C);
+                                var cb = hb < 0.35f ? StasisRegistry.RIFT_CRYSTAL_SMALL : hb < 0.6f ? StasisRegistry.RIFT_CRYSTAL_MEDIUM
+                                    : hb < 0.85f ? StasisRegistry.RIFT_CRYSTAL_LARGE : StasisRegistry.RIFT_CRYSTAL_CLUSTER;
+                                level.setBlock(p.above(), cb.get().defaultBlockState(), 2);
+                                changed = true;
+                                continue;
+                            }
                             if (put == rock) {
                                 BlockState ore = ore(x, y, z, id ^ 0x5A0);
                                 if (ore != null) put = ore;
