@@ -790,11 +790,16 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
     vec3 col = vec3(0.06, 0.03, 0.1) * exp(-dot(q, q) * 1.5);
     float cover = 0.0;
     if (inside) {
-        // (λ-Nero: the End's look for every rift, "nice enough to make the standard for all") a black pupil, and
-        // around it the End's sky far away: stars and violet haze, at infinity behind the hole
-        vec2 pp = x / vec2(W * 0.5, W * 0.33);
-        if (dot(pp, pp) <= 1.0) return vec4(0.0, 0.0, 0.0, 1.0);
-        return vec4(farSide(dir, time, 0), 1.0);
+        // (λ-Nero's side attempt, 2026-10-16: the End look's pupil was too big) inside, black at the lips going to
+        // grey towards the middle, and a small pupil: black on even rift ids, purple on odd ones (to compare both;
+        // the End look is 52afba1)
+        float depthIn = clamp(1.0 - abs(x.y) / max(edge, 1e-3), 0.0, 1.0) * clamp(1.0 - abs(x.x) / W, 0.0, 1.0);
+        float g = pow(clamp(depthIn * 1.6, 0.0, 1.0), 1.3);
+        float grain = hash32(int(floor(x.x * 16.0)), int(floor(x.y * 16.0)), int(floor(lt * 3.0)), id ^ 0x6A);
+        vec3 inner = mix(vec3(0.0), vec3(0.52, 0.5, 0.58), g) * (0.92 + 0.08 * grain);
+        vec2 pp = x / vec2(W * 0.28, W * 0.19);
+        if (dot(pp, pp) <= 1.0) return vec4((id & 1) == 0 ? vec3(0.0) : vec3(0.32, 0.1, 0.55), 1.0);
+        return vec4(inner, 1.0);
     }
     // light leaking past the lips (no outline): here and there, flickering in steps
     if (abs(x.x) < W * 1.02 && abs(x.y) <= edge + 1.0 / 16.0) {
