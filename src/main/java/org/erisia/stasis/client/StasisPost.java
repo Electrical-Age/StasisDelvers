@@ -118,7 +118,7 @@ public final class StasisPost {
             d[o + 1] = (float) (f.y() - fy);
             d[o + 2] = (float) (f.z() - fz);
             d[o + 3] = (float) shownRadius(f);
-            d[o + 4] = (float) f.collapse();
+            d[o + 4] = (float) shownCollapse(f);
             d[o + 5] = (float) f.failing();
             d[o + 6] = f.column() ? 1 : 0;
             d[o + 7] = f.seed();
@@ -325,6 +325,22 @@ public final class StasisPost {
         e[0] += (f.radius() - e[0]) * Math.min(1, dt / tc);
         if (Math.abs(f.radius() - e[0]) < 0.01) e[0] = f.radius();
         if (SHOWN.size() > 64) SHOWN.keySet().removeIf(id -> ClientFields.fields().stream().noneMatch(x -> x.id() == id));
+        return e[0];
+    }
+
+    /** The collapse as drawn: eased (the server sends it 5 times a second); 0 stays 0. */
+    static final java.util.Map<Integer, double[]> SHOWN_C = new java.util.HashMap<>();
+
+    static double shownCollapse(Field f) {
+        if (f.collapse() <= 0) {
+            SHOWN_C.remove(f.id());
+            return 0;
+        }
+        long now = System.nanoTime();
+        double[] e = SHOWN_C.computeIfAbsent(f.id(), k -> new double[]{f.collapse(), now});
+        double dt = Math.min(0.25, (now - e[1]) / 1e9);
+        e[1] = now;
+        e[0] += (f.collapse() - e[0]) * Math.min(1, dt / 0.2);
         return e[0];
     }
 

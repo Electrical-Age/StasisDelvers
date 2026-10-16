@@ -389,6 +389,7 @@ public class TowerBlockEntity extends BlockEntity {
                     state = State.COLLAPSING;
                     collapseTicks = 0;
                     collapseProgress = 0;
+                    collapseTail = 0;
                     collapseSpeed = 1.0 / (10 + 15 * sl.getRandom().nextDouble());   // 10-25 s
                     boltBurst = 0;
                     int seed = sl.getRandom().nextInt();
@@ -400,15 +401,32 @@ public class TowerBlockEntity extends BlockEntity {
                 // (Baughn: too predictable) each collapse runs at its own pace, 10-25 s, and time stutters through
                 // it: the front pauses, lurches, now and then slips back a little, with lightning in bursts
                 var rnd = sl.getRandom();
-                double step = collapseSpeed * (rnd.nextDouble() < 0.12 ? 0 : rnd.nextDouble() < 0.08 ? -1.5 : rnd.nextDouble() < 0.1 ? 3 : 1);
-                collapseProgress = Math.max(0, Math.min(1, collapseProgress + step / 20.0));
                 collapseTicks++;
+                if (collapseTail > 0) {
+                    // the knot's mist drifts apart (collapse 1 -> 2, 2.5 s), then the field is gone (FAILURE-PLAN D)
+                    collapseTail++;
+                    double c = 1 + Math.min(1, collapseTail / 50.0);
+                    if (collapseTail % 4 == 0 || c >= 2) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
+                    if (c >= 2) stop(sl);
+                    break;
+                }
+                double step;
+                if (collapseProgress >= 0.75) step = 0.25 / 3.5;   // the squeeze into the tower: steady, ~3.5 s
+                else {
+                    double roll = rnd.nextDouble();
+                    step = collapseSpeed * (roll < 0.12 ? 0 : roll < 0.2 ? -1.5 : roll < 0.3 ? 3 : 1);
+                }
+                collapseProgress = Math.max(0, Math.min(1, collapseProgress + step / 20.0));
                 if (rnd.nextInt(boltBurst > 0 ? 3 : 25) == 0) bolt(sl);
                 if (boltBurst > 0) boltBurst--;
                 else if (rnd.nextInt(60) == 0) boltBurst = 10 + rnd.nextInt(20);
                 double c = collapseTicks >= 25 * 20 ? 1.0 : collapseProgress;   // (never longer than 25 s)
-                if (collapseTicks % 5 == 0 || c >= 1) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
-                if (c >= 1) stop(sl);
+                if (collapseTicks % 4 == 0 || c >= 1) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
+                if (c >= 1) {
+                    // the pop: lightning lashes out from the knot
+                    for (int i = 0; i < 4; i++) boltOut(sl);
+                    collapseTail = 1;
+                }
             }
         }
         setChanged();
@@ -580,7 +598,7 @@ public class TowerBlockEntity extends BlockEntity {
 
     /** The collapse's own pace and progress (0..1), and a lightning burst in progress (ticks). */
     double collapseProgress, collapseSpeed = 1.0 / 15;
-    int boltBurst;
+    int boltBurst, collapseTail;
 
     /** Power coming in, W (an average over a few seconds), for the console. */
     double inAvgW;
