@@ -10,7 +10,8 @@
 // deep i's lowest and highest ground - floor(camera y); [176..182] the mist's clocks (mistWind ..); [184..186] the strata
 // mask's corner - floor(camera); [187] strata mask valid (0/1); [188..191] the weather clock mod each pocket epoch
 // length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196..199] unused; [200..203] static deep
-// i's core facing (yaw, radians: the eye turns to the nearest player); [204..215] unused; [216] render distance (blocks);
+// i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
+// static deep i's eye centre (the warped core) - floor(camera); [216] render distance (blocks);
 // [1024 + 12i ..] drifting deep i (i < MAX_DEEPS, nearest first): centre - floor(camera) (x, z), radius, strength,
 // surface y - floor(camera y), edge-noise id, lowest and highest ground - floor(camera y), ground grid corner -
 // floor(camera) (x, z) and spacing, 1 unused; [2048 + 64i ..] drifting deep i's ground grid (8 x 8 surface y -
@@ -736,12 +737,13 @@ vec3 strataUp(float tScene, float rd) {
     return wsum > 1e-4 ? acc / wsum : best;
 }
 
-// ---- the rift core's eye (λ-Nero, settled look v3; prototype tools/rift/core_anim.py in LabAgent's workdir): an
-// upright disc at the rift's centre turned to the nearest player. A black horizontal slit, a faint eye circle of ~1/2
-// block area, urchin tendrils lashing out from the rim up and down and fading (each slot redrawn with new hashes every
-// cycle), kept within the pupil's width +15% by a soft tanh bound, and faint lines inside that never meet them.
-const float EYE_R = 0.399, EYE_PUPIL = 0.391;
-const vec3 EYE_STRONG = vec3(0.75, 0.37, 0.94), EYE_FAINT = vec3(0.33, 0.22, 0.43), EYE_RING = vec3(0.24, 0.2, 0.28);
+// ---- the rift core's eye (λ-Nero, v5 after "it should be a hole, not a thing"; preview tools/rift/core_v5.py in
+// LabAgent's workdir): a tear in the black on the 1/16-block grid, a bit wider than tall, with a black pupil in its
+// middle. Around the pupil you see where the rift leads, far away (the End: dark sky, stars, violet haze; the Nether:
+// ember light), fixed in view direction, so it shifts with parallax behind the hole. Light leaks past the ragged lips
+// here and there; cracks of light run out from them in stop-motion, hold and heal. The eye's own clock now and then
+// freezes or steps back. It holds its facing and twitches towards the nearest player (StasisPost: saccades).
+const vec3 EYE_RIM = vec3(0.55, 0.42, 0.95), EYE_CRACK = vec3(0.55, 0.45, 0.9);
 
 float segDist(vec2 p, vec2 a, vec2 b) {
     vec2 ab = b - a;
@@ -749,71 +751,77 @@ float segDist(vec2 p, vec2 a, vec2 b) {
     return length(p - a - ab * h);
 }
 
-// x, y in blocks on the disc (y up); the eye's colour (added) and the slit's cover (a)
-vec4 eyePattern(vec2 x, float time, int id, float px) {
-    // px: a screen pixel's size here (blocks): lines keep at least ~1 px, so the eye still reads from afar
-    float r = length(x);
-    float rw = max(0.025, 1.5 * px);
-    vec3 col = EYE_RING * 1.4 * (1.0 - smoothstep(0.0, rw, abs(r - EYE_R)));
-    // faint inner lines: short strokes on a jittered field, re-drawn about once a second, never reaching the rim
-    if (r < EYE_R * 0.82) {
-        float cyc = floor(time * 0.9);
-        vec2 cell = floor(x / 0.12);
-        float hh = hash32(int(cell.x), int(cell.y), int(cyc), id ^ 0xE7E);
-        float ang = hh * 6.2832;
-        vec2 dl = vec2(cos(ang), sin(ang));
-        vec2 lc = x - (cell + 0.5) * 0.12;
-        float line = 1.0 - smoothstep(0.004, 0.012, abs(dot(lc, vec2(-dl.y, dl.x))));
-        line *= 1.0 - smoothstep(0.03, 0.06, abs(dot(lc, dl)));
-        col += EYE_FAINT * line * step(0.55, hh) * sin(3.1416 * fract(time * 0.9));
+// the eye's clock: real time, but every ~2 s maybe a 0.25 s freeze or a 0.2 s step back
+float eyeClock(float t, int id) {
+    float k = floor(t / 2.0), u = t - k * 2.0;
+    float r = hash32(int(k), 77, 0, id);
+    if (r < 0.35 && u >= 1.0 && u < 1.25) return k * 2.0 + 1.0;
+    if (r >= 0.35 && r < 0.55 && u >= 1.0 && u < 1.2) return t - 0.2;
+    return t;
+}
+
+// the far side through the hole, by view direction (so it sits at infinity); dest 0 the End, 1 the Nether
+vec3 farSide(vec3 dir, float t, int dest) {
+    vec2 uv = vec2(atan(dir.x, dir.z), asin(clamp(dir.y, -1.0, 1.0))) * 16.0;
+    vec2 cell = floor(uv * 4.0);
+    if (dest == 1) {
+        float g = 0.5 + 0.5 * sin(uv.x * 0.9 + t * 0.4) * sin(uv.y * 0.8 - t * 0.3);
+        return vec3(0.18, 0.03, 0.01) + vec3(0.5, 0.15, 0.03) * g * g;
     }
-    // tendrils
-    float tend = 0.0;
-    float PB = EYE_PUPIL * 1.15;
-    for (int k = 0; k < 22; k++) {
-        float P = 0.55 + 0.6 * hash32(k, 0, 1, id ^ 0x7E4);
-        float ph = hash32(k, 0, 2, id ^ 0x7E4) * P;
-        float cyc = floor((time + ph) / P);
-        float a = max(0.0, time + ph - cyc * P);   // (float rounding gave a tiny negative: pow() NaN, a magenta disc)
+    float haze = 0.5 + 0.5 * sin(uv.x * 0.7 + 0.3 * sin(uv.y * 0.9 + t * 0.2)) * cos(uv.y * 0.55 - t * 0.15);
+    vec3 c = vec3(0.07, 0.04, 0.13) + vec3(0.3, 0.16, 0.5) * haze * haze;
+    float st = hash32(int(cell.x), int(cell.y), 5, 0x57A2);
+    if (st > 0.93) c = max(c, vec3(0.85, 0.85, 1.0) * (st - 0.93) / 0.07);
+    return c;
+}
+
+// x: blocks on the eye's plane (y up), already on the 1/16 grid; W: the tear's half-width. Out: rgb, a = how much it
+// replaces what's there (the black)
+vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
+    float lt = eyeClock(time, id);
+    float H = W * 0.62 * (0.88 + 0.24 * (0.5 + 0.5 * sin(floor(lt * 2.5) * 1.9)));
+    float xx = clamp(1.0 - (x.x / W) * (x.x / W), 0.0, 1.0);
+    float edge = H * pow(xx, 0.75);
+    float jag = hash32(int(floor(x.x * 16.0)), 5, 0, id) * 1.5 / 16.0;
+    bool inside = abs(x.x) < W && abs(x.y) <= edge - jag;
+    // the void close to the tear is a hair less black (light bending in)
+    vec2 q = x / vec2(W * 1.5, W * 0.9);
+    vec3 col = vec3(0.06, 0.03, 0.1) * exp(-dot(q, q) * 1.5);
+    float cover = 0.0;
+    if (inside) {
+        vec2 pp = x / vec2(W * 0.5, W * 0.33);
+        if (dot(pp, pp) <= 1.0) return vec4(0.0, 0.0, 0.0, 1.0);    // the pupil: black
+        return vec4(farSide(dir, time, dest), 1.0);
+    }
+    // light leaking past the lips (no outline): here and there, flickering in steps
+    if (abs(x.x) < W * 1.02 && abs(x.y) <= edge + 1.0 / 16.0) {
+        float leak = hash32(int(floor(x.x * 16.0)), x.y > 0.0 ? 1 : 0, int(floor(lt * 6.0)), id ^ 9);
+        if (leak < 0.45) return vec4(EYE_RIM * (0.35 + 0.65 * leak / 0.45), 1.0);
+    }
+    // cracks: jagged fissures from the lips, growing in 0.08 s steps, holding, healing back
+    for (int k = 0; k < 6; k++) {
+        float P = 1.3 + hash32(k, 1, 0, id) * 1.0, ph = hash32(k, 2, 0, id) * P;
+        float cyc = floor((lt + ph) / P);
+        float a = max(0.0, lt + ph - cyc * P);
+        if (a > 1.1) continue;
+        a = floor(a / 0.08) * 0.08;
+        float reach = a < 0.7 ? min(1.0, a / 0.3) : 1.0 - (a - 0.7) / 0.4;
         int ci = int(cyc);
-        float outT = 0.12 + 0.13 * hash32(k, ci, 3, id);
-        float life = outT + 0.35 + 0.35 * hash32(k, ci, 4, id);
-        if (a > life) continue;
-        float up = hash32(k, ci, 5, id) < 0.5 ? -1.0 : 1.0;
-        vec3 v3 = normalize(vec3(hash32(k, ci, 6, id) - 0.5, (abs(hash32(k, ci, 7, id) - 0.5) * 6.0 + 1.0) * up, hash32(k, ci, 8, id) - 0.5));
-        vec2 d2 = v3.xy;
-        float fore = length(d2);
-        d2 /= max(fore, 1e-3);
-        float len = (0.7 + 0.6 * hash32(k, ci, 9, id)) * (0.35 + 0.65 * fore);
-        float curl = (hash32(k, ci, 10, id) - 0.5) * 4.4;
-        float wave = 2.0 + 3.0 * hash32(k, ci, 11, id), phase = 6.3 * hash32(k, ci, 12, id);
-        float x0 = (hash32(k, ci, 13, id) * 1.8 - 0.9) * EYE_PUPIL;
-        vec2 st = vec2(x0, sqrt(max(EYE_R * EYE_R - x0 * x0, 0.0)) * up * 1.02);
-        // cheap reject: the tendril stays within its length of its start
-        if (length(x - st) > len + 0.3) continue;
-        float head = pow(min(1.0, a / outT), 0.6);
-        float fade = a < outT ? 1.0 : 1.0 - (a - outT) / (life - outT);
-        vec2 perp = vec2(-d2.y, d2.x);
-        vec2 prev = st;
-        for (int m = 1; m <= 8; m++) {
-            float s = head * float(m) / 8.0;
-            float bend = curl * s * s * sin(phase + a * 9.0) + 0.12 * sin(wave * s * 6.28 + phase + a * 14.0);
-            vec2 p = st + d2 * s * len + perp * bend * 0.25 * s;
-            p.x = PB * tanh(p.x / PB);
-            float w = max(0.022 * (1.0 - 0.7 * float(m) / 8.0) * fore + 0.008, px);
-            float dd = segDist(x, prev, p);
-            tend = max(tend, fade * (1.0 - smoothstep(w * 0.5, w, dd)) * (fade < 1.0 ? 0.5 + 0.5 * float(m) / 8.0 : 1.0));
-            prev = p;
+        float up = hash32(k, ci, 3, id) < 0.5 ? -1.0 : 1.0;
+        float x0 = (hash32(k, ci, 4, id) * 1.6 - 0.8) * W;
+        vec2 p = vec2(x0, up * H * pow(max(0.0, 1.0 - (x0 / W) * (x0 / W)), 0.75));
+        float ang = 1.5708 * up + (hash32(k, ci, 5, id) - 0.5) * 1.6 + x0 / W * 0.5;
+        int n = int(((0.8 + 1.2 * hash32(k, ci, 6, id)) * W * reach) * 8.0);
+        if (length(x - p) > float(n) * 0.125 + 0.1) continue;
+        for (int i = 0; i < 16; i++) {
+            if (i >= n) break;
+            ang += (hash32(k, ci, 10 + i, id) - 0.5) * 1.2;
+            vec2 nx = p + vec2(cos(ang), sin(ang)) * 0.125;
+            if (segDist(x, p, nx) < 0.5 / 16.0) return vec4(EYE_CRACK, 1.0);
+            p = nx;
         }
     }
-    col += EYE_STRONG * tend * 1.3;
-    // the slit: black, opaque
-    vec2 sl = x / vec2(EYE_R * 0.98, EYE_R * 0.075);
-    float e2 = dot(sl, sl);
-    float slit = 1.0 - smoothstep(0.85, 1.0, e2);
-    // a thin violet lip, so the slit reads on the dark disc (AdventurAgent: dark on dark)
-    col += EYE_STRONG * 0.55 * smoothstep(0.7, 1.0, e2) * (1.0 - smoothstep(1.0, 1.9, e2));
-    return vec4(col, slit);
+    return vec4(col, 0.0);
 }
 
 // strata weather colours: the mist a little darker than the deeps' (underground), the warning violet
@@ -942,12 +950,16 @@ void main() {
                 }
             }
             c = c * trans + glow;
-            // the eye at each rift's heart, over the black (it's what the black hides)
+            // the eye at each rift's heart, over the black (it's what the black hides): its plane at the warped core
+            // (slots 204 + 3i), turned by the CPU's saccades (slot 200 + i: yaw + 10 x destination)
             float eyeTime = data(29);
             for (int i = 0; i < nsd && i < 4; i++) {
-                vec3 ec = vec3(data(220 + 5 * i), data(221 + 5 * i), data(222 + 5 * i)) - camFrac;
-                if (dot(ec, ec) > 96.0 * 96.0) continue;
-                float f = data(200 + i);
+                vec3 ec = vec3(data(204 + 3 * i), data(205 + 3 * i), data(206 + 3 * i)) - camFrac;
+                if (dot(ec, ec) > 128.0 * 128.0) continue;
+                float yd = data(200 + i);
+                int dest = int(floor((yd + 5.0) / 10.0));
+                float f = yd - 10.0 * float(dest);
+                float W = clamp(0.6 + data(223 + 5 * i) * 0.018, 0.75, 1.8);
                 vec3 nrm = vec3(sin(f), 0.0, cos(f)), rt = vec3(cos(f), 0.0, -sin(f));
                 float dn = dot(dir2, nrm);
                 if (abs(dn) < 1e-3) continue;
@@ -955,9 +967,10 @@ void main() {
                 if (th <= 0.0 || th > tEnd) continue;
                 vec3 hp = dir2 * th - ec;
                 vec2 ex = vec2(dot(hp, rt), hp.y);
-                if (abs(ex.x) > 1.8 || abs(ex.y) > 1.8) continue;
-                vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), th * 2.0 / InSize.y);
-                c = mix(c + ep.rgb, vec3(0.0), ep.a);
+                if (abs(ex.x) > W * 2.6 || abs(ex.y) > W * 2.6) continue;
+                ex = (floor(ex * 16.0) + 0.5) / 16.0;      // Minecraft's texel grid
+                vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), W, dir2, dest);
+                c = mix(c + ep.rgb, ep.rgb, ep.a);
             }
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);

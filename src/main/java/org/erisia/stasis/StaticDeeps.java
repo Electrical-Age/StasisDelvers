@@ -75,6 +75,26 @@ public final class StaticDeeps {
         return out;
     }
 
+    /** The centre of d's warped body (where shape() is smallest: x + warp(x) = centre), for the eye and its touch. */
+    public static float[] core(Deep d) {
+        float x = d.x(), y = d.y(), z = d.z();
+        float k = Math.min(1f, d.radius() * d.radius() / 576f);
+        for (int i = 0; i < 6; i++) {
+            float wx = (Noise.value32(x / 18f, y / 18f, z / 18f, d.id()) - 0.5f) * 16 * k;
+            float wy = (Noise.value32(x / 18f + 31, y / 18f, z / 18f, d.id()) - 0.5f) * 10 * k;
+            float wz = (Noise.value32(x / 18f, y / 18f + 47, z / 18f, d.id()) - 0.5f) * 16 * k;
+            x = d.x() - wx;
+            y = d.y() - wy;
+            z = d.z() - wz;
+        }
+        return new float[]{x, y, z};
+    }
+
+    /** The eye's half-width at d's core (stasis.fsh: W); its touch reaches that far. */
+    public static float eyeHalfWidth(Deep d) {
+        return Math.max(0.75f, Math.min(1.8f, 0.6f + d.radius() * 0.018f));
+    }
+
     /**
      * The organic distance measure of a point to deep d: the distance warped by noise, relative to the radius
      * (<= 1 inside, <= RIFT in the rift). The shader has the same (stasis.fsh: staticShape).

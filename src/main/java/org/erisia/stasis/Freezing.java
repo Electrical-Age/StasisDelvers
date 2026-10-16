@@ -155,13 +155,16 @@ public final class Freezing {
             e.setNewSpeed(e.getNewSpeed() / 0.3f);
     }
 
-    /** Is the player touching a rift core's eye (a 1.6 x 1.6 block disc at the static deep's centre; any facing)? */
+    /** Is the player touching a rift core's eye (its tear, at the warped body's centre; any facing)? */
     static boolean touchesCore(ServerLevel level, ServerPlayer p) {
         int seed = Deeps.seed(level);
         if (seed == 0) return false;
         var box = p.getBoundingBox();
-        for (StaticDeeps.Deep d : StaticDeeps.near((float) p.getX(), (float) p.getY(), (float) p.getZ(), 4, seed))
-            if (box.intersects(d.x() - 0.8, d.y() - 0.8, d.z() - 0.8, d.x() + 0.8, d.y() + 0.8, d.z() + 0.8)) return true;
+        for (StaticDeeps.Deep d : StaticDeeps.near((float) p.getX(), (float) p.getY(), (float) p.getZ(), 12, seed)) {
+            float[] c = StaticDeeps.core(d);
+            float w = StaticDeeps.eyeHalfWidth(d);
+            if (box.intersects(c[0] - w, c[1] - w * 0.7, c[2] - w, c[0] + w, c[1] + w * 0.7, c[2] + w)) return true;
+        }
         return false;
     }
 

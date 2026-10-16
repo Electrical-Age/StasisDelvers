@@ -198,16 +198,24 @@ public final class StasisPost {
                 d[o + 2] = (float) (sd.z() - fz);
                 d[o + 3] = sd.radius();
                 d[o + 4] = sd.id() & 0xFFFFFF;
-                // the eye turns to the nearest player (λ-Nero), upright
-                double best = Double.MAX_VALUE, yaw = 0;
+                // the eye (λ-Nero): upright at the warped core; it holds its facing and twitches towards the nearest
+                // player now and then (saccades: parallax as you walk round it, not a sticker); plus its destination
+                float[] core = org.erisia.stasis.StaticDeeps.core(sd);
+                d[204 + 3 * (ns - 1)] = (float) (core[0] - fx);
+                d[205 + 3 * (ns - 1)] = (float) (core[1] - fy);
+                d[206 + 3 * (ns - 1)] = (float) (core[2] - fz);
+                double best = Double.MAX_VALUE, want = 0;
                 for (var pl : mc.level.players()) {
-                    double dx = pl.getX() - sd.x(), dz = pl.getZ() - sd.z(), dd = dx * dx + dz * dz + Math.pow(pl.getEyeY() - sd.y(), 2);
+                    double dx = pl.getX() - core[0], dz = pl.getZ() - core[2], dd = dx * dx + dz * dz + Math.pow(pl.getEyeY() - core[1], 2);
                     if (dd < best) {
                         best = dd;
-                        yaw = Math.atan2(dx, dz);
+                        want = Math.atan2(dx, dz);
                     }
                 }
-                d[200 + ns - 1] = (float) yaw;
+                double yaw = saccade(sd.id(), want, clock);
+                String dest = org.erisia.stasis.Gates.destination(sd);
+                int destCode = dest.equals("minecraft:the_end") ? 0 : dest.equals("minecraft:the_nether") ? 1 : 2;
+                d[200 + ns - 1] = (float) (yaw + 10 * destCode);
             }
         }
         d[218] = ns;
@@ -228,6 +236,32 @@ public final class StasisPost {
         if (img == null) return;
         for (int i = 0; i < SLOTS; i++) img.setPixelABGR(i % WIDTH, i / WIDTH, Float.floatToRawIntBits(d[i]));
         texture.upload();
+    }
+
+    /** Per eye (static deep id): its facing (rad) and when it may move next (weather clock, s). */
+    static final java.util.Map<Integer, double[]> EYES = new java.util.HashMap<>();
+
+    /** The eye's facing: held for 0.5-1.5 s, then a quick twitch towards the wanted facing (over ~0.12 s). */
+    static double saccade(int id, double want, double clock) {
+        double[] e = EYES.computeIfAbsent(id, k -> new double[]{want, clock, want, clock});
+        // e: {from, twitch start, to, next decision}
+        if (clock >= e[3]) {
+            double cur = facing(e, clock);
+            double diff = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+            if (Math.abs(diff) > 0.05) {
+                e[0] = cur;
+                e[1] = clock;
+                e[2] = cur + diff;
+            }
+            e[3] = clock + 0.5 + Math.abs(Math.sin(clock * 12.9898 + id)) * 1.0;
+        }
+        if (EYES.size() > 64) EYES.clear();
+        return Math.atan2(Math.sin(facing(e, clock)), Math.cos(facing(e, clock)));
+    }
+
+    static double facing(double[] e, double clock) {
+        double u = Math.min(1, Math.max(0, (clock - e[1]) / 0.12));
+        return e[0] + (e[2] - e[0]) * (u * u * (3 - 2 * u));
     }
 
     /** -Dstasisdelvers.debugDeeps=true: log every deep sent to the shader, every frame (for AdventurAgent's tests). */
