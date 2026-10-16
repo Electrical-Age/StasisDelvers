@@ -51,7 +51,7 @@ public final class Deeps {
      * minute to pass on average, 3 at worst, with size and speed varying: the wind runs 0.65-1.35 blocks/s over a
      * 3-hour swell (plus a slow bend sideways), and each deep adds its own ±0.12 (cell()).
      */
-    static double[] drift(double t, int seed) {
+    public static double[] drift(double t, int seed) {
         float ang = windAngle(seed);
         double along = 1.0 * t + 3780 * Math.sin(t / 10800.0);   // speed 1 + 0.35 cos(t / 3 h)
         return new double[]{
@@ -175,7 +175,7 @@ public final class Deeps {
     }
 
     /** Is (x, y) within the drifting deeps' height band at this column (surface - 6 .. surface + 64)? */
-    static boolean inBand(Level level, int x, int y, int z) {
+    public static boolean inBand(Level level, int x, int y, int z) {
         if (!level.hasChunkAt(new net.minecraft.core.BlockPos(x, 0, z))) return false;
         int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         return y >= surface - 6 && y <= surface + 64;

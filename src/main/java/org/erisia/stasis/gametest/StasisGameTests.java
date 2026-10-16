@@ -1050,6 +1050,44 @@ public final class StasisGameTests {
             double a = org.erisia.stasis.Storms.tau(seed, ov, 1500), b = org.erisia.stasis.Storms.tau(seed, ov, 1501);
             c.check("a test storm speeds the clock", b - a > 9.9, String.format("%.3f", b - a));
         }, false));
+        // storm coverage: at full intensity about half the land in storm mist, a tenth of that rift; ramping with it
+        CASES.put("storm_coverage", new Spec(1, (h, c) -> () -> {
+            int seed = 4242;
+            java.util.Random rng = new java.util.Random(5);
+            for (double i : new double[]{1.0, 0.5}) {
+                int mist = 0, rift = 0, n = 20000;
+                for (int k = 0; k < n; k++) {
+                    int kind = org.erisia.stasis.Storms.kind(seed, i, rng.nextFloat() * 20000 - 10000, rng.nextFloat() * 20000 - 10000, 123456.0);
+                    if (kind >= 1) mist++;
+                    if (kind == 2) rift++;
+                }
+                double m = mist / (double) n, r = rift / (double) n;
+                c.check("covered share at " + i, Math.abs(m - org.erisia.stasis.Storms.mistShare(i)) < 0.04, String.format("%.3f", m));
+                c.check("rift share at " + i, Math.abs(r - org.erisia.stasis.Storms.riftShare(i)) < 0.015, String.format("%.3f", r));
+            }
+            c.check("no storm, no cover", org.erisia.stasis.Storms.kind(seed, 0, 5, 5, 1) == 0);
+        }, false));
+        // in a storm a tower draws x2 in mist and x3 in rift (Baughn), and a field holds a storm rift
+        CASES.put("storm_draw_and_rules", new Spec(100, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            double fm = t.testStorm(1f, 0f), fr = t.testStorm(0f, 1f), fh = t.testStorm(0.5f, 0.5f);
+            c.check("storm mist: x2", Math.abs(fm - 2) < 1e-9, String.valueOf(fm));
+            c.check("storm rift: x3", Math.abs(fr - 3) < 1e-9, String.valueOf(fr));
+            c.check("half and half: x2.5", Math.abs(fh - 2.5) < 1e-9, String.valueOf(fh));
+            var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
+            org.erisia.stasis.Storms.TEST.put(box, 2);
+            ServerPlayer out = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true), in = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            for (ServerPlayer p : new ServerPlayer[]{out, in})
+                wear(p, true, org.erisia.stasis.StasisRegistry.STASIS_HELMET.get(), org.erisia.stasis.StasisRegistry.STASIS_CHEST.get(),
+                    org.erisia.stasis.StasisRegistry.STASIS_LEGS.get(), org.erisia.stasis.StasisRegistry.STASIS_BOOTS.get());
+            return () -> {
+                org.erisia.stasis.Storms.TEST.remove(box);
+                c.check("storm rift: suits don't help", !out.isAlive());
+                c.check("a field holds a storm rift", in.isAlive() && Freezing.ticks(in) == 0, "ticks " + Freezing.ticks(in));
+                remove(h, out);
+                remove(h, in);
+            };
+        }));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();

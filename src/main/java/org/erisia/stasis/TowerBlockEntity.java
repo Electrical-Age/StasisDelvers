@@ -40,8 +40,14 @@ public class TowerBlockEntity extends BlockEntity {
     /** Tests: keep the weather set by testWeather. */
     boolean weatherPinned;
 
+    /** Storm shares (stage 3): mist (with drifting deeps) and rift, while a storm runs; else 0. */
+    float stormMist, stormRift;
+    boolean storming;
+
+    /** Baughn: in a storm mist x2 and rift x3 (as disjoint shares); in normal weather a drifting deep x1.5. */
     double weatherFactor() {
-        return 1 + 0.5 * weather + 2 * staticWeather;
+        double w = storming ? stormMist + 2 * stormRift : 0.5 * weather;
+        return 1 + w + 2 * staticWeather;
     }
 
     static float staticOverlap(ServerLevel level, Field f) {
@@ -219,7 +225,14 @@ public class TowerBlockEntity extends BlockEntity {
         } else if (state == State.RUNNING && level.getGameTime() % 20 == 0) {
             weather = FieldData.get(sl).get(fieldId).map(f -> Deeps.overlap(sl, f)).orElse(0f);
             staticWeather = FieldData.get(sl).get(fieldId).map(f -> staticOverlap(sl, f)).orElse(0f);
-        } else if (state != State.RUNNING) weather = staticWeather = 0;
+            storming = Storms.intensity(sl) > 0;
+            float[] st = storming ? FieldData.get(sl).get(fieldId).map(f -> Storms.overlap(sl, f)).orElse(new float[2]) : new float[2];
+            stormMist = st[0];
+            stormRift = st[1];
+        } else if (state != State.RUNNING) {
+            weather = staticWeather = stormMist = stormRift = 0;
+            storming = false;
+        }
         double perTick = drawFor(r) * testDrawFactor * weatherFactor() / 20.0;
         switch (state) {
             case OFF -> {
@@ -279,6 +292,15 @@ public class TowerBlockEntity extends BlockEntity {
         weather = drifting;
         staticWeather = statics;
         weatherPinned = true;
+    }
+
+    /** Tests: pin a storm's shares (mist, rift) and read the weather factor. */
+    public double testStorm(float mist, float rift) {
+        storming = true;
+        stormMist = mist;
+        stormRift = rift;
+        weatherPinned = true;
+        return weatherFactor();
     }
 
     public void testBolt() {

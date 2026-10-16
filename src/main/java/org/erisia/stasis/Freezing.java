@@ -78,7 +78,10 @@ public final class Freezing {
             if (w != null && w.state() == Pockets.State.RIFT) zone = 2;
             else if (w != null && w.state() != Pockets.State.CLEAR && zone == 0) strataMist = true;
         }
-        boolean deep = stopped && !eddy && (zone > 0 || strataMist || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
+        // storms (stage 3): storm rift is a rift, storm mist a drifting deep (passing weather: the Delver hold)
+        int storm = stopped && zone < 2 ? Storms.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) : 0;
+        if (storm == 2) zone = 2;
+        boolean deep = stopped && !eddy && (zone > 0 || strataMist || storm == 1 || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
         // a hold lasts while the deep is over the player (Baughn: it crosses in a minute at worst), 2 min at most
         boolean held = level.getGameTime() < s.heldUntil && deep;
         if (s.heldUntil != 0 && !held) {   // the hold is over: start fresh

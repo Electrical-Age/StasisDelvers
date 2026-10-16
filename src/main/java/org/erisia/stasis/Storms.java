@@ -141,6 +141,82 @@ public final class Storms {
         return t <= s.end() ? s : scheduled(seed, n + 1);
     }
 
+    // ---- the storm field: coverage over the surface band, carried on the warped wind
+
+    static final float SCALE = 90;
+
+    /** fbm32's quantiles (sampled once), so coverage shares come out right whatever the noise's distribution. */
+    static final float[] QUANT;
+
+    static {
+        float[] v = new float[8192];
+        for (int i = 0; i < v.length; i++) v[i] = Noise.fbm32(i * 1.618f, 0.5f, i * 0.7071f + 33, 0x5701);
+        java.util.Arrays.sort(v);
+        QUANT = v;
+    }
+
+    /** The noise value above which a share `share` of the land lies. */
+    static float threshold(double share) {
+        int i = (int) Math.round((1 - Math.max(0, Math.min(1, share))) * (QUANT.length - 1));
+        return QUANT[i];
+    }
+
+    /** The storm field's noise at (x, z) at warped time tau. */
+    public static float field(int seed, float x, float z, double tau) {
+        double[] d = Deeps.drift(tau, seed);
+        return Noise.fbm32((float) ((x - d[0]) / SCALE), 0.5f, (float) ((z - d[1]) / SCALE), seed ^ 0x5701);
+    }
+
+    /** Covered share at intensity i: up to half the band (Baughn's ~50%), and rifts a tenth of that, late. */
+    public static double mistShare(double i) {
+        return 0.5 * i;
+    }
+
+    public static double riftShare(double i) {
+        return 0.05 * i * i;
+    }
+
+    /** 0 none, 1 storm mist, 2 storm rift, at a column (x, z) (the height band is the caller's). */
+    public static int kind(int seed, double i, float x, float z, double tau) {
+        if (i <= 0) return 0;
+        float n = field(seed, x, z, tau);
+        if (n > threshold(riftShare(i))) return 2;
+        return n > threshold(mistShare(i)) ? 1 : 0;
+    }
+
+    /** GameTests: boxes with a forced storm kind. */
+    public static final java.util.Map<net.minecraft.world.phys.AABB, Integer> TEST = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** The storm at a block: 0 none, 1 mist, 2 rift (in the surface band, in stopping dimensions). */
+    public static int at(Level level, int x, int y, int z) {
+        if (!TEST.isEmpty())
+            for (var e : TEST.entrySet())
+                if (e.getKey().contains(x + 0.5, y + 0.5, z + 0.5)) return e.getValue();
+        if (!Stasis.stops(level)) return 0;
+        int seed = Deeps.seed(level);
+        double i = intensity(level);
+        if (i <= 0 || seed == 0) return 0;
+        int k = kind(seed, i, x + 0.5f, z + 0.5f, Deeps.time(level));
+        return k > 0 && Deeps.inBand(level, x, y, z) ? k : 0;
+    }
+
+    /** A field's shares in storm mist (with drifting deeps) and storm rift (27 samples, as Deeps.overlap). */
+    static float[] overlap(Level level, Field f) {
+        int mist = 0, rift = 0, n = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++) {
+                    double l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    double k = l == 0 ? 0 : 0.7 * f.radius() / l;
+                    int x = (int) Math.floor(f.x() + dx * k), y = (int) Math.floor(f.y() + dy * k), z = (int) Math.floor(f.z() + dz * k);
+                    n++;
+                    int s = at(level, x, y, z);
+                    if (s == 2) rift++;
+                    else if (s == 1 || Deeps.at(level, x, y, z) > 0.5f) mist++;
+                }
+        return new float[]{mist / (float) n, rift / (float) n};
+    }
+
     // ---- level-side helpers
 
     public static double intensity(Level level) {
