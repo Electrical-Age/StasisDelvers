@@ -16,6 +16,9 @@ import org.erisia.stasis.StasisRegistry;
 @Mod(value = StasisDelvers.MODID, dist = Dist.CLIENT)
 public final class StasisClient {
     public StasisClient(IEventBus modBus) {
+        modBus.addListener(net.neoforged.neoforge.client.event.RegisterGuiLayersEvent.class, e -> e.registerAbove(
+            net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "suit_gauge"),
+            SuitGauge::render));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
         // the shield is drawn by the post effect now (so the desaturation can't grey it); ShieldRenderer is kept for
         // a possible later geometry version (falling cells)

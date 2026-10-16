@@ -12,7 +12,7 @@
 // length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196..199] unused; [200..203] static deep
 // i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
 // static deep i's eye centre (the warped core) - floor(camera); [1580 + 4i] its NDC x, y, distance, in front (0/1);
-// [1596] strain on reality (0..1, nearness to a core); [216] render distance (blocks); [1312] storm
+// [1596] strain on reality (0..1, nearness to a core); [1597 + i] static deep i's inhale before a puff (0..1); [216] render distance (blocks); [1312] storm
 // intensity; [1313] storm warning 0..1; [1314] wind angle; [1315, 1316] the storm field's noise coordinates at
 // floor(camera) (x, z); [1317, 1318] its mist and rift thresholds; [1319] its noise seed; [1320 + 16j + i] the ground
 // (y - floor(camera y)) on a 16 x 16 grid of spacing 16 from [1576, 1577] (corner - floor(camera));
@@ -330,16 +330,18 @@ float mistDensity(vec3 q, int k, bool detail) {
     }
     // static: anchored, breathing (density, height and coverage swell and ebb over ~16 s, out of step per deep; AdventurAgent
     // found a 30% swing too subtle to see)
+    // (the inhale before a puff, slots 1597 + i: the mist draws in towards the rift and thickens)
+    float inhale = data(1597 + hk.idx);
     vec3 dv = q - hk.c;
     dv.y *= 1.4;
-    float s = length(dv) / (hk.R * 1.15);
+    float s = length(dv) / (hk.R * 1.15 * (1.0 - 0.3 * inhale));
     float env = 1.0 - smoothstep(0.8, 1.15, s);
     if (env <= 0.0) return 0.0;
     float br = 0.5 + 0.5 * sin(breathAngle + id);
     float h = q.y - groundAt(STATIC_GROUND + 64 * hk.idx, hk.g, q.xz);
     vec3 p = (q + hitCamI) * (32.0 / 96.0);
     p.y *= 1.5;
-    return env * (0.4 + 0.6 * br) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, staticPhase, detail);
+    return env * (0.4 + 0.6 * br + 0.8 * inhale) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, staticPhase, detail);
 }
 
 void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {

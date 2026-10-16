@@ -200,6 +200,9 @@ public final class StasisPost {
                 d[o + 2] = (float) (sd.z() - fz);
                 d[o + 3] = sd.radius();
                 d[o + 4] = sd.id() & 0xFFFFFF;
+                // the inhale before a puff (0..1 over its last 4 s): the rift's mist draws in and darkens
+                double inh = org.erisia.stasis.Deeps.nextPuffIn(sd, wclock, ClientFields.deepSeed());
+                d[1597 + ns - 1] = inh < 4 ? (float) Math.pow(1 - inh / 4, 2) : 0;
                 // the eye (λ-Nero): upright at the warped core; it holds its facing and twitches towards the nearest
                 // player now and then (saccades: parallax as you walk round it, not a sticker); plus its destination
                 float[] core = org.erisia.stasis.StaticDeeps.core(sd);
@@ -239,6 +242,7 @@ public final class StasisPost {
             d[o + 3] = v.w > 0.05f ? 1 : 0;
         }
         d[1596] = Math.max(0, strain);
+        lastStrain = Math.max(0, strain);
         // strata weather (rift stage 2): the mask around the camera, and the weather clock per pocket epoch length
         // (wrapped here in double; the shader adds a pocket's phase and carries)
         if (Stasis.stops(mc.level)) StrataMask.frame(cam.x, cam.y, cam.z, ClientFields.deepSeed(), d, fx, fy, fz);
@@ -307,6 +311,9 @@ public final class StasisPost {
         double u = Math.min(1, Math.max(0, (clock - e[1]) / 0.12));
         return e[0] + (e[2] - e[0]) * (u * u * (3 - 2 * u));
     }
+
+    /** The strain on reality near a rift core, 0..1 (for the HUD's flicker, SuitGauge). */
+    public static volatile float lastStrain;
 
     /** -Dstasisdelvers.debugDeeps=true: log every deep sent to the shader, every frame (for AdventurAgent's tests). */
     static final boolean DEBUG_DEEPS = Boolean.getBoolean("stasisdelvers.debugDeeps");

@@ -130,6 +130,16 @@ public final class Deeps {
         }
     }
 
+    /** Seconds until rift sd's next puff (the "inhale" before it), or infinity if it skips that breath or makes none. */
+    public static double nextPuffIn(StaticDeeps.Deep sd, double t, int seed) {
+        if (sd.y() + sd.radius() * 0.35f < 30 || StaticDeeps.isGate(sd)) return Double.POSITIVE_INFINITY;
+        float interval = 60 + 60 * Noise.hash32(sd.id(), 0, 41, seed);
+        float phase = Noise.hash32(sd.id(), 0, 42, seed) * interval;
+        long j = (long) Math.floor((t + phase) / interval) + 1;
+        if (Noise.hash32(sd.id(), (int) j, 44, seed) < 0.15f) return Double.POSITIVE_INFINITY;
+        return j * (double) interval - phase - t;
+    }
+
     /** A puff's id (24 bits, like a drifting deep's): its rift's and its number's. */
     public static int puffId(StaticDeeps.Deep sd, int j) {
         return (int) ((sd.id() * 31L + j * 2654435761L) & 0xFFFFFF);
