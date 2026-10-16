@@ -56,6 +56,7 @@ public final class StasisPost {
     static void init() {
         texture = new DynamicTexture(() -> "stasisdelvers field data", WIDTH, ROWS, true);
         Minecraft.getInstance().getTextureManager().register(DATA, texture);
+        StrataMask.init();
     }
 
     static void tick(ClientTickEvent.Post e) {
@@ -200,6 +201,14 @@ public final class StasisPost {
             }
         }
         d[218] = ns;
+        // strata weather (rift stage 2): the mask around the camera, and the weather clock per pocket epoch length
+        // (wrapped here in double; the shader adds a pocket's phase and carries)
+        if (Stasis.stops(mc.level)) StrataMask.frame(cam.x, cam.y, cam.z, ClientFields.deepSeed(), d, fx, fy, fz);
+        int[] periods = {600, 900, 1200, 1800};
+        for (int i = 0; i < 4; i++) {
+            d[188 + i] = (float) (clock - Math.floor(clock / periods[i]) * periods[i]);
+            d[192 + i] = (float) Math.floor(clock / periods[i]);
+        }
         long now = mc.level.getGameTime();
         grids.values().removeIf(g -> now - g.made() > 200);
         // lightning bolts (BoltRenderer), projected to the screen

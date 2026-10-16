@@ -911,6 +911,43 @@ public final class StasisGameTests {
                 org.erisia.stasis.Pockets.TEST.remove(box);
             }
         }, false));
+        // upwellings: every rift breathes out puffs (drifting deeps) that ride the wind from its hole, grow and fade
+        CASES.put("rift_upwellings", new Spec(1, (h, c) -> () -> {
+            int seed = 777;
+            org.erisia.stasis.StaticDeeps.Deep sd = null;
+            for (int i = -4; i < 4 && sd == null; i++)
+                for (int k = -4; k < 4 && sd == null; k++) {
+                    var d = org.erisia.stasis.StaticDeeps.cell(i, 0, k, seed);
+                    if (d != null && d.y() > 0) sd = d;
+                }
+            c.check("a rift to test", sd != null);
+            if (sd == null) return;
+            int seen = 0, moved = 0, felt = 0;
+            double t0 = 2.0e6;
+            for (int s = 0; s < 3600; s += 30) {
+                double t = t0 + s;
+                var a = org.erisia.stasis.Deeps.near(sd.x(), sd.z(), t, seed);
+                var b = org.erisia.stasis.Deeps.near(sd.x(), sd.z(), t + 10, seed);
+                for (var pa : a) {
+                    for (var pb : b)
+                        if (pa.id() == pb.id() && pa.radius() < 25) {
+                            // after 10 s a puff has moved with the wind (0.65-1.35 b/s), give or take its growth
+                            double m = Math.hypot(pb.x() - pa.x(), pb.z() - pa.z());
+                            if (Math.hypot(pa.x() - sd.x(), pa.z() - sd.z()) < 500) {
+                                seen++;
+                                if (m > 5 && m < 15) moved++;
+                                if (pa.strength() > 0.6f && org.erisia.stasis.Deeps.horizontal(pa.x(), pa.z(), t, seed) > 0.5f) felt++;
+                            }
+                        }
+                }
+            }
+            c.check("puffs come out", seen > 50, String.valueOf(seen));
+            c.check("they ride the wind", moved > seen * 0.6, moved + " of " + seen);
+            c.check("they are deeps where they are", felt > 10, String.valueOf(felt));
+            var x1 = org.erisia.stasis.Deeps.near(sd.x(), sd.z(), t0, seed);
+            var x2 = org.erisia.stasis.Deeps.near(sd.x(), sd.z(), t0, seed);
+            c.check("deterministic", x1.equals(x2));
+        }, false));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();

@@ -4,6 +4,10 @@
         "mist": {
             "width": 800,
             "height": 450
+        },
+        "strata": {
+            "width": 800,
+            "height": 450
         }
     },
     "passes": [
@@ -34,6 +38,37 @@
         },
         {
             "vertex_shader": "minecraft:core/screenquad",
+            "fragment_shader": "stasisdelvers:post/stasis_strata",
+            "inputs": [
+                {
+                    "sampler_name": "Depth",
+                    "target": "minecraft:main",
+                    "use_depth_buffer": true
+                },
+                {
+                    "sampler_name": "Data",
+                    "location": "stasisdelvers:fielddata",
+                    "width": 1024,
+                    "height": 4
+                },
+                {
+                    "sampler_name": "Mist",
+                    "location": "stasisdelvers:mistnoise",
+                    "width": 272,
+                    "height": 136,
+                    "bilinear": true
+                },
+                {
+                    "sampler_name": "Strata",
+                    "location": "stasisdelvers:stratamask",
+                    "width": 512,
+                    "height": 512
+                }
+            ],
+            "output": "strata"
+        },
+        {
+            "vertex_shader": "minecraft:core/screenquad",
             "fragment_shader": "stasisdelvers:post/stasis",
             "inputs": [
                 {
@@ -61,6 +96,10 @@
                 {
                     "sampler_name": "MistBuf",
                     "target": "mist"
+                },
+                {
+                    "sampler_name": "StrataBuf",
+                    "target": "strata"
                 }
             ],
             "output": "swap"

@@ -104,4 +104,9 @@ tasks.named('processResources', ProcessResources) {
         rename { 'stasis_mist.fsh' }
         filter { String line -> line.startsWith('#version') ? line + '\n#define MIST_PASS' : line }
     }
+    from('src/main/resources/assets/stasisdelvers/shaders/post/stasis.fsh') {
+        into 'assets/stasisdelvers/shaders/post'
+        rename { 'stasis_strata.fsh' }
+        filter { String line -> line.startsWith('#version') ? line + '\n#define STRATA_PASS' : line }
+    }
 }

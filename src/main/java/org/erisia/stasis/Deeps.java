@@ -66,6 +66,7 @@ public final class Deeps {
                 Deep deep = cell(i, k, t, seed, d);
                 if (deep != null) out.add(deep);
             }
+        puffs(x, z, 0, t, seed, d, out);
         return out;
     }
 
@@ -85,7 +86,42 @@ public final class Deeps {
                 Deep deep = cell(i, k, t, seed, d);
                 if (deep != null) out.add(deep);
             }
+        puffs(x, z, range, t, seed, d, out);
         return out;
+    }
+
+    // ---- upwellings (rift stage 2): every rift breathes out a puff of deep every 60-120 s from its hole. A puff is a
+    // drifting deep: carried off on the wind from where it left, growing from 6 to 24 blocks across 3-5 minutes, fading
+    // as it goes. Gameplay mist like the others (at(), towers).
+
+    static final float PUFF_REACH = 480;   // a puff's farthest drift (5 min at up to 1.35 b/s) plus its radius
+
+    /** The puffs from the rifts within range (+ PUFF_REACH) of (x, z), alive now; added to near() and within(). */
+    static void puffs(float x, float z, float range, double t, int seed, double[] drift, List<Deep> out) {
+        for (StaticDeeps.Deep sd : StaticDeeps.near(x, 100, z, range + PUFF_REACH, seed)) {
+            if (sd.y() < -20) continue;   // too deep to reach the surface
+            float interval = 60 + 60 * Noise.hash32(sd.id(), 0, 41, seed);
+            float phase = Noise.hash32(sd.id(), 0, 42, seed) * interval;
+            long now = (long) Math.floor((t + phase) / interval);
+            for (long j = now; j >= now - 6; j--) {
+                double age = t + phase - j * (double) interval;
+                int jj = (int) j;
+                float life = 180 + 120 * Noise.hash32(sd.id(), jj, 43, seed);
+                if (age >= life) break;
+                if (Noise.hash32(sd.id(), jj, 44, seed) < 0.15f) continue;   // the rift skips a breath now and then
+                double[] then = drift(t - age, seed);
+                float u = (float) (age / life);
+                float strength = Math.min(1f, (float) age / 20f) * (1 - u * u);
+                float ox = (Noise.hash32(sd.id(), jj, 45, seed) - 0.5f) * 0.6f * sd.radius(), oz = (Noise.hash32(sd.id(), jj, 46, seed) - 0.5f) * 0.6f * sd.radius();
+                out.add(new Deep((float) (sd.x() + ox + drift[0] - then[0]), (float) (sd.z() + oz + drift[1] - then[1]),
+                    (float) (6 + 18 * Math.pow(u, 0.6)), strength, puffId(sd, jj)));
+            }
+        }
+    }
+
+    /** A puff's id (24 bits, like a drifting deep's): its rift's and its number's. */
+    public static int puffId(StaticDeeps.Deep sd, int j) {
+        return (int) ((sd.id() * 31L + j * 2654435761L) & 0xFFFFFF);
     }
 
     static Deep cell(int i, int k, double t, int seed, double[] drift) {

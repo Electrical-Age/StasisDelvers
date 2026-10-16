@@ -9,7 +9,7 @@ import net.minecraft.world.level.Level;
  * places, and its clear spells. Long-run shares: clear 25%, rift ~15%, mist the rest. Players can't learn a timetable. Both sides compute it from the deep seed and Deeps.time.
  * <p>
  * Where it applies: the strata mask, 4-block cells that touch the strata (Strata.at isn't OUT at any of the cell's
- * 8 corner blocks). Rules and visuals use the same mask, so what you see is what hits you.
+ * 8 corners on the 4-block lattice). Rules and visuals use the same mask, so what you see is what hits you.
  */
 public final class Pockets {
     private Pockets() {
@@ -126,7 +126,7 @@ public final class Pockets {
     // ---- the strata mask
 
     /** How far any strata reaches from its deep's centre (bounds radius 2.3R+4 at R=64, roots, vents to R+80). */
-    static final float REACH = 200;
+    public static final float REACH = 200;
 
     /** The deep whose strata mask covers block (x, y, z), or null. Only in stopping dimensions (Level form). */
     public static StaticDeeps.Deep strataAt(Level level, int x, int y, int z) {
@@ -147,11 +147,12 @@ public final class Pockets {
         return null;
     }
 
-    /** Is the 4-block cell at (cx, cy, cz) (its low corner) strata: Strata.at not OUT at one of its 8 corner blocks? */
+    /** Is the 4-block cell at (cx, cy, cz) (its low corner) strata: Strata.at not OUT at one of its 8 corners, the
+     *  points of the 4-block lattice (the client's StrataMask evaluates each lattice point once)? */
     public static boolean masked(StaticDeeps.Deep d, int cx, int cy, int cz) {
         Strata.Shape shape = Strata.shapeOf(d);
         for (int i = 0; i < 8; i++)
-            if (Strata.at(shape, d, cx + (i & 1) * (CELL - 1), cy + (i >> 1 & 1) * (CELL - 1), cz + (i >> 2 & 1) * (CELL - 1)) != Strata.OUT)
+            if (Strata.at(shape, d, cx + (i & 1) * CELL, cy + (i >> 1 & 1) * CELL, cz + (i >> 2 & 1) * CELL) != Strata.OUT)
                 return true;
         return false;
     }
