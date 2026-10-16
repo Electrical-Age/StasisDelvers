@@ -53,7 +53,11 @@ public final class GateRoom {
             for (Field f : fields) {
                 var box = new net.minecraft.world.phys.AABB(f.x() - f.radius(), f.y() - f.radius(), f.z() - f.radius(),
                     f.x() + f.radius(), f.y() + f.radius(), f.z() + f.radius());
-                for (Display.BlockDisplay d : level.getEntitiesOfClass(Display.BlockDisplay.class, box, x -> x.entityTags().contains(DEBRIS))) {
+                // (tagged, or untagged but beside a gate rift: rooms made before the tag existed, AdventurAgent)
+                int seed = Deeps.seed(level);
+                for (Display.BlockDisplay d : level.getEntitiesOfClass(Display.BlockDisplay.class, box, x -> x.entityTags().contains(DEBRIS)
+                    || StaticDeeps.near((float) x.getX(), (float) x.getY(), (float) x.getZ(), 10, seed).stream().anyMatch(g -> StaticDeeps.isGate(g)
+                    && x.distanceToSqr(g.x(), g.y(), g.z()) < 12 * 12))) {
                     BlockPos bp = d.blockPosition();
                     if (!Stasis.isRunning(level, bp)) continue;
                     BlockState st = ((BlockDisplayInvoker) d).stasis$getBlockState();
