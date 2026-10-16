@@ -14,7 +14,8 @@
     "StructurePieceInvoker",
     "StrongholdPortalRoomMixin",
     "DisplayInvoker",
-    "BlockDisplayInvoker"
+    "BlockDisplayInvoker",
+    "StructureTemplateMixin"
   ],
   "client": [
     "client.GameRendererMixin",

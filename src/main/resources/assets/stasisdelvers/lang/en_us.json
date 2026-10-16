@@ -29,5 +29,7 @@
   "item.stasisdelvers.rift_shard": "Rift Shard",
   "item.stasisdelvers.rift_dust": "Rift Dust",
   "item.stasisdelvers.charged_rift_shard": "Charged Rift Shard",
-  "subtitles.stasisdelvers.rift.hum": "Low hum"
+  "subtitles.stasisdelvers.rift.hum": "Low hum",
+  "block.stasisdelvers.stilled_water": "Stilled Water",
+  "block.stasisdelvers.stilled_lava": "Stilled Lava"
 }

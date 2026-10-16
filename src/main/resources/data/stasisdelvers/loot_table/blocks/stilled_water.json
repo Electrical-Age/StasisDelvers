@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "stasisdelvers:stilled_water"
+        }
+      ],
+      "rolls": 1
+    }
+  ],
+  "random_sequence": "stasisdelvers:blocks/stilled_water"
+}

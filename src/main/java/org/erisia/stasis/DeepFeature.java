@@ -58,6 +58,7 @@ public record DeepFeature() implements Feature {
         long t0 = System.nanoTime();
         for (StaticDeeps.Deep d : deeps) any |= carve(level, d, x0, z0, minY, maxY);
         for (StaticDeeps.Deep d : deeps) any |= strata(level, d, x0, z0, minY, maxY);
+        if (StasisConfig.timeScars) for (StaticDeeps.Deep d : deeps) any |= TimeScars.place(level, d, x0, z0, minY, maxY);
         if (any) {
             // vents, spires and sinkholes change the top: the chunk's heightmaps (rain, spawning, sky light, later
             // features) must follow, as for EA's oil outcrops (2caba052)

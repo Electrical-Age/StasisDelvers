@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "stasisdelvers:stilled_water",
+    "stasisdelvers:stilled_lava"
+  ]
+}

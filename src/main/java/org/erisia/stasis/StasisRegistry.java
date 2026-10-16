@@ -118,6 +118,16 @@ public final class StasisRegistry {
             ITEMS.registerSimpleBlockItem(b);
     }
 
+    /** Stilled liquids (StilledLiquids): taken with a shovel from stopped water and lava; they thaw where time runs. */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<StilledLiquids.StilledBlock> STILLED_WATER_BLOCK = BLOCKS.registerBlock("stilled_water",
+        p -> new StilledLiquids.StilledBlock(p, false), p -> p.mapColor(net.minecraft.world.level.material.MapColor.WATER).strength(0.5f)
+            .sound(net.minecraft.world.level.block.SoundType.GLASS).noOcclusion());
+    public static final net.neoforged.neoforge.registries.DeferredBlock<StilledLiquids.StilledBlock> STILLED_LAVA_BLOCK = BLOCKS.registerBlock("stilled_lava",
+        p -> new StilledLiquids.StilledBlock(p, true), p -> p.mapColor(net.minecraft.world.level.material.MapColor.FIRE).strength(0.5f)
+            .sound(net.minecraft.world.level.block.SoundType.GLASS).lightLevel(st -> 15));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> STILLED_WATER = ITEMS.registerSimpleBlockItem(STILLED_WATER_BLOCK);
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> STILLED_LAVA = ITEMS.registerSimpleBlockItem("stilled_lava", STILLED_LAVA_BLOCK, p -> p.stacksTo(4));
+
     /** A rift crystal shard (placeholder for the dust / shard / charged grades). */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_SHARD = ITEMS.registerSimpleItem("rift_shard");
     /** The crystal grades (Crystals): dust from small and medium buds, charged shards from a cluster broken in violet. */

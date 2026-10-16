@@ -1088,6 +1088,26 @@ public final class StasisGameTests {
                 remove(h, in);
             };
         }));
+        // stilled liquids thaw where time runs (inside the field) and stay solid in stopped land; crops after the crash
+        // stand at all stages
+        CASES.put("stilled_liquids_and_crops", new Spec(80, (h, c) -> {
+            var level = h.getLevel();
+            BlockPos in = h.absolutePos(new BlockPos(3, 2, 4)), out = h.absolutePos(new BlockPos(12, 2, 4));
+            level.setBlockAndUpdate(in, org.erisia.stasis.StasisRegistry.STILLED_WATER_BLOCK.get().defaultBlockState());
+            level.setBlockAndUpdate(out, org.erisia.stasis.StasisRegistry.STILLED_LAVA_BLOCK.get().defaultBlockState());
+            return () -> {
+                c.check("in a field it thaws to water", level.getBlockState(in).is(net.minecraft.world.level.block.Blocks.WATER), level.getBlockState(in).toString());
+                c.check("in stopped land it stays stilled", level.getBlockState(out).is(org.erisia.stasis.StasisRegistry.STILLED_LAVA_BLOCK.get()), level.getBlockState(out).toString());
+                c.check("stilled lava stacks to 4", new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.STILLED_LAVA.get()).getMaxStackSize() == 4);
+                level.setBlockAndUpdate(in, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                level.setBlockAndUpdate(out, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                var wheat = (net.minecraft.world.level.block.CropBlock) net.minecraft.world.level.block.Blocks.WHEAT;
+                java.util.Set<Integer> ages = new java.util.HashSet<>();
+                for (int i = 0; i < 200; i++)
+                    ages.add(wheat.getAge(org.erisia.stasis.TimeScars.cropAge(wheat, wheat.defaultBlockState(), new BlockPos(i * 7, 64, i * 3))));
+                c.check("crops at every stage", ages.size() == wheat.getMaxAge() + 1, ages.toString());
+            };
+        }));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();
