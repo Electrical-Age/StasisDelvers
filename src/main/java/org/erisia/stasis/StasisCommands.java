@@ -167,7 +167,7 @@ final class StasisCommands {
                         sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z),
                         StaticDeeps.isGate(sd) ? "none (gate rift)" : Strata.shapeOf(sd).id() + ", to " + Gates.destination(sd))
                         + String.format(", eye at %.0f %.0f %.0f", StaticDeeps.core(sd)[0], StaticDeeps.core(sd)[1], StaticDeeps.core(sd)[2])
-                        + Ruins.describe(level, sd)), false);
+                        + Ruins.describe(level, sd) + (DeepFeature.messiness(sd) > 0 ? String.format(", messy %.2f", DeepFeature.messiness(sd)) : "")), false);
                 return list.size();
             }))
             .then(Commands.literal("strata").executes(c -> {
