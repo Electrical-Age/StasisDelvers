@@ -99,9 +99,10 @@ public final class ConsoleScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
-        super.extractRenderState(g, mouseX, mouseY, a);
         int x = width / 2 - 150, y = height / 2 - 92;
+        // the panel first, then the buttons on it (drawn after, it greyed them out: AdventurAgent's stills)
         g.fill(x - 8, y - 8, x + 308, height / 2 + 86, 0xD0101018);
+        super.extractRenderState(g, mouseX, mouseY, a);
         g.text(font, "STASIS TOWER", x, y, 0xFFB8A8E8);
         if (st == null) {
             g.text(font, "...", x, y + 14, 0xFFA0A0A0);
