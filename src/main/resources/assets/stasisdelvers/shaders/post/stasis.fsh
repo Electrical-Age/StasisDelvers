@@ -334,14 +334,14 @@ float mistDensity(vec3 q, int k, bool detail) {
     float inhale = data(1597 + hk.idx);
     vec3 dv = q - hk.c;
     dv.y *= 1.4;
-    float s = length(dv) / (hk.R * 1.15 * (1.0 - 0.3 * inhale));
+    float s = length(dv) / (hk.R * 1.15 * (1.0 - 0.45 * inhale));
     float env = 1.0 - smoothstep(0.8, 1.15, s);
     if (env <= 0.0) return 0.0;
     float br = 0.5 + 0.5 * sin(breathAngle + id);
     float h = q.y - groundAt(STATIC_GROUND + 64 * hk.idx, hk.g, q.xz);
     vec3 p = (q + hitCamI) * (32.0 / 96.0);
     p.y *= 1.5;
-    return env * (0.4 + 0.6 * br + 0.8 * inhale) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, staticPhase, detail);
+    return env * (0.4 + 0.6 * br + 1.6 * inhale) * mistAt(p + id, h, 6.0 + 8.0 * br, 0.38 + 0.27 * br, staticPhase, detail);
 }
 
 void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
@@ -1059,9 +1059,11 @@ void main() {
                 for (int m = 0; m < 14; m++) {
                     vec3 qq = camFrac + dir2 * (ta + (float(m) + jit2) * sl);
                     float sh = staticShape(i, qq + camInt, camInt);
-                    float core = 1.0 - smoothstep(0.22, 0.36, sh);
-                    float border = smoothstep(0.26, 0.36, sh) * (1.0 - smoothstep(0.36, 0.5, sh));
-                    glow += trans * border * sl * 0.035 * vec3(0.3, 0.12, 0.5);
+                    // the inhale before a puff (slot 1597 + i): the black swells and the border flares
+                    float inh = data(1597 + i);
+                    float core = 1.0 - smoothstep(0.22, 0.36 + 0.08 * inh, sh);
+                    float border = smoothstep(0.26, 0.36 + 0.08 * inh, sh) * (1.0 - smoothstep(0.36 + 0.08 * inh, 0.5 + 0.1 * inh, sh));
+                    glow += trans * border * sl * (0.035 + 0.09 * inh) * vec3(0.3, 0.12, 0.5);
                     trans *= exp(-sl * 0.6 * core);
                 }
             }
