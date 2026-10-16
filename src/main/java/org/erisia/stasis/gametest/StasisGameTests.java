@@ -989,8 +989,11 @@ public final class StasisGameTests {
                     gate == null ? "-" : String.format("shape %.3f", org.erisia.stasis.StaticDeeps.shape(gate, 5000.5f, 20.5f, -6999.5f)));
                 c.check("it leads to the End", gate != null && org.erisia.stasis.Gates.destination(gate).equals("minecraft:the_end"));
                 c.check("no strata around it", org.erisia.stasis.Pockets.strataAt(seed, 5000, 10, -7000) == null);
+                // another level (its own deep seed) with no gates leaves this one's alone (the End loads after the Overworld)
+                org.erisia.stasis.StaticDeeps.setGates(seed + 1, java.util.List.of());
+                c.check("another level's gates don't clear these", org.erisia.stasis.StaticDeeps.zone(seed, 5000.5f, 20.5f, -6999.5f) == 2);
             } finally {
-                org.erisia.stasis.StaticDeeps.setGates(0, java.util.List.of());
+                org.erisia.stasis.StaticDeeps.setGates(seed, java.util.List.of());
             }
         }, false));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")

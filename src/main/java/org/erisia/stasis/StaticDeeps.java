@@ -35,22 +35,19 @@ public final class StaticDeeps {
         return new Deep(x, y, z, r, ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ seed) & 0xFFFFFF);
     }
 
-    /** Gate rifts (Gates: stronghold portal rooms), per deep seed: extra static deeps, known once their room generates. */
-    private static volatile int gateSeed;
-    private static volatile List<Deep> gates = List.of();
+    /** Gate rifts (Gates: stronghold portal rooms), per deep seed (each level has its own): extra static deeps, known
+     *  once their room generates. (One list for all levels lost the Overworld's gates when the End loaded after it.) */
+    private static final java.util.Map<Integer, List<Deep>> GATES = new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile java.util.Set<Integer> gateIds = java.util.Set.of();
 
     /** Set the gate rifts for a deep seed (server: Gates.publish; client: the Gates packet). */
     public static void setGates(int seed, java.util.Collection<Long> centres) {
         List<Deep> l = new ArrayList<>();
+        for (long c : centres) l.add(Gates.gate(net.minecraft.core.BlockPos.of(c)));
+        if (l.isEmpty()) GATES.remove(seed);
+        else GATES.put(seed, List.copyOf(l));
         java.util.Set<Integer> ids = new java.util.HashSet<>();
-        for (long c : centres) {
-            Deep d = Gates.gate(net.minecraft.core.BlockPos.of(c));
-            l.add(d);
-            ids.add(d.id());
-        }
-        gateSeed = seed;
-        gates = List.copyOf(l);
+        GATES.values().forEach(g -> g.forEach(d -> ids.add(d.id())));
         gateIds = java.util.Set.copyOf(ids);
         SECTIONS.clear();
     }
@@ -63,10 +60,9 @@ public final class StaticDeeps {
     /** The static deeps whose cells touch the box around (x, y, z) with this margin: at most 8, plus gate rifts. */
     public static List<Deep> near(float x, float y, float z, float margin, int seed) {
         List<Deep> out = new ArrayList<>(2);
-        if (seed == gateSeed)
-            for (Deep g : gates)
-                if (Math.abs(g.x() - x) <= margin + g.radius() && Math.abs(g.y() - y) <= margin + g.radius() && Math.abs(g.z() - z) <= margin + g.radius())
-                    out.add(g);
+        for (Deep g : GATES.getOrDefault(seed, List.of()))
+            if (Math.abs(g.x() - x) <= margin + g.radius() && Math.abs(g.y() - y) <= margin + g.radius() && Math.abs(g.z() - z) <= margin + g.radius())
+                out.add(g);
         int i0 = (int) Math.floor((x - margin) / CX), i1 = (int) Math.floor((x + margin) / CX);
         int j0 = (int) Math.floor((y - margin) / CY), j1 = (int) Math.floor((y + margin) / CY);
         int k0 = (int) Math.floor((z - margin) / CZ), k1 = (int) Math.floor((z + margin) / CZ);
