@@ -74,8 +74,9 @@ public final class TimeScars {
                 }
                 case 1 -> {
                     // gravel (sand in some rifts) caught falling: 1-3 blocks with gaps, as if just let go
+                    // (clear of the ceiling: right under it, it read as ordinary ceiling gravel, AdventurAgent)
                     BlockState g = (id & 4) == 0 ? Blocks.GRAVEL.defaultBlockState() : Blocks.SAND.defaultBlockState();
-                    int y = ceil;
+                    int y = ceil - 2 - (int) (Noise.hash32(cx, cz, 355 + k, id) * 3);
                     int n = 1 + (int) (u * 3);
                     for (int i = 0; i < n && y > ceil - gap + 2; i++) {
                         level.setBlock(new BlockPos(x, y, z), g, 2);
