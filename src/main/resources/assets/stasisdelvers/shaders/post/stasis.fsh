@@ -539,11 +539,15 @@ vec4 shieldAt(vec2 cell, vec3 n, vec3 view, float r, float failing, float warm, 
     // a failing shield (failing = 1 - charge while the store drains): a share of the cells is dark, growing from
     // none at 60% charge to 90% when empty. Which cells changes all the time (Baughn: the same ones always went first):
     // each cell's level wanders on its own slow noise; cells near the threshold flicker before they go
+    // (Baughn 2026-10-17: it barely followed the charge, and the same hexes stayed: the dark share now grows evenly
+    // with the drain from the first percent, and the dark comes in drifting patches as well as single cells)
     if (failing > 0.0) {
-        float p = 0.9 * smoothstep(0.4, 1.0, failing);
+        float p = 0.92 * pow(failing, 1.15);
         float tt = time * (0.35 + 0.5 * rnd) + rnd * 61.0;
         float k = floor(tt), fr = smoothstep(0.0, 1.0, fract(tt));
-        float lvl = mix(hash13(vec3(rnd * 131.0, k, 7.1)), hash13(vec3(rnd * 131.0, k + 1.0, 7.1)), fr);
+        float own = mix(hash13(vec3(rnd * 131.0, k, 7.1)), hash13(vec3(rnd * 131.0, k + 1.0, 7.1)), fr);
+        float patch = value32(n * 2.2 + vec3(time * 0.11, -time * 0.07, time * 0.05), 0x5A1D);
+        float lvl = 0.55 * own + 0.45 * smoothstep(0.2, 0.8, patch);
         float m = lvl - p;
         if (m < 0.0) a *= 0.0;
         else if (m < 0.06 && hash13(vec3(rnd * 97.0, floor(time * 14.0), 3.3)) < 0.5) a *= 0.15;

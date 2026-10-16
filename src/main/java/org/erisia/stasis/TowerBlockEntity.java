@@ -349,15 +349,25 @@ public class TowerBlockEntity extends BlockEntity {
                 if (store.amount() <= 0) {
                     state = State.COLLAPSING;
                     collapseTicks = 0;
+                    collapseProgress = 0;
+                    collapseSpeed = 1.0 / (10 + 15 * sl.getRandom().nextDouble());   // 10-25 s
+                    boltBurst = 0;
                     int seed = sl.getRandom().nextInt();
                     FieldData.get(sl).update(sl, fieldId, f -> f.withSeed(seed));
                     StasisDelvers.LOG.info("Stasis tower at {} ran out of power: field {} collapses", worldPosition.toShortString(), fieldId);
                 }
             }
             case COLLAPSING -> {
+                // (Baughn: too predictable) each collapse runs at its own pace, 10-25 s, and time stutters through
+                // it: the front pauses, lurches, now and then slips back a little, with lightning in bursts
+                var rnd = sl.getRandom();
+                double step = collapseSpeed * (rnd.nextDouble() < 0.12 ? 0 : rnd.nextDouble() < 0.08 ? -1.5 : rnd.nextDouble() < 0.1 ? 3 : 1);
+                collapseProgress = Math.max(0, Math.min(1, collapseProgress + step / 20.0));
                 collapseTicks++;
-                if (sl.getRandom().nextInt(20) == 0) bolt(sl);   // every second or so
-                double c = Math.min(1.0, collapseTicks / (double) COLLAPSE_TICKS);
+                if (rnd.nextInt(boltBurst > 0 ? 3 : 25) == 0) bolt(sl);
+                if (boltBurst > 0) boltBurst--;
+                else if (rnd.nextInt(60) == 0) boltBurst = 10 + rnd.nextInt(20);
+                double c = collapseTicks >= 25 * 20 ? 1.0 : collapseProgress;   // (never longer than 25 s)
                 if (collapseTicks % 5 == 0 || c >= 1) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
                 if (c >= 1) stop(sl);
             }
@@ -515,6 +525,10 @@ public class TowerBlockEntity extends BlockEntity {
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
+
+    /** The collapse's own pace and progress (0..1), and a lightning burst in progress (ticks). */
+    double collapseProgress, collapseSpeed = 1.0 / 15;
+    int boltBurst;
 
     /** Power coming in, W (an average over a few seconds), for the console. */
     double inAvgW;

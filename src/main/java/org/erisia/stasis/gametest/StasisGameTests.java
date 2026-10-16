@@ -1319,7 +1319,7 @@ public final class StasisGameTests {
                 free.discard();
             };
         }, false, true));
-        CASES.put("tower_collapses_when_empty", new Spec(330, (h, c) -> {
+        CASES.put("tower_collapses_when_empty", new Spec(560, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
                 t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.6 * 4 / 3), tx);
