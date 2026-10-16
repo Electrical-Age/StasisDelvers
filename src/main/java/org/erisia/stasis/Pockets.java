@@ -8,8 +8,8 @@ import net.minecraft.world.level.Level;
  * minutes, each with its own random number of rift spells (0-2, each after a 20 s violet warning), their lengths and
  * places, and its clear spells. Long-run shares: clear 25%, rift ~15%, mist the rest. Players can't learn a timetable. Both sides compute it from the deep seed and Deeps.time.
  * <p>
- * Where it applies: the strata mask, 4-block cells that touch the strata (Strata.at isn't OUT at any of the cell's
- * 8 corners on the 4-block lattice). Rules and visuals use the same mask, so what you see is what hits you.
+ * Where it applies: the strata mask, 4-block cells that touch the strata (Strata.at is a cavity or vent at one of the
+ * cell's 8 corners on the 4-block lattice). Rules and visuals use the same mask, so what you see is what hits you.
  */
 public final class Pockets {
     private Pockets() {
@@ -147,12 +147,18 @@ public final class Pockets {
         return null;
     }
 
+    /** Strata open space (cavities and vents), where weather happens; not the rock, nor the spires in the open air
+     *  (their pockets floated as black boxes beside them: AdventurAgent). */
+    public static boolean open(int strataClass) {
+        return strataClass == Strata.CAVITY || strataClass == Strata.VENT;
+    }
+
     /** Is the 4-block cell at (cx, cy, cz) (its low corner) strata: Strata.at not OUT at one of its 8 corners, the
      *  points of the 4-block lattice (the client's StrataMask evaluates each lattice point once)? */
     public static boolean masked(StaticDeeps.Deep d, int cx, int cy, int cz) {
         Strata.Shape shape = Strata.shapeOf(d);
         for (int i = 0; i < 8; i++)
-            if (Strata.at(shape, d, cx + (i & 1) * CELL, cy + (i >> 1 & 1) * CELL, cz + (i >> 2 & 1) * CELL) != Strata.OUT)
+            if (open(Strata.at(shape, d, cx + (i & 1) * CELL, cy + (i >> 1 & 1) * CELL, cz + (i >> 2 & 1) * CELL)))
                 return true;
         return false;
     }

@@ -91,7 +91,7 @@ public final class Deeps {
     }
 
     // ---- upwellings (rift stage 2): every rift breathes out a puff of deep every 60-120 s from its hole. A puff is a
-    // drifting deep: carried off on the wind from where it left, growing from 6 to 24 blocks across 3-5 minutes, fading
+    // drifting deep: carried off on the wind from where it left, growing from 10 to 32 blocks across 3-5 minutes, fading
     // as it goes. Gameplay mist like the others (at(), towers).
 
     static final float PUFF_REACH = 480;   // a puff's farthest drift (5 min at up to 1.35 b/s) plus its radius
@@ -111,10 +111,10 @@ public final class Deeps {
                 if (Noise.hash32(sd.id(), jj, 44, seed) < 0.15f) continue;   // the rift skips a breath now and then
                 double[] then = drift(t - age, seed);
                 float u = (float) (age / life);
-                float strength = Math.min(1f, (float) age / 20f) * (1 - u * u);
+                float strength = Math.min(1f, (float) age / 12f) * (1 - u * u * u);
                 float ox = (Noise.hash32(sd.id(), jj, 45, seed) - 0.5f) * 0.6f * sd.radius(), oz = (Noise.hash32(sd.id(), jj, 46, seed) - 0.5f) * 0.6f * sd.radius();
                 out.add(new Deep((float) (sd.x() + ox + drift[0] - then[0]), (float) (sd.z() + oz + drift[1] - then[1]),
-                    (float) (6 + 18 * Math.pow(u, 0.6)), strength, puffId(sd, jj)));
+                    (float) (10 + 22 * Math.pow(u, 0.6)), strength, puffId(sd, jj)));
             }
         }
     }

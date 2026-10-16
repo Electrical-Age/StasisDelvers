@@ -29,6 +29,11 @@ public final class RiftHum {
         var mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         if (mc.level.getGameTime() % 5 == 0) scan(mc);
+        // each pocket's warning is its own hum (one hum carried from pocket to pocket and ran 34 s: AdventurAgent)
+        if (playing != null && !playing.isStopped() && target > 0.01f && (playing.px != sx || playing.py != sy || playing.pz != sz)) {
+            mc.getSoundManager().stop(playing);
+            playing = null;
+        }
         if (target > 0.01f && (playing == null || playing.isStopped())) {
             playing = new Hum();
             mc.getSoundManager().play(playing);
@@ -71,10 +76,12 @@ public final class RiftHum {
             looping = true;
             volume = 0.01f;
             attenuation = SoundInstance.Attenuation.NONE;
-            x = sx;
-            y = sy;
-            z = sz;
+            x = px = sx;
+            y = py = sy;
+            z = pz = sz;
         }
+
+        final double px, py, pz;
 
         @Override
         public boolean canStartSilent() {
@@ -85,9 +92,6 @@ public final class RiftHum {
         public void tick() {
             volume += (Math.max(0.0001f, target) - volume) * 0.15f;
             pitch = 0.8f + 0.45f * progress;
-            x = sx;
-            y = sy;
-            z = sz;
             if (target <= 0.01f && volume < 0.02f) stop();
         }
     }

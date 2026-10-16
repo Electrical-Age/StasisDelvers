@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * The strata mask for the strata pass (stasis.fsh STRATA_PASS; rift stage 2): which 4-block cells around the camera
- * are strata (Pockets' mask: Strata.at isn't OUT at one of the cell's 8 corners, on the same 4-block lattice as the
+ * are strata (Pockets' mask: a strata cavity or vent at one of the cell's 8 corners, on the same 4-block lattice as the
  * server), and whose. 64^3 cells (256 blocks) around the camera, made on a background thread whenever the camera
  * enters another 32-block cell; the old mask stays in use until the new one is ready. A 512 x 512 texture: 8 x 8
  * tiles of 64 x 64 (x across, y down, a tile per z); per texel the deep id (rgb, 24 bits) and a = 255 for strata.
@@ -101,7 +101,7 @@ public final class StrataMask {
                     for (int j = j0; j <= j1; j++) {
                         int li = (k * L + j) * L + i;
                         if (lat[li] >= 0) continue;
-                        if (Strata.at(shape, d, x0 + i * CELL, y0 + j * CELL, z0 + k * CELL) != Strata.OUT) {
+                        if (Pockets.open(Strata.at(shape, d, x0 + i * CELL, y0 + j * CELL, z0 + k * CELL))) {
                             lat[li] = d.id() & 0xFFFFFF;
                             any = true;
                         }

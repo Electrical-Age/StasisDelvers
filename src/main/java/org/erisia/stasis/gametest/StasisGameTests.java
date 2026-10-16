@@ -781,7 +781,7 @@ public final class StasisGameTests {
                 double a = rng.nextDouble() * 2 * Math.PI, r = Math.sqrt(rng.nextDouble()) * b.radius();
                 int x = (int) Math.floor(d.x() + r * Math.cos(a)), z = (int) Math.floor(d.z() + r * Math.sin(a));
                 int y = b.minY() + rng.nextInt(b.maxY() - b.minY());
-                if (org.erisia.stasis.Strata.at(d, x, y, z) == org.erisia.stasis.Strata.OUT) continue;
+                if (!org.erisia.stasis.Pockets.open(org.erisia.stasis.Strata.at(d, x, y, z))) continue;
                 hits++;
                 int cx = Math.floorDiv(x, 4) * 4, cy = Math.floorDiv(y, 4) * 4, cz = Math.floorDiv(z, 4) * 4;
                 // a strata block inside a cell is not always a corner, so check that most cells with strata are masked
@@ -792,7 +792,7 @@ public final class StasisGameTests {
                 if (org.erisia.stasis.Pockets.masked(d, (int) Math.floor(d.x() + r * Math.cos(a)) & ~3, b.minY() + rng.nextInt(b.maxY() - b.minY()) & ~3,
                     (int) Math.floor(d.z() + r * Math.sin(a)) & ~3)) outside++;
             }
-            c.check("strata cells are masked", hits > 100 && missed < hits / 10, missed + " of " + hits + " missed");
+            c.check("strata cavity cells are masked", hits > 30 && missed < hits / 10, missed + " of " + hits + " missed");
             c.check("nothing masked outside the bounds", outside == 0, String.valueOf(outside));
         }, false));
         // a rift pocket (forced) freezes even a stasis-armoured player outside a field; a field holds it; mist drains
