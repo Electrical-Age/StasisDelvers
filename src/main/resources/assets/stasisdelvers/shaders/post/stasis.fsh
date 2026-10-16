@@ -790,14 +790,21 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
     vec3 col = vec3(0.06, 0.03, 0.1) * exp(-dot(q, q) * 1.5);
     float cover = 0.0;
     if (inside) {
+        // (λ-Nero: no view of the far side; the pupil may be light) a dark hole, and deep in it a pale light: the
+        // pupil, white-violet at its heart going purple at its edge, flickering in steps
         vec2 pp = x / vec2(W * 0.5, W * 0.33);
-        if (dot(pp, pp) <= 1.0) return vec4(0.0, 0.0, 0.0, 1.0);    // the pupil: black
-        return vec4(farSide(dir, time, dest), 1.0);
+        float pr = dot(pp, pp);
+        if (pr <= 1.0) {
+            float fl = 0.85 + 0.15 * hash32(int(floor(lt * 7.0)), 3, 0, id);
+            return vec4(mix(vec3(0.88, 0.82, 1.0), vec3(0.45, 0.22, 0.8), pr) * fl, 1.0);
+        }
+        float grain = hash32(int(floor(x.x * 16.0)), int(floor(x.y * 16.0)), int(floor(lt * 3.0)), id ^ 0x6A);
+        return vec4(vec3(0.03, 0.01, 0.06) + vec3(0.04, 0.02, 0.07) * grain * smoothstep(1.0, 2.5, pr), 1.0);
     }
     // light leaking past the lips (no outline): here and there, flickering in steps
     if (abs(x.x) < W * 1.02 && abs(x.y) <= edge + 1.0 / 16.0) {
         float leak = hash32(int(floor(x.x * 16.0)), x.y > 0.0 ? 1 : 0, int(floor(lt * 6.0)), id ^ 9);
-        if (leak < 0.45) return vec4((dest == 1 ? vec3(0.85, 0.35, 0.12) : EYE_RIM) * (0.35 + 0.65 * leak / 0.45), 1.0);
+        if (leak < 0.45) return vec4(EYE_RIM * (0.35 + 0.65 * leak / 0.45), 1.0);
     }
     // cracks: jagged fissures from the lips, growing in 0.08 s steps, holding, healing back
     for (int k = 0; k < 6; k++) {
@@ -818,7 +825,7 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
             if (i >= n) break;
             ang += (hash32(k, ci, 10 + i, id) - 0.5) * 1.2;
             vec2 nx = p + vec2(cos(ang), sin(ang)) * 0.125;
-            if (segDist(x, p, nx) < 0.5 / 16.0) return vec4(dest == 1 ? vec3(0.8, 0.3, 0.1) : EYE_CRACK, 1.0);
+            if (segDist(x, p, nx) < 0.5 / 16.0) return vec4(EYE_CRACK, 1.0);
             p = nx;
         }
     }
