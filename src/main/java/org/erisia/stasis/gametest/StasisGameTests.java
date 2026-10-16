@@ -843,7 +843,12 @@ public final class StasisGameTests {
                         .setValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING, net.minecraft.core.Direction.EAST));
                     var cp = net.minecraft.world.level.ChunkPos.containing(bud0);
                     org.erisia.stasis.Crystals.testForget(level, cp);
-                    org.erisia.stasis.Crystals.sweep(level, cp);
+                    org.erisia.stasis.Crystals.FACE_SHARE = 1f;
+                    try {
+                        org.erisia.stasis.Crystals.sweep(level, cp);
+                    } finally {
+                        org.erisia.stasis.Crystals.FACE_SHARE = 0.6f;
+                    }
                     int stage = org.erisia.stasis.StasisConfig.crystalStageSeconds;
                     c.check("a generated bud keeps its stage", level.getBlockState(gen).is(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_MEDIUM.get())
                         && org.erisia.stasis.Crystals.testExposure(level, gen, 0) == 2.0 * stage, String.valueOf(org.erisia.stasis.Crystals.testExposure(level, gen, 0)));

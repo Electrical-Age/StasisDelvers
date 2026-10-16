@@ -198,6 +198,16 @@ public final class StasisPost {
                 d[o + 2] = (float) (sd.z() - fz);
                 d[o + 3] = sd.radius();
                 d[o + 4] = sd.id() & 0xFFFFFF;
+                // the eye turns to the nearest player (λ-Nero), upright
+                double best = Double.MAX_VALUE, yaw = 0;
+                for (var pl : mc.level.players()) {
+                    double dx = pl.getX() - sd.x(), dz = pl.getZ() - sd.z(), dd = dx * dx + dz * dz + Math.pow(pl.getEyeY() - sd.y(), 2);
+                    if (dd < best) {
+                        best = dd;
+                        yaw = Math.atan2(dx, dz);
+                    }
+                }
+                d[200 + ns - 1] = (float) yaw;
             }
         }
         d[218] = ns;

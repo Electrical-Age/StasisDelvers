@@ -43,7 +43,7 @@ public final class Crystals {
     }
 
     /** Share of a budding block's open faces that can grow a bud (worldgen buds 60% of cavity cells). */
-    static final float FACE_SHARE = 0.6f;
+    public static volatile float FACE_SHARE = 0.6f;   // (GameTests set it to 1, so the test's faces all count)
 
     static List<Block> stages() {
         return List.of(StasisRegistry.RIFT_CRYSTAL_SMALL.get(), StasisRegistry.RIFT_CRYSTAL_MEDIUM.get(),

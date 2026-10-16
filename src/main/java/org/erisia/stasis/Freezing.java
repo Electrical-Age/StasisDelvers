@@ -89,6 +89,8 @@ public final class Freezing {
             // a rift: nothing protects, a statue in about 3 s (Baughn). No messages for deeps, rifts or eddies: fear of
             // the unknown is part of the theme (Baughn)
             s.ticks += 2;
+            // touching the eye at the rift's heart (λ-Nero): a statue at once
+            if (touchesCore(level, p)) s.ticks = StasisConfig.freezeTicks;
             if (StasisConfig.debugMessages && s.counted % 20 == 0) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("(debug) rift"));
         } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
@@ -151,6 +153,16 @@ public final class Freezing {
         var fatigue = p.getEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE);
         if (fatigue != null && fatigue.getAmplifier() == 0 && !Stasis.isRunning(p.level(), p.blockPosition()))
             e.setNewSpeed(e.getNewSpeed() / 0.3f);
+    }
+
+    /** Is the player touching a rift core's eye (a 1.6 x 1.6 block disc at the static deep's centre; any facing)? */
+    static boolean touchesCore(ServerLevel level, ServerPlayer p) {
+        int seed = Deeps.seed(level);
+        if (seed == 0) return false;
+        var box = p.getBoundingBox();
+        for (StaticDeeps.Deep d : StaticDeeps.near((float) p.getX(), (float) p.getY(), (float) p.getZ(), 4, seed))
+            if (box.intersects(d.x() - 0.8, d.y() - 0.8, d.z() - 0.8, d.x() + 0.8, d.y() + 0.8, d.z() + 0.8)) return true;
+        return false;
     }
 
     /** Leave a statue with the player's inventory and experience, and kill the player. */
