@@ -1067,6 +1067,12 @@ void main() {
             // the eye at each rift's heart, over the black (it's what the black hides): its plane at the warped core
             // (slots 204 + 3i), turned by the CPU's saccades (slot 200 + i: yaw + 10 x destination)
             float eyeTime = data(29);
+            // the eye through the same lens pull as the picture (unpulled, it slid off as you came close: AdventurAgent)
+            vec4 hsE = inv * vec4(uv * 2.0 - 1.0, 0.5, 1.0);
+            vec3 dirE = normalize(hsE.xyz / hsE.w);
+            float depthE = texture(DepthSampler, uv).r;
+            vec4 hpE = inv * vec4(uv * 2.0 - 1.0, depthE, 1.0);
+            float tEndE = depthE > 0.0 ? length(hpE.xyz / hpE.w) : 200.0;
             for (int i = 0; i < nsd && i < 4; i++) {
                 vec3 ec = vec3(data(204 + 3 * i), data(205 + 3 * i), data(206 + 3 * i)) - camFrac;
                 if (dot(ec, ec) > 128.0 * 128.0) continue;
@@ -1075,15 +1081,15 @@ void main() {
                 float f = yd - 10.0 * float(dest);
                 float W = clamp(0.6 + data(223 + 5 * i) * 0.018, 0.75, 1.8);
                 vec3 nrm = vec3(sin(f), 0.0, cos(f)), rt = vec3(cos(f), 0.0, -sin(f));
-                float dn = dot(dir2, nrm);
+                float dn = dot(dirE, nrm);
                 if (abs(dn) < 1e-3) continue;
                 float th = dot(ec, nrm) / dn;
-                if (th <= 0.0 || th > tEnd) continue;
-                vec3 hp = dir2 * th - ec;
+                if (th <= 0.0 || th > tEndE) continue;
+                vec3 hp = dirE * th - ec;
                 vec2 ex = vec2(dot(hp, rt), hp.y);
                 if (abs(ex.x) > W * 2.6 || abs(ex.y) > W * 2.6) continue;
                 ex = (floor(ex * 16.0) + 0.5) / 16.0;      // Minecraft's texel grid
-                vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), W, dir2, dest);
+                vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), W, dirE, dest);
                 // mostly hidden in black fog (Baughn): drifting veils thin to show parts of it now and then
                 float veil = value32(vec3(ex / W * 0.9 + vec2(eyeTime * 0.07, 0.0), eyeTime * 0.11), int(data(224 + 5 * i)) ^ 0xF06);
                 float vis = 0.12 + 0.88 * smoothstep(0.42, 0.72, veil);
