@@ -282,14 +282,16 @@ public final class Strata {
         }
     }
 
-    private static final Map<Integer, Roots> ROOTS = new ConcurrentHashMap<>();
+    /** Keyed by the whole deep, not its id: 24-bit ids collide (two rifts mirrored across the axis shared one, and
+     *  the cache gave one the other's roots). */
+    private static final Map<StaticDeeps.Deep, Roots> ROOTS = new ConcurrentHashMap<>();
 
     static Roots roots(StaticDeeps.Deep d) {
-        Roots r = ROOTS.get(d.id());
+        Roots r = ROOTS.get(d);
         if (r != null) return r;
         if (ROOTS.size() > 256) ROOTS.clear();
         r = makeRoots(d);
-        ROOTS.put(d.id(), r);
+        ROOTS.put(d, r);
         return r;
     }
 

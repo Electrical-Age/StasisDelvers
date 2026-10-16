@@ -56,13 +56,17 @@ public final class Ruins {
     }
 
     /** Each deep's ruins, cached (every chunk of the rift asks). */
-    static final java.util.Map<Long, List<Ruin>> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    record Key(StaticDeeps.Deep d, Object dim) {
+    }
+
+    /** (keyed by the whole deep: ids collide) */
+    static final java.util.Map<Key, List<Ruin>> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Deep d's ruins: 1-2 spots in its strata rock (a body or cavity cell away from the rift), underground. */
     static List<Ruin> ruins(WorldGenLevel level, StaticDeeps.Deep d) {
         List<Identifier> pool = pool(level);
         if (pool.isEmpty() || StaticDeeps.isGate(d)) return List.of();
-        long key = (long) d.id() << 32 ^ level.getLevel().dimension().hashCode();
+        Key key = new Key(d, level.getLevel().dimension());
         List<Ruin> cached = CACHE.get(key);
         if (cached != null) return cached;
         List<Ruin> out = new java.util.ArrayList<>(2);
