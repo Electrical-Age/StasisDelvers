@@ -948,6 +948,51 @@ public final class StasisGameTests {
             var x2 = org.erisia.stasis.Deeps.near(sd.x(), sd.z(), t0, seed);
             c.check("deterministic", x1.equals(x2));
         }, false));
+        // gates (Baughn): rifts lead to the End or the Nether at 2:1; Nether rifts have netherrack and soul sand in their
+        // rock, End rifts none; a gate rift (stronghold portal room) is a static deep with a rift core and no strata
+        CASES.put("rift_gates", new Spec(1, (h, c) -> () -> {
+            int end = 0, nether = 0, other = 0;
+            for (int i = 0; i < 3000; i++) {
+                String dest = org.erisia.stasis.Gates.destination(new org.erisia.stasis.StaticDeeps.Deep(0, 0, 0, 30, i * 7919 & 0xFFFFFF));
+                if (dest.equals("minecraft:the_end")) end++;
+                else if (dest.equals("minecraft:the_nether")) nether++;
+                else other++;
+            }
+            c.check("End 2 : Nether 1", other == 0 && Math.abs(end / (double) (end + nether) - 2 / 3.0) < 0.03, end + "/" + nether + "/" + other);
+            org.erisia.stasis.StaticDeeps.Deep netherDeep = null, endDeep = null;
+            for (int i = 1; netherDeep == null || endDeep == null; i++) {
+                var d = new org.erisia.stasis.StaticDeeps.Deep(0, 0, 0, 30, i * 7919 & 0xFFFFFF);
+                if (org.erisia.stasis.Gates.destination(d).equals("minecraft:the_nether")) netherDeep = d;
+                else endDeep = d;
+            }
+            int scattered = 0, bad = 0, endScatter = 0;
+            for (int x = 0; x < 40; x++)
+                for (int y = 0; y < 40; y++)
+                    for (int z = 0; z < 10; z++) {
+                        var b = org.erisia.stasis.Gates.scatterForTest(netherDeep, x, y, z);
+                        if (b != null) {
+                            scattered++;
+                            if (!b.is(net.minecraft.world.level.block.Blocks.NETHERRACK) && !b.is(net.minecraft.world.level.block.Blocks.SOUL_SAND)) bad++;
+                        }
+                        if (org.erisia.stasis.Gates.scatterForTest(endDeep, x, y, z) != null) endScatter++;
+                    }
+            c.check("a Nether rift: some netherrack and soul sand", scattered > 200 && scattered < 3200 && bad == 0, scattered + " of 16000, " + bad + " other");
+            c.check("an End rift: no scatter", endScatter == 0, String.valueOf(endScatter));
+            int seed = 31337;
+            var centre = new net.minecraft.core.BlockPos(5000, 20, -7000);
+            try {
+                org.erisia.stasis.StaticDeeps.setGates(seed, java.util.List.of(centre.asLong()));
+                var near = org.erisia.stasis.StaticDeeps.near(5000, 20, -7000, 10, seed);
+                var gate = near.stream().filter(org.erisia.stasis.StaticDeeps::isGate).findFirst().orElse(null);
+                c.check("the gate rift is a static deep", gate != null, near.toString());
+                c.check("its core is rift", org.erisia.stasis.StaticDeeps.zone(seed, 5000.5f, 20.5f, -6999.5f) == 2,
+                    gate == null ? "-" : String.format("shape %.3f", org.erisia.stasis.StaticDeeps.shape(gate, 5000.5f, 20.5f, -6999.5f)));
+                c.check("it leads to the End", gate != null && org.erisia.stasis.Gates.destination(gate).equals("minecraft:the_end"));
+                c.check("no strata around it", org.erisia.stasis.Pockets.strataAt(seed, 5000, 10, -7000) == null);
+            } finally {
+                org.erisia.stasis.StaticDeeps.setGates(0, java.util.List.of());
+            }
+        }, false));
         // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
         CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
             var level = h.getLevel();

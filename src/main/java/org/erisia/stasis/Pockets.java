@@ -138,6 +138,7 @@ public final class Pockets {
     public static StaticDeeps.Deep strataAt(int seed, int x, int y, int z) {
         int cx = Math.floorDiv(x, CELL) * CELL, cy = Math.floorDiv(y, CELL) * CELL, cz = Math.floorDiv(z, CELL) * CELL;
         for (StaticDeeps.Deep d : StaticDeeps.near(x, y, z, REACH, seed)) {
+            if (StaticDeeps.isGate(d)) continue;   // gate rifts have no strata
             Strata.Bounds b = Strata.bounds(d);
             if (cy + CELL - 1 < b.minY() || cy > b.maxY()) continue;
             double dx = Math.max(0, Math.max(cx - d.x(), d.x() - (cx + CELL))), dz = Math.max(0, Math.max(cz - d.z(), d.z() - (cz + CELL)));

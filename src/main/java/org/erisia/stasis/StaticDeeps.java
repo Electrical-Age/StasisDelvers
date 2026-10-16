@@ -35,9 +35,38 @@ public final class StaticDeeps {
         return new Deep(x, y, z, r, ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791) ^ seed) & 0xFFFFFF);
     }
 
-    /** The static deeps whose cells touch the box around (x, y, z) with this margin: at most 8. */
+    /** Gate rifts (Gates: stronghold portal rooms), per deep seed: extra static deeps, known once their room generates. */
+    private static volatile int gateSeed;
+    private static volatile List<Deep> gates = List.of();
+    private static volatile java.util.Set<Integer> gateIds = java.util.Set.of();
+
+    /** Set the gate rifts for a deep seed (server: Gates.publish; client: the Gates packet). */
+    public static void setGates(int seed, java.util.Collection<Long> centres) {
+        List<Deep> l = new ArrayList<>();
+        java.util.Set<Integer> ids = new java.util.HashSet<>();
+        for (long c : centres) {
+            Deep d = Gates.gate(net.minecraft.core.BlockPos.of(c));
+            l.add(d);
+            ids.add(d.id());
+        }
+        gateSeed = seed;
+        gates = List.copyOf(l);
+        gateIds = java.util.Set.copyOf(ids);
+        SECTIONS.clear();
+    }
+
+    /** Is d a gate rift (no strata, no worldgen of its own)? */
+    public static boolean isGate(Deep d) {
+        return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id());
+    }
+
+    /** The static deeps whose cells touch the box around (x, y, z) with this margin: at most 8, plus gate rifts. */
     public static List<Deep> near(float x, float y, float z, float margin, int seed) {
         List<Deep> out = new ArrayList<>(2);
+        if (seed == gateSeed)
+            for (Deep g : gates)
+                if (Math.abs(g.x() - x) <= margin + g.radius() && Math.abs(g.y() - y) <= margin + g.radius() && Math.abs(g.z() - z) <= margin + g.radius())
+                    out.add(g);
         int i0 = (int) Math.floor((x - margin) / CX), i1 = (int) Math.floor((x + margin) / CX);
         int j0 = (int) Math.floor((y - margin) / CY), j1 = (int) Math.floor((y + margin) / CY);
         int k0 = (int) Math.floor((z - margin) / CZ), k1 = (int) Math.floor((z + margin) / CZ);
@@ -56,9 +85,11 @@ public final class StaticDeeps {
      */
     public static float shape(Deep d, float x, float y, float z) {
         // domain warp: the blob bulges and sends out lobes
-        float wx = (Noise.value32(x / 18f, y / 18f, z / 18f, d.id()) - 0.5f) * 16;
-        float wy = (Noise.value32(x / 18f + 31, y / 18f, z / 18f, d.id()) - 0.5f) * 10;
-        float wz = (Noise.value32(x / 18f, y / 18f + 47, z / 18f, d.id()) - 0.5f) * 16;
+        // (smaller for the small gate rifts, r < 24: else the warp moves their core off the room's middle)
+        float k = Math.min(1f, d.radius() * d.radius() / 576f);
+        float wx = (Noise.value32(x / 18f, y / 18f, z / 18f, d.id()) - 0.5f) * 16 * k;
+        float wy = (Noise.value32(x / 18f + 31, y / 18f, z / 18f, d.id()) - 0.5f) * 10 * k;
+        float wz = (Noise.value32(x / 18f, y / 18f + 47, z / 18f, d.id()) - 0.5f) * 16 * k;
         float dx = x + wx - d.x(), dy = (y + wy - d.y()) * 1.4f, dz = z + wz - d.z();
         float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
         float rough = 1 + 0.3f * (Noise.fbm32(x / 9f, y / 9f, z / 9f, d.id() ^ 0x77) - 0.5f) * 2;

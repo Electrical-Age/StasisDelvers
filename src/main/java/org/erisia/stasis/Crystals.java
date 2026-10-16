@@ -131,6 +131,7 @@ public final class Crystals {
     static boolean strataChunk(int seed, int cx, int cz) {
         float x = cx * 16 + 8, z = cz * 16 + 8;
         for (StaticDeeps.Deep d : StaticDeeps.near(x, 100, z, 300, seed)) {
+            if (StaticDeeps.isGate(d)) continue;
             double r = Strata.bounds(d).radius() + 12;
             if ((x - d.x()) * (x - d.x()) + (z - d.z()) * (z - d.z()) <= r * r) return true;
         }

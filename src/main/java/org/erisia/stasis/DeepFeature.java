@@ -106,6 +106,10 @@ public record DeepFeature() implements Feature {
                             : h < 0.45f ? Blocks.BLACKSTONE.defaultBlockState() : h < 0.6f ? Blocks.TUFF.defaultBlockState() : null;
                         BlockState ore = ore(x, y, z, id ^ 0x0BE);
                         if (ore != null) shell = ore;
+                        else {
+                            BlockState sc = Gates.scatter(d, x, y, z);   // the destination's plain blocks
+                            if (sc != null) shell = sc;
+                        }
                         if (shell != null) {
                             level.setBlock(p, shell, 2);
                             changed = true;
@@ -204,6 +208,10 @@ public record DeepFeature() implements Feature {
                             if (put == rock) {
                                 BlockState ore = ore(x, y, z, id ^ 0x5A0);
                                 if (ore != null) put = ore;
+                                else {
+                                    BlockState sc = Gates.scatter(d, x, y, z);
+                                    if (sc != null) put = sc;
+                                }
                             }
                             level.setBlock(p, put, 2);
                             changed = true;

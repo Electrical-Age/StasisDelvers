@@ -46,6 +46,18 @@ public final class StasisNet {
         }
     }
 
+    /** The level's gate rifts (Gates): their deep seed and centres (packed block positions). */
+    public record GateRifts(int seed, List<Long> centres) implements CustomPacketPayload {
+        public static final Type<GateRifts> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "gate_rifts"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, GateRifts> CODEC = StreamCodec.composite(
+            ByteBufCodecs.INT, GateRifts::seed, ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::centres, GateRifts::new);
+
+        @Override
+        public Type<GateRifts> type() {
+            return TYPE;
+        }
+    }
+
     /** 0: fine .. 1: frozen. */
     public record Freeze(float progress) implements CustomPacketPayload {
         public static final Type<Freeze> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "freeze"));
@@ -177,6 +189,7 @@ public final class StasisNet {
                 ClientFields.set(p.fields(), ctx.player().level());
             });
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
+            r.playToClient(GateRifts.TYPE, GateRifts.CODEC, (p, ctx) -> StaticDeeps.setGates(p.seed(), p.centres()));
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
@@ -192,6 +205,11 @@ public final class StasisNet {
     public static void sendFields(ServerPlayer player) {
         FieldData d = FieldData.get(player.level());
         send(player, new Fields(d.fields(), d.deepSeed()));
+        sendGates(player);
+    }
+
+    static void sendGates(ServerPlayer player) {
+        send(player, new GateRifts(FieldData.get(player.level()).deepSeed(), Gates.list(player.level())));
     }
 
     public static void sendFields(ServerLevel level) {

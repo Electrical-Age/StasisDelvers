@@ -99,7 +99,7 @@ public final class Deeps {
     /** The puffs from the rifts within range (+ PUFF_REACH) of (x, z), alive now; added to near() and within(). */
     static void puffs(float x, float z, float range, double t, int seed, double[] drift, List<Deep> out) {
         for (StaticDeeps.Deep sd : StaticDeeps.near(x, 100, z, range + PUFF_REACH, seed)) {
-            if (sd.y() < -20) continue;   // too deep to reach the surface
+            if (sd.y() < -20 || StaticDeeps.isGate(sd)) continue;   // too deep to reach the surface; gates are in strongholds
             float interval = 60 + 60 * Noise.hash32(sd.id(), 0, 41, seed);
             float phase = Noise.hash32(sd.id(), 0, 42, seed) * interval;
             long now = (long) Math.floor((t + phase) / interval);

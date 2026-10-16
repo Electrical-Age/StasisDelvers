@@ -120,7 +120,7 @@ float staticShape(int i, vec3 w, vec3 camI) {
     float R = data(o + 3);
     int id = int(data(o + 4));
     vec3 wp = vec3(value32(w / 18.0, id), value32(w / 18.0 + vec3(31.0, 0.0, 0.0), id), value32(w / 18.0 + vec3(0.0, 47.0, 0.0), id)) - 0.5;
-    vec3 dv = w + wp * vec3(16.0, 10.0, 16.0) - c;
+    vec3 dv = w + wp * vec3(16.0, 10.0, 16.0) * min(1.0, R * R / 576.0) - c;   // (StaticDeeps.shape: less warp for gate rifts)
     dv.y *= 1.4;
     float rough = 1.0 + 0.3 * (fbm32(w / 9.0, id ^ 0x77) - 0.5) * 2.0;
     return length(dv) / (R * rough);

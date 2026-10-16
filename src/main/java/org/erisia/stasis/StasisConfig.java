@@ -34,6 +34,10 @@ public final class StasisConfig {
     static final ModConfigSpec.BooleanValue RIFT_ORES;
     static final ModConfigSpec.DoubleValue RIFT_ORE_RATE;
     static final ModConfigSpec.IntValue CRYSTAL_STAGE_SECONDS;
+    static final ModConfigSpec.ConfigValue<List<? extends String>> RIFT_DESTINATIONS;
+    static final ModConfigSpec.ConfigValue<List<? extends String>> RIFT_SCATTER;
+    static final ModConfigSpec.DoubleValue RIFT_SCATTER_RATE;
+    static final ModConfigSpec.BooleanValue END_PORTAL_RIFTS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -77,6 +81,17 @@ public final class StasisConfig {
         CRYSTAL_STAGE_SECONDS = b.comment("Seconds of strata weather (mist, violet or rift, outside fields) per rift crystal growth stage:",
                 "small after one, cluster after four. A pocket is in weather 75% of the time.")
             .defineInRange("crystalStageSeconds", 1200, 10, 86400);
+        RIFT_DESTINATIONS = b.comment("Where static rifts lead, as dimension:weight (Baughn: the End 2, the Nether 1). Packs can add",
+                "dimensions. Gate rifts in stronghold portal rooms always lead to the End. Worldgen: new chunks only.")
+            .defineListAllowEmpty("riftDestinations", List.of("minecraft:the_end:2", "minecraft:the_nether:1"), () -> "minecraft:the_end:1", o -> o instanceof String);
+        RIFT_SCATTER = b.comment("Plain blocks of a destination scattered in its rifts' shell and strata, as dimension=block,block.",
+                "Ores stay overworld. Worldgen: new chunks only.")
+            .defineListAllowEmpty("riftScatter", List.of("minecraft:the_nether=minecraft:netherrack,minecraft:soul_sand"), () -> "minecraft:the_nether=minecraft:netherrack", o -> o instanceof String);
+        RIFT_SCATTER_RATE = b.comment("About this share of a rift's shell and strata rock becomes its destination's scatter blocks.")
+            .defineInRange("riftScatterRate", 0.05, 0.0, 0.4);
+        END_PORTAL_RIFTS = b.comment("Stronghold portal rooms get a gate rift (to the End) instead of an End portal frame (Baughn).",
+                "Worldgen: new strongholds only.")
+            .define("endPortalRifts", true);
         SPEC = b.build();
     }
 
@@ -97,6 +112,8 @@ public final class StasisConfig {
     static volatile boolean riftOres = true;
     static volatile double riftOreRate = 0.006;
     public static volatile int crystalStageSeconds = 1200;
+    static volatile double riftScatterRate = 0.05;
+    public static volatile boolean endPortalRifts = true;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -135,5 +152,8 @@ public final class StasisConfig {
         riftOres = RIFT_ORES.get();
         riftOreRate = RIFT_ORE_RATE.get();
         crystalStageSeconds = CRYSTAL_STAGE_SECONDS.get();
+        Gates.configure(RIFT_DESTINATIONS.get(), RIFT_SCATTER.get());
+        riftScatterRate = RIFT_SCATTER_RATE.get();
+        endPortalRifts = END_PORTAL_RIFTS.get();
     }
 }

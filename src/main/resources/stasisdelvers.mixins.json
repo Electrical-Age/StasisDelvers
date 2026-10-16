@@ -10,7 +10,9 @@
     "BlockStateBaseMixin",
     "LivingEntityMixin",
     "ServerPlayerGameModeMixin",
-    "ItemEntityAccessor"
+    "ItemEntityAccessor",
+    "StructurePieceInvoker",
+    "StrongholdPortalRoomMixin"
   ],
   "client": [
     "client.GameRendererMixin",

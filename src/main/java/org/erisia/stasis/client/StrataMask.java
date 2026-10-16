@@ -81,6 +81,7 @@ public final class StrataMask {
         java.util.Arrays.fill(lat, -1);
         List<StaticDeeps.Deep> deeps = new ArrayList<>();
         for (StaticDeeps.Deep d : StaticDeeps.near(x0 + SPAN / 2f, y0 + SPAN / 2f, z0 + SPAN / 2f, SPAN / 2f + Pockets.REACH, seed)) {
+            if (StaticDeeps.isGate(d)) continue;
             Strata.Bounds b = Strata.bounds(d);
             if (b.maxY() < y0 || b.minY() > y0 + SPAN) continue;
             double dx = Math.max(0, Math.max(x0 - d.x(), d.x() - (x0 + SPAN))), dz = Math.max(0, Math.max(z0 - d.z(), d.z() - (z0 + SPAN)));
