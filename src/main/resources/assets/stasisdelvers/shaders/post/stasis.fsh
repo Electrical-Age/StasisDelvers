@@ -604,8 +604,11 @@ float stormGround(vec2 q) {
     return mix(mix(data(o), data(o + 1), f.x), mix(data(o + 16), data(o + 17), f.x), f.y);
 }
 
+vec3 camIntS;
+
 void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout float L, inout float V) {
     float si = data(1312);
+    camIntS = vec3(data(16), data(17), data(18));
     if (si <= 0.0) return;
     vec2 no = vec2(data(1315), data(1316));
     float thM = data(1317), thR = data(1318);
@@ -620,10 +623,14 @@ void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout fl
         float nz = fbm32(vec3(no + q.xz / 90.0, 0.5).xzy, seed);
         if (nz < thM) continue;
         float band = smoothstep(-6.0, -3.0, h) * exp(-max(0.0, h - 4.0) / 22.0);
-        if (nz >= thR) {
-            float k = smoothstep(thR, thR + 0.015, nz);
-            float a = 1.0 - exp(-dt * 0.5 * k * band);
-            V += T * (1.0 - k) * 0.06 * dt * band;
+        // rifts: ragged in 3D (a 2D field alone made straight-walled slabs with flat bottoms: AdventurAgent), rising
+        // from the ground and frayed at the top
+        float nr = nz + 0.05 * (fbm32((q + vec3(camIntS)) / 14.0, seed ^ 0x77) - 0.5);
+        if (nr >= thR) {
+            float rb = smoothstep(-8.0, 6.0, h + 6.0 * (hash13(floor(q * 0.5)) - 0.5)) * (1.0 - smoothstep(8.0, 36.0, h));
+            float k = smoothstep(thR, thR + 0.035, nr) * rb;
+            float a = 1.0 - exp(-dt * 0.3 * k);
+            V += T * (1.0 - k) * rb * 0.05 * dt;
             T *= 1.0 - a;
         } else {
             float k = smoothstep(thM, thM + 0.04, nz) * si;
@@ -1046,13 +1053,15 @@ void main() {
             }
         }
         // a storm's warning: a violet glow low on the upwind horizon, brightening as it comes (only on the sky)
-        if (depth <= 0.0 && data(1313) > 0.0) {
+        if (data(1313) > 0.0) {
             float wa = data(1314);
             vec2 up = -vec2(cos(wa), sin(wa));
             vec2 hd = normalize(dir.xz + vec2(1e-5));
             float facing = max(0.0, dot(hd, up));
-            float low = exp(-max(0.0, dir.y + 0.02) * 9.0);
-            c += vec3(0.45, 0.2, 0.75) * data(1313) * pow(facing, 3.0) * low * 0.55;
+            float low = exp(-max(0.0, dir.y + 0.05) * 6.0) * smoothstep(-0.35, -0.05, dir.y);
+            // on the sky and, like fog, on far terrain (a sky-only glow cut hard along the skyline: AdventurAgent)
+            float far = depth > 0.0 ? smoothstep(rd * 0.35, rd * 1.0, length(rel)) : 1.0;
+            c += vec3(0.45, 0.2, 0.75) * data(1313) * pow(facing, 2.0) * low * 0.5 * far;
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }
