@@ -221,6 +221,24 @@ public final class StasisPost {
             }
         }
         d[218] = ns;
+        // rift core surroundings (λ-Nero): each core's place on screen (for the lens pull) and the strain on reality,
+        // stronger nearer a core, so players can home in by following "darker and greyer"
+        Matrix4f fwd0 = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
+        float strain = 0;
+        for (int i = 0; i < ns; i++) {
+            float cx = d[204 + 3 * i] + (float) fx, cy = d[205 + 3 * i] + (float) fy, cz = d[206 + 3 * i] + (float) fz;
+            double dist = Math.sqrt(Math.pow(cx - cam.x, 2) + Math.pow(cy - cam.y, 2) + Math.pow(cz - cam.z, 2));
+            float R = d[223 + 5 * i];
+            strain = (float) Math.max(strain, 1 - dist / (R * 2.5 + 20));
+            org.joml.Vector4f v = new org.joml.Vector4f((float) (cx - cam.x), (float) (cy - cam.y), (float) (cz - cam.z), 1f);
+            fwd0.transform(v);
+            int o = 1580 + 4 * i;
+            d[o] = v.w > 0.05f ? v.x / v.w : 0;
+            d[o + 1] = v.w > 0.05f ? v.y / v.w : 0;
+            d[o + 2] = (float) dist;
+            d[o + 3] = v.w > 0.05f ? 1 : 0;
+        }
+        d[1596] = Math.max(0, strain);
         // strata weather (rift stage 2): the mask around the camera, and the weather clock per pocket epoch length
         // (wrapped here in double; the shader adds a pocket's phase and carries)
         if (Stasis.stops(mc.level)) StrataMask.frame(cam.x, cam.y, cam.z, ClientFields.deepSeed(), d, fx, fy, fz);

@@ -11,7 +11,8 @@
 // mask's corner - floor(camera); [187] strata mask valid (0/1); [188..191] the weather clock mod each pocket epoch
 // length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196..199] unused; [200..203] static deep
 // i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
-// static deep i's eye centre (the warped core) - floor(camera); [216] render distance (blocks); [1312] storm
+// static deep i's eye centre (the warped core) - floor(camera); [1580 + 4i] its NDC x, y, distance, in front (0/1);
+// [1596] strain on reality (0..1, nearness to a core); [216] render distance (blocks); [1312] storm
 // intensity; [1313] storm warning 0..1; [1314] wind angle; [1315, 1316] the storm field's noise coordinates at
 // floor(camera) (x, z); [1317, 1318] its mist and rift thresholds; [1319] its noise seed; [1320 + 16j + i] the ground
 // (y - floor(camera y)) on a 16 x 16 grid of spacing 16 from [1576, 1577] (corner - floor(camera));
@@ -914,7 +915,23 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
 const vec3 STRATA_MIST = vec3(0.42, 0.40, 0.50), STRATA_VIOLET = vec3(0.62, 0.22, 0.95);
 
 void main() {
-    vec3 c = texture(InSampler, texCoord).rgb;
+    // a rift core bends the light round it (λ-Nero): within ~12 blocks, the picture is pulled towards the core's
+    // place on screen (slots 1580 + 4i: its NDC, distance, in front)
+    vec2 uv = texCoord;
+    if (data(22) > 0.5) {
+        int nsd0 = int(data(218));
+        for (int i = 0; i < nsd0 && i < 4; i++) {
+            int o = 1580 + 4 * i;
+            float dist = data(o + 2);
+            if (data(o + 3) < 0.5 || dist > 12.0) continue;
+            vec2 cuv = vec2(data(o), data(o + 1)) * 0.5 + 0.5;
+            vec2 dv = cuv - uv;
+            float len = length(dv * vec2(InSize.x / InSize.y, 1.0));
+            float w = 1.0 - dist / 12.0;
+            uv += dv * 0.09 * w * w * exp(-len * 5.0);
+        }
+    }
+    vec3 c = texture(InSampler, uv).rgb;
     float stops = data(22);
     float warn = data(23);
     float depth = texture(DepthSampler, texCoord).r;
@@ -993,6 +1010,17 @@ void main() {
             fringe = max(fringe, smoothstep(0.32, 0.36, sh) * (1.0 - smoothstep(0.36, 0.45, sh)));
         }
         vec3 grey = mix(vec3(l), c, 0.18 * (1.0 - deep)) * mix(vec3(0.96, 0.99, 1.04), vec3(0.62, 0.6, 0.74), deep);
+        // strain on reality near a rift core (λ-Nero): the world darkens and greys the nearer the core, both where
+        // you look (towards it) and all round as you approach (slot 1596)
+        float strainAll = data(1596), strainHere = 0.0;
+        for (int i = 0; i < nsd && i < 4; i++) {
+            vec3 cc = vec3(data(204 + 3 * i), data(205 + 3 * i), data(206 + 3 * i));
+            float sR = data(223 + 5 * i);
+            vec3 q = depth > 0.0 ? p : camFrac + dir * 200.0;
+            strainHere = max(strainHere, 1.0 - smoothstep(sR * 0.5, sR * 2.2 + 16.0, length(q - cc)));
+        }
+        float strain = max(strainAll * 0.6, strainHere) * (1.0 - run);
+        grey = mix(grey, vec3(dot(grey, vec3(0.299, 0.587, 0.114))) * vec3(0.92, 0.9, 1.0), strain * 0.8) * (1.0 - 0.45 * strain);
         c = mix(grey, c, run);
         if (data(31) > 0.0 || data(218) > 0.0) {
             // deep mist along the view ray, out to the render distance (fading with the terrain there): marched at a
