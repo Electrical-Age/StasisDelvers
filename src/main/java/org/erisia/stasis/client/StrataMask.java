@@ -52,7 +52,15 @@ public final class StrataMask {
         else if (key != jobKey && (job == null || job.isDone())) {
             if (job != null && job.isDone()) upload(job.join());
             jobKey = key;
-            job = CompletableFuture.supplyAsync(() -> make(nx, ny, nz, seed), net.minecraft.util.Util.backgroundExecutor());
+            // the ground on the lattice (render thread; the job can't read the level): strata above it is open sky
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            int[] ground = new int[(N + 1) * (N + 1)];
+            for (int k = 0; k <= N; k++)
+                for (int i = 0; i <= N; i++) {
+                    double g = StasisPost.surface(mc, nx + i * CELL, nz + k * CELL, Double.NaN);
+                    ground[k * (N + 1) + i] = Double.isNaN(g) ? Integer.MAX_VALUE : (int) g;
+                }
+            job = CompletableFuture.supplyAsync(() -> make(nx, ny, nz, seed, ground), net.minecraft.util.Util.backgroundExecutor());
         } else if (job != null && job.isDone()) {
             upload(job.join());
             job = null;
@@ -75,7 +83,7 @@ public final class StrataMask {
     }
 
     /** The mask with corner (x0, y0, z0): the lattice points first (each Strata.at once), then the cells. */
-    static Result make(int x0, int y0, int z0, int seed) {
+    static Result make(int x0, int y0, int z0, int seed, int[] ground) {
         int L = N + 1;
         int[] lat = new int[L * L * L];
         java.util.Arrays.fill(lat, -1);
@@ -102,6 +110,7 @@ public final class StrataMask {
                     for (int j = j0; j <= j1; j++) {
                         int li = (k * L + j) * L + i;
                         if (lat[li] >= 0) continue;
+                        if (y0 + j * CELL > (long) ground[k * L + i] + 1) continue;   // above the ground: open sky
                         if (Pockets.open(Strata.at(shape, d, x0 + i * CELL, y0 + j * CELL, z0 + k * CELL))) {
                             lat[li] = d.id() & 0xFFFFFF;
                             any = true;

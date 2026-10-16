@@ -132,7 +132,11 @@ public final class Pockets {
     public static StaticDeeps.Deep strataAt(Level level, int x, int y, int z) {
         if (!Stasis.stops(level)) return null;
         int seed = Deeps.seed(level);
-        return seed == 0 ? null : strataAt(seed, x, y, z);
+        if (seed == 0) return null;
+        // not above the ground: a sky rift's strata "cavities" are open sky (they showed as black blobs: AdventurAgent)
+        if (level.hasChunkAt(new net.minecraft.core.BlockPos(x, 0, z))
+            && y > level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) + 1) return null;
+        return strataAt(seed, x, y, z);
     }
 
     public static StaticDeeps.Deep strataAt(int seed, int x, int y, int z) {

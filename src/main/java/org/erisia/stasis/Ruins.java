@@ -70,6 +70,12 @@ public final class Ruins {
                 int y = (int) Math.floor(d.y() + (Noise.hash32(d.id(), r, 422 + tryi, 0x7A1) - 0.6) * d.radius());
                 int k = Strata.at(d, x, y, z);
                 if ((k != Strata.BODY && k != Strata.CAVITY) || StaticDeeps.shape(d, x, y, z) < 0.6f) continue;
+                // underground (the generator's own surface, the same from every chunk): a sky rift's strata is air
+                // there, and its ruins hung in the sky (AdventurAgent)
+                var sl = level.getLevel();
+                int surf = sl.getChunkSource().getGenerator().getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG,
+                    sl, sl.getChunkSource().randomState());
+                if (y + 10 > surf || y - 10 < level.getMinY()) continue;
                 Identifier id = pool.get((int) (Noise.hash32(d.id(), r, 432, 0x7A1) * pool.size()) % pool.size());
                 Rotation rot = Rotation.values()[(int) (Noise.hash32(d.id(), r, 433, 0x7A1) * 4) & 3];
                 out.add(new Ruin(id, new BlockPos(x, y, z), rot, d.id() * 31 + r));
