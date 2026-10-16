@@ -75,7 +75,7 @@ public final class NodeFreezer {
 
     /** Is the node only cables, a battery or an EA-to-FE exporter? */
     static boolean infrastructure(NodeBase n) {
-        if (n instanceof EnergyConverterElnToOtherNode) return true;
+        if (n instanceof EnergyConverterElnToOtherNode || n instanceof TowerSignalNode) return true;
         if (n instanceof TransparentNode t) return t.element instanceof BatteryElement;
         if (n instanceof SixNode s) {
             boolean any = false;

@@ -297,6 +297,7 @@ public class TowerBlockEntity extends BlockEntity {
         }
         double r = radius();
         store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
+        if (level.getGameTime() % 10 == 3) signals(sl);
         double in = received / FE_PER_J;
         received = 0;
         inAvgW += (in * 20 - inAvgW) / 40.0;
@@ -333,6 +334,10 @@ public class TowerBlockEntity extends BlockEntity {
                 double drain = Math.max(0, Math.min(1, -netAvg / Math.max(1e-9, perTick)));
                 if (drain > 0.1 && sl.getRandom().nextDouble() < 0.002 * drain * drain) bolt(sl);
                 if (weather > 0 && sl.getRandom().nextDouble() < 0.003 * weather) bolt(sl);   // a deep crossing the field
+                // overcharged (pushed past its preferred range, Baughn): lightning lashes outwards from the mast, more
+                // the further it's pushed (about every 2 s at +25%)
+                double over = effRadius / designRadius() - 1;
+                if (over > 0.01 && sl.getRandom().nextDouble() < 0.1 * over / (MAX_EXPAND - 1)) boltOut(sl);
                 store.take((int) Math.ceil(perTick * FE_PER_J));
                 netAvg += (in - perTick - netAvg) / 60.0;
                 if (netAvg < -0.02 * perTick) draining = true;
@@ -401,6 +406,21 @@ public class TowerBlockEntity extends BlockEntity {
             net.minecraft.sounds.SoundSource.WEATHER, 1.5F, 0.8F + rnd.nextFloat() * 0.4F);
     }
 
+    /** A bolt from the mast top outwards, through the shield to the land beyond it (an overcharged tower). */
+    void boltOut(ServerLevel sl) {
+        var rnd = sl.getRandom();
+        double r = radius() * (1.05 + 0.3 * rnd.nextDouble());
+        double a = rnd.nextDouble() * 2 * Math.PI;
+        double cx = worldPosition.getX() + 0.5, cz = worldPosition.getZ() + 0.5;
+        double top = worldPosition.getY() + TowerBlock.HEIGHT + segments + 0.5;
+        int tx = (int) Math.floor(cx + Math.cos(a) * r), tz = (int) Math.floor(cz + Math.sin(a) * r);
+        double ty = sl.hasChunkAt(new BlockPos(tx, 0, tz))
+            ? sl.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, tx, tz) : worldPosition.getY();
+        StasisNet.sendBolt(sl, new StasisNet.Bolt(cx, top, cz, tx + 0.5, ty, tz + 0.5, rnd.nextInt()));
+        sl.playSound(null, tx + 0.5, ty, tz + 0.5, net.minecraft.sounds.SoundEvents.LIGHTNING_BOLT_THUNDER,
+            net.minecraft.sounds.SoundSource.WEATHER, 1.2F, 1.2F + rnd.nextFloat() * 0.3F);
+    }
+
     void start(ServerLevel sl) {
         effRadius = 0;
         effRadius = goalRadius();
@@ -435,6 +455,14 @@ public class TowerBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         if (level instanceof ServerLevel sl && state != State.OFF && !removedByUnload) stop(sl);
+        if (!removedByUnload && node != null) {
+            try {
+                node.onBreakBlock();
+            } catch (LinkageError e) {
+                // (no EA)
+            }
+            node = null;
+        }
         if (level != null && !level.isClientSide() && !removedByUnload) structure.release(level);
         if (level != null && level.isClientSide()) TowerClientHooks.removed(this);
         super.setRemoved();
@@ -460,6 +488,7 @@ public class TowerBlockEntity extends BlockEntity {
         if (!Double.isNaN(targetRadius)) out.putDouble("target", targetRadius);
         out.putBoolean("override", override);
         out.putDouble("radius", effRadius);
+        out.putString("facing", facing.getSerializedName());
         structure.save(out);
     }
 
@@ -480,6 +509,8 @@ public class TowerBlockEntity extends BlockEntity {
         targetRadius = in.getDoubleOr("target", Double.NaN);
         override = in.getBooleanOr("override", false);
         effRadius = in.getDoubleOr("radius", 0);
+        var fd = net.minecraft.core.Direction.byName(in.getStringOr("facing", "south"));
+        facing = fd != null && fd.getAxis().isHorizontal() ? fd : net.minecraft.core.Direction.SOUTH;
         stepGoal = effRadius;
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
@@ -497,8 +528,36 @@ public class TowerBlockEntity extends BlockEntity {
         return new StasisNet.ConsoleState(worldPosition, v, structureLine());
     }
 
-    /** Set by a signal port this tick (the console's target buttons yield to it). */
+    /** Set while a signal cable feeds the input side (the console's target buttons yield to it). */
     boolean signalSet;
+    /** The console's side (Baughn: input on its left, output on its right); set when the core forms. */
+    net.minecraft.core.Direction facing = net.minecraft.core.Direction.SOUTH;
+    TowerSignalNode node;
+
+    public net.minecraft.core.Direction facing() {
+        return facing;
+    }
+
+    /** Twice a second: the EA signal sides (TowerSignalNode). */
+    void signals(ServerLevel sl) {
+        try {
+            if (node == null || node.isDestructing()) node = TowerSignalNode.attach(sl, worldPosition, facing);
+            if (node == null) return;
+            double share = storedJ() / Math.max(1, storeMaxJ());
+            node.outProc.setOutputNormalizedSafe(Math.max(0, Math.min(1, share)));
+            boolean fed = node.inputAttached(sl, worldPosition, facing);
+            if (fed) {
+                double v = node.in.getNormalized();
+                targetRadius = minRadius() + (maxRadius() - minRadius()) * v;
+            }
+            if (fed != signalSet) {
+                signalSet = fed;
+                setChanged();
+            }
+        } catch (LinkageError e) {
+            // (no EA: no signal sides)
+        }
+    }
 
     String structureLine() {
         TowerStructure s = structure;

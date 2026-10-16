@@ -132,6 +132,12 @@ public class TowerBlock extends Block implements EntityBlock {
             }
         }
         if (level.getBlockEntity(master) instanceof TowerBlockEntity t) {
+            // the console faces whoever formed the core (the nearest player): input on its left, output on its right
+            var pl = level.getNearestPlayer(master.getX() + 0.5, master.getY() + 0.5, master.getZ() + 0.5, 16, false);
+            if (pl != null) {
+                double dx = pl.getX() - (master.getX() + 0.5), dz = pl.getZ() - (master.getZ() + 0.5);
+                t.facing = net.minecraft.core.Direction.getApproximateNearest(dx, 0, dz);
+            }
             t.onLoad();
             t.setChanged();
             level.sendBlockUpdated(master, base.setValue(CELL, MASTER), base.setValue(CELL, MASTER), Block.UPDATE_CLIENTS);
