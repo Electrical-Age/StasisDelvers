@@ -134,7 +134,8 @@ final class StasisCommands {
                     + StaticDeeps.zone(level, (int) Math.floor(pos.x), (int) Math.floor(pos.y), (int) Math.floor(pos.z))), false);
                 for (var sd : list.subList(0, Math.min(8, list.size())))
                     src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f %.0f, radius %.0f (rift ~%.0f), %.0f blocks away, strata %s",
-                        sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z), Strata.shapeOf(sd).id())), false);
+                        sd.x(), sd.y(), sd.z(), sd.radius(), sd.radius() * 0.35, Math.hypot(sd.x() - pos.x, sd.z() - pos.z),
+                        StaticDeeps.isGate(sd) ? "none (gate rift)" : Strata.shapeOf(sd).id() + ", to " + Gates.destination(sd))), false);
                 return list.size();
             }))
             .then(Commands.literal("strata").executes(c -> {
