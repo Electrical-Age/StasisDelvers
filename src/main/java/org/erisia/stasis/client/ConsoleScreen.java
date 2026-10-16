@@ -132,16 +132,22 @@ public final class ConsoleScreen extends Screen {
         g.text(font, String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" (x%.2f)", v(5)) : "", net),
             x, by + 26, net < 0 ? 0xFFE0A060 : 0xFFE0E0E0);
         if (net < 0 && s == 1) g.text(font, String.format("Empty in %s", time(v(1) / -net)), x + 220, by + 26, 0xFFE0A060);
-        g.text(font, String.format("Radius %.0f now, goal %.0f, target %.0f", v(10), v(11), v(9)), x, by + 42, 0xFFE0E0E0);
+        g.text(font, String.format("Radius %.0f now, goal %.0f, target %.0f%s", v(10), v(11), v(9), v(13) > 0 ? " (by signal)" : ""), x, by + 42,
+            v(13) > 0 ? 0xFF80C0FF : 0xFFE0E0E0);
         g.text(font, String.format("Preferred %.0f, range %.0f to %.0f (above %.0f: ruinous draw)", v(6), v(7), v(8), v(6)), x, by + 54, 0xFFA0A0B0);
-        if (v(13) > 0) g.text(font, "Target set by signal (left side)", x + 160, by + 42, 0xFF80C0FF);
         boolean on = v(12) > 0;
         boolean armed = System.currentTimeMillis() < armedUntil;
-        g.text(font, on ? "SAFETY OFF (OVERRIDE): no shrinking; it collapses when the store runs dry"
+        // (wrapped to the panel: long lines ran off its edge, AdventurAgent)
+        String safety = on ? "SAFETY OFF (OVERRIDE): no shrinking; it collapses when the store runs dry"
             : armed ? "Confirm: the field will not save itself and collapses when the store runs dry"
-            : share < 0.6 ? "Safety: shrinking to save power" : "Safety: on (shrinks below 60%)",
-            x, by + 68, on || armed ? 0xFFFF4040 : share < 0.6 ? 0xFFE0C060 : 0xFF70C070);
-        g.text(font, st.text().length() > 60 ? st.text().substring(0, 60) + "..." : st.text(), x, by + 80, 0xFF909098);
+            : share < 0.6 ? "Safety: shrinking to save power" : "Safety: on (shrinks below 60%)";
+        int ly = by + 68;
+        for (var line : font.split(Component.literal(safety), 300)) {
+            g.text(font, line, x, ly, on || armed ? 0xFFFF4040 : share < 0.6 ? 0xFFE0C060 : 0xFF70C070);
+            ly += 10;
+        }
+        var lines = font.split(Component.literal(st.text()), 300);
+        g.text(font, lines.get(0), x, ly + 2, 0xFF909098);
     }
 
     static String time(double s) {

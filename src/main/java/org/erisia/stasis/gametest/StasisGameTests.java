@@ -1266,9 +1266,13 @@ public final class StasisGameTests {
             Field f = field(h, c, new Vec3(8.5, 3.5, 4.5), 12, 1.0);
             FieldData.get(level).update(level, f.id(), x -> x.withFailing(0.95));
             BlockPos inPocket = null, inField = null;
+            // (any height in the field: at some moments the drifting pockets miss the floor row)
+            for (int y = 1; y <= 6 && (inPocket == null || inField == null); y++)
             for (int x = 1; x < 16 && (inPocket == null || inField == null); x++)
                 for (int z = 1; z < 8; z++) {
-                    BlockPos p = h.absolutePos(new BlockPos(x, 1, z));
+                    BlockPos p = h.absolutePos(new BlockPos(x, y, z));
+                    if (inPocket != null && inField != null) break;
+                    if (!h.getLevel().getBlockState(p).isAir()) continue;
                     if (!f.containsBlock(p.getX(), p.getY(), p.getZ())) continue;
                     boolean run = Stasis.isRunning(level, p), steady = Stasis.isRunningSteady(level, p);
                     if (!run && steady && inPocket == null) inPocket = p;
@@ -1285,10 +1289,13 @@ public final class StasisGameTests {
             level.addFreshEntity(held);
             level.addFreshEntity(free);
             int h0 = held.tickCount, f0 = free.tickCount;
-            BlockPos hp = inPocket;
+            BlockPos hp = inPocket, fp = inField;
+            // (eddies drift: the free pig's spot may turn into a pocket during the test; only require ticks while it ran)
+            boolean[] ranSometime = {false};
+            for (int d = 1; d <= 3; d++) h.runAfterDelay(d, () -> ranSometime[0] |= Stasis.isRunning(level, fp));
             return () -> {
                 boolean stillPocket = !Stasis.isRunning(level, hp);
-                c.check("the pig in running land ticked", free.tickCount > f0, f0 + " -> " + free.tickCount);
+                c.check("the pig in running land ticked", !ranSometime[0] || free.tickCount > f0, f0 + " -> " + free.tickCount);
                 c.check("the pig in the pocket didn't (while the pocket stayed)", !stillPocket || held.tickCount == h0, h0 + " -> " + held.tickCount);
                 held.discard();
                 free.discard();
@@ -1300,18 +1307,20 @@ public final class StasisGameTests {
                 t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.6 * 4 / 3), tx);
                 tx.commit();
             }
+            int[] fid = {0};
             h.runAfterDelay(5, () -> {
                 c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                fid[0] = t.fieldId();   // (by id: the safety may shrink it below 16 as it empties)
                 t.testDrawFactor = 1e6;   // empty the store in a tick
             });
             h.runAfterDelay(160, () -> {
                 c.check("halfway through the collapse", t.state() == org.erisia.stasis.TowerBlockEntity.State.COLLAPSING, t.state().name());
-                var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.radius() == 16.0).findFirst();
+                var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.id() == fid[0]).findFirst();
                 c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.3 && f.get().collapse() < 0.7, f.toString());
             });
             return () -> {
                 c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());
-                c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 16.0));
+                c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.id() == fid[0]));
             };
         }, false, true));
         // Electrical Age: nodes in stopped land leave the simulation; inside a field they run; cables and batteries in
@@ -1365,7 +1374,8 @@ public final class StasisGameTests {
             return () -> {
                 var light = settledLight(h);
                 BlockPos tp = h.absolutePos(new BlockPos(1, 1, 4)), op = h.absolutePos(new BlockPos(15, 1, 4));
-                c.check("a torch in the field gives light 14", light.getLightValue(tp) == 14, "" + light.getLightValue(tp));
+                // (or it's guttering: random ticks may dim a flame at any time, Flames.gutterChance)
+                c.check("a torch in the field gives light 14", light.getLightValue(tp) == 14 || Flames.guttering(h.getLevel(), tp), "" + light.getLightValue(tp));
                 c.check("a torch in stopped land gives none", light.getLightValue(op) == 0, "" + light.getLightValue(op));
                 c.check("a lantern in stopped land gives none", light.getLightValue(h.absolutePos(new BlockPos(15, 1, 7))) == 0);
                 c.check("the overworld's monster spawn block light limit is 7", h.getLevel().dimensionType().monsterSpawnBlockLightLimit() == 7,
@@ -1378,7 +1388,7 @@ public final class StasisGameTests {
             return () -> {
                 int l = settledLight(h).getLightValue(h.absolutePos(new BlockPos(12, 1, 4)));
                 BlockPos tp = h.absolutePos(new BlockPos(12, 1, 4));
-                c.check("the torch the new field covers gives light 14", l == 14, l + " emission " + Flames.emission(h.getLevel().getBlockState(tp), h.getLevel(), tp)
+                c.check("the torch the new field covers gives light 14", l == 14 || Flames.guttering(h.getLevel(), tp), l + " emission " + Flames.emission(h.getLevel().getBlockState(tp), h.getLevel(), tp)
                     + " running " + Stasis.isRunning(h.getLevel(), tp));
             };
         }, true, true));

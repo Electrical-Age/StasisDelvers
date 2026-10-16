@@ -534,6 +534,10 @@ public class TowerBlockEntity extends BlockEntity {
     net.minecraft.core.Direction facing = net.minecraft.core.Direction.SOUTH;
     TowerSignalNode node;
 
+    public int fieldId() {
+        return fieldId;
+    }
+
     public net.minecraft.core.Direction facing() {
         return facing;
     }
