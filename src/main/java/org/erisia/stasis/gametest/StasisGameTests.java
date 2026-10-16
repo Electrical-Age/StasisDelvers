@@ -580,7 +580,7 @@ public final class StasisGameTests {
             h.runAfterDelay(3, () -> c.check("40% charged: still off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name()));
             h.runAfterDelay(4, () -> {
                 try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(40) * 0.2 * 4 / 3), tx);
+                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(40) * 0.3 * 4 / 3), tx);   // (70%: over the safety's 60%)
                     tx.commit();
                 }
             });
@@ -594,6 +594,31 @@ public final class StasisGameTests {
                 c.check("time runs next to the tower", Stasis.isRunning(h.getLevel(), h.absolutePos(new BlockPos(6, 1, 4))));
                 t.setRemoved();   // breaking the tower takes its field down
                 c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 40.0));
+            };
+        }, false, true));
+        // the tower's range (console): the preferred range from the mast; a target from the tower's own size up to +25%
+        // at (R/Rd)^6 draw; below 60% charge the safety shrinks it in proportion, in 2-block steps; OVERRIDE holds it
+        CASES.put("tower_range", new Spec(10, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 3);
+            t.testCharge(1.0);
+            return () -> {
+                c.check("preferred range 40", t.designRadius() == 40 && t.goalRadius() == 40, t.designRadius() + " / " + t.goalRadius());
+                c.check("the minimum covers the tower", t.minRadius() == 7, String.valueOf(t.minRadius()));
+                t.setControls(1000, false);
+                c.check("expansion stops at +25%", t.target() == 50, String.valueOf(t.target()));
+                c.check("at +25% the draw is ~3.8x", Math.abs(t.drawPenalty(50) - Math.pow(1.25, 6)) < 1e-9, String.valueOf(t.drawPenalty(50)));
+                c.check("below the preferred range, no penalty", t.drawPenalty(30) == 1);
+                t.setControls(20, false);
+                c.check("a smaller target", t.goalRadius() == 20, String.valueOf(t.goalRadius()));
+                t.setControls(Double.NaN, false);
+                t.testCharge(0.3);
+                double g = t.goalRadius();
+                c.check("at 30% the safety halves the way to the minimum", g >= 22 && g <= 24 && g % 2 == 0, String.valueOf(g));
+                t.setControls(Double.NaN, true);
+                c.check("OVERRIDE holds the full range", t.goalRadius() == 40, String.valueOf(t.goalRadius()));
+                c.check("the store never shrinks with the target", t.storeMaxJ() == org.erisia.stasis.TowerBlockEntity.storeFor(40));
+                t.setControls(Double.NaN, false);
+                t.setRemoved();   // (its 40-block field would reach the next tests)
             };
         }, false, true));
         // Baughn: the shield shows the charge only while the store drains, averaged (no flicker at break-even)

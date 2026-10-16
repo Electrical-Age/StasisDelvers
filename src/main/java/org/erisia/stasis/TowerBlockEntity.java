@@ -107,7 +107,7 @@ public class TowerBlockEntity extends BlockEntity {
             if (!sized && level != null && !level.isClientSide()) {
                 sized = true;
                 segments = countSegments();
-                setCapacity((int) (storeFor(radius()) * FE_PER_J));
+                setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
             }
             return super.insert(amount, transaction);
         }
@@ -148,7 +148,7 @@ public class TowerBlockEntity extends BlockEntity {
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
         if (level != null && !level.isClientSide()) {
             segments = countSegments();
-            store.setCapacity((int) (storeFor(radius()) * FE_PER_J));
+            store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
         }
     }
 
@@ -160,8 +160,74 @@ public class TowerBlockEntity extends BlockEntity {
         return segments;
     }
 
+    /**
+     * The field's radius now (the effective radius; console, safety and steps applied). Before the tower runs: what
+     * it would start at.
+     */
     public double radius() {
+        return effRadius > 0 ? effRadius : goalRadius();
+    }
+
+    // ---- range (tower console, CONSOLE-PLAN.md A; Baughn's refinements)
+
+    /** The preferred range: from the tower's size (mast segments), as before. */
+    public double designRadius() {
         return radiusFor(segments);
+    }
+
+    /** The least the field shrinks to: just the tower itself (the mast and the core, plus a margin). */
+    public double minRadius() {
+        return Math.min(designRadius(), Math.max(6, segments + 4));
+    }
+
+    /** The most it expands to: slightly past the preferred range, at ruinous cost (drawPenalty). */
+    public double maxRadius() {
+        return designRadius() * MAX_EXPAND;
+    }
+
+    static final double MAX_EXPAND = 1.25, SAFETY_SHARE = 0.6, STEP = 2;
+
+    /** The console's (or the signal port's) target; NaN: the preferred range. */
+    double targetRadius = Double.NaN;
+    /** OVERRIDE: no automatic shrinking below SAFETY_SHARE charge (it runs at full size until it collapses). */
+    boolean override;
+    /** The radius the field has now; 0 while off. */
+    double effRadius;
+    /** The stepped goal (hysteresis: it moves only by whole steps). */
+    double stepGoal;
+
+    public double target() {
+        return Math.max(minRadius(), Math.min(maxRadius(), Double.isNaN(targetRadius) ? designRadius() : targetRadius));
+    }
+
+    public boolean override() {
+        return override;
+    }
+
+    /** Console: set the target radius (NaN: the preferred range) and OVERRIDE. */
+    public void setControls(double target, boolean override) {
+        this.targetRadius = Double.isNaN(target) ? Double.NaN : Math.max(minRadius(), Math.min(maxRadius(), target));
+        this.override = override;
+        setChanged();
+    }
+
+    /**
+     * Where the field is heading: the target, or (safety on, below 60% charge) shrunk toward the minimum in proportion
+     * to charge, in whole steps (Gemini: continuous shrinking thrashes chunk re-meshing).
+     */
+    public double goalRadius() {
+        double t = target();
+        double share = storedJ() / Math.max(1, storeMaxJ());
+        if (override || share >= SAFETY_SHARE) return t;
+        double min = minRadius();
+        double g = min + (t - min) * Math.max(0, share) / SAFETY_SHARE;
+        return Math.max(min, Math.floor(g / STEP) * STEP);
+    }
+
+    /** Above the preferred range the draw climbs steeply: (R / R_design)^6 (x3.8 at +25%). */
+    public double drawPenalty(double r) {
+        double d = designRadius();
+        return r > d ? Math.pow(r / d, 6) : 1;
     }
 
     public static double radiusFor(int segments) {
@@ -185,8 +251,9 @@ public class TowerBlockEntity extends BlockEntity {
         return store.amount() / FE_PER_J;
     }
 
+    /** The store is sized by the preferred range, so changing the target never clips energy. */
     public double storeMaxJ() {
-        return storeFor(radius());
+        return storeFor(designRadius());
     }
 
     int countSegments() {
@@ -212,12 +279,24 @@ public class TowerBlockEntity extends BlockEntity {
             int s = countSegments();
             if (s != segments) {
                 segments = s;
-                if (state != State.OFF) FieldData.get(sl).update(sl, fieldId, f -> f.withRadius(radius()));
+                Tickets.update(sl, this);
+            }
+        }
+        // the field's radius follows its goal, a block a second (shrinking gives grace to land left stopped)
+        if (state == State.RUNNING && level.getGameTime() % 20 == 10) {
+            if (effRadius <= 0)   // (a save from before the console: take the field as it is)
+                effRadius = stepGoal = FieldData.get(sl).get(fieldId).map(Field::radius).orElse(designRadius());
+            double g = goalRadius();
+            if (stepGoal == 0 || Math.abs(g - stepGoal) >= STEP || g == target() || g == minRadius()) stepGoal = g;
+            double next = effRadius < stepGoal ? Math.min(stepGoal, effRadius + 1) : Math.max(stepGoal, effRadius - 1);
+            if (next != effRadius) {
+                effRadius = next;
+                FieldData.get(sl).update(sl, fieldId, f -> f.withRadius(effRadius));
                 Tickets.update(sl, this);
             }
         }
         double r = radius();
-        store.setCapacity((int) (storeFor(r) * FE_PER_J));
+        store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
         double in = received / FE_PER_J;
         received = 0;
         if (weatherPinned) {
@@ -233,10 +312,10 @@ public class TowerBlockEntity extends BlockEntity {
             weather = staticWeather = stormMist = stormRift = 0;
             storming = false;
         }
-        double perTick = drawFor(r) * testDrawFactor * weatherFactor() / 20.0;
+        double perTick = drawFor(r) * drawPenalty(r) * testDrawFactor * weatherFactor() / 20.0;
         switch (state) {
             case OFF -> {
-                if (storedJ() >= 0.5 * storeFor(r)) start(sl);
+                if (storedJ() >= 0.5 * storeMaxJ()) start(sl);
             }
             case RUNNING -> {
                 if (FieldData.get(sl).get(fieldId).isEmpty()) {     // removed by a command: start over
@@ -248,15 +327,17 @@ public class TowerBlockEntity extends BlockEntity {
                     bolt(sl);   // lock-on
                     startedAt = -1;
                 }
-                // a failing shield sparks now and then (about every 25 s when empty)
-                if (failing > 0.1 && sl.getRandom().nextDouble() < 0.002 * failing * failing) bolt(sl);
+                // a shield losing power sparks now and then, by how fast it drains (Baughn: stable at 5% throws
+                // nothing), about every 25 s at a full drain
+                double drain = Math.max(0, Math.min(1, -netAvg / Math.max(1e-9, perTick)));
+                if (drain > 0.1 && sl.getRandom().nextDouble() < 0.002 * drain * drain) bolt(sl);
                 if (weather > 0 && sl.getRandom().nextDouble() < 0.003 * weather) bolt(sl);   // a deep crossing the field
                 store.take((int) Math.ceil(perTick * FE_PER_J));
                 netAvg += (in - perTick - netAvg) / 60.0;
                 if (netAvg < -0.02 * perTick) draining = true;
                 else if (netAvg > 0.02 * perTick) draining = false;
                 // the shield shows the charge only while the store drains (Baughn), eased over about 2 s
-                double target = draining ? 1 - storedJ() / storeFor(r) : 0;
+                double target = draining ? 1 - storedJ() / storeMaxJ() : 0;
                 failing += (target - failing) / 40.0;
                 if (level.getGameTime() % 5 == 0) FieldData.get(sl).update(sl, fieldId, f -> f.withFailing(failing));
                 if (store.amount() <= 0) {
@@ -320,6 +401,9 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     void start(ServerLevel sl) {
+        effRadius = 0;
+        effRadius = goalRadius();
+        stepGoal = effRadius;
         Field f = FieldData.get(sl).add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, radius(), false,
             StasisConfig.towerFieldRate);
         fieldId = f.id();
@@ -340,6 +424,8 @@ public class TowerBlockEntity extends BlockEntity {
         if (fieldId != 0) FieldData.get(sl).remove(sl, fieldId);
         fieldId = 0;
         state = State.OFF;
+        effRadius = 0;
+        stepGoal = 0;
         collapseTicks = 0;
         failing = 0;
         Tickets.update(sl, this);
@@ -370,6 +456,9 @@ public class TowerBlockEntity extends BlockEntity {
         out.putInt("collapse", collapseTicks);
         out.putInt("energy", store.amount());
         out.putDouble("failing", failing);
+        if (!Double.isNaN(targetRadius)) out.putDouble("target", targetRadius);
+        out.putBoolean("override", override);
+        out.putDouble("radius", effRadius);
         structure.save(out);
     }
 
@@ -387,6 +476,10 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity(Integer.MAX_VALUE);
         store.set(in.getIntOr("energy", 0));
         failing = in.getDoubleOr("failing", 0);
+        targetRadius = in.getDoubleOr("target", Double.NaN);
+        override = in.getBooleanOr("override", false);
+        effRadius = in.getDoubleOr("radius", 0);
+        stepGoal = effRadius;
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
