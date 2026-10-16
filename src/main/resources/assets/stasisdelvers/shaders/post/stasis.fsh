@@ -797,8 +797,18 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
         float g = pow(clamp(depthIn * 1.6, 0.0, 1.0), 1.3);
         float grain = hash32(int(floor(x.x * 16.0)), int(floor(x.y * 16.0)), int(floor(lt * 3.0)), id ^ 0x6A);
         vec3 inner = mix(vec3(0.0), vec3(0.52, 0.5, 0.58), g) * (0.92 + 0.08 * grain);
-        vec2 pp = x / vec2(W * 0.28, W * 0.19);
-        if (dot(pp, pp) <= 1.0) return vec4((id & 1) == 0 ? vec3(0.0) : vec3(0.32, 0.1, 0.55), 1.0);
+        // the lines back (λ-Nero): radial ticks in the grey, turning backwards in steps on their own clock, so they
+        // never line up with the cracks outside
+        float rot = -floor(lt * 4.0) * 0.0875;
+        float th = atan(x.y / 0.7, x.x) - rot;
+        float sect = th * 18.0 / 6.2832;
+        float rr = length(x / vec2(W, max(edge, 1e-3)));
+        if (abs(fract(sect) - 0.5) < 0.16 && rr > 0.3 && rr < 0.82
+            && hash32(int(floor(mod(sect, 18.0))), int(floor(lt * 4.0)), 11, id) < 0.6) inner *= 0.5;
+        // a feline slit: wide, thin, pointed at the ends
+        float sx = x.x / (W * 0.46);
+        if (abs(sx) < 1.0 && abs(x.y) <= W * 0.075 * (1.0 - sx * sx))
+            return vec4((id & 1) == 0 ? vec3(0.0) : vec3(0.32, 0.1, 0.55), 1.0);
         return vec4(inner, 1.0);
     }
     // light leaking past the lips (no outline): here and there, flickering in steps
