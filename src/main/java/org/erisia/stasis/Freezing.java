@@ -205,12 +205,30 @@ public final class Freezing {
         }
     }
 
-    /** A fresh start in a new place: no freezing for a while. */
+    /** Last login grace per player (game time): a login grace at most once per 30 min, so relogging can't cheese a rift. */
+    private static final java.util.Map<UUID, Long> LOGIN_GRACE = new java.util.concurrent.ConcurrentHashMap<>();
+    static final long LOGIN_GRACE_EVERY = 36000;
+
+    /** A fresh start in a new place: no freezing for a while (a login: at most once per 30 minutes, Baughn). */
     static void grace(PlayerEvent e) {
         if (e.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level) {
             State s = state(p);
+            long now = level.getGameTime();
+            if (e instanceof PlayerEvent.PlayerLoggedInEvent && !Stasis.isRunning(level, p.blockPosition()) && !Suits.protectsWithoutDraw(p)) {
+                Long last = LOGIN_GRACE.get(p.getUUID());
+                if (last != null && now - last < LOGIN_GRACE_EVERY && now >= last) {
+                    long left = (LOGIN_GRACE_EVERY - (now - last) + 1199) / 1200;
+                    p.sendSystemMessage(net.minecraft.network.chat.Component.literal("Time stops here, and your login grace is used up: the next in "
+                        + left + " min (once every 30 minutes).").withStyle(net.minecraft.ChatFormatting.RED));
+                    StasisNet.sendFields(p);
+                    return;
+                }
+                LOGIN_GRACE.put(p.getUUID(), now);
+                p.sendSystemMessage(net.minecraft.network.chat.Component.literal("Time stops here: you have a short grace to reach safety. "
+                    + "Login grace is given once every 30 minutes.").withStyle(net.minecraft.ChatFormatting.GOLD));
+            }
             s.ticks = 0;
-            s.graceUntil = level.getGameTime() + StasisConfig.graceTicks;
+            s.graceUntil = now + StasisConfig.graceTicks;
             StasisNet.sendFields(p);
             if (REDIRECTED.remove(p.getUUID()))
                 p.sendSystemMessage(net.minecraft.network.chat.Component.literal(

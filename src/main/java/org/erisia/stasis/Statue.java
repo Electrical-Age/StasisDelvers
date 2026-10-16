@@ -54,6 +54,8 @@ public class Statue extends Entity {
         s.setCustomName(Component.literal(s.ownerName));   // just the name (Baughn: creepier)
         s.setCustomNameVisible(true);
         s.syncOwner();
+        // keepInventory (Baughn): the player keeps gear and experience; the statue is only a statue
+        if (level.getGameRules().get(net.minecraft.world.level.gamerules.GameRules.KEEP_INVENTORY)) return s;
         var inv = player.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) {
             ItemStack st = inv.removeItemNoUpdate(i);
