@@ -102,15 +102,20 @@ def main():
     write_json(os.path.join(A, 'items', 'rift_shard.json'), {'model': {'type': 'minecraft:model', 'model': 'stasisdelvers:item/rift_shard'}})
     # loot: stone drops itself; budding blocks and buds drop nothing (as amethyst); a cluster drops 2-4 shards
     lt = os.path.join(D, 'stasisdelvers', 'loot_table', 'blocks')
+    # (26.x loot format: pool "condition", entry "modifier" with "type"; the old "functions"/"conditions" keys are
+    # silently ignored: a cluster dropped 1 shard, AdventurAgent)
     for name in ['riftstone', 'riftstone_vein']:
-        write_json(os.path.join(lt, f'{name}.json'), {'type': 'minecraft:block', 'pools': [{'rolls': 1, 'entries': [
-            {'type': 'minecraft:item', 'name': f'stasisdelvers:{name}'}], 'conditions': [{'condition': 'minecraft:survives_explosion'}]}]})
+        write_json(os.path.join(lt, f'{name}.json'), {'type': 'minecraft:block', 'pools': [{
+            'condition': {'type': 'minecraft:survives_explosion'},
+            'entries': [{'type': 'minecraft:item', 'name': f'stasisdelvers:{name}'}], 'rolls': 1}],
+            'random_sequence': f'stasisdelvers:blocks/{name}'})
     for name in ['budding_rift_crystal'] + CRYSTALS[:3]:
         write_json(os.path.join(lt, f'{name}.json'), {'type': 'minecraft:block', 'pools': []})
-    write_json(os.path.join(lt, 'rift_crystal_cluster.json'), {'type': 'minecraft:block', 'pools': [{'rolls': 1, 'entries': [
-        {'type': 'minecraft:item', 'name': 'stasisdelvers:rift_shard', 'functions': [
-            {'function': 'minecraft:set_count', 'count': {'type': 'minecraft:uniform', 'min': 2, 'max': 4}},
-            {'function': 'minecraft:explosion_decay'}]}]}]})
+    write_json(os.path.join(lt, 'rift_crystal_cluster.json'), {'type': 'minecraft:block', 'pools': [{'entries': [{
+        'type': 'minecraft:item', 'name': 'stasisdelvers:rift_shard', 'modifier': [
+            {'type': 'minecraft:set_count', 'count': {'type': 'minecraft:uniform', 'min': 2, 'max': 4}},
+            {'type': 'minecraft:explosion_decay'}]}], 'rolls': 1}],
+        'random_sequence': 'stasisdelvers:blocks/rift_crystal_cluster'})
     # the pickaxe tag (merge with what's there)
     tag = os.path.join(D, 'minecraft', 'tags', 'block', 'mineable', 'pickaxe.json')
     t = json.load(open(tag)) if os.path.exists(tag) else {'replace': False, 'values': []}

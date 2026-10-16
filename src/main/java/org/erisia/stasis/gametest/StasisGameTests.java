@@ -728,6 +728,26 @@ public final class StasisGameTests {
                 org.erisia.stasis.Strata.setWeights(java.util.List.of("saddle:1", "staircase:1", "splash:1", "pods:1"));
             }
         }, false));
+        // a rift crystal cluster mined with a pickaxe drops 2-4 shards (26.x loot format: "modifier", not "functions")
+        CASES.put("rift_crystal_drops", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            var pos = h.absolutePos(new net.minecraft.core.BlockPos(1, 2, 1));
+            var state = org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_CLUSTER.get().defaultBlockState();
+            var tool = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE);
+            int min = 99, max = 0;
+            for (int i = 0; i < 40; i++) {
+                int n = 0;
+                for (var st : net.minecraft.world.level.block.Block.getDrops(state, level, pos, null, null, tool))
+                    if (st.is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())) n += st.getCount();
+                min = Math.min(min, n);
+                max = Math.max(max, n);
+            }
+            c.check("2-4 shards per cluster", min >= 2 && max <= 4 && max > min, min + ".." + max);
+            int stone = 0;
+            for (var st : net.minecraft.world.level.block.Block.getDrops(org.erisia.stasis.StasisRegistry.RIFTSTONE.get().defaultBlockState(), level, pos, null, null, tool))
+                stone += st.getCount();
+            c.check("riftstone drops itself", stone == 1, String.valueOf(stone));
+        }, false));
         // the drifting deeps' clock never wraps: a deep moves smoothly (< 0.2 blocks in 0.05 s, but it moves) across the
         // old 14.5 h wrap of Eddies.time and weeks or a year into a world
         CASES.put("deeps_clock_continuous", new Spec(1, (h, c) -> () -> {

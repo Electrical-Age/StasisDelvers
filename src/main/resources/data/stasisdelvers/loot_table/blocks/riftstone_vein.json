@@ -2,18 +2,17 @@
   "type": "minecraft:block",
   "pools": [
     {
-      "rolls": 1,
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
       "entries": [
         {
           "type": "minecraft:item",
           "name": "stasisdelvers:riftstone_vein"
         }
       ],
-      "conditions": [
-        {
-          "condition": "minecraft:survives_explosion"
-        }
-      ]
+      "rolls": 1
     }
-  ]
+  ],
+  "random_sequence": "stasisdelvers:blocks/riftstone_vein"
 }
