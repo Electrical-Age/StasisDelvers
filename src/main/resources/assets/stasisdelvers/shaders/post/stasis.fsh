@@ -140,7 +140,8 @@ struct Deep {
 
 Deep loadDeep(int i) {
     int o = DEEP_BASE + DEEP_STRIDE * i;
-    return Deep(vec2(data(o), data(o + 1)), data(o + 2), data(o + 3), data(o + 4), int(data(o + 5)));
+    float st = data(o + 3);
+    return Deep(vec2(data(o), data(o + 1)), data(o + 2), st > 1.5 ? st - 2.0 : st, data(o + 4), int(data(o + 5)));
 }
 
 // Deeps.horizontal plus the height band, for one deep: intensity 0..1 at q (= world - floor(camera)); camI =
@@ -284,8 +285,18 @@ float mistDensity(vec3 q, int k, bool detail) {
     if (hk.kind == 0) {
         // drifting: patches carried along with the deep, plus a slow wind of their own through it
         float d = length(q.xz - hk.c.xz);
-        float env = smoothstep(-4.0, 10.0, hk.R - d) * min(1.0, hk.st * 1.5);
+        // a puff from a rift (strength + 2): a denser, rounder plume, thickest in its middle (the plain deeps' patchy
+        // mist hid them: AdventurAgent saw only a faint darkening)
+        bool puff = hk.st > 1.5;
+        float st = puff ? hk.st - 2.0 : hk.st;
+        float env = smoothstep(-4.0, 10.0, hk.R - d) * min(1.0, st * 1.5);
         if (env <= 0.0) return 0.0;
+        if (puff) {
+            float hp = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
+            vec3 pp = vec3(q.x - hk.c.x + mistWind.x, q.y + hitCamI.y, q.z - hk.c.z + mistWind.y) * (32.0 / 64.0);
+            float core = 1.0 - smoothstep(0.0, 1.0, d / max(hk.R, 1.0));
+            return env * (0.5 + 1.2 * core) * mistAt(pp + id, hp - 4.0, 16.0, 0.85, mistPhase, detail);
+        }
         float h = q.y - groundAt(GROUND_BASE + 64 * hk.idx, hk.g, q.xz);
         vec3 p = vec3(q.x - hk.c.x + mistWind.x, q.y + hitCamI.y, q.z - hk.c.z + mistWind.y) * (32.0 / 96.0);
         p.y *= 1.5;

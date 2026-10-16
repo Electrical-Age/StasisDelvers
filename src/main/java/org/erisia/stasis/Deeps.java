@@ -27,7 +27,10 @@ public final class Deeps {
     static final float CELL = 256f, OCCUPANCY = 0.8f;
 
     /** A drifting deep now: centre (x, z), radius (with breathing and its form/fade envelope applied), strength 0..1. */
-    public record Deep(float x, float z, float radius, float strength, int id) {
+    public record Deep(float x, float z, float radius, float strength, int id, boolean puff) {
+        Deep(float x, float z, float radius, float strength, int id) {
+            this(x, z, radius, strength, id, false);
+        }
     }
 
     /**
@@ -114,7 +117,7 @@ public final class Deeps {
                 float strength = Math.min(1f, (float) age / 12f) * (1 - u * u * u);
                 float ox = (Noise.hash32(sd.id(), jj, 45, seed) - 0.5f) * 0.6f * sd.radius(), oz = (Noise.hash32(sd.id(), jj, 46, seed) - 0.5f) * 0.6f * sd.radius();
                 out.add(new Deep((float) (sd.x() + ox + drift[0] - then[0]), (float) (sd.z() + oz + drift[1] - then[1]),
-                    (float) (10 + 22 * Math.pow(u, 0.6)), strength, puffId(sd, jj)));
+                    (float) (10 + 22 * Math.pow(u, 0.6)), strength, puffId(sd, jj), true));
             }
         }
     }

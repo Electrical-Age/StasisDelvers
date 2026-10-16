@@ -165,7 +165,7 @@ public final class StasisPost {
                 d[o] = (float) (dp.x() - fx);
                 d[o + 1] = (float) (dp.z() - fz);
                 d[o + 2] = dp.radius();
-                d[o + 3] = dp.strength();
+                d[o + 3] = dp.strength() + (dp.puff() ? 2 : 0);   // (stasis.fsh: over 1.5 = a puff from a rift)
                 d[o + 4] = (float) (surface - fy);
                 d[o + 5] = dp.id() & 0xFFFFFF;
             }
