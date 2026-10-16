@@ -135,6 +135,9 @@ public final class StasisRegistry {
     /** Music for stopped land: a melancholic/eldritch subset of the vanilla tracks (assets/stasisdelvers/sounds.json). */
     public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> MUSIC_STOPPED = SOUNDS.register("music.stopped",
         () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "music.stopped")));
+    /** A strata pocket about to turn rift hums (client/RiftHum; sounds/rift_hum.ogg, made with sox). */
+    public static final DeferredHolder<net.minecraft.sounds.SoundEvent, net.minecraft.sounds.SoundEvent> RIFT_HUM = SOUNDS.register("rift.hum",
+        () -> net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "rift.hum")));
 
     /** Worldgen around static deeps (DeepFeature; data/stasisdelvers/worldgen, neoforge/biome_modifier). */
     static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.levelgen.feature.Feature>> FEATURE_TYPES =

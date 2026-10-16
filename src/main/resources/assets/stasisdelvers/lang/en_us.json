@@ -28,5 +28,6 @@
   "block.stasisdelvers.rift_crystal_cluster": "Rift Crystal Cluster",
   "item.stasisdelvers.rift_shard": "Rift Shard",
   "item.stasisdelvers.rift_dust": "Rift Dust",
-  "item.stasisdelvers.charged_rift_shard": "Charged Rift Shard"
+  "item.stasisdelvers.charged_rift_shard": "Charged Rift Shard",
+  "subtitles.stasisdelvers.rift.hum": "Low hum"
 }

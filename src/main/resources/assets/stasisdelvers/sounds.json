@@ -123,5 +123,15 @@
     "stream": true
    }
   ]
+ },
+ "rift.hum": {
+  "category": "ambient",
+  "sounds": [
+   {
+    "name": "stasisdelvers:rift_hum",
+    "stream": false
+   }
+  ],
+  "subtitle": "subtitles.stasisdelvers.rift.hum"
  }
 }
