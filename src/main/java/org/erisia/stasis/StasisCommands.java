@@ -140,10 +140,15 @@ final class StasisCommands {
                     return 1;
                 })
                 .then(Commands.literal("start").executes(c -> {
-                    Storms.start(c.getSource().getLevel());
+                    Storms.start(c.getSource().getLevel(), 0);
                     c.getSource().sendSuccess(() -> Component.literal("A storm starts now (test override)"), true);
                     return 1;
-                }))
+                }).then(Commands.argument("minutes", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0, 600)).executes(c -> {
+                    double m = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(c, "minutes");
+                    Storms.start(c.getSource().getLevel(), m);
+                    c.getSource().sendSuccess(() -> Component.literal("A storm starts in " + m + " min (test override; its glow shows now)"), true);
+                    return 1;
+                })))
                 .then(Commands.literal("stop").executes(c -> {
                     Storms.stop(c.getSource().getLevel());
                     c.getSource().sendSuccess(() -> Component.literal("The test storm ramps out"), true);

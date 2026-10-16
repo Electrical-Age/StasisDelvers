@@ -259,11 +259,11 @@ public final class Storms {
         }
     }
 
-    /** /stasis storm start: a storm from now, the configured length (its warning skipped). */
-    public static void start(ServerLevel level) {
+    /** /stasis storm start [minutes]: a storm from now (or that many minutes ahead, its warning glow showing). */
+    public static void start(ServerLevel level, double minutesAhead) {
         Forced o = Forced.get(level);
-        double t = level.getGameTime() / 20.0;
-        if (o.active && t < o.end) return;
+        double now = level.getGameTime() / 20.0, t = now + minutesAhead * 60;
+        if (o.active && now < o.end) return;
         // a finished override becomes a fixed offset in tau (it must never jump back)
         if (o.active) o.folded += 9 * integral(new Storm(o.start, o.end - o.start), o.end);
         o.active = true;
