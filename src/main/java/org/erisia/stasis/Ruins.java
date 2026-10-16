@@ -85,6 +85,8 @@ public final class Ruins {
                 int surf = sl.getChunkSource().getGenerator().getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG,
                     sl, sl.getChunkSource().randomState());
                 if (y + 10 > surf) continue;
+                final int fx = x, fy = y, fz = z;
+                if (out.stream().anyMatch(o -> o.origin().distSqr(new BlockPos(fx, fy, fz)) < 24 * 24)) continue;   // apart
                 Identifier id = pool.get((int) (Noise.hash32(d.id(), r, 432, 0x7A1) * pool.size()) % pool.size());
                 Rotation rot = Rotation.values()[(int) (Noise.hash32(d.id(), r, 433, 0x7A1) * 4) & 3];
                 out.add(new Ruin(id, new BlockPos(x, y, z), rot, d.id() * 31 + r));
