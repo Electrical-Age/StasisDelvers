@@ -288,6 +288,11 @@ public class TowerBlockEntity extends BlockEntity {
         return storeFor(designRadius());
     }
 
+    /** The mast top above the field centre (client: the collapse's knot; counted, since segments isn't synced). */
+    public int mastTop() {
+        return TowerBlock.HEIGHT + countSegments();
+    }
+
     int countSegments() {
         int n = 0;
         BlockPos p = TowerStructure.pole(worldPosition, 1);

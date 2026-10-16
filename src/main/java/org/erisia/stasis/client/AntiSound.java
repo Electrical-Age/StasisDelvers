@@ -61,7 +61,7 @@ public final class AntiSound {
         double d = Math.min(p.distanceToSqr(b.fx(), b.fy(), b.fz()), p.distanceToSqr(b.tx(), b.ty(), b.tz()));
         if (d > 64 * 64) return;
         long now = System.nanoTime();
-        if ((now - crackAt) / 1e9 > CUT) mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.9F));
+        if ((now - crackAt) / 1e9 > CUT) mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.25F));
         crackAt = now;
     }
 
@@ -91,8 +91,8 @@ public final class AntiSound {
             low = 0.02 + 0.98 * smooth(CUT, CUT + LOWS, t);
             high = 0.03 + 0.97 * smooth(CUT, CUT + HIGHS, t);
         }
-        vol = (float) (low * (1 - 0.5 * strain));
-        hf = (float) (high * (1 - 0.85 * strain));
+        vol = (float) (low * (1 - 0.4 * strain));
+        hf = (float) (high * (1 - 0.75 * strain));
         sag = (float) (1 - 0.06 * strain);
         if (Math.abs(vol - appliedVol) > 0.005 || (vol == 1) != (appliedVol == 1)) {
             appliedVol = vol;

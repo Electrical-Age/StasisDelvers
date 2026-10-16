@@ -124,6 +124,8 @@ public final class StasisPost {
             d[o + 7] = f.seed();
             d[o + 8] = f.formedAt() > 0
                 ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;
+            d[o + 9] = f.collapse() > 0 && mc.level.getBlockEntity(net.minecraft.core.BlockPos.containing(f.x(), f.y(), f.z()))
+                instanceof org.erisia.stasis.TowerBlockEntity t ? t.mastTop() : 0;
         }
         d[24] = n;
         // the client's render distance in blocks (terrain ends, and vanilla's render-distance fog with it, there)

@@ -23,7 +23,7 @@
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
 // shape id;
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
-// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved.
+// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), mast top above the centre (a collapsing tower; else 0).
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
 // lattice on each icosahedron face; the nearest lattice point is the cell, the gap to the second nearest its rim).
@@ -1157,7 +1157,7 @@ void main() {
             // the mast top and shrinks to a knot (u^3); then (collapse 1..2, ~2.5 s) the knot's mist drifts apart
             float squeeze = collapse > 0.75 ? clamp((collapse - 0.75) / 0.25, 0.0, 1.0) : 0.0;
             float tail = collapse > 1.0 ? min(1.0, collapse - 1.0) : 0.0;
-            float mastUp = max(2.0, r / 8.0);
+            float mastUp = data(k + 9) > 0.5 ? data(k + 9) : max(2.0, r / 8.0);   // (StasisPost: the tower's mast top)
             if (squeeze > 0.0) {
                 fc.y += mastUp * squeeze;
                 r = mix(r, 1.2, squeeze * squeeze * squeeze);
@@ -1181,7 +1181,7 @@ void main() {
                 // mist in spots (Baughn: mostly clear inside, fading in and out): where the eddies are (Eddies, the
                 // stopped pockets from failing 0.7), and before that sparse wisps that come and go, each region on its
                 // own slow pulse
-                float share = collapse > 0.0 || failing > 0.7 ? eddyShare(min(collapse, 1.0), failing) : 0.05 + 0.15 * (failing - 0.25) / 0.45;
+                float share = collapse > 0.0 || failing > 0.7 ? eddyShare(min(collapse, 1.0), failing) : 0.04 + 0.08 * (failing - 0.25) / 0.45;
                 share = mix(share, 0.95, max(squeeze, tail > 0.0 ? 1.0 : 0.0));   // the knot is all mist
                 float thr = 0.5 + (0.5 - share) * 0.45;
                 float ta = max(t1, 0.0), tb = min(t2, tmax);
@@ -1194,7 +1194,7 @@ void main() {
                         float pulse = 0.5 + 0.5 * sin(et * 0.5 + hash13(floor(wp / 9.0)) * 6.2832);
                         float dn = smoothstep(thr - 0.03, thr + 0.03, eddy(wp, et, sd)) * pulse * pulse;
                         if (squeeze > 0.0 || tail > 0.0) dn = smoothstep(thr - 0.03, thr + 0.03, eddy(wp, et * (1.0 + 3.0 * squeeze), sd));
-                        mist += (1.0 - mist) * dn * min(1.0, stepLen * (0.025 + 0.4 * squeeze + 0.25 * (1.0 - tail) * step(0.001, tail)));
+                        mist += (1.0 - mist) * dn * min(1.0, stepLen * ((collapse > 0.0 ? 0.025 : 0.008) + 0.4 * squeeze + 0.25 * (1.0 - tail) * step(0.001, tail)));
                     }
                     // squeezed, the mist glows over-bright violet-white; in the tail it fades as it spreads
                     vec3 mc = mix(vec3(0.78, 0.82, 0.88), vec3(0.95, 0.9, 1.0) * (1.0 + 1.5 * squeeze), max(squeeze, step(0.001, tail)));
