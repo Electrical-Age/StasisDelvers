@@ -56,6 +56,17 @@ final class StasisEvents {
         mob.getNavigation().stop();
     }
 
+    /**
+     * No sleeping in stopped land (λ-Nero: a night slept through out there moved the sun and the light in the fields):
+     * no night passes there, so there's none to skip. Beds inside fields work as usual.
+     */
+    static void canSleep(net.neoforged.neoforge.event.entity.player.CanPlayerSleepEvent e) {
+        if (e.getProblem() != null || !(e.getLevel() instanceof ServerLevel level) || !Stasis.stops(level)) return;
+        if (!Stasis.isRunning(level, e.getPos()))
+            e.setProblem(new net.minecraft.world.entity.player.Player.BedSleepingProblem(
+                net.minecraft.network.chat.Component.literal("Time stands still here: there is no night to sleep through")));
+    }
+
     /** Load the fields on the main thread (the light engine reads them from its own: FieldData.peek). */
     static void levelLoad(LevelEvent.Load e) {
         if (e.getLevel() instanceof ServerLevel level) {
