@@ -548,7 +548,7 @@ vec4 shieldAt(vec2 cell, vec3 n, vec3 cc, vec3 view, float r, float amber, float
     float band = clamp((amber - rnd) / 0.03, 0.0, 1.0);
     tint = mix(tint, vec3(1.0, 0.55, 0.2), max(warm, floor(band * 3.0 + 0.999) / 3.0));
     float f = (lost - rnd) / 0.02;        // > 0: lost; the last 0.004 of key above it flickers, the first 0.02 below shrinks
-    if (f > -0.2) {
+    if (lost > 0.0 && f > -0.2) {
         if (f >= 1.0) return vec4(0.0);
         if (f < 0.0) {
             if (hash13(vec3(rnd * 97.0, floor(time * 14.0), 3.3)) < 0.5) a *= 0.12;
