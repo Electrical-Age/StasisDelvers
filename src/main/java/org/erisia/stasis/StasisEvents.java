@@ -40,6 +40,22 @@ final class StasisEvents {
             e.setSpawnCancelled(true);
     }
 
+    /**
+     * Friendly mobs stay inside their field (λ-Nero: they walked into its edge and froze there): a peaceful mob whose
+     * step would take it from running land into stopped land is put back and its path dropped. Monsters may wander out
+     * (and freeze).
+     */
+    static void keepFriendlyInside(net.neoforged.neoforge.event.tick.EntityTickEvent.Post e) {
+        if (!(e.getEntity() instanceof net.minecraft.world.entity.Mob mob) || mob instanceof net.minecraft.world.entity.monster.Enemy) return;
+        if (!(mob.level() instanceof ServerLevel level) || !Stasis.stops(level) || mob.isPassenger() || mob.isLeashed()) return;
+        var now = mob.blockPosition();
+        var was = net.minecraft.core.BlockPos.containing(mob.xo, mob.yo, mob.zo);
+        if (now.equals(was) || Stasis.isRunning(level, now) || !Stasis.isRunning(level, was)) return;
+        mob.setPos(mob.xo, mob.yo, mob.zo);
+        mob.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        mob.getNavigation().stop();
+    }
+
     /** Load the fields on the main thread (the light engine reads them from its own: FieldData.peek). */
     static void levelLoad(LevelEvent.Load e) {
         if (e.getLevel() instanceof ServerLevel level) {
