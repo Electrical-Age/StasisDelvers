@@ -19,8 +19,13 @@ public final class StasisDelvers {
 
     public StasisDelvers(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.SYNCED, StasisConfig.SPEC);
-        modBus.addListener(ModConfigEvent.Loading.class, e -> StasisConfig.refresh());
-        modBus.addListener(ModConfigEvent.Reloading.class, e -> StasisConfig.refresh());
+        // (only our synced config: the client config's Loading came first on clients and crashed refresh, AdventurAgent)
+        modBus.addListener(ModConfigEvent.Loading.class, e -> {
+            if (e.getConfig().getSpec() == StasisConfig.SPEC) StasisConfig.refresh();
+        });
+        modBus.addListener(ModConfigEvent.Reloading.class, e -> {
+            if (e.getConfig().getSpec() == StasisConfig.SPEC) StasisConfig.refresh();
+        });
         NeoForge.EVENT_BUS.addListener(StasisEvents::entityTick);
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelLoad);
