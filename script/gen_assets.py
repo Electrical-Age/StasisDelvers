@@ -71,10 +71,12 @@ def layer(colors, path):
     rect(0, 15, 31, 15, trim)                         # neck ring
     rect(8, 0, 15, 7, shade(base, 1.08))              # crown
     rect(11, 0, 12, 7, trim)                          # crest ridge over the top
-    rect(8, 8, 15, 8, trim)                           # brow
-    rect(9, 10, 14, 13, shade(base, 0.22), 0.04)      # the visor: dark glass
-    rect(9, 10, 14, 10, glow, 0.03)                   # its glow line
-    px(8, 11, trim); px(15, 11, trim)                 # visor hinges
+    rect(8, 8, 15, 8, glow, 0.03)                     # brow: the glow line
+    rect(8, 9, 8, 14, trim); rect(15, 9, 15, 14, trim)  # the window frame
+    for y in range(9, 15):                            # the visor: clear, the wearer's face and fringe show (Baughn)
+        for x in range(9, 15):
+            im.putpixel((x, y), (0, 0, 0, 0))
+    px(9, 9, (230, 245, 255)); px(14, 14, (200, 225, 240))   # glints on the glass corners
     for x0 in (1, 17):                                 # a grille low on each side (two vertical slots read as eyes)
         for y in (12, 14):
             rect(x0 + 1, y, x0 + 5, y, shade(base, 0.55))
