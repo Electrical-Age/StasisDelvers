@@ -1910,6 +1910,43 @@ public final class StasisGameTests {
             }
             return () -> c.check("measured", true, log.toString());
         }, false, true));
+        // bug reports (client/report/Redactor): no paths, addresses, user names or tokens leave the player's machine,
+        // while versions, class names and log times stay readable
+        CASES.put("bugreport_redaction", new Spec(1, (h, c) -> () -> {
+            var r = new org.erisia.stasis.client.report.Redactor(java.util.List.of("/home/alice/.local/share/PrismLauncher/instances/Incognito/minecraft/.",
+                "/mnt/games/Incognito/minecraft", "C:\\Users\\Alice\\curseforge\\minecraft\\Instances\\Incognito"), "play.example.org:25565", "alice");
+            java.util.function.BiConsumer<String, String> eq = (in, want) -> {
+                String got = r.redact(in);
+                c.check("redact: " + in, got.equals(want), "got '" + got + "', want '" + want + "'");
+            };
+            eq.accept("Loading /home/alice/.local/share/PrismLauncher/instances/Incognito/minecraft/mods/eln.jar",
+                "Loading <game>/mods/eln.jar");
+            eq.accept("real path /mnt/games/Incognito/minecraft/logs/latest.log", "real path <game>/logs/latest.log");
+            eq.accept("C:\\Users\\Alice\\curseforge\\minecraft\\Instances\\Incognito\\config\\x.toml", "<game>\\config\\x.toml");
+            eq.accept("url file:///C:/Users/Alice/curseforge/minecraft/Instances/Incognito/mods/a.jar", "url <game>/mods/a.jar");
+            eq.accept("at /home/alice/.gradle/caches/foo-1.2.jar", "at <path>/foo-1.2.jar");
+            eq.accept("jar:file:/opt/java/lib/rt.jar!/java/lang/Object.class", "<path>/rt.jar!/java/lang/Object.class");
+            eq.accept("tmp /tmp/hsperf_x/123 done", "tmp <path> done");
+            eq.accept("D:\\Games\\notes.txt here", "<path> here");
+            eq.accept("share \\\\nas\\mc\\x", "share <path>");
+            eq.accept("Connecting to play.example.org, 25565", "Connecting to <server>, 25565");
+            eq.accept("Connecting to play.example.org:25565", "Connecting to <server>");
+            eq.accept("from /192.168.1.10:25565 ok", "from /<ip> ok");
+            eq.accept("peer 10.0.0.5.", "peer <ip>.");
+            eq.accept("ipv6 [2001:db8::1]:25565 and fe80::1%eth0 and 2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+                "ipv6 <ip> and <ip>%eth0 and <ip>");
+            eq.accept("neoforge-26.3.0.75-beta, version 1.2.3.400, mod v1.2.3.4", "neoforge-26.3.0.75-beta, version 1.2.3.400, mod v1.2.3.4");
+            eq.accept("[12:34:56] [Render thread/INFO] [net.minecraft.client.Minecraft/]: Setting user: Bob",
+                "[12:34:56] [Render thread/INFO] [net.minecraft.client.Minecraft/]: Setting user: Bob");
+            eq.accept("at net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:827)",
+                "at net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:827)");
+            eq.accept("user Alice and ALICE but not Alicesmith", "user <user> and <user> but not Alicesmith");
+            eq.accept("--username Bob --accessToken eyJhbGciOi.xyz --version 26.3", "--username Bob --accessToken <redacted> --version 26.3");
+            eq.accept("password=hunter2 token: abc session=s1", "password=<redacted> token: <redacted> session=<redacted>");
+            var shortUser = new org.erisia.stasis.client.report.Redactor(java.util.List.of(), null, "bob");
+            c.check("a user name under 4 characters stays", shortUser.redact("bob builds").equals("bob builds"));
+            c.check("no game dir, no server: plain text unchanged", shortUser.redact("Stasis tower at 12, 64, -30").equals("Stasis tower at 12, 64, -30"));
+        }, false));
     }
 
     /** Place an EA six-node device (1.12 id) on the floor at a local position, as a player would. */
