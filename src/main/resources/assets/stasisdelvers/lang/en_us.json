@@ -34,5 +34,6 @@
   "block.stasisdelvers.stilled_lava": "Stilled Lava",
   "subtitles.stasisdelvers.storm.wind": "Storm wind",
   "item.stasisdelvers.rift_compass": "Rift Compass",
-  "block.stasisdelvers.rift_barometer": "Rift Barometer"
+  "block.stasisdelvers.rift_barometer": "Rift Barometer",
+  "item.stasisdelvers.scrap": "Scrap"
 }

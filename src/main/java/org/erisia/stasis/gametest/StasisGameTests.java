@@ -262,7 +262,9 @@ public final class StasisGameTests {
                 double e = ((org.erisia.stasis.DelverSuitItem) p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).getItem())
                     .getEnergy(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
                 c.check("suited: no freezing", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
-                c.check("the suit drew power (10 W per piece)", e < 40000 && e > 40000 - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
+                double full = org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
+                c.check("the suit drew power (10 W per piece)", e < full && e > full - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
+                c.check("a full Delver suit lasts 30 minutes (Baughn)", Math.abs(full - 10 * 60 * 30) < 1e-6, full + " J");
                 c.check("suited in stopped land: Mining Fatigue I", p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
                 remove(h, p);
             };
@@ -648,6 +650,66 @@ public final class StasisGameTests {
                 t.setRemoved();
             };
         }, false, true));
+        // early game (Baughn 2026-10-17): a charged Delver suit on the first join, once
+        CASES.put("starter_suit_once", new Spec(5, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), false, true);
+            return () -> {
+                int worn = 0;
+                for (var slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD,
+                        net.minecraft.world.entity.EquipmentSlot.CHEST, net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+                    var st = p.getItemBySlot(slot);
+                    if (st.getItem() instanceof org.erisia.stasis.DelverSuitItem d && d.getEnergy(st) >= d.getEnergyMax(st) - 1e-6) worn++;
+                }
+                c.check("first join: a full charged Delver suit, worn", worn == 4, worn + " pieces");
+                org.erisia.stasis.StarterKit.login(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p));
+                int inv = 0;
+                for (int i = 0; i < p.getInventory().getContainerSize(); i++)
+                    if (p.getInventory().getItem(i).getItem() instanceof org.erisia.stasis.DelverSuitItem) inv++;
+                c.check("the next login: no second suit", inv == 4, inv + " suit items in all");
+                remove(h, p);
+            };
+        }, false, true));
+        // a ruined tower's core (coreDrop 0) breaks into scrap, which smelts into an iron nugget
+        CASES.put("ruined_core_scrap", new Spec(2, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            return () -> {
+                var level = h.getLevel();
+                var pos = t.getBlockPos();
+                var tool = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE);
+                var whole = net.minecraft.world.level.block.Block.getDrops(level.getBlockState(pos), level, pos, t, null, tool);
+                c.check("a working core drops itself", whole.stream().anyMatch(st -> st.is(org.erisia.stasis.StasisRegistry.TOWER_ITEM.get())), whole.toString());
+                t.coreDrop = 0;
+                var ruined = net.minecraft.world.level.block.Block.getDrops(level.getBlockState(pos), level, pos, t, null, tool);
+                c.check("a ruined core drops scrap only", !ruined.isEmpty() && ruined.stream().allMatch(st -> st.is(org.erisia.stasis.StasisRegistry.SCRAP.get())),
+                    ruined.toString());
+                var in = new net.minecraft.world.item.crafting.SingleRecipeInput(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.SCRAP.get()));
+                var r = level.recipeAccess().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING, in, level);
+                c.check("scrap smelts into an iron nugget", r.isPresent() && r.get().value().assemble(in).is(net.minecraft.world.item.Items.IRON_NUGGET),
+                    String.valueOf(r));
+                t.setRemoved();
+            };
+        }, false, true));
+        // a locked tower (the spawn tower) keeps its settings; anyone can feed a tower from their suit (a jump-start)
+        CASES.put("tower_lock_and_feed", new Spec(70, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            ServerPlayer p = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), false);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            t.locked = true;
+            double before = t.target();
+            t.setControls(before + 8, true);
+            c.check("locked: the console can't change the radius or OVERRIDE", t.target() == before && !t.override(), t.target() + " " + t.override());
+            t.toggleFeed(p);
+            return () -> {
+                var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
+                var d = (org.erisia.stasis.DelverSuitItem) head.getItem();
+                double given = 4 * (d.getEnergyMax(head) - d.getEnergy(head));
+                c.check("feeding: the store filled from the suit", t.storedJ() > 4000 && Math.abs(t.storedJ() - given) < 50,
+                    String.format("store %.0f J, suit gave %.0f J", t.storedJ(), given));
+                remove(h, p);
+                t.setRemoved();
+            };
+        }, false, true));
         // Baughn: the shield shows the charge only while the store drains, averaged (no flicker at break-even)
         CASES.put("tower_shield_shows_drain", new Spec(120, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
@@ -875,7 +937,8 @@ public final class StasisGameTests {
                 double e = ((org.erisia.stasis.DelverSuitItem) p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).getItem())
                     .getEnergy(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
                 c.check("in a mist pocket the Delver suit freezes slowly", p.isAlive() && Freezing.ticks(p) > 0, "ticks " + Freezing.ticks(p));
-                c.check("and drains x2 (20 W per piece)", e < 40000 - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
+                double full = org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
+                c.check("and drains x2 (20 W per piece)", e < full - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
                 remove(h, p);
             };
         }));
@@ -1843,9 +1906,19 @@ public final class StasisGameTests {
 
     /** A survival-mode player placed at a local position (the vanilla mock player is in creative). */
     static ServerPlayer survivalPlayer(GameTestHelper h, Vec3 local, boolean endGrace) {
+        return survivalPlayer(h, local, endGrace, false);
+    }
+
+    /** starterSuit: let the first-join suit come (else the test player counts as having had it). */
+    static ServerPlayer survivalPlayer(GameTestHelper h, Vec3 local, boolean endGrace, boolean starterSuit) {
         var cookie = net.minecraft.server.network.CommonListenerCookie.createInitial(
             new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "stasis-test"), false);
         ServerPlayer p = new ServerPlayer(h.getLevel().getServer(), h.getLevel(), cookie.gameProfile(), cookie.clientInformation());
+        if (!starterSuit) {
+            var persisted = new net.minecraft.nbt.CompoundTag();
+            persisted.putBoolean(org.erisia.stasis.StarterKit.TAG, true);
+            p.getPersistentData().put(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG, persisted);
+        }
         var connection = new net.minecraft.network.Connection(net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
         new io.netty.channel.embedded.EmbeddedChannel(connection);
         h.getLevel().getServer().getPlayerList().placeNewPlayer(connection, p, cookie);

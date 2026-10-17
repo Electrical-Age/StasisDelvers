@@ -88,6 +88,18 @@ public final class StasisNet {
         }
     }
 
+    /** Console: start or stop feeding the tower from your batteries and suit. */
+    public record ConsoleFeed(net.minecraft.core.BlockPos pos) implements CustomPacketPayload {
+        public static final Type<ConsoleFeed> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_feed"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleFeed> CODEC = StreamCodec.composite(
+            net.minecraft.core.BlockPos.STREAM_CODEC, ConsoleFeed::pos, ConsoleFeed::new);
+
+        @Override
+        public Type<ConsoleFeed> type() {
+            return TYPE;
+        }
+    }
+
     public record ConsoleSet(net.minecraft.core.BlockPos pos, double target, boolean override) implements CustomPacketPayload {
         public static final Type<ConsoleSet> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_set"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleSet> CODEC = StreamCodec.composite(
@@ -124,7 +136,8 @@ public final class StasisNet {
     public static TowerBlockEntity consoleTower(ServerPlayer p, net.minecraft.core.BlockPos pos) {
         if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(pos)) > 8 * 8) return null;
         if (!(p.level().getBlockEntity(pos) instanceof TowerBlockEntity t) || !t.isMaster()) return null;
-        if (!p.level().mayInteract(p, pos)) return null;
+        // (spawn protection doesn't close the console, Baughn: a locked tower guards its settings itself)
+        if (!p.level().getWorldBorder().isWithinBounds(pos)) return null;
         return t;
     }
 
@@ -257,17 +270,25 @@ public final class StasisNet {
             r.playToServer(ConsoleQuery.TYPE, ConsoleQuery.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) {
                     TowerBlockEntity t = consoleTower(sp, p.pos());
-                    if (t != null) send(sp, t.consoleState());
+                    if (t != null) send(sp, t.consoleState(sp));
+                }
+            });
+            r.playToServer(ConsoleFeed.TYPE, ConsoleFeed.CODEC, (p, ctx) -> {
+                if (ctx.player() instanceof ServerPlayer sp) {
+                    TowerBlockEntity t = consoleTower(sp, p.pos());
+                    if (t == null) return;
+                    t.toggleFeed(sp);
+                    send(sp, t.consoleState(sp));
                 }
             });
             r.playToServer(ConsoleSet.TYPE, ConsoleSet.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) {
                     TowerBlockEntity t = consoleTower(sp, p.pos());
                     if (t == null) return;
-                    if (p.override() != t.override())
+                    if (!t.locked && p.override() != t.override())
                         StasisDelvers.LOG.info("{} turned the tower at {} OVERRIDE {}", sp.getName().getString(), p.pos().toShortString(), p.override() ? "ON" : "off");
                     t.setControls(p.target(), p.override());
-                    send(sp, t.consoleState());
+                    send(sp, t.consoleState(sp));
                 }
             });
             r.playToClient(ConsoleState.TYPE, ConsoleState.CODEC, (p, ctx) -> consoleSink.accept(p));

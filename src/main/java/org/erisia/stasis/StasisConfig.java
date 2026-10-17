@@ -46,6 +46,9 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue STORM_EVERY_HOURS;
     static final ModConfigSpec.IntValue STORM_MINUTES;
     static final ModConfigSpec.IntValue STORM_WARN_MINUTES;
+    static final ModConfigSpec.DoubleValue DELVER_SUIT_MINUTES;
+    static final ModConfigSpec.BooleanValue STARTER_SUIT;
+    static final ModConfigSpec.IntValue MAP_DESK_HOURS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -110,6 +113,10 @@ public final class StasisConfig {
                 "length (Baughn: about an in-game month, ~10 h).").defineInRange("stormEveryHours", 10.0, 0.25, 1000.0);
         STORM_MINUTES = b.comment("A storm's length in minutes (Baughn: 20 for now).").defineInRange("stormMinutes", 20, 4, 600);
         STORM_WARN_MINUTES = b.comment("Minutes before a storm that its violet glow shows on the upwind horizon.").defineInRange("stormWarnMinutes", 60, 0, 6000);
+        DELVER_SUIT_MINUTES = b.comment("Minutes a fully charged Delver suit lasts in stopped land (Baughn: 30). Its store scales with it",
+                "(10 W per piece: 18 kJ at 30 minutes).").defineInRange("delverSuitMinutes", 30.0, 1.0, 600.0);
+        STARTER_SUIT = b.comment("Give each player a full, charged Delver suit on their first join.").define("starterSuit", true);
+        MAP_DESK_HOURS = b.comment("Real hours before the map desk gives the same player another map.").defineInRange("mapDeskHours", 24, 0, 8760);
         SPEC = b.build();
     }
 
@@ -139,6 +146,9 @@ public final class StasisConfig {
     static volatile double skyMessyChance = 0.1;
     static volatile double stormEveryHours = 10;
     static volatile int stormMinutes = 20, stormWarnMinutes = 60;
+    static volatile double delverSuitMinutes = 30;
+    static volatile boolean starterSuit = true;
+    static volatile int mapDeskHours = 24;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -188,5 +198,8 @@ public final class StasisConfig {
         stormEveryHours = STORM_EVERY_HOURS.get();
         stormMinutes = STORM_MINUTES.get();
         stormWarnMinutes = STORM_WARN_MINUTES.get();
+        delverSuitMinutes = DELVER_SUIT_MINUTES.get();
+        starterSuit = STARTER_SUIT.get();
+        mapDeskHours = MAP_DESK_HOURS.get();
     }
 }

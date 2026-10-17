@@ -20,7 +20,7 @@ public final class ConsoleScreen extends Screen {
     StasisNet.ConsoleState st;
     int ticks;
     long armedUntil;
-    Button overrideButton;
+    Button overrideButton, feedButton;
     final java.util.List<Button> targetButtons = new java.util.ArrayList<>();
     /** The last target we asked for, until the server's readout catches up (a quick second +5 was lost). */
     double pending = Double.NaN;
@@ -73,6 +73,9 @@ public final class ConsoleScreen extends Screen {
         targetButtons.add(addRenderableWidget(Button.builder(Component.literal("Minimum"), b -> set(v(7), v(12) > 0)).bounds(x + 210, y, 90, 20).build()));
         overrideButton = addRenderableWidget(Button.builder(Component.literal("OVERRIDE"), b -> pressOverride())
             .bounds(x, y + 28, 300, 20).build());
+        // (Baughn: charging a tower from your suit, e.g. to start a dead one)
+        feedButton = addRenderableWidget(Button.builder(Component.literal("Feed from your suit"),
+            b -> ClientPacketDistributor.sendToServer(new StasisNet.ConsoleFeed(pos))).bounds(x, y + 52, 300, 20).build());
     }
 
     void pressOverride() {
@@ -97,8 +100,15 @@ public final class ConsoleScreen extends Screen {
             overrideButton.setMessage(Component.literal(on ? "OVERRIDE ON - press to restore the safety"
                 : armed ? "CONFIRM OVERRIDE (press again)" : "OVERRIDE (disable the safety)"));
         }
-        // a signal sets the target: the buttons step aside (they were silently ignored)
-        for (Button b : targetButtons) b.active = v(13) <= 0;
+        // a signal sets the target: the buttons step aside (they were silently ignored); a locked tower keeps its settings
+        boolean locked = st != null && st.v().size() > 17 && v(17) > 0;
+        for (Button b : targetButtons) b.active = v(13) <= 0 && !locked;
+        if (overrideButton != null) overrideButton.active = !locked;
+        if (feedButton != null) {
+            boolean feeding = st != null && st.v().size() > 18 && v(18) > 0;
+            feedButton.setMessage(Component.literal(feeding ? String.format("FEEDING (%.1f kJ so far) - press to stop", v(19))
+                : "Feed from your suit (batteries first, then the suit itself)"));
+        }
     }
 
     @Override
@@ -110,7 +120,7 @@ public final class ConsoleScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
         int x = width / 2 - 150, y = height / 2 - 92;
         // the panel first, then the buttons on it (drawn after, it greyed them out: AdventurAgent's stills)
-        g.fill(x - 8, y - 8, x + 308, height / 2 + 86, 0xD0101018);
+        g.fill(x - 8, y - 8, x + 308, height / 2 + 110, 0xD0101018);
         super.extractRenderState(g, mouseX, mouseY, a);
         g.text(font, "STASIS TOWER", x, y, 0xFFB8A8E8);
         if (st == null) {
@@ -153,6 +163,10 @@ public final class ConsoleScreen extends Screen {
         int ly = by + 68;
         for (var line : font.split(Component.literal(safety), 300)) {
             g.text(font, line, x, ly, on || armed ? 0xFFFF4040 : retreat || strainNow > 0.05 ? 0xFFE0A040 : 0xFF70C070);
+            ly += 10;
+        }
+        if (st.v().size() > 17 && v(17) > 0) {
+            g.text(font, "LOCKED: the settings can't be changed here", x, ly, 0xFFB0B0FF);
             ly += 10;
         }
         var lines = font.split(Component.literal(st.text()), 300);

@@ -9,13 +9,17 @@ import net.minecraft.world.item.ItemStack;
  * (four pieces) is needed. Charged in Electrical Age's battery chargers like any EA electrical item.
  */
 public class DelverSuitItem extends Item implements IItemEnergyBattery, TimeSuit {
-    private final double storage, chargePower, draw;
+    private final double chargePower, draw;
 
-    public DelverSuitItem(Properties properties, double storage, double chargePower, double draw) {
+    /** The store follows the config (StasisConfig.delverSuitMinutes: Baughn, 30 minutes): draw x the time. */
+    public DelverSuitItem(Properties properties, double chargePower, double draw) {
         super(properties);
-        this.storage = storage;
         this.chargePower = chargePower;
         this.draw = draw;
+    }
+
+    double storage() {
+        return draw * 60 * StasisConfig.delverSuitMinutes;
     }
 
     @Override
@@ -25,17 +29,17 @@ public class DelverSuitItem extends Item implements IItemEnergyBattery, TimeSuit
 
     @Override
     public void setEnergy(ItemStack stack, double value) {
-        TimeSuit.setEnergy(stack, Math.min(storage, value));
+        TimeSuit.setEnergy(stack, Math.min(storage(), value));
     }
 
     @Override
     public double getEnergy(ItemStack stack) {
-        return TimeSuit.energy(stack);
+        return Math.min(storage(), TimeSuit.energy(stack));   // (suits charged before a shorter setting hold no more)
     }
 
     @Override
     public double getEnergyMax(ItemStack stack) {
-        return storage;
+        return storage();
     }
 
     @Override
@@ -64,7 +68,7 @@ public class DelverSuitItem extends Item implements IItemEnergyBattery, TimeSuit
 
     @Override
     public int getBarWidth(ItemStack stack) {
-        return (int) Math.round(13 * Math.min(1, getEnergy(stack) / storage));
+        return (int) Math.round(13 * Math.min(1, getEnergy(stack) / storage()));
     }
 
     @Override

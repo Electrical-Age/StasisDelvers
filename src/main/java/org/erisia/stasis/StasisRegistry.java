@@ -40,9 +40,9 @@ public final class StasisRegistry {
         10, defense(0, 0, 0, 0), 1, net.minecraft.sounds.SoundEvents.ARMOR_EQUIP_GENERIC, 0f, 0f,
         net.minecraft.tags.TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "repairs_stasis_armor")), asset("stasis_armor"));
 
-    // Delver suit: 40 kJ per piece, charged at 400 W, 10 W per piece in stopped land (a full charge: about 67 minutes)
+    // Delver suit: charged at 400 W, 10 W per piece in stopped land; its store lasts StasisConfig.delverSuitMinutes (30: 18 kJ)
     static net.neoforged.neoforge.registries.DeferredItem<DelverSuitItem> delver(String name, net.minecraft.world.item.equipment.ArmorType type) {
-        return ITEMS.registerItem(name, p -> new DelverSuitItem(p, 40000, 400, 10), p -> p.humanoidArmor(DELVER, type).stacksTo(1));
+        return ITEMS.registerItem(name, p -> new DelverSuitItem(p, 400, 10), p -> p.humanoidArmor(DELVER, type).stacksTo(1));
     }
 
     // Stasis armour: E-Coal's damage absorption (1.7.10 points {2, 6, 5, 2} as ratios) on a 60 kJ store per piece
@@ -137,6 +137,8 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> STILLED_LAVA = ITEMS.registerSimpleBlockItem("stilled_lava", STILLED_LAVA_BLOCK, p -> p.stacksTo(4));
 
     /** A rift crystal shard (placeholder for the dust / shard / charged grades). */
+    /** What a ruined tower core breaks into (Baughn 2026-10-17: they never drop as cores); smelts into an iron nugget. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> SCRAP = ITEMS.registerSimpleItem("scrap");
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_SHARD = ITEMS.registerSimpleItem("rift_shard");
     /** The crystal grades (Crystals): dust from small and medium buds, charged shards from a cluster broken in violet. */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_DUST = ITEMS.registerSimpleItem("rift_dust");

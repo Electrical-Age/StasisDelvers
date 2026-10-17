@@ -101,6 +101,41 @@ final class Suits {
         }
     }
 
+    /**
+     * Take up to maxJ from a player (a tower console's feed, Baughn: a jump-start from the suit): carried batteries first
+     * (at their discharge power), then the worn suit pieces, evenly, down to nothing. Returns the J taken.
+     */
+    static double drain(ServerPlayer p, double maxJ) {
+        double left = maxJ;
+        var inv = p.getInventory();
+        for (int i = 0; i < 36 && left > 1e-6; i++) {
+            ItemStack src = inv.getItem(i);
+            if (src.isEmpty() || src.getItem() instanceof TimeSuit || !(src.getItem() instanceof IItemEnergyBattery sb)) continue;
+            double take = Math.min(left, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
+            if (take <= 0) continue;
+            sb.setEnergy(src, sb.getEnergy(src) - take);
+            left -= take;
+        }
+        java.util.List<ItemStack> pieces = new java.util.ArrayList<>();
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b && b.getEnergy(s) > 0) pieces.add(s);
+        }
+        // in equal shares, so the pieces run down together
+        while (left > 1e-6 && !pieces.isEmpty()) {
+            double share = left / pieces.size();
+            for (var it = pieces.iterator(); it.hasNext(); ) {
+                ItemStack s = it.next();
+                IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
+                double take = Math.min(share, b.getEnergy(s));
+                b.setEnergy(s, b.getEnergy(s) - take);
+                left -= take;
+                if (b.getEnergy(s) <= 1e-6) it.remove();
+            }
+        }
+        return maxJ - left;
+    }
+
     /** Would the suit protect (full and charged), without drawing power? */
     static boolean protectsWithoutDraw(ServerPlayer p) {
         for (EquipmentSlot slot : ARMOR) {

@@ -2,6 +2,7 @@ package org.erisia.stasis;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
@@ -90,6 +91,10 @@ public class TowerBlockEntity extends BlockEntity {
 
         int amount() {
             return energy;
+        }
+
+        int capacity() {
+            return capacity;
         }
 
         /** Testing (/stasis tower charge): set the store to a share of its capacity. */
@@ -204,8 +209,58 @@ public class TowerBlockEntity extends BlockEntity {
         return override;
     }
 
-    /** Console: set the target radius (NaN: the preferred range) and OVERRIDE. */
+    /**
+     * Block-entity flags (Baughn 2026-10-17; set with /data, in templates, or by the ruined-cottage placement): locked =
+     * the console shows but can't change the radius or OVERRIDE (the spawn tower); coreDrop = the chance this core block
+     * drops itself when broken (else scrap: ruined cottages 0). Kept on every core block.
+     */
+    public boolean locked;
+    public double coreDrop = 1;
+
+    /** Console: feeding the store from a player's batteries and suit (Baughn: a jump-start), 2 kW while it lasts. */
+    java.util.@org.jspecify.annotations.Nullable UUID feeder;
+    double fed;
+    static final double FEED_W = 2000;
+
+    public void toggleFeed(ServerPlayer p) {
+        if (p.getUUID().equals(feeder)) feeder = null;
+        else {
+            feeder = p.getUUID();
+            fed = 0;
+            StasisDelvers.LOG.info("{} feeds the tower at {} from their suit", p.getName().getString(), worldPosition.toShortString());
+        }
+    }
+
+    /** Once a second: move up to FEED_W from the feeder (carried batteries first, then the suit pieces evenly). */
+    void feed(ServerLevel sl) {
+        if (feeder == null) return;
+        if (!(sl.getPlayerByUUID(feeder) instanceof ServerPlayer p) || p.isSpectator()
+            || p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition)) > 8 * 8) {
+            feeder = null;
+            return;
+        }
+        if (!sized) {
+            sized = true;
+            segments = countSegments();
+            store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
+        }
+        double room = (store.capacity() - store.amount()) / FE_PER_J;
+        double got = Suits.drain(p, Math.min(FEED_W, room));
+        if (got > 0) {
+            store.set(Math.min(store.capacity(), store.amount() + (int) (got * FE_PER_J)));
+            fed += got;
+            setChanged();
+        }
+        if (got < 1 || room - got < 1) {
+            p.sendSystemMessage(net.minecraft.network.chat.Component.literal(String.format("Fed the tower %.1f kJ%s.", fed / 1000,
+                room - got < 1 ? "; its store is full" : "; you have nothing left to give")));
+            feeder = null;
+        }
+    }
+
+    /** Console: set the target radius (NaN: the preferred range) and OVERRIDE (ignored on a locked tower). */
     public void setControls(double target, boolean override) {
+        if (locked) return;
         this.targetRadius = Double.isNaN(target) ? Double.NaN : Math.max(minRadius(), Math.min(maxRadius(), target));
         this.override = override;
         setChanged();
@@ -307,6 +362,7 @@ public class TowerBlockEntity extends BlockEntity {
             setChanged();
             sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
+        if (level.getGameTime() % 20 == 0) feed(sl);
         if (level.getGameTime() % 20 == 0 || segments == 0) {
             int s = countSegments();
             if (s != segments) {
@@ -584,6 +640,8 @@ public class TowerBlockEntity extends BlockEntity {
         out.putInt("collapse", collapseTicks);
         out.putInt("energy", store.amount());
         out.putDouble("failing", failing);
+        if (locked) out.putBoolean("locked", true);
+        if (coreDrop < 1) out.putDouble("coreDrop", coreDrop);
         out.putDouble("amber", amber);
         out.putDouble("dropout", dropout);
         out.putDouble("side", side);
@@ -632,6 +690,8 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity(Integer.MAX_VALUE);
         store.set(in.getIntOr("energy", 0));
         failing = in.getDoubleOr("failing", 0);
+        locked = in.getBooleanOr("locked", false);
+        coreDrop = in.getDoubleOr("coreDrop", 1);
         amber = in.getDoubleOr("amber", 0);
         dropout = in.getDoubleOr("dropout", 0);
         side = in.getDoubleOr("side", 0);
@@ -680,11 +740,16 @@ public class TowerBlockEntity extends BlockEntity {
 
     /** The console's readout (StasisNet.ConsoleState). */
     public StasisNet.ConsoleState consoleState() {
+        return consoleState(null);
+    }
+
+    /** ... plus, for the player asking: locked (17), feeding from them (18), kJ fed so far (19). */
+    public StasisNet.ConsoleState consoleState(@org.jspecify.annotations.Nullable ServerPlayer asker) {
         double r = radius();
         java.util.List<Double> v = java.util.List.of((double) state.ordinal(), storedJ(), storeMaxJ(), inAvgW,
             drawFor(r) * drawPenalty(r) * weatherFactor(), weatherFactor(), designRadius(), minRadius(), maxRadius(), target(),
             state == State.OFF ? 0 : r, goalRadius(), override ? 1.0 : 0.0, signalSet ? 1.0 : 0.0, retreating ? 1.0 : 0.0, carryRadius(),
-            failing);
+            failing, locked ? 1.0 : 0.0, asker != null && asker.getUUID().equals(feeder) ? 1.0 : 0.0, fed / 1000);
         return new StasisNet.ConsoleState(worldPosition, v, structureLine());
     }
 

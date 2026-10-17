@@ -161,6 +161,15 @@ public class TowerBlock extends Block implements EntityBlock {
         }
     }
 
+    /** A core block of a ruined tower (coreDrop < 1, Baughn: 0 in cottages) mostly breaks into scrap instead. */
+    @Override
+    protected java.util.List<net.minecraft.world.item.ItemStack> getDrops(BlockState state, net.minecraft.world.level.storage.loot.LootParams.Builder params) {
+        if (params.getOptionalParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.BLOCK_ENTITY) instanceof TowerBlockEntity t
+            && t.coreDrop < 1 && params.getLevel().getRandom().nextDouble() >= t.coreDrop)
+            return java.util.List.of(new net.minecraft.world.item.ItemStack(StasisRegistry.SCRAP.get(), 2 + params.getLevel().getRandom().nextInt(3)));
+        return super.getDrops(state, params);
+    }
+
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new TowerBlockEntity(pos, state);

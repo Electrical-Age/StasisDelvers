@@ -30,6 +30,8 @@ public final class StasisDelvers {
         StasisRegistry.register(modBus);
         StasisNet.register(modBus);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post.class, Freezing::tick);
+        // (the starter suit first: a new player in stopped land is protected by it at once)
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, StarterKit::login);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, Freezing::grace);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, Freezing::grace);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerChangedDimensionEvent.class, Freezing::grace);
