@@ -84,6 +84,9 @@ public final class StasisClient {
         });
         // still textures in stopped land (Baughn: lava, water and campfires kept animating)
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterSpriteSourcesEvent.class, FrozenSprites::registerSource);
+        // stilled water looks like the water it froze from (λ-Nero: it looked like ice): the biome's water tint
+        modBus.addListener(net.neoforged.neoforge.client.event.RegisterColorHandlersEvent.BlockTintSources.class, e ->
+            e.register(java.util.List.of(net.minecraft.client.color.block.BlockTintSources.water()), org.erisia.stasis.StasisRegistry.STILLED_WATER_BLOCK.get()));
         modBus.addListener(net.neoforged.neoforge.client.event.TextureAtlasStitchedEvent.class, FrozenSprites::stitched);
         org.erisia.stasis.ClientFields.onChange = FrozenSprites::fieldsChanged;
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> FrozenSprites.tick(net.minecraft.client.Minecraft.getInstance()));

@@ -72,19 +72,36 @@ public final class StilledLiquids {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level) || !isTool(e.getItemStack())) return;
         var hit = Item.getPlayerPOVHitResult(level, p, ClipContext.Fluid.ANY);
         if (hit.getType() != HitResult.Type.BLOCK) return;
-        BlockPos pos = hit.getBlockPos();
+        if (take(p, level, hit.getBlockPos(), e.getItemStack(), e.getHand())) {
+            e.setCanceled(true);
+            e.setCancellationResult(InteractionResult.SUCCESS);
+        }
+    }
+
+    /**
+     * ... or with the shovel on the liquid as a block: stopped liquids are solid, so the client sends a click on a block
+     * and RightClickItem never fires (λ-Nero: the shovel didn't work).
+     */
+    static void useOnBlock(PlayerInteractEvent.RightClickBlock e) {
+        if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level) || !isTool(e.getItemStack())) return;
+        if (take(p, level, e.getPos(), e.getItemStack(), e.getHand())) {
+            e.setCanceled(true);
+            e.setCancellationResult(InteractionResult.SUCCESS);
+        }
+    }
+
+    static boolean take(ServerPlayer p, ServerLevel level, BlockPos pos, ItemStack tool, net.minecraft.world.InteractionHand hand) {
         BlockState st = level.getBlockState(pos);
-        if (!(st.getBlock() instanceof LiquidBlock) || Stasis.isRunning(level, pos)) return;
+        if (!(st.getBlock() instanceof LiquidBlock) || Stasis.isRunning(level, pos)) return false;
         var fs = st.getFluidState();
         boolean lava = fs.is(net.minecraft.tags.FluidTags.LAVA);
-        if (!fs.isSource() && !(st.getValue(LiquidBlock.LEVEL) >= 8)) return;   // sources and falling columns only
-        if (!level.mayInteract(p, pos)) return;
+        if (!fs.isSource() && !(st.getValue(LiquidBlock.LEVEL) >= 8)) return false;   // sources and falling columns only
+        if (!level.mayInteract(p, pos)) return false;
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
         ItemStack got = new ItemStack(lava ? StasisRegistry.STILLED_LAVA.get() : StasisRegistry.STILLED_WATER.get());
         if (!p.getInventory().add(got)) level.addFreshEntity(new net.minecraft.world.entity.item.ItemEntity(level, p.getX(), p.getY(), p.getZ(), got));
-        e.getItemStack().hurtAndBreak(1, p, e.getHand());
+        tool.hurtAndBreak(1, p, hand);
         level.playSound(null, pos, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_BREAK, net.minecraft.sounds.SoundSource.BLOCKS, 0.8f, lava ? 0.6f : 1.3f);
-        e.setCanceled(true);
-        e.setCancellationResult(InteractionResult.SUCCESS);
+        return true;
     }
 }
