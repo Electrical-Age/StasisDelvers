@@ -86,7 +86,7 @@ public final class TowerStructure {
             }
         }
         // towers built before core hiding existed (and any drift): keep the core hidden exactly while the tower stands
-        if (every % 20 == 10) TowerBlock.setHidden(level, core, status == Status.OK);
+        if (every % 20 == 10) TowerBlock.setHidden(level, core, false);   // (Baughn: the core stays visible: it's the console)
         if (status == Status.WAITING && ++quietTicks >= DEBOUNCE && pending == null) {
             List<String> v = layout.violations();
             if (!v.isEmpty()) {
@@ -152,7 +152,7 @@ public final class TowerStructure {
             }
         }
         resetParts(level, parts);
-        TowerBlock.setHidden(level, core, status == Status.OK);
+        TowerBlock.setHidden(level, core, false);
     }
 
     /** Sets the given poles' parts and resets the poles of the previous build that aren't in the list. */

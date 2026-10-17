@@ -821,6 +821,12 @@ public class TowerBlockEntity extends BlockEntity {
         }
     }
 
+    /** What the tower will draw at its target radius (Baughn: known before it's powered), e.g. "4.3 kW". */
+    String drawText() {
+        double t = target(), w = drawFor(t) * drawPenalty(t) * weatherFactor();
+        return w >= 1000 ? String.format("%.1f kW", w / 1000) : String.format("%.0f W", w);
+    }
+
     String structureLine() {
         TowerStructure s = structure;
         return switch (s.status) {
@@ -828,7 +834,7 @@ public class TowerBlockEntity extends BlockEntity {
                 + "the mast's side make booms. Feed power (FE, e.g. EA's exporter) into any face.";
             case WAITING, BUILDING -> "Building the tower...";
             case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
-                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ".";
+                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ". Draw: " + drawText() + ".";
             case INVALID -> "Tower layout not allowed: " + s.message;
             case REFUSED -> "Tower refused: " + s.message;
             case FAILED -> "Tower could not be built (see the server log).";
@@ -840,7 +846,7 @@ public class TowerBlockEntity extends BlockEntity {
         double r = radius(), stored = storedJ(), max = storeMaxJ();
         StringBuilder sb = new StringBuilder("Stasis tower: ");
         sb.append(switch (state) {
-            case OFF -> stored >= 0.5 * max ? "starting" : "off (needs half a store to start)";
+            case OFF -> stored >= 0.5 * max ? "starting" : "off, needs half a store to start";
             case RUNNING -> "field up, radius " + (int) r;
             case COLLAPSING -> "COLLAPSING";
         });
@@ -854,12 +860,13 @@ public class TowerBlockEntity extends BlockEntity {
                 + "the mast's side make booms. Feed power (FE, e.g. EA's exporter) into any face.";
             case WAITING, BUILDING -> "Building the tower...";
             case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
-                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ".";
+                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ". Draw: " + drawText() + ".";
             case INVALID -> "Tower layout not allowed: " + s.message;
             case REFUSED -> "Tower refused: " + s.message;
             case FAILED -> "Tower could not be built (see the server log).";
         });
-        return net.minecraft.network.chat.Component.literal(sb.toString());
+        boolean bad = s.status == TowerStructure.Status.INVALID || s.status == TowerStructure.Status.REFUSED || s.status == TowerStructure.Status.FAILED;
+        return net.minecraft.network.chat.Component.literal(sb.toString()).withStyle(bad ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.WHITE);
     }
 
     /** Is this the tower (the bottom centre of a formed core), not just a core block? */

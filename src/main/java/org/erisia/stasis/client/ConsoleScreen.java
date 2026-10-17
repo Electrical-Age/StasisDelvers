@@ -98,7 +98,7 @@ public final class ConsoleScreen extends Screen {
         if (overrideButton != null) {
             boolean on = v(12) > 0, armed = System.currentTimeMillis() < armedUntil;
             overrideButton.setMessage(Component.literal(on ? "OVERRIDE ON - press to restore the safety"
-                : armed ? "CONFIRM OVERRIDE (press again)" : "OVERRIDE (disable the safety)"));
+                : armed ? "CONFIRM OVERRIDE: press again" : "OVERRIDE: disable the safety"));
         }
         // a signal sets the target: the buttons step aside (they were silently ignored); a locked tower keeps its settings
         boolean locked = st != null && st.v().size() > 17 && v(17) > 0;
@@ -106,8 +106,8 @@ public final class ConsoleScreen extends Screen {
         if (overrideButton != null) overrideButton.active = !locked;
         if (feedButton != null) {
             boolean feeding = st != null && st.v().size() > 18 && v(18) > 0;
-            feedButton.setMessage(Component.literal(feeding ? String.format("FEEDING (%.1f kJ so far) - press to stop", v(19))
-                : "Feed from your suit (batteries first, then the suit itself)"));
+            feedButton.setMessage(Component.literal(feeding ? String.format("FEEDING: %.1f kJ so far - press to stop", v(19))
+                : "Feed from your suit"));
         }
     }
 
@@ -127,7 +127,7 @@ public final class ConsoleScreen extends Screen {
             g.text(font, "...", x, y + 14, 0xFFA0A0A0);
             return;
         }
-        String[] states = {"OFF (needs half a store to start)", "FIELD UP", "COLLAPSING"};
+        String[] states = {"OFF", "FIELD UP", "COLLAPSING"};
         int s = (int) v(0);
         g.text(font, states[Math.max(0, Math.min(2, s))], x + 90, y, s == 2 ? 0xFFFF5050 : s == 1 ? 0xFF70E070 : 0xFFA0A0A0);
         // charge bar, with the safety's 60% mark
@@ -138,28 +138,30 @@ public final class ConsoleScreen extends Screen {
         // the safety's marks: the last ditch (15%) and where a retreated field grows back (80%)
         g.fill(x + 45, by - 2, x + 46, by + 12, 0xFFFF8060);
         g.fill(x + 240, by - 2, x + 241, by + 12, 0xFFFFFFFF);
+        g.fill(x + 150, by - 2, x + 151, by + 12, 0xFF60E060);   // (Baughn: green at 50%, where a dead tower starts)
         g.text(font, "15%", x + 37, by - 10, 0xFFB0B0B0);
+        g.text(font, "50%", x + 142, by - 10, 0xFF80E080);
         g.text(font, "80%", x + 232, by - 10, 0xFFB0B0B0);
-        g.text(font, String.format("Charge %.0f%%  (%.0f of %.0f kJ)", 100 * share, v(1) / 1000, v(2) / 1000), x, by + 14, 0xFFE0E0E0);
+        g.text(font, String.format("Charge %.0f%%: %.0f of %.0f kJ", 100 * share, v(1) / 1000, v(2) / 1000), x, by + 14, 0xFFE0E0E0);
         double in = v(3), draw = s == 1 ? v(4) : 0, net = in - draw;
-        String power = String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" (x%.2f)", v(5)) : "", net);
+        String power = String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" x%.2f", v(5)) : "", net);
         g.text(font, power, x, by + 26, net < 0 ? 0xFFE0A060 : 0xFFE0E0E0);
         // (after the power line, however long it is: the x1.04 pushed it into "Empty in", AdventurAgent)
         if (net < 0 && s == 1) g.text(font, String.format("Empty in %s", time(v(1) / -net)), x + Math.max(220, font.width(power) + 12), by + 26, 0xFFE0A060);
-        g.text(font, String.format("Radius %.0f now, goal %.0f, target %.0f%s", v(10), v(11), v(9), v(13) > 0 ? " (by signal)" : ""), x, by + 42,
+        g.text(font, String.format("Radius %.0f now, goal %.0f, target %.0f%s", v(10), v(11), v(9), v(13) > 0 ? " by signal" : ""), x, by + 42,
             v(13) > 0 ? 0xFF80C0FF : 0xFFE0E0E0);
-        g.text(font, String.format("Preferred %.0f, range %.0f to %.0f (above %.0f: ruinous draw)", v(6), v(7), v(8), v(6)), x, by + 54, 0xFFA0A0B0);
+        g.text(font, String.format("Preferred %.0f, range %.0f to %.0f", v(6), v(7), v(8)), x, by + 54, 0xFFA0A0B0);
         boolean on = v(12) > 0;
         boolean armed = System.currentTimeMillis() < armedUntil;
         // (wrapped to the panel: long lines ran off its edge, AdventurAgent)
         boolean retreat = st.v().size() > 14 && v(14) > 0;
         double carry = st.v().size() > 15 ? v(15) : -1, strainNow = st.v().size() > 16 ? v(16) : 0;
         String sustain = carry > 0 ? String.format("its power carries r %.0f", carry) : "its power carries none of it";
-        String safety = on ? "SAFETY OFF (OVERRIDE): no retreat; it collapses when the store runs dry"
+        String safety = on ? "SAFETY OFF: no retreat; it collapses when the store runs dry"
             : armed ? "Confirm: the field will not save itself and collapses when the store runs dry"
-            : retreat ? String.format("SAFETY RETREAT to r %.0f to recharge; back to r %.0f at 80%% (lower the target or add power to hold)", v(11), v(9))
-            : strainNow > 0.05 ? String.format("FAILING (strain %.0f%%): %s", 100 * strainNow, sustain)
-            : "Safety: on (retreats when failing)";
+            : retreat ? String.format("SAFETY RETREAT to r %.0f to recharge; back to r %.0f at 80%%", v(11), v(9))
+            : strainNow > 0.05 ? String.format("FAILING, strain %.0f%%: %s", 100 * strainNow, sustain)
+            : "Safety: on";
         int ly = by + 68;
         for (var line : font.split(Component.literal(safety), 300)) {
             g.text(font, line, x, ly, on || armed ? 0xFFFF4040 : retreat || strainNow > 0.05 ? 0xFFE0A040 : 0xFF70C070);
@@ -169,8 +171,12 @@ public final class ConsoleScreen extends Screen {
             g.text(font, "LOCKED: the settings can't be changed here", x, ly, 0xFFB0B0FF);
             ly += 10;
         }
-        var lines = font.split(Component.literal(st.text()), 300);
-        g.text(font, lines.get(0), x, ly + 2, 0xFF909098);
+        // (a refused or disallowed layout in red: Baughn missed it in grey)
+        boolean bad = st.text().startsWith("Tower layout not allowed") || st.text().startsWith("Tower refused") || st.text().startsWith("Tower could not");
+        for (var line : font.split(Component.literal(st.text()), 300)) {
+            g.text(font, line, x, ly + 2, bad ? 0xFFFF5050 : 0xFF909098);
+            ly += 10;
+        }
     }
 
     static String time(double s) {

@@ -379,8 +379,8 @@ public final class StasisGameTests {
                     if (part != want) { ok = false; sb.append(k).append('=').append(part).append(' '); }
                 }
                 c.check("mast poles: ladder up to the ladder top, hidden above", ok, sb.toString());
-                c.check("core blocks hidden (the tower draws its core)", h.getBlockState(base).getValue(org.erisia.stasis.TowerBlock.HIDDEN)
-                    && h.getBlockState(base.above()).getValue(org.erisia.stasis.TowerBlock.HIDDEN));
+                c.check("core blocks stay visible (the console: Baughn)", !h.getBlockState(base).getValue(org.erisia.stasis.TowerBlock.HIDDEN)
+                    && !h.getBlockState(base.above()).getValue(org.erisia.stasis.TowerBlock.HIDDEN));
                 c.check("boom poles hidden", h.getBlockState(base.above(7).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
                     == org.erisia.stasis.TowerPoleBlock.Part.HIDDEN);
             };
@@ -707,6 +707,22 @@ public final class StasisGameTests {
                 c.check(n + " registered", structures.get(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.STRUCTURE,
                     Identifier.fromNamespaceAndPath(org.erisia.stasis.StasisDelvers.MODID, n))).isPresent());
         }, false));
+        // a whole time suit keeps its wearer at full speed in a slow field (Baughn 2026-10-17)
+        CASES.put("suit_full_speed_in_slow_field", new Spec(2, (h, c) -> {
+            var level = h.getLevel();
+            Vec3 a = h.absoluteVec(new Vec3(4.5, 1.0, 4.5));
+            var f = org.erisia.stasis.FieldData.get(level).add(level, a.x, a.y, a.z, 6, false, 0.5);
+            ServerPlayer bare = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true), suited = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true);
+            wear(suited, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            return () -> {
+                c.check("unsuited in the 0.5 field: half speed", org.erisia.stasis.PlayerRates.rate(bare) == 0.5, "" + org.erisia.stasis.PlayerRates.rate(bare));
+                c.check("suited: full speed", org.erisia.stasis.PlayerRates.rate(suited) == 1.0, "" + org.erisia.stasis.PlayerRates.rate(suited));
+                org.erisia.stasis.FieldData.get(level).remove(level, f.id());
+                remove(h, bare);
+                remove(h, suited);
+            };
+        }, false, true));
         // a ruined cottage's tower comes dead and never drops as a core (the template processor)
         CASES.put("ruined_cottage_core", new Spec(1, (h, c) -> () -> {
             var nbt = new net.minecraft.nbt.CompoundTag();

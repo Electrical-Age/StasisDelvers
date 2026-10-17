@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Players in a slow field run slow: their client is sent the field's tick rate (vanilla's ticking-state packet, 20 x
+ * Players in a slow field run slow (unless they wear a whole time suit: Baughn 2026-10-17): their client is sent the field's tick rate (vanilla's ticking-state packet, 20 x
  * rate), so movement, animations, mining and eating all slow down together on their screen, and the server counts the
  * player's own countdowns (mining progress, item use, attack cooldown) only in the ticks that rate runs in (mixins
  * ServerPlayerGameModeMixin, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
@@ -37,8 +37,15 @@ public final class PlayerRates {
     /** The player's tick rate in (0, 1]: their field's rate, 1 elsewhere (stopped land too). */
     public static double rate(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level)) return 1.0;
+        if (fullSuit(p)) return 1.0;   // (Baughn: the suit keeps its wearer at full speed in a slow field)
         double r = Stasis.rateAt(level, p.blockPosition());
         return r <= 0.0 || r >= 1.0 ? 1.0 : r;
+    }
+
+    /** A whole time suit worn (any charge: inside a field it draws nothing). */
+    static boolean fullSuit(ServerPlayer p) {
+        for (var slot : Suits.ARMOR) if (!(p.getItemBySlot(slot).getItem() instanceof TimeSuit)) return false;
+        return true;
     }
 
     /** Does the player's own clock run in this game tick? */
