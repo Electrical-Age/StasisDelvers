@@ -218,8 +218,25 @@ VARIANTS = [('snapped', snapped), ('stripped', stripped), ('sagging', sagging), 
             ('weathered', weathered), ('toppled', toppled)]
 
 
+# Baughn: the platform must work without other mods: Rechiseled end stone -> the nearest vanilla end-stone blocks
+VANILLA = {'stairs': 'minecraft:end_stone_brick_stairs', 'block': 'minecraft:end_stone_bricks'}
+
+
+def vanilla(t):
+    for v in t.b.values():
+        if not v[0].startswith('rechiseled:'): continue
+        if v[0].endswith('_stairs') or '_stairs_' in v[0]:
+            v[0] = VANILLA['stairs']
+            v[1] = {k: x for k, x in v[1].items() if k in ('facing', 'half', 'shape', 'waterlogged')}
+        else:
+            v[0], v[1] = VANILLA['block'], {}
+
+
 def main():
     base = T(read(gzip.decompress(open(sys.argv[1], 'rb').read())))
+    vanilla(base)
+    left = {v[0] for v in base.b.values() if not v[0].startswith(('minecraft:', 'stasisdelvers:', 'eln:'))}
+    assert not left, left
     os.makedirs(sys.argv[2], exist_ok=True)
     for i, (name, f) in enumerate(VARIANTS):
         t = base.copy()
