@@ -22,9 +22,9 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 - Suit glove: check slim (Alex) skins and two-handed maps; glove art is placeholder (mostly sleeve and cuff visible).
 
 ## Field tick rates
-- From inside a slow field, entities (which still run at 20 on the server) are drawn creeping at the client rate,
-  then snap at the next position sync (arrow: drawn 5.7 b/s, jumps ~3.9 blocks; AdventurAgent). Idea: client-side,
-  interpolate non-player entities on real time rather than the slowed client tick.
+- From inside a slow field, arrows (client-simulated flight) creep at the client rate, then snap at each position sync
+  (AdventurAgent). Walking mobs are fine (interpolated). Real-time interpolation steps were tried (727d17e) and
+  reverted: mobs pulsed at a 4 Hz beat. An arrow fix would need extra client physics steps for projectiles only.
 - Not yet checked: mob AI near/in slow fields; fields above or below the player.
 
 ## Later (Baughn 2026-10-13, msg 1559534246849282069)
