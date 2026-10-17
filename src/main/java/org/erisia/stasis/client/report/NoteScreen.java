@@ -67,6 +67,12 @@ final class NoteScreen extends Screen {
         return false;
     }
 
+    /** No blur: over another screen (the console) it would be a second blur in the frame, which crashes (AdventurAgent). */
+    @Override
+    public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
+        g.fill(0, 0, width, height, 0x60000000);
+    }
+
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
         int w = Math.min(320, width - 20), x = (width - w) / 2, y = height / 2 - 20;

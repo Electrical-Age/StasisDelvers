@@ -117,8 +117,9 @@ public final class BugReport {
             e.register(KEY);
         });
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, BugReport::tick);
-        // vanilla only feeds key mappings with no screen open; reports are wanted most in GUIs (Post: text fields first)
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.KeyPressed.Post.class, e -> {
+        // vanilla only feeds key mappings with no screen open; reports are wanted most in GUIs (Pre: an EA screen's text
+        // field ate F7 before Post: AdventurAgent)
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.KeyPressed.Pre.class, e -> {
             if (e.getScreen() instanceof NoteScreen) return;
             if (KEY.matches(e.getKeyEvent())) {
                 request(Minecraft.getInstance().hasShiftDown());
