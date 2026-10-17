@@ -125,6 +125,10 @@ public final class StasisRegistry {
         RiftBarometerBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(2.5f, 9f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> st.getValue(RiftBarometerBlock.POWER) / 3));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> RIFT_BAROMETER = ITEMS.registerSimpleBlockItem(RIFT_BAROMETER_BLOCK);
+    /** The surveyor's desk (spawn cottage): maps to ruined cottages (MapDeskBlock). */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<MapDeskBlock> MAP_DESK_BLOCK = BLOCKS.registerBlock("surveyors_desk",
+        MapDeskBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.WOOD).strength(2.5f).sound(net.minecraft.world.level.block.SoundType.WOOD));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> MAP_DESK = ITEMS.registerSimpleBlockItem(MAP_DESK_BLOCK);
 
     /** Stilled liquids (StilledLiquids): taken with a shovel from stopped water and lava; they thaw where time runs. */
     public static final net.neoforged.neoforge.registries.DeferredBlock<StilledLiquids.StilledBlock> STILLED_WATER_BLOCK = BLOCKS.registerBlock("stilled_water",

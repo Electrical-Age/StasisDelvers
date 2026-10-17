@@ -689,6 +689,26 @@ public final class StasisGameTests {
                 t.setRemoved();
             };
         }, false, true));
+        // a ruined cottage's tower comes dead and never drops as a core (the template processor)
+        CASES.put("ruined_cottage_core", new Spec(1, (h, c) -> () -> {
+            var nbt = new net.minecraft.nbt.CompoundTag();
+            nbt.putString("state", "RUNNING");
+            nbt.putInt("field", 7);
+            nbt.putInt("energy", 5000);
+            var info = new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo(BlockPos.ZERO,
+                org.erisia.stasis.StasisRegistry.TOWER.get().defaultBlockState(), nbt);
+            var out = org.erisia.stasis.RuinedCottages.RuinedCore.CODEC.codec().parse(com.mojang.serialization.JsonOps.INSTANCE,
+                new com.google.gson.JsonObject()).getOrThrow().process(h.getLevel(), BlockPos.ZERO, BlockPos.ZERO, info, info,
+                new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings(), null);
+            var o = out.nbt();
+            c.check("dead: off, empty, no field", "OFF".equals(o.getStringOr("state", "")) && o.getIntOr("field", -1) == 0 && o.getIntOr("energy", -1) == 0, o.toString());
+            c.check("coreDrop 0", o.getDoubleOr("coreDrop", 1) == 0, o.toString());
+            var dirt = new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo(BlockPos.ZERO,
+                net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), null);
+            c.check("other blocks untouched", org.erisia.stasis.RuinedCottages.RuinedCore.CODEC.codec().parse(com.mojang.serialization.JsonOps.INSTANCE,
+                new com.google.gson.JsonObject()).getOrThrow().process(h.getLevel(), BlockPos.ZERO, BlockPos.ZERO, dirt, dirt,
+                new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings(), null) == dirt);
+        }, false));
         // a locked tower (the spawn tower) keeps its settings; anyone can feed a tower from their suit (a jump-start)
         CASES.put("tower_lock_and_feed", new Spec(70, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);

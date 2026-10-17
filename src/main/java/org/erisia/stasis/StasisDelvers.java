@@ -28,6 +28,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(NewChunkGrace::chunkLoad);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> StasisCommands.register(e.getDispatcher()));
         StasisRegistry.register(modBus);
+        RuinedCottages.register(modBus);
         StasisNet.register(modBus);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post.class, Freezing::tick);
         // (the starter suit first: a new player in stopped land is protected by it at once)

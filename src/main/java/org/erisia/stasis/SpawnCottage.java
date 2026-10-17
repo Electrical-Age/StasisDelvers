@@ -51,12 +51,16 @@ public final class SpawnCottage {
                 level.setBlock(info.pos(), Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
             }
         }
-        // every tower in it starts full: its field comes up on its first tick
+        // every tower in it starts full (its field comes up on its first tick) and locked (Baughn: no one changes the
+        // spawn tower's settings; feeding it is fine)
         for (int x = 0; x < size.getX(); x++)
             for (int yy = 0; yy < size.getY(); yy++)
                 for (int z = 0; z < size.getZ(); z++)
-                    if (level.getBlockEntity(origin.offset(x, yy, z)) instanceof TowerBlockEntity tower
-                        && tower.getBlockState().getValue(TowerBlock.CELL) == TowerBlock.MASTER) tower.fillStore();
+                    if (level.getBlockEntity(origin.offset(x, yy, z)) instanceof TowerBlockEntity tower) {
+                        tower.locked = true;
+                        tower.setChanged();
+                        if (tower.getBlockState().getValue(TowerBlock.CELL) == TowerBlock.MASTER) tower.fillStore();
+                    }
         level.setRespawnData(LevelData.RespawnData.of(Level.OVERWORLD, spawnPos, 0f, 0f));
         StasisDelvers.LOG.info("Spawn cottage placed at {} ({}), spawn {}", origin.toShortString(), size.toShortString(), spawnPos.toShortString());
         return spawnPos;

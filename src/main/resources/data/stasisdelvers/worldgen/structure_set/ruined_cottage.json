@@ -1,0 +1,14 @@
+{
+  "structures": [
+    {
+      "structure": "stasisdelvers:ruined_cottage",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 64,
+    "separation": 24,
+    "salt": 491203117
+  }
+}
