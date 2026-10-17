@@ -1173,15 +1173,20 @@ void main() {
                 // stopped pockets from failing 0.7), and before that sparse wisps that come and go, each region on its
                 // own slow pulse
                 float share = collapse > 0.0 || failing > 0.7 ? eddyShare(collapse, failing) : 0.04 + 0.08 * (failing - 0.25) / 0.45;
+                // (a remnant keeps thinner wisps: AdventurAgent saw the whole old field greyed out)
+                if (frozen) share *= 0.55;
                 float thr = 0.5 + (0.5 - share) * 0.45;
                 float ta = max(t1, 0.0), tb = min(t2, tmax);
                 if (tb > ta) {
                     vec3 camI = vec3(data(16), data(17), data(18));
                     float et = frozen ? ftime : data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
                     int sd = int(data(k + 7));
+                    float jit = ign(gl_FragCoord.xy);   // (jittered steps: fixed ones left seams)
                     for (int m = 0; m < 12; m++) {
-                        vec3 wp = camI + o + v * (ta + (float(m) + 0.5) * stepLen);
-                        float pulse = 0.5 + 0.5 * sin(et * 0.5 + hash13(floor(wp / 9.0)) * 6.2832);
+                        vec3 wp = camI + o + v * (ta + (float(m) + jit) * stepLen);
+                        // each region on its own pulse, the phase smooth in space (a hash per 9-block cube read as
+                        // grey boxes with straight edges: AdventurAgent)
+                        float pulse = 0.5 + 0.5 * sin(et * 0.5 + value32(wp / 9.0, sd ^ 0x9a1) * 12.566);
                         float dn = smoothstep(thr - 0.03, thr + 0.03, eddy(wp, et, sd)) * pulse * pulse;
                         mist += (1.0 - mist) * dn * min(1.0, stepLen * (collapse > 0.0 ? 0.025 : 0.008));
                     }
@@ -1230,6 +1235,9 @@ void main() {
                     if (dp > 0.05) sh = vec4(mix(sh.rgb, vec3(0.92, 0.96, 1.0), 0.6 * dp),
                         min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(ftime * 3.0 + cell.y * 6.0)))));
                 }
+                // a remnant's surviving hexes are shards of amber glass hanging in the air: filled and brighter
+                // (they were tiny and faint: AdventurAgent)
+                if (frozen && sh.a > 0.0) sh = vec4(mix(sh.rgb, vec3(1.0, 0.7, 0.35), 0.3), min(0.75, sh.a * 1.6 + 0.22));
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 // about to die: the rim crackles white-gold (rim only, flickering; ~0.4 s in a real collapse)
                 if (brk < 0.015) {
