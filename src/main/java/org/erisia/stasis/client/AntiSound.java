@@ -66,7 +66,9 @@ public final class AntiSound {
                 (int) Math.sqrt(d), d > 64 * 64 ? " (too far, ignored)" : "", appliedVol, appliedHf, String.format("%.2f", strain), filter);
         }
         if (d > 64 * 64) return;
-        if ((now - crackAt) / 1e9 > CUT) mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.25F));
+        // in a burst, the sound gets a moment back between cuts (else a burst is one long silence)
+        if ((now - crackAt) / 1e9 < CUT + 0.25) return;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.25F));
         crackAt = now;
     }
 
