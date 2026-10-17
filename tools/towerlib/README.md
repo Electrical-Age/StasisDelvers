@@ -47,7 +47,9 @@ tools/towerlib/build_library.sh full      # everything: ~30 min wall on 8 proces
 ```
 Env: `TOWERLIB_CACHE` (default `tools/towerlib/cache`, git-ignored), `TOWERLIB_OUT` (default `tools/towerlib/out`),
 `P3A_PROCS` (8), `GRADLE` (default `./gradlew`; lab box: `/var/lib/mclab/agent/tools/stasis-build.sh`),
-`NO_INSTALL=1`, `TOWERLIB_DATE` (fixed provenance date). The complete solve cache of the shipped library is
+`NO_INSTALL=1`, `TOWERLIB_DATE` (fixed provenance date). `P3A_STRENGTH` (default 1.4 in `fem.py`, 1.0 before 2026-10-17): a factor on
+every allowable stress (`SIG_T`, `SIG_C0`, `SIG_CAB`; not E); the library is built with it, so the cache is only valid
+for one value (use a new `TOWERLIB_CACHE` per value). The complete solve cache of the shipped library is
 `timestop-proto/towerlib/p3acache` (7748 pickles, 56 MB): `TOWERLIB_CACHE=.../p3acache build_library.sh export`
 re-exports the shipped library without solving. Single steps: `cd tools && python3 -m towerlib --help`
 (`run NAME [seam] [q..]`, `cov booms|bays|seams|test|validate`, `pat count|solve`, `export`, `gold`, ...).
@@ -59,6 +61,11 @@ re-exports the shipped library without solving. Single steps: `cd tools && pytho
 3. `export`, the 7 test layouts (seam) under the rule, `gold`.
 A run under the stay rule alone would give a smaller library (the P3a-rule keys are still looked up as near
 matches). Keys already in the cache are not re-solved, so an interrupted `full` resumes.
+
+The P3a-rule goldens (`towergen/src/test/resources/p3a_goldens_p3arule.json.gz`, GoldenTest checks them under
+stayCap none) are not made by `full`: after it, with the same cache and a separate out dir,
+`TOWERLIB_OUT=OTHER P3A_STAYCAP=none python3 -m towerlib run NAME seam 1.0 0.3` for the 7 test layouts, then
+`TOWERLIB_OUT=OTHER P3A_STAYCAP=none python3 -m towerlib gold`, and copy `OTHER/p3a_goldens.json.gz` there.
 
 Known order dependence: `p3acov.lib_index` and `p3apat` read the cache in `glob` order, and the pattern phase only
 solves patterns the cache lacks at that point; that is why `full` keeps the historical phase order.

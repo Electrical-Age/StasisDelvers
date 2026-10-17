@@ -60,7 +60,7 @@ def provenance(n_cache):
         origin='timestop-proto towerlib @ e060c08 (P3a + stay rule); see tools/towerlib/README.md',
         date=os.environ.get('TOWERLIB_DATE') or datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
         cache=os.path.basename(paths.CACHE.rstrip('/')), cache_files=n_cache,
-        params=dict(D_CAP=A.D_CAP, D_FRAC=A.D_FRAC, BACKSTAY_MODE=A.BACKSTAY_MODE, STAY_CAP=A.STAY_CAP,
+        params=dict(STRENGTH=F.STRENGTH, D_CAP=A.D_CAP, D_FRAC=A.D_FRAC, BACKSTAY_MODE=A.BACKSTAY_MODE, STAY_CAP=A.STAY_CAP,
                     STAY_RISE=A.STAY_RISE, STAY_MIN_RATIO=A.STAY_MIN_RATIO, STAY_MIN_RISE=A.STAY_MIN_RISE,
                     rules='entries = union of the solve cache: P3a rule (stay cap none) runs, then stay rule (same)',
                     env=env),

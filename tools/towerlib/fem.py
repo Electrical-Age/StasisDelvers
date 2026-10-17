@@ -14,9 +14,13 @@ import scipy.sparse as sp
 from scipy.optimize import linprog
 from . import gsx as G
 
-SIG_T, SIG_C0, L0, E = 300.0, 150.0, 3.0, G.E
+# material strength: one factor on every allowable stress (tension, compression, cable; pole bending via SIG_B);
+# stiffness E and the buckling length L0 unchanged. 1.0 until 2026-10-17 (300 / 150 / 600), now 1.4 (towergen/NOTES.md
+# "Material strength x1.4"). Env P3A_STRENGTH.
+STRENGTH = float(os.environ.get('P3A_STRENGTH', '1.4'))
+SIG_T, SIG_C0, L0, E = 300.0 * STRENGTH, 150.0 * STRENGTH, 3.0, G.E
 RHO = 1.0
-SIG_CAB = 600.0
+SIG_CAB = 600.0 * STRENGTH
 WIDTHS = np.round(0.05 * 1.2 ** np.arange(21), 3)     # 0.05 .. 1.92
 AREAS = WIDTHS ** 2
 CAB_W = np.array([0.04, 0.06, 0.09, 0.12])
