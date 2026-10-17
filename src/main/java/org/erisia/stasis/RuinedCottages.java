@@ -60,8 +60,26 @@ public final class RuinedCottages {
 
     /** The cottage templates there are (Baughn's builds), sorted so a seed always picks the same one. */
     static List<Identifier> templates(StructureTemplateManager m) {
-        return m.listTemplates().filter(id -> id.getNamespace().equals(StasisDelvers.MODID) && id.getPath().startsWith(PREFIX))
-            .sorted().toList();
+        // cached (a map search asks for every candidate chunk, and listing all templates each time hung incognito's
+        // server twice, 2026-10-17); refreshed every minute, so new templates show up without a restart
+        Cache c = cache;
+        long now = System.nanoTime();
+        if (c == null || c.manager != m || now - c.at > 60_000_000_000L) {
+            c = new Cache(m, now, m.listTemplates().filter(id -> id.getNamespace().equals(StasisDelvers.MODID) && id.getPath().startsWith(PREFIX))
+                .sorted().toList());
+            cache = c;
+        }
+        return c.list;
+    }
+
+    private record Cache(StructureTemplateManager manager, long at, List<Identifier> list) {
+    }
+
+    private static volatile Cache cache;
+
+    /** Are there cottage templates at all (else nothing generates, and maps can't find any)? */
+    public static boolean dormant(net.minecraft.server.level.ServerLevel level) {
+        return templates(level.getStructureTemplateManager()).isEmpty();
     }
 
     public static final class Cottage extends Structure {

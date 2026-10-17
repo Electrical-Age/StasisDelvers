@@ -56,7 +56,8 @@ public class MapDeskBlock extends Block {
 
     /** A map to the nearest unclaimed cottage (claiming it), framing the desk and the cottage; null if none in reach. */
     public static ItemStack map(ServerLevel level, BlockPos from) {
-        BlockPos to = level.findNearestMapStructure(COTTAGES, from, 256, true);
+        if (RuinedCottages.dormant(level)) return null;   // (no cottage templates yet: none generate, and the search would be long)
+        BlockPos to = level.findNearestMapStructure(COTTAGES, from, 100, true);
         if (to == null) return null;
         int cx = (from.getX() + to.getX()) / 2, cz = (from.getZ() + to.getZ()) / 2;
         int span = Math.max(Math.abs(to.getX() - from.getX()), Math.abs(to.getZ() - from.getZ())) + 64;
