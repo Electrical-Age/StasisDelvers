@@ -18,6 +18,12 @@ public final class ClientFields {
         deepSeed = s;
     }
 
+    /** Is the point inside a (sphere) field's shield? (Weather stays out: WeatherEffectRendererMixin, ClientLevelMixin.) */
+    public static boolean underShield(double x, double y, double z) {
+        for (Field f : fields()) if (!f.column() && f.containsPoint(x, y, z)) return true;
+        return false;
+    }
+
     public static List<Field> fields() {
         return fields;
     }

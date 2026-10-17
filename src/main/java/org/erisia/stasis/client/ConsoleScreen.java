@@ -63,7 +63,7 @@ public final class ConsoleScreen extends Screen {
 
     @Override
     protected void init() {
-        int x = width / 2 - 150, y = height / 2 + 30;
+        int x = width / 2 - 150, y = height / 2 + 46;   // (below the text: long help lines ran into the buttons)
         targetButtons.clear();
         targetButtons.add(addRenderableWidget(Button.builder(Component.literal("-5"), b -> set(target() - 5, v(12) > 0)).bounds(x, y, 30, 20).build()));
         targetButtons.add(addRenderableWidget(Button.builder(Component.literal("-1"), b -> set(target() - 1, v(12) > 0)).bounds(x + 34, y, 30, 20).build()));
@@ -120,7 +120,7 @@ public final class ConsoleScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
         int x = width / 2 - 150, y = height / 2 - 92;
         // the panel first, then the buttons on it (drawn after, it greyed them out: AdventurAgent's stills)
-        g.fill(x - 8, y - 8, x + 308, height / 2 + 110, 0xD0101018);
+        g.fill(x - 8, y - 8, x + 308, height / 2 + 126, 0xD0101018);
         super.extractRenderState(g, mouseX, mouseY, a);
         g.text(font, "STASIS TOWER", x, y, 0xFFB8A8E8);
         if (st == null) {
@@ -132,7 +132,7 @@ public final class ConsoleScreen extends Screen {
         g.text(font, states[Math.max(0, Math.min(2, s))], x + 90, y, s == 2 ? 0xFFFF5050 : s == 1 ? 0xFF70E070 : 0xFFA0A0A0);
         // charge bar, with the safety's 60% mark
         double share = v(1) / Math.max(1, v(2));
-        int by = y + 16;
+        int by = y + 24;   // (room for the 15/50/80% labels under the title)
         g.fill(x, by, x + 300, by + 10, 0xFF202028);
         g.fill(x, by, x + (int) (300 * Math.max(0, Math.min(1, share))), by + 10, share < 0.15 ? 0xFFD05030 : share < 0.5 ? 0xFFD0A030 : 0xFF50A0D0);
         // the safety's marks: the last ditch (15%) and where a retreated field grows back (80%)
@@ -173,7 +173,9 @@ public final class ConsoleScreen extends Screen {
         }
         // (a refused or disallowed layout in red: Baughn missed it in grey)
         boolean bad = st.text().startsWith("Tower layout not allowed") || st.text().startsWith("Tower refused") || st.text().startsWith("Tower could not");
+        int n = 0;
         for (var line : font.split(Component.literal(st.text()), 300)) {
+            if (n++ == 3) break;   // (at most three lines: the buttons are below)
             g.text(font, line, x, ly + 2, bad ? 0xFFFF5050 : 0xFF909098);
             ly += 10;
         }

@@ -22,6 +22,7 @@ public abstract class WeatherEffectRendererMixin {
     private WeatherEffectRenderer.ColumnInstance stasis$stillRain(WeatherEffectRenderer self, RandomSource random, long ticks, int x, int bottomY,
                                                                    int topY, int z, int light, float partial,
                                                                    Operation<WeatherEffectRenderer.ColumnInstance> original) {
+        bottomY = stasis$shelter(x, z, bottomY, topY);
         boolean still = stasis$stopped(x, (bottomY + topY) >> 1, z);
         return original.call(self, random, still ? 0L : ticks, x, bottomY, topY, z, light, still ? 0f : partial);
     }
@@ -31,8 +32,26 @@ public abstract class WeatherEffectRendererMixin {
     private WeatherEffectRenderer.ColumnInstance stasis$stillSnow(WeatherEffectRenderer self, RandomSource random, long ticks, int x, int bottomY,
                                                                    int topY, int z, int light, float partial,
                                                                    Operation<WeatherEffectRenderer.ColumnInstance> original) {
+        bottomY = stasis$shelter(x, z, bottomY, topY);
         boolean still = stasis$stopped(x, (bottomY + topY) >> 1, z);
         return original.call(self, random, still ? 0L : ticks, x, bottomY, topY, z, light, still ? 0f : partial);
+    }
+
+    /**
+     * A field's shield keeps the weather out (Baughn): a column over a field stops at the shield's top; one wholly under
+     * it is empty (bottom = top).
+     */
+    private static int stasis$shelter(int x, int z, int bottomY, int topY) {
+        double cx = x + 0.5, cz = z + 0.5;
+        for (var f : org.erisia.stasis.ClientFields.fields()) {
+            if (f.column()) continue;
+            double dx = cx - f.x(), dz = cz - f.z(), r2 = f.radius() * f.radius(), d2 = dx * dx + dz * dz;
+            if (d2 >= r2) continue;
+            double h = Math.sqrt(r2 - d2), top = f.y() + h, bottom = f.y() - h;
+            if (bottomY >= top || topY <= bottom) continue;   // (the column misses the sphere)
+            bottomY = Math.min(topY, Math.max(bottomY, (int) Math.ceil(top)));
+        }
+        return bottomY;
     }
 
     private static boolean stasis$stopped(int x, int y, int z) {

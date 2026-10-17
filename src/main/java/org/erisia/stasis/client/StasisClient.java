@@ -30,6 +30,7 @@ public final class StasisClient {
         // flames' light in chunk meshes (smooth lighting) depends on where they are
         org.erisia.stasis.Flames.clientResolver = g -> g instanceof org.erisia.stasis.mixin.client.RenderSectionRegionAccessor r ? r.stasis$level() : null;
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Pre.class, FrozenEntities::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, RiftHum::tick);
         // flames: recheck gutters once their chunk (and its light) is in
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> org.erisia.stasis.Flames.clientTick(net.minecraft.client.Minecraft.getInstance().level));

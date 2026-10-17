@@ -43,7 +43,8 @@ public abstract class ClientLevelMixin {
         target = "Lnet/minecraft/client/multiplayer/ClientLevel;addParticle(Lnet/minecraft/core/particles/ParticleOptions;DDDDDD)V"))
     private boolean stasis$rainSplash(ClientLevel level, net.minecraft.core.particles.ParticleOptions particle, double x, double y, double z,
                                       double xd, double yd, double zd) {
-        return Stasis.isRunning(level, BlockPos.containing(x, y, z));
+        // (and none under a field's shield: it keeps the weather out, Baughn)
+        return Stasis.isRunning(level, BlockPos.containing(x, y, z)) && !org.erisia.stasis.ClientFields.underShield(x, y, z);
     }
 
     @WrapWithCondition(method = "tickWeatherEffects", require = 2, at = @At(value = "INVOKE",

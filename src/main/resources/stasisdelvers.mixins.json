@@ -34,6 +34,7 @@
     "client.ChannelAccessor",
     "client.SoundEngineMixin",
     "client.WeatherEffectRendererMixin",
+    "client.EntityRendererAgeMixin",
     "client.ChatComponentAccessor"
   ],
   "injectors": {
