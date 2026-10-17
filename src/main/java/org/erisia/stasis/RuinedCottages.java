@@ -33,7 +33,8 @@ import org.jspecify.annotations.Nullable;
  * Fixable but dead; about one per square kilometre (worldgen/structure_set/ruined_cottage.json), found with the map
  * desk's maps (structure tag stasisdelvers:on_cottage_maps). The templates are Baughn's builds: every
  * data/stasisdelvers/structure/ruined_cottage/*.nbt, picked at random; with none, nothing generates. Placed on dry
- * land only. Their tower cores never drop as cores (coreDrop 0: scrap) and come dead: off, store empty, no field.
+ * land only. Their tower cores never drop as cores (coreDrop 0: scrap) and come dead: off, store empty, no field; the
+ * poles become survey poles and the tower is read anew on the spot (with a seed of its own).
  */
 public final class RuinedCottages {
     private RuinedCottages() {
@@ -59,7 +60,7 @@ public final class RuinedCottages {
     }
 
     /** The cottage templates there are (Baughn's builds), sorted so a seed always picks the same one. */
-    static List<Identifier> templates(StructureTemplateManager m) {
+    public static List<Identifier> templates(StructureTemplateManager m) {
         // cached (a map search asks for every candidate chunk, and listing all templates each time hung incognito's
         // server twice, 2026-10-17); refreshed every minute, so new templates show up without a restart
         Cache c = cache;
@@ -122,7 +123,7 @@ public final class RuinedCottages {
             super(PIECE.get(), tag, m, id -> settings(tag.read("Rot", Rotation.LEGACY_CODEC).orElse(Rotation.NONE)));
         }
 
-        static StructurePlaceSettings settings(Rotation rot) {
+        public static StructurePlaceSettings settings(Rotation rot) {
             return new StructurePlaceSettings().setRotation(rot).setMirror(Mirror.NONE)
                 .addProcessor(BlockIgnoreProcessor.STRUCTURE_BLOCK).addProcessor(RuinedCore.INSTANCE);
         }
@@ -147,12 +148,22 @@ public final class RuinedCottages {
         public StructureTemplate.@Nullable StructureBlockInfo process(LevelReader level, BlockPos target, BlockPos reference,
                 StructureTemplate.StructureBlockInfo original, StructureTemplate.StructureBlockInfo current, StructurePlaceSettings settings,
                 @Nullable StructureTemplate template) {
-            if (current == null || !current.state().is(StasisRegistry.TOWER.get())) return current;
+            if (current == null) return current;
+            // the template's poles: plain survey poles again, so the tower is read anew where it stands
+            if (current.state().is(StasisRegistry.TOWER_SEGMENT.get()))
+                return new StructureTemplate.StructureBlockInfo(current.pos(), current.state().setValue(TowerPoleBlock.PART, TowerPoleBlock.Part.SURVEY), current.nbt());
+            if (!current.state().is(StasisRegistry.TOWER.get())) return current;
             CompoundTag nbt = current.nbt() == null ? new CompoundTag() : current.nbt().copy();
             nbt.putDouble("coreDrop", 0);
             nbt.putString("state", "OFF");
             nbt.putInt("field", 0);
             nbt.putInt("energy", 0);
+            // forget the build where the template was made (absolute pole positions); each site gets its own look
+            nbt.remove("parted");
+            nbt.remove("layout");
+            nbt.putString("tstatus", "NONE");
+            nbt.putInt("ladder", -1);
+            nbt.putInt("seed", (int) net.minecraft.util.Mth.getSeed(current.pos().getX(), 0, current.pos().getZ()));
             return new StructureTemplate.StructureBlockInfo(current.pos(), current.state(), nbt);
         }
 

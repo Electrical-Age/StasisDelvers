@@ -743,6 +743,40 @@ public final class StasisGameTests {
                 new com.google.gson.JsonObject()).getOrThrow().process(h.getLevel(), BlockPos.ZERO, BlockPos.ZERO, dirt, dirt,
                 new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings(), null) == dirt);
         }, false));
+        // every ruined-cottage template places a dead core whose tower is read anew on the spot (valid, built, poles reset)
+        CASES.put("ruined_cottage_templates", new Spec(120, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var m = level.getStructureTemplateManager();
+            var ids = org.erisia.stasis.RuinedCottages.templates(m);
+            c.check("there are cottage templates", !ids.isEmpty(), "" + ids);
+            boolean sync = org.erisia.stasis.TowerStructure.syncBuild;
+            org.erisia.stasis.TowerStructure.syncBuild = true;
+            c.cleanup.add(() -> org.erisia.stasis.TowerStructure.syncBuild = sync);
+            List<BlockPos> at = new ArrayList<>();
+            for (int i = 0; i < ids.size(); i++) {
+                BlockPos p = h.absolutePos(new BlockPos(16 + 14 * (i % 2), 1, -6 + 14 * (i / 2)));   // (apart: booms mustn't meet; near: ticking)
+                var rot = net.minecraft.world.level.block.Rotation.values()[i % 4];
+                m.getOrCreate(ids.get(i)).placeInWorld(level, p, p, org.erisia.stasis.RuinedCottages.Piece.settings(rot), level.getRandom(), 2);
+                at.add(p);
+            }
+            return () -> {
+                for (int i = 0; i < ids.size(); i++) {
+                    BlockPos p = at.get(i);
+                    String n = ids.get(i).getPath();
+                    org.erisia.stasis.TowerBlockEntity tb = null;
+                    for (BlockPos q : BlockPos.betweenClosed(p.offset(-5, 0, -5), p.offset(5, 13, 5)))
+                        if (level.getBlockEntity(q) instanceof org.erisia.stasis.TowerBlockEntity t
+                            && level.getBlockState(q).getValue(org.erisia.stasis.TowerBlock.CELL) == org.erisia.stasis.TowerBlock.MASTER) tb = t;
+                    c.check(n + ": a dead core", tb != null && tb.state() == org.erisia.stasis.TowerBlockEntity.State.OFF && tb.storedJ() == 0,
+                        tb == null ? "no core" : tb.state() + " " + tb.storedJ());
+                    if (tb != null) c.check(n + ": its tower is read and built here", tb.structure.status == org.erisia.stasis.TowerStructure.Status.OK,
+                        tb.structure.status + " " + tb.structure.message + " " + tb.structure.layout);
+                }
+                for (BlockPos p : at)
+                    for (BlockPos q : BlockPos.betweenClosed(p.offset(-5, -1, -5), p.offset(5, 14, 5)))
+                        level.setBlock(q, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+            };
+        }, false, true));
         // a locked tower (the spawn tower) keeps its settings; anyone can feed a tower from their suit (a jump-start)
         CASES.put("tower_lock_and_feed", new Spec(200, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
