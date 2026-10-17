@@ -68,7 +68,7 @@ public final class WaterLines {
             NativeImage out = new NativeImage(w, h, false);
             image.copyRect(out, 0, 0, 0, 0, w, h, false, false);
             double a = Math.PI * orient / ORIENT, ca = Math.cos(a), sa = Math.sin(a);
-            float lift = strength == 1 ? 0.55f : 0.28f;
+            float lift = strength == 1 ? 0.95f : 0.7f;   // (0.55/0.28 were barely visible: AdventurAgent measured 13-15/255)
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++) {
                     // across the lines (texture x = east, y = south) and along them; the lines repeat every 4 pixels of a
@@ -78,14 +78,14 @@ public final class WaterLines {
                     double band = Math.abs(((across % 4) + 4) % 4 - 2) / 2;   // 1 on the line, 0 between
                     int dash = (int) Math.floor((along + 64) / 3);
                     int line = (int) Math.floor((across + 64) / 4);
-                    boolean on = band > 0.62 && hash(dash, line) > 0.3;
+                    boolean on = band > 0.55 && hash(dash, line) > 0.25;
                     if (!on) continue;
                     int c = out.getPixel(x, y);
                     int al = c >>> 24, r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
                     r = (int) (r + (255 - r) * lift);
                     g = (int) (g + (255 - g) * lift);
                     b = (int) (b + (255 - b) * lift);
-                    out.setPixel(x, y, (Math.min(255, al + 40) << 24) | (r << 16) | (g << 8) | b);
+                    out.setPixel(x, y, (Math.min(255, al + (strength == 1 ? 140 : 90)) << 24) | (r << 16) | (g << 8) | b);
                 }
             return new SpriteContents(id, new FrameSize(w, h), out, Optional.empty(), extra, tex);
         } catch (Exception e) {
