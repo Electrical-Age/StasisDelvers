@@ -102,6 +102,9 @@ public class Statue extends Entity {
 
     @Override
     public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+        // (AdventurAgent: players hit it first, and nothing said how to free the gear)
+        if (source.getEntity() instanceof net.minecraft.server.level.ServerPlayer p)
+            p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("A frozen statue: right-click it to free what it holds"));
         return false;
     }
 
