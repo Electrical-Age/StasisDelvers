@@ -5,8 +5,8 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 ## Tower mesh (towergen MeshBuilder)
 - Where a laced leg goes from 4 to 3 chords, the wider member's end battens show as a step. (2026-10-17: tried the
   3-chord member's ring instead; worse at big width changes, kept; see towergen/NOTES.md "Gusset seams".)
-- Brace hubs inside laced legs: fixed 2026-10-17 for solid braces narrower than the leg's hollow (they now stop at
-  the lacing planes); laced bracing and braces wider than a 3-chord leg's hollow still form a hub there.
+- Brace hubs inside laced legs: since 2026-10-17 drawn in the member colour instead of dark knuckle; they are still
+  there (cutting the braces at the leg's faces left wide / shallow braces ending in mid-air, so that was reverted).
 - K nodes (two wide laced diagonals meeting a leg): the gusset fills the crotch, up to 0.64 blocks on H64's widest
   legs. Fine if it reads as a gusset plate; revisit if it looks heavy.
 - Nearly parallel members past the setback cap overlap inside each other.

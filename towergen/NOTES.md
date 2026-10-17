@@ -134,16 +134,13 @@ Known limits:
   and the lacing start just off the gusset (batten centre 0.35 x its width past the face where the last chord edge
   leaves the hull: sunk 0.15 x, no face coplanar with the gusset's). Splice ends are unchanged.
 - Brace hubs inside laced legs (small dark knuckle blocks seen through the lacing): at a node where a laced leg
-  continues (chord splices) and every other end there is a solid member narrower than the leg or a cable, whose
-  section starts inside the leg's lacing planes and leaves at more than 10 degrees to its axis (`legBraces`), there
-  is no hub: each member is cut where its section first reaches a lacing plane (the end face stays inside the leg)
-  and capped. Other leg nodes (laced bracing: envelope joints; members wider than a 3-chord leg's hollow;
-  near-parallel members) keep the hull joint. Hulls q1: H24b 172 -> 142, H40 235 -> 191, H40r3 351 -> 323, H40b4
-  333 -> 309, H64max 621 -> 573, H100 839 -> 699; triangles q1 0 to -3% (H100 67094 -> 65944). Cables ending at
-  such a node are cut at the lacing planes too. Slow random sweep (100 layouts x 2 q, seed 7): 57032 hulls, 0
-  failed, no exceptions.
+  continues (chord splices), the brace hub is drawn in its widest member's part (rust / steel) instead of
+  colKnuckle, so it reads as the braces meeting rather than a floating dark block. Geometry unchanged. A first
+  version cut the braces at the leg's lacing planes with no hub; reverted the same day: wide or shallow braces then
+  ended in mid-air (H16 W4 branchClose, H40 q0.3 node 49), i.e. visibly detached members.
+- Slow random sweep (100 layouts x 2 q, seed 7): no failures, no exceptions.
 - Known: where the hull covers a chord past 0.49 x its length (very short laced members), the end batten may sit
-  inside the hull (as before).
+  inside the hull (as before). Hubs of braces inside laced legs are still drawn (recoloured only).
 - Not changed: the 4 -> 3 chord step. Tried giving the end batten ring to the 3-chord member (the wider member's
   square ring is the step): small changes (0.77 -> 0.45) look cleaner, but large ones (1.92 -> 0.64, H40 q0.3 node
   52) leave the unmatched 4th chord as a lone post and the wide member's lacing ends poke out of its chord cuts, so
@@ -156,8 +153,8 @@ Known limits:
 - towerview shots: `branchClose` (the branch node from 2 blocks), `nodeN@DIST[:DEG[:UP]]` (close-up of node N at
   DIST blocks, DEG around from the outward radial, UP above; e.g. `node13@1.3:20:-1.3` looks up at H16 W4's gusset).
 - Renders: `renders/contact_gusset_sink.png` (1920 x 3240, before | after: H16 W4 q1 node 13 from below (gusset lip,
-  chords sunk, batten off the face), H16 W4 branchClose (brace hub gone), H40 q0.3 node 49 from inside, H64max and
-  H100 `ljoint` (braces no longer cross the leg's hollow), H64max `close`).
+  chords sunk, batten off the face), H16 W4 branchClose (brace hubs in member colour), H40 q0.3 node 49 from inside,
+  H64max and H100 `ljoint`, H64max `close`).
 
 ## Laced members at branch nodes: envelope (gusset) joints (2026-10-13, owner report 2)
 - Report: H16 W4@2 / W5@2, lower west leg: a laced member ending at a node (Y: the laced leg ends where a solid leg
@@ -254,7 +251,7 @@ Known limits:
   continue, nearest 0.3 H). Singles in renders/before_hull, renders/after_hull (git-ignored).
 - Known: the hull fills the crotch between members at small angles (a gusset look, bounded as above); near-parallel
   members beyond the setback cap overlap inside each other; hubs inside laced legs (bracing only) are still drawn
-  (2026-10-17: gone where the bracing is solid and narrower than the leg's hollow, see "Gusset seams").
+  (2026-10-17: drawn in the member colour instead of colKnuckle, see "Gusset seams").
 
 ## Mesh: watertight joints, crossing offsets (2026-10-13; the cube hubs, superseded by the hulls above)
 - Every node with >= 2 member ends gets a hub: a cube oriented like the widest member, half-size the smallest that
@@ -323,8 +320,7 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   refused even when short; hanging the lower boom from the upper one (or anchors between rings) would accept them.
 - LP-infeasible boom solves are not cached, so they are not in `boom_failed` (only repair-gave-up ones are).
 - Joint look: section changes on laced legs show as chord-width splice cubes; big hubs where a laced boom truss
-  tapers into a solid chord; hubs of braces sit inside laced legs (2026-10-17: only laced bracing and braces wider
-  than a 3-chord leg's hollow still do); hubs read as a dark band in colKnuckle on solid
+  tapers into a solid chord; hubs of braces sit inside laced legs (2026-10-17: in the member colour, no longer dark); hubs read as a dark band in colKnuckle on solid
   legs (`hubMemberColour` / colKnuckle tune it); ground hubs reach h below ground.
 - Meshes are heavy: H64max is ~110k triangles (lacing dominates). LOD (skip lacing at distance) is needed in the mod.
 - The library is 7.8 MB gz in the jar. `LibraryBin` (TGLB1, lossless, 2.0 MB gz, reads in 20 ms) exists for towerweb;

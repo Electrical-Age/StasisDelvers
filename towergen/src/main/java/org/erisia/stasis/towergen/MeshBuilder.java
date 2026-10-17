@@ -27,8 +27,8 @@ import org.erisia.stasis.towergen.VisualParams.Part;
  * end outside). Laced chords at a free end are ordinary members of the node joint; where a laced member continues
  * into another (along a leg) each chord pair gets a two-member hull joint (flush when collinear). A laced member ending
  * at a branch joins its node's hull by its envelope (a gusset, gussetLip wider than its chords); its chords' open ends
- * sink into the gusset (chordSink) and its end batten stands just off the gusset face. Solid braces ending at a node
- * inside a continuing laced leg stop at the leg's lacing planes, capped, with no hub (legBraces). Members that cross
+ * sink into the gusset (chordSink) and its end batten stands just off the gusset face. Brace hubs inside a continuing
+ * laced leg take the widest brace's part (not the dark knuckle colour). Members that cross
  * without sharing a node (X-braces, crossing cables) are pushed apart along the common normal so no faces are
  * coplanar (no z-fighting).
  */
@@ -60,7 +60,6 @@ public final class MeshBuilder {
         double[][] pl, vt;     // prism planes / vertices (clearance), computed on demand
         boolean envelope;      // a laced member's outer section (not drawn; its chords are cut at e)
         double vis = -1;       // chord ends at a gusset: the visible cut (the gusset face; e is sunk below it)
-        boolean stub;          // a brace ending inside a laced leg: drawn from e, capped (no hub)
 
         End(double[] p, double[] d, double[] sd, double a, double len, boolean cable, Part part) {
             this.p = p; this.d = d; this.sd = sd; this.a = a; this.len = len; this.cable = cable; this.part = part;
@@ -76,6 +75,7 @@ public final class MeshBuilder {
         Hull3 hull;
         Part part;
         JointInfo info;                                     // tests
+        boolean inLeg;                                      // a node inside a continuing laced leg
 
         void add(End e) { ends.add(e); }
     }
@@ -364,17 +364,11 @@ public final class MeshBuilder {
         }
         for (int nd = 0; nd < n; nd++) {
             if (nodeHub[nd] == null) continue;
-            // braces inside a laced leg: where a laced member continues through the node (chord splices) and only
-            // narrower solid members / cables end there, their hub would float in the leg's hollow (a dark block seen
-            // through the lacing); they stop inside the leg instead, capped (legBraces)
-            List<double[]> legs = new ArrayList<>();
-            double legB = 1e300;
-            for (int b : at.get(nd)) {
-                if (type[b] != LACED) continue;
-                int e = t.bi[b] == nd ? 0 : 1;
-                if (cont[2 * b + e] >= 0) { legs.addAll(legPlanes(lg[b], node(P, nd))); legB = Math.min(legB, lg[b].b); }
-            }
-            if (!legBraces(nodeHub[nd], legs, legB)) solve(nodeHub[nd], sink);
+            // a brace hub inside a continuing laced leg (chord splices through the node) sits in the leg's hollow,
+            // seen through the lacing: drawn in its widest member's part, not as a dark knuckle block
+            for (int b : at.get(nd))
+                if (type[b] == LACED && cont[2 * b + (t.bi[b] == nd ? 0 : 1)] >= 0) nodeHub[nd].inLeg = true;
+            solve(nodeHub[nd], sink);
         }
         for (Joint hb : chordHubs) { solve(hb, sink); hb.part = hb.ends.get(0).part; }   // chord splices: a piece of chord
         // chords run straight to their envelope's cut (the gusset face), and their open ends sink into the gusset by
@@ -431,7 +425,7 @@ public final class MeshBuilder {
                 continue;
             }
             End e0 = mEnd[2 * b], e1 = mEnd[2 * b + 1];
-            double t0 = e0.sealed || e0.stub ? e0.e : 0, t1 = e1.sealed || e1.stub ? e1.e : 0;
+            double t0 = e0.sealed ? e0.e : 0, t1 = e1.sealed ? e1.e : 0;
             if (len[b] - t0 - t1 < 1e-6) continue;
             double[] p0 = V.add(e0.p, V.mul(ax[b], t0)), p1 = V.sub(e1.p, V.mul(ax[b], t1));
             mesh.beam(p0, p1, dw[b], dw[b], part[b], !e0.sealed, !e1.sealed);
@@ -675,7 +669,7 @@ public final class MeshBuilder {
         boolean gusset = false;
         for (End en : core) gusset |= en.envelope;
         // hubs holding laced members are gusset blocks in the widest member's part
-        jt.part = vp.jointMemberColour() || through || gusset ? w.part : Part.KNUCKLE;
+        jt.part = vp.jointMemberColour() || through || gusset || jt.inLeg ? w.part : Part.KNUCKLE;
         if (sink != null) {
             JointInfo ji = new JointInfo();
             ji.hull = h;
@@ -761,68 +755,6 @@ public final class MeshBuilder {
             for (int k = 0; k < 3; k++) { off[j][k] += push * dw[i] * nrm[k]; off[i][k] -= push * dw[j] * nrm[k]; }
         }
         return off;
-    }
-
-    /** Cosine of the smallest angle between a brace and the laced leg for {@link #legBraces} (10 degrees). */
-    static final double LEG_BRACE_COS = 0.985;
-
-    /**
-     * The lacing planes of laced member g's section around node c, as half-spaces n . x <= r (rows nx ny nz r, the
-     * last row the member's unit axis, flagged by r = NaN): one per face, through the chord centres.
-     */
-    private static List<double[]> legPlanes(Laced g, double[] c) {
-        List<double[]> out = new ArrayList<>();
-        for (int k = 0; k < g.nc; k++) {
-            double[] nn = V.unit(V.add(g.dir[k], g.dir[(k + 1) % g.nc]));
-            out.add(new double[]{nn[0], nn[1], nn[2], V.dot(nn, c) + g.h * V.dot(g.dir[k], nn)});
-        }
-        double[] a = V.mul(g.dv, 1 / g.L);
-        out.add(new double[]{a[0], a[1], a[2], Double.NaN});
-        return out;
-    }
-
-    /**
-     * Brace ends at a node inside a continuing laced leg (legs: the lacing half-spaces of the spliced members there,
-     * {@link #legPlanes}; legB the narrowest one's outer width): if every end of the joint is a solid member narrower
-     * than the leg or a cable, its whole section starts inside the leg's lacing planes (crossing offset included) and
-     * it leaves the leg at more than 10 degrees to its axis, each is cut where its section first reaches a lacing
-     * plane (its end face stays inside the leg) and capped there, and the joint gets no hub. Otherwise (laced ends,
-     * members wider than the leg's hollow, near-parallel members) false: the ordinary hull joint.
-     */
-    private boolean legBraces(Joint jt, List<double[]> legs, double legB) {
-        if (legs.isEmpty()) return false;
-        double maxF = Math.max(0, Math.min(0.49, vp.jointMaxSetbackFrac()));
-        double[] cut = new double[jt.ends.size()];
-        for (int i = 0; i < jt.ends.size(); i++) {
-            End en = jt.ends.get(i);
-            if (en.envelope) return false;
-            double sf = 1e300;
-            for (int k = 0; k < 4; k++) {
-                double[] x0 = corner(en, 0, k);
-                double best = 0;                  // the leaving parameter, over the leg members (union)
-                double lo = 1e300;                // within one member: the first plane reached
-                boolean inside = true;
-                for (double[] h : legs) {
-                    if (Double.isNaN(h[3])) {     // end of one member's planes: its axis
-                        if (Math.abs(V.dot(en.d, h)) > LEG_BRACE_COS) return false;
-                        if (inside) best = Math.max(best, lo);
-                        lo = 1e300;
-                        inside = true;
-                        continue;
-                    }
-                    double d0 = h[0] * x0[0] + h[1] * x0[1] + h[2] * x0[2] - h[3], d1 = V.dot(en.d, h);
-                    if (d0 > -1e-9) inside = false;
-                    else if (d1 > 1e-12) lo = Math.min(lo, -d0 / d1);
-                }
-                if (best <= 1e-9 || best >= 1e299) return false;
-                sf = Math.min(sf, best);
-            }
-            if (!en.cable && 2 * en.a >= legB) return false;
-            if (sf > maxF * en.len) return false;
-            cut[i] = sf;
-        }
-        for (int i = 0; i < jt.ends.size(); i++) { End en = jt.ends.get(i); en.e = cut[i]; en.stub = true; }
-        return true;
     }
 
     /** Continuing laced members: the bend between them below 30 degrees (leg kinks at the base flare included). */
