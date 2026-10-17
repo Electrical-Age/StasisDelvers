@@ -5,7 +5,7 @@ import net.minecraft.world.level.Level;
 import org.erisia.stasis.LocalTime;
 import org.erisia.stasis.Stasis;
 
-/** The overworld clock as the client draws it: the world's day count with the local time of day where the player is. */
+/** The overworld clock as the client draws it: the local time where the player is (the grey's or a field's, day count included). */
 public final class LocalClock {
     private LocalClock() {
     }
@@ -15,7 +15,6 @@ public final class LocalClock {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.level.dimension() != Level.OVERWORLD || !Stasis.stops(mc.level)) return Double.NaN;
         var p = mc.player.getEyePosition(partial);
-        double tod = LocalTime.Client.timeOfDay(mc.level, p.x, p.y, p.z, partial, LocalTime.wrap(totalTicks + (double) partial));
-        return totalTicks - Math.floorMod(totalTicks, (long) LocalTime.DAY) + tod;
+        return LocalTime.Client.time(mc.level, p.x, p.y, p.z, partial, totalTicks + (double) partial);
     }
 }

@@ -554,8 +554,9 @@ public final class StasisGameTests {
             h.runAfterDelay(5, () -> pig.hurtServer(h.getLevel(), h.getLevel().damageSources().generic(), 100f));
             return () -> c.check("the dead pig is gone", pig.isRemoved(), "removed " + pig.isRemoved() + " hp " + pig.getHealth() + " deathTime " + pig.deathTime);
         }, false, true));
-        // local time (visual): a field's clock skews at 50-200% towards the world's; when it goes, its chunks keep its time
-        CASES.put("field_clock_skews_and_chunks_remember", new Spec(41, (h, c) -> {
+        // local time (visual): a field's clock starts from the grey's and skews at 50-200% towards the world's; when the
+        // field goes, so does its clock (Baughn: no per-chunk memory, the grey has one time)
+        CASES.put("field_clock_skews_and_goes", new Spec(41, (h, c) -> {
             ServerLevel level = h.getLevel();
             Vec3 a = h.absoluteVec(new Vec3(3.5, 1, 4.5));
             Field f = FieldData.get(level).add(level, a.x, a.y, a.z, 12);   // r 12 always covers its own chunk's centre
@@ -566,10 +567,9 @@ public final class StasisGameTests {
                 double moved = org.erisia.stasis.LocalTime.wrapDiff(first[0], now);
                 c.check("the clock moves at 0.5x or 2x (40 ticks: 20 or 80)", Math.abs(moved - 20) < 2.5 || Math.abs(moved - 80) < 2.5,
                     "moved " + moved + " from " + first[0]);
+                c.check("a new field starts from the grey's time (a sunset)", Math.abs(first[0] - org.erisia.stasis.LocalTime.DEFAULT_TOD) < 81, "first " + first[0]);
                 FieldData.get(level).remove(level, f.id());
-                long chunk = net.minecraft.world.level.ChunkPos.pack(net.minecraft.core.BlockPos.containing(a.x, a.y, a.z));
-                double kept = org.erisia.stasis.LocalTime.ChunkClocks.get(level).at(chunk);
-                c.check("its centre chunk keeps that time", Math.abs(kept - now) < 0.001, "kept " + kept + " clock " + now);
+                c.check("when it goes, its clock goes (the land shows the grey's time again)", Double.isNaN(org.erisia.stasis.LocalTime.clockOf(level, f.id())));
             };
         }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {

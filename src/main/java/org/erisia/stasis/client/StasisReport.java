@@ -71,7 +71,7 @@ public final class StasisReport {
             c.add("gutters", ReportData.gutters(bp.getX() >> 4, bp.getZ() >> 4));
             Vec3 p = mc.player.position();
             long gt = mc.level.getOverworldClockTime();
-            c.addProperty("local_time_of_day", LocalTime.Client.timeOfDay(mc.level, p.x, p.y, p.z, 1f, LocalTime.wrap(gt)));
+            c.addProperty("local_time_of_day", LocalTime.wrap(LocalTime.Client.time(mc.level, p.x, p.y, p.z, 1f, gt)));
             c.addProperty("local_clock", LocalClock.local(gt, 1f));
             return c;
         });

@@ -30,7 +30,10 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::finalizeSpawn);
         NeoForge.EVENT_BUS.addListener(StasisEvents::keepFriendlyInside);
-        NeoForge.EVENT_BUS.addListener(StasisEvents::canSleep);
+        NeoForge.EVENT_BUS.addListener(FieldSleep::canSleep);
+        NeoForge.EVENT_BUS.addListener(FieldSleep::canContinue);
+        NeoForge.EVENT_BUS.addListener(FieldSleep::tick);
+        NeoForge.EVENT_BUS.addListener(FieldSleep::noWorldSkip);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelLoad);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelUnload);
         NeoForge.EVENT_BUS.addListener(NewChunkGrace::chunkLoad);
@@ -52,7 +55,6 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::incomingDamage);
         NeoForge.EVENT_BUS.addListener(StasisEvents::deathLog);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, LocalTime::tick);
-        NeoForge.EVENT_BUS.addListener(LocalTime::watch);
         NeoForge.EVENT_BUS.addListener(SpawnCottage::serverStarted);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, PlayerRates::tick);
         NeoForge.EVENT_BUS.addListener(PlayerRates::logout);

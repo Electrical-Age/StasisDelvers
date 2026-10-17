@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
@@ -13,9 +12,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Local time of day, visual only (Baughn + λ-Nero, notes/timestop/LOCAL-TIME-PLAN.md): stopped land shows the time it
- * froze at (a chunk remembers it; never-run land shows a sunset), a field shows its own clock, which skews at 50-200%
- * towards the world's time until it matches. The client draws sky, sun and light from the local time where the camera is.
+ * Local time, visual only (Baughn + λ-Nero, notes/timestop/LOCAL-TIME-PLAN.md): all stopped land shows one frozen time
+ * (a sunset on day 0, so the moon never changes there; Baughn 2026-10-17: land a field leaves takes the grey's time, no
+ * per-chunk memory), a field shows its own clock, which skews at 50-200% towards the world's time of day until it
+ * matches. Field clocks are absolute (day count included: the moon phase is the field's own), and sleeping in a field
+ * moves only that field's clock to the next morning (FieldSleep). The client draws sky, sun, moon and light from the
+ * local time where the camera is.
  */
 public final class LocalTime {
     private LocalTime() {
@@ -35,7 +37,7 @@ public final class LocalTime {
 
     // ---------------------------------------------------------------- server
 
-    /** Chunk -> the time of day it froze at (written when a field over it goes). */
+    /** Chunk -> the time of day it froze at: no longer written or drawn (the grey has one time); kept so old saves load. */
     public static final class ChunkClocks extends SavedData {
         public static final Codec<ChunkClocks> CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE)
             .xmap(ChunkClocks::new, c -> {
@@ -64,10 +66,27 @@ public final class LocalTime {
         }
     }
 
-    /** Field id -> its clock (time of day), per level; kept with FieldData. */
+    /** Field id -> its clock (absolute ticks: day count and time of day), per level; kept with FieldData. A new field
+     *  starts from the grey's time. */
     static double fieldClock(ServerLevel level, Field f) {
         FieldData fd = FieldData.get(level);
-        return fd.clocks.computeIfAbsent(f.id(), id -> ChunkClocks.get(level).at(ChunkPos.pack(BlockPos.containing(f.x(), f.y(), f.z()))));
+        return fd.clocks.computeIfAbsent(f.id(), id -> DEFAULT_TOD);
+    }
+
+    /** Sets a field's clock (absolute) and tells the clients at once. */
+    static void setFieldClock(ServerLevel level, Field f, double c) {
+        FieldData fd = FieldData.get(level);
+        fd.clocks.put(f.id(), c);
+        fd.setDirty();
+        Map<Integer, double[]> sync = new HashMap<>();
+        for (Field g : fd.fields()) sync.put(g.id(), new double[]{fieldClock(level, g), g.rate()});
+        StasisNet.sendFieldClocks(level, sync);
+    }
+
+    /** Is it night at this time of day (when a bed can be used; vanilla's clear-weather span)? */
+    public static boolean night(double t) {
+        double tod = wrap(t);
+        return tod >= 12542 && tod <= 23459;
     }
 
     /** Server tick: every field's clock skews towards the world's time; clients hear about it every 40 ticks. */
@@ -80,14 +99,14 @@ public final class LocalTime {
             Map<Integer, double[]> sync = new HashMap<>();
             for (Field f : fd.fields()) {
                 double c = fieldClock(level, f);
-                double d = wrapDiff(c, global);
+                double d = wrapDiff(wrap(c), global);
                 double step;
                 if (Math.abs(d) < 1.0) {
-                    c = global;
+                    c += d;
                     step = f.rate();
                 } else {
                     step = f.rate() * (d > 0 ? 2.0 : 0.5);
-                    c = wrap(c + step);
+                    c += step;
                 }
                 fd.clocks.put(f.id(), c);
                 sync.put(f.id(), new double[]{c, step});
@@ -103,34 +122,9 @@ public final class LocalTime {
         return FieldData.get(level).clocks.getOrDefault(id, Double.NaN);
     }
 
-    /** A field goes: the chunks it covered keep the time it showed. */
+    /** A field goes: its clock goes with it (the land shows the grey's time again). */
     static void fieldGone(ServerLevel level, Field f) {
-        Double c = FieldData.get(level).clocks.remove(f.id());
-        if (c == null) return;
-        ChunkClocks cc = ChunkClocks.get(level);
-        Map<Long, Double> changed = new HashMap<>();
-        int r = (int) Math.ceil(f.radius());
-        int cx0 = ((int) Math.floor(f.x() - r)) >> 4, cx1 = ((int) Math.floor(f.x() + r)) >> 4;
-        int cz0 = ((int) Math.floor(f.z() - r)) >> 4, cz1 = ((int) Math.floor(f.z() + r)) >> 4;
-        for (int cx = cx0; cx <= cx1; cx++)
-            for (int cz = cz0; cz <= cz1; cz++) {
-                double px = (cx << 4) + 8, pz = (cz << 4) + 8;
-                if (f.containsPoint(px, f.y(), pz)) {
-                    long k = ChunkPos.pack(cx, cz);
-                    cc.clocks.put(k, c);
-                    changed.put(k, c);
-                }
-            }
-        cc.setDirty();
-        if (!changed.isEmpty()) StasisNet.sendChunkClocks(level, changed);
-    }
-
-    /** A player starts watching a chunk: its frozen time, if it has one. */
-    static void watch(net.neoforged.neoforge.event.level.ChunkWatchEvent.Watch e) {
-        ChunkClocks cc = ChunkClocks.get(e.getLevel());
-        long k = e.getPos().pack();
-        Double c = cc.clocks.get(k);
-        if (c != null) StasisNet.sendChunkClocks(e.getPlayer(), Map.of(k, c));
+        FieldData.get(level).clocks.remove(f.id());
     }
 
     // ---------------------------------------------------------------- client
@@ -159,34 +153,12 @@ public final class LocalTime {
         }
 
         /**
-         * Stopped land's time at (x, z): the chunk's, blended with its neighbours' over ~3 blocks at each chunk edge
-         * (AdventurAgent: a hard sun jump at the edge of a removed field's chunks).
+         * The time to draw at this position (absolute: sky, sun, moon, light), with a 3-block blend at field edges.
+         * global: the world's time (absolute), as the caller read it raw (reading the clock here would recurse into the
+         * clock mixin: AdventurAgent's StackOverflowError).
          */
-        static double outside(double x, double z) {
-            double fx = (x - 8) / 16.0, fz = (z - 8) / 16.0;   // between chunk centres
-            int cx = (int) Math.floor(fx), cz = (int) Math.floor(fz);
-            double tx = edge(fx - cx), tz = edge(fz - cz);
-            double a = CHUNKS.getOrDefault(ChunkPos.pack(cx, cz), DEFAULT_TOD);
-            double b = CHUNKS.getOrDefault(ChunkPos.pack(cx + 1, cz), DEFAULT_TOD);
-            double c = CHUNKS.getOrDefault(ChunkPos.pack(cx, cz + 1), DEFAULT_TOD);
-            double d = CHUNKS.getOrDefault(ChunkPos.pack(cx + 1, cz + 1), DEFAULT_TOD);
-            // circular blend, all relative to a
-            double ab = a + wrapDiff(a, b) * tx, cd = a + wrapDiff(a, c) + (wrapDiff(a, d) - wrapDiff(a, c)) * tx;
-            return wrap(ab + (cd - ab) * tz);
-        }
-
-        /** 0..1 across the gap between two chunk centres, changing only within 1.5 blocks of the chunk edge. */
-        private static double edge(double t) {
-            double u = (t - 0.5) * 16.0 / 3.0 + 0.5;
-            u = Math.max(0, Math.min(1, u));
-            return u * u * (3 - 2 * u);
-        }
-
-        /** The time of day to draw at this position (sky, sun, light), with a 3-block blend at field edges. */
-        /** globalTod: the world's time of day, as the caller read it raw (reading the clock here would recurse into the
-         *  clock mixin: AdventurAgent's StackOverflowError). */
-        public static double timeOfDay(Level level, double x, double y, double z, float partial, double globalTod) {
-            double outside = outside(x, z);
+        public static double time(Level level, double x, double y, double z, float partial, double global) {
+            double outside = DEFAULT_TOD;
             double best = 0, inside = outside;
             for (Field f : ClientFields.fields()) {
                 double[] c = FIELDS.get(f.id());
@@ -196,12 +168,15 @@ public final class LocalTime {
                 double w = Math.max(0, Math.min(1, (f.radius() - d) / 3.0)) * (1 - f.collapse());
                 if (w > best) {
                     best = w;
-                    inside = wrap(c[0] + (level.getGameTime() - c[2] + partial) * c[1]);
+                    inside = c[0] + (level.getGameTime() - c[2] + partial) * c[1];
                 }
             }
-            // running land that isn't a field (the spawn area) shows the world's clock (AdventurAgent)
-            if (best <= 0 && Stasis.isRunning(level, BlockPos.containing(x, y, z))) return wrap(globalTod);
-            return wrap(outside + wrapDiff(outside, inside) * best);
+            if (best <= 0) {
+                // running land that isn't a field (the spawn area) shows the world's clock (AdventurAgent)
+                return Stasis.isRunning(level, BlockPos.containing(x, y, z)) ? global : outside;
+            }
+            // the field's day (and moon) with the time of day blended towards the grey's at the edge
+            return inside - wrapDiff(wrap(outside), wrap(inside)) * (1 - best);
         }
     }
 }
