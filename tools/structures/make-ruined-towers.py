@@ -110,6 +110,7 @@ def clean_tower(t, seed):
             for key in ('parted', 'layout'): n.pop(key, None)
             n['tstatus'] = (8, 'NONE'); n['ladder'] = (3, -1)
             n['seed'] = (3, seed)
+            n['ruined'] = (1, 1); n['coreDrop'] = (6, 0.0)   # (also set by the mod's processor at worldgen)
 
 
 def mast_top(t, h):

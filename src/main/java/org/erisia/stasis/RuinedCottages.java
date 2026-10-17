@@ -34,7 +34,8 @@ import org.jspecify.annotations.Nullable;
  * desk's maps (structure tag stasisdelvers:on_cottage_maps). The templates are Baughn's builds: every
  * data/stasisdelvers/structure/ruined_cottage/*.nbt, picked at random; with none, nothing generates. Placed on dry
  * land only. Their tower cores never drop as cores (coreDrop 0: scrap) and come dead: off, store empty, no field; the
- * poles become survey poles and the tower is read anew on the spot (with a seed of its own).
+ * poles become survey poles, and the tower is read anew on the spot (with a seed of its own) once it first runs: until
+ * then no tower is drawn, so the bare poles show the damage (Baughn).
  */
 public final class RuinedCottages {
     private RuinedCottages() {
@@ -155,6 +156,7 @@ public final class RuinedCottages {
             if (!current.state().is(StasisRegistry.TOWER.get())) return current;
             CompoundTag nbt = current.nbt() == null ? new CompoundTag() : current.nbt().copy();
             nbt.putDouble("coreDrop", 0);
+            nbt.putBoolean("ruined", true);   // (no tower drawn until it first runs: the bare poles show the damage)
             nbt.putString("state", "OFF");
             nbt.putInt("field", 0);
             nbt.putInt("energy", 0);

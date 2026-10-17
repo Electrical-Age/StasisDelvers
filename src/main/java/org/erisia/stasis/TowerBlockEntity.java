@@ -212,9 +212,10 @@ public class TowerBlockEntity extends BlockEntity {
     /**
      * Block-entity flags (Baughn 2026-10-17; set with /data, in templates, or by the ruined-cottage placement): locked =
      * the console shows but can't change the radius or OVERRIDE (the spawn tower); coreDrop = the chance this core block
-     * drops itself when broken (else scrap: ruined cottages 0). Kept on every core block.
+     * drops itself when broken (else scrap: ruined cottages 0); ruined = a ruin's core: its tower isn't read or drawn
+     * (the bare poles show the damage) until it first runs (Baughn). Kept on every core block.
      */
-    public boolean locked;
+    public boolean locked, ruined;
     public double coreDrop = 1;
 
     /** Console: feeding the store from a player's batteries and suit (Baughn: a jump-start), 2 kW while it lasts. */
@@ -386,7 +387,7 @@ public class TowerBlockEntity extends BlockEntity {
     void serverTick() {
         if (!(level instanceof ServerLevel sl)) return;
         ticks++;
-        if (structure.tick(sl, worldPosition, ticks)) {
+        if (!ruined && structure.tick(sl, worldPosition, ticks)) {
             setChanged();
             sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
@@ -600,6 +601,7 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     void start(ServerLevel sl) {
+        ruined = false;   // (a ruin that runs is a tower again: read and drawn from the next tick)
         if (remnant != null) {
             remnant = null;
             sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
@@ -669,6 +671,7 @@ public class TowerBlockEntity extends BlockEntity {
         out.putInt("energy", store.amount());
         out.putDouble("failing", failing);
         if (locked) out.putBoolean("locked", true);
+        if (ruined) out.putBoolean("ruined", true);
         if (coreDrop < 1) out.putDouble("coreDrop", coreDrop);
         out.putDouble("amber", amber);
         out.putDouble("dropout", dropout);
@@ -719,6 +722,7 @@ public class TowerBlockEntity extends BlockEntity {
         store.set(in.getIntOr("energy", 0));
         failing = in.getDoubleOr("failing", 0);
         locked = in.getBooleanOr("locked", false);
+        ruined = in.getBooleanOr("ruined", false);
         coreDrop = in.getDoubleOr("coreDrop", 1);
         amber = in.getDoubleOr("amber", 0);
         dropout = in.getDoubleOr("dropout", 0);

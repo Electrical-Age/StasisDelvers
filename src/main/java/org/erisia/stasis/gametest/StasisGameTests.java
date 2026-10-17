@@ -743,8 +743,9 @@ public final class StasisGameTests {
                 new com.google.gson.JsonObject()).getOrThrow().process(h.getLevel(), BlockPos.ZERO, BlockPos.ZERO, dirt, dirt,
                 new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings(), null) == dirt);
         }, false));
-        // every ruined-cottage template places a dead core whose tower is read anew on the spot (valid, built, poles reset)
-        CASES.put("ruined_cottage_templates", new Spec(120, (h, c) -> {
+        // every ruined-cottage template places a dead, ruined core: no tower is read or drawn (the bare poles show the
+        // damage) until it runs; then its tower is read anew on the spot (valid, built)
+        CASES.put("ruined_cottage_templates", new Spec(160, (h, c) -> {
             ServerLevel level = h.getLevel();
             var m = level.getStructureTemplateManager();
             var ids = org.erisia.stasis.RuinedCottages.templates(m);
@@ -759,17 +760,27 @@ public final class StasisGameTests {
                 m.getOrCreate(ids.get(i)).placeInWorld(level, p, p, org.erisia.stasis.RuinedCottages.Piece.settings(rot), level.getRandom(), 2);
                 at.add(p);
             }
+            java.util.function.Function<BlockPos, org.erisia.stasis.TowerBlockEntity> core = p -> {
+                for (BlockPos q : BlockPos.betweenClosed(p.offset(-5, 0, -5), p.offset(5, 13, 5)))
+                    if (level.getBlockEntity(q) instanceof org.erisia.stasis.TowerBlockEntity t
+                        && level.getBlockState(q).getValue(org.erisia.stasis.TowerBlock.CELL) == org.erisia.stasis.TowerBlock.MASTER) return t;
+                return null;
+            };
+            h.runAfterDelay(70, () -> {
+                for (int i = 0; i < ids.size(); i++) {
+                    var tb = core.apply(at.get(i));
+                    String n = ids.get(i).getPath();
+                    c.check(n + ": a dead ruin", tb != null && tb.ruined && tb.coreDrop == 0 && tb.state() == org.erisia.stasis.TowerBlockEntity.State.OFF && tb.storedJ() == 0,
+                        tb == null ? "no core" : tb.ruined + " " + tb.state() + " " + tb.storedJ());
+                    if (tb == null) continue;
+                    c.check(n + ": no tower read or drawn while ruined", tb.structure.status == org.erisia.stasis.TowerStructure.Status.NONE, tb.structure.status.name());
+                    tb.ruined = false;   // (as when it first runs)
+                }
+            });
             return () -> {
                 for (int i = 0; i < ids.size(); i++) {
-                    BlockPos p = at.get(i);
-                    String n = ids.get(i).getPath();
-                    org.erisia.stasis.TowerBlockEntity tb = null;
-                    for (BlockPos q : BlockPos.betweenClosed(p.offset(-5, 0, -5), p.offset(5, 13, 5)))
-                        if (level.getBlockEntity(q) instanceof org.erisia.stasis.TowerBlockEntity t
-                            && level.getBlockState(q).getValue(org.erisia.stasis.TowerBlock.CELL) == org.erisia.stasis.TowerBlock.MASTER) tb = t;
-                    c.check(n + ": a dead core", tb != null && tb.state() == org.erisia.stasis.TowerBlockEntity.State.OFF && tb.storedJ() == 0,
-                        tb == null ? "no core" : tb.state() + " " + tb.storedJ());
-                    if (tb != null) c.check(n + ": its tower is read and built here", tb.structure.status == org.erisia.stasis.TowerStructure.Status.OK,
+                    var tb = core.apply(at.get(i));
+                    if (tb != null) c.check(ids.get(i).getPath() + ": once running, its tower is read and built here", tb.structure.status == org.erisia.stasis.TowerStructure.Status.OK,
                         tb.structure.status + " " + tb.structure.message + " " + tb.structure.layout);
                 }
                 for (BlockPos p : at)
