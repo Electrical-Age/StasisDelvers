@@ -13,10 +13,15 @@ Cosmetic leftovers to batch later. Add screenshots/layouts when you find more.
 - Fat member ending at a node can leave a block sticking out; ground hubs reach below ground.
 
 ## Generator
-- H40b4: one strut's tension/compression colour differs between browser (JS) and JVM (force sign, floating point).
-- Stay rule refuses booms stacked 1-3 blocks apart on one face (anchors only at 4-block ring levels): relax with
-  anchors between rings or hanging the lower boom from the upper one.
-- maxStaysPerBoom is a target: flat truss booms keep about one stay per node; a real cut needs fewer boom stations.
+- (Done 2026-10-17) H40b4 strut colour JS vs JVM: tie forces (mirrored wind cases) are now steel; all 7 presets
+  hash identically in the browser (towergen/NOTES.md "Strut colour: ties are steel").
+- Stay rule refuses booms stacked 1-3 blocks apart on one face (anchors only at 4-block ring levels). 2026-10-17:
+  `stayAtBoomAbove` hangs the lower boom from the upper boom's root nodes (refusals 16.7% -> 11.1%), but it is OFF:
+  without a library rebuild ~5% of the newly accepted layouts are over the catalogue or mechanisms. Needs a
+  decision: rebuild (mirror in towerlib) vs runtime bracing vs leave it (towergen/NOTES.md "Stays between rings").
+- maxStaysPerBoom is a target: flat truss booms keep about one stay per free boom node (measured 2026-10-17: the
+  flat-node put-back does nearly all of it); a real cut needs boom designs with fewer free nodes or out-of-plane
+  depth, i.e. a library rebuild (towergen/NOTES.md "Known limits" under solver parameters).
 
 ## Client
 - Suit glove: check slim (Alex) skins and two-handed maps; glove art is placeholder (mostly sleeve and cuff visible).

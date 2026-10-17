@@ -105,7 +105,9 @@ public final class Spine {
      * max(BAY, STAY_RISE x L) above the boom, else H (the P3a rule). Cap (STAY_CAP): the stays must anchor at or
      * below the next boom level above in the same direction ("same": the only booms a boom's stays can cross; a
      * perpendicular or opposite boom leaves the mast from another face) or in any direction ("any"); if the
-     * preferred level is above the cap, the highest ring level at or below the cap is used. A boom whose capped rise
+     * preferred level is above the cap, the highest ring level at or below the cap is used; if that rise is too small
+     * and the cap is a same-direction boom (STAY_AT_BOOM), the cap level itself (the stays end at that boom's root
+     * nodes, between ring levels; not in the offline builder's p3alib.anchor_levels yet). A boom whose capped rise
      * is below max(STAY_MIN_RISE, STAY_MIN_RATIO x L) is refused (one {@link Refusal} per boom in refusals; the
      * level is still returned). Depends only on the layout (ring levels are levels(H)), so the game can check a
      * layout before building it.
@@ -125,12 +127,16 @@ public final class Spine {
             if (c.STAY_CAP != Consts.STAY_CAP_NONE)
                 for (Layout.Boom o : booms)
                     if (o.y() > yb && o.y() < cap && (c.STAY_CAP == Consts.STAY_CAP_ANY || o.dir() == b.dir())) { cap = o.y(); capBy = o; }
+            double need = Math.max(c.STAY_MIN_RISE, c.STAY_MIN_RATIO * L);
             if (ya > cap) {
                 ya = ys[0];
                 for (int y : ys) if (y <= cap) ya = y;
+                // hang from the boom above: its root nodes are where this boom's anchors would be at that level (same
+                // face, same ring_s_at), so the stitch merges them; only a same-direction cap has them on this face
+                if (c.STAY_AT_BOOM && ya - yb < need - 1e-9 && capBy != null && capBy.dir() == b.dir()
+                        && cap - yb >= need - 1e-9) ya = cap;
             }
             out[bi] = ya;
-            double need = Math.max(c.STAY_MIN_RISE, c.STAY_MIN_RATIO * L);
             if (refusals != null && ya - yb < need - 1e-9) {
                 int maxL = c.STAY_MIN_RATIO > 0 ? (int) Math.floor((ya - yb) / c.STAY_MIN_RATIO + 1e-9) : 0;
                 String m = String.format("boom %c y%d L%d: its stays need an anchor at least %.1f blocks above it, but "
@@ -304,7 +310,7 @@ public final class Spine {
         int k = 0;
         for (int sg : new int[]{1, -1})
             roots[k++] = new double[]{sr * dv[0] + sg * sr * pv[0], yb, sr * dv[2] + sg * sr * pv[2]};
-        double sa = s[Arrays.binarySearch(ys, ya)];
+        double sa = ringSAt(ys, s, ya);
         double[][] anchors;
         if (sa > 0) {
             anchors = new double[2][];
@@ -414,7 +420,7 @@ public final class Spine {
     /** p3alib.boom_key_int (ya from {@link #anchorLevels}). */
     int[] boomKey(int[] ys, double[] s, int H, int yb, int Lb, int ya) {
         double sr = ringSAt(ys, s, yb);
-        double sa = s[Arrays.binarySearch(ys, ya)];
+        double sa = ringSAt(ys, s, ya);              // ya is a ring level, or a boom root level (stayAtBoomAbove)
         int li = 0;
         while (li < c.L_LADDER.length && c.L_LADDER[li] < Lb - 1e-9) li++;
         if (li == c.L_LADDER.length) throw new IllegalArgumentException("boom longer than the L ladder: " + Lb);
@@ -465,8 +471,10 @@ public final class Spine {
 
     private BsGeo bsGeometry(int d, int ya, int[] ys, double[] s, int npair) {
         List<Integer> lev = new ArrayList<>();
-        lev.add(ya);
-        if (npair == 2) for (int y : ys) if (y > ya) { lev.add(y); break; }
+        int y0 = ys[ys.length - 1];
+        for (int y : ys) if (y >= ya) { y0 = y; break; }  // a stay anchor between rings (stayAtBoomAbove): next ring up
+        lev.add(y0);
+        if (npair == 2) for (int y : ys) if (y > y0) { lev.add(y); break; }
         if (lev.size() < npair) return null;
         List<double[]> att = new ArrayList<>(), gnd = new ArrayList<>();
         for (int y : lev) {
@@ -649,7 +657,7 @@ public final class Spine {
             int[] key = boomKey(ys, rings, H, b.y(), b.length(), yaAll[bi]);
             BoomInfo bo = new BoomInfo();
             bo.yb = b.y(); bo.dir = b.dir(); bo.L = b.length(); bo.ya = yaAll[bi]; bo.ikey = key;
-            bo.sr = ringSAt(ys, rings, b.y()); bo.sa = rings[Arrays.binarySearch(ys, bo.ya)];
+            bo.sr = ringSAt(ys, rings, b.y()); bo.sa = ringSAt(ys, rings, bo.ya);
             bo.entry = resolver.resolve(key, bo);
             List<Load>[] bl = boomLoadsWorld(bo.entry, bi, bo.yb, bo.dir, bo.sr, bo.ya, bo.sa);
             List<double[][]> g = new ArrayList<>();

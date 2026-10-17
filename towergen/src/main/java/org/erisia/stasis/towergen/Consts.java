@@ -18,6 +18,9 @@ public final class Consts {
      *  Library header constants STAY_CAP / STAY_RISE / STAY_MIN_RATIO / STAY_MIN_RISE; these defaults if absent. */
     public int STAY_CAP = STAY_CAP_SAME;
     public double STAY_RISE = 0.7, STAY_MIN_RATIO = 0.35, STAY_MIN_RISE = 2.0;
+    /** Stays that no ring level under the cap can take anchor at the capping boom's root nodes (SolverParams
+     *  stayAtBoomAbove, default off: the library is not trained for it, see towergen/NOTES.md "Stays between rings"). */
+    public boolean STAY_AT_BOOM = false;
     /** Boom keys (Arrays.toString) whose library solve failed (header "boom_failed"): refused, never a fallback. */
     public java.util.Set<String> BOOM_FAILED = new java.util.HashSet<>();
     public static final int STAY_CAP_NONE = 0, STAY_CAP_SAME = 1, STAY_CAP_ANY = 2;
@@ -53,6 +56,7 @@ public final class Consts {
         FIXF = o.FIXF;
         BOOM_FAILED = o.BOOM_FAILED;
         STAY_CAP = o.STAY_CAP; STAY_RISE = o.STAY_RISE; STAY_MIN_RATIO = o.STAY_MIN_RATIO; STAY_MIN_RISE = o.STAY_MIN_RISE;
+        STAY_AT_BOOM = o.STAY_AT_BOOM;
         N_FLOOR = o.N_FLOOR; N_R = o.N_R; V_FLOOR = o.V_FLOOR; V_R = o.V_R; MG_FLOOR = o.MG_FLOOR; MG_R = o.MG_R;
         T_FLOOR = o.T_FLOOR; T_R = o.T_R; BELOW = o.BELOW; CLASS_TOL = o.CLASS_TOL; CEIL_EPS = o.CEIL_EPS;
         DEMAND_EPS = o.DEMAND_EPS; caseWind = o.caseWind; caseTors = o.caseTors; caseName = o.caseName; K = o.K;
@@ -64,11 +68,11 @@ public final class Consts {
         if (p.backstays() == BACKSTAYS && p.backstayMinBoom() == BS_MIN_L && p.backstayDistFactor() == D_FRAC
                 && p.backstayDistCap() == D_CAP && p.backstayMinTension() == BS_T_MIN && p.backstaySecondPair() == BS_CAP
                 && STAY_CAP_NAMES.indexOf(p.stayCap()) == STAY_CAP && p.stayRise() == STAY_RISE
-                && p.stayMinRatio() == STAY_MIN_RATIO && p.stayMinRise() == STAY_MIN_RISE)
+                && p.stayMinRatio() == STAY_MIN_RATIO && p.stayMinRise() == STAY_MIN_RISE && p.stayAtBoomAbove() == STAY_AT_BOOM)
             return this;
         Consts c = new Consts(this);
         c.STAY_CAP = STAY_CAP_NAMES.indexOf(p.stayCap()); c.STAY_RISE = p.stayRise();
-        c.STAY_MIN_RATIO = p.stayMinRatio(); c.STAY_MIN_RISE = p.stayMinRise();
+        c.STAY_MIN_RATIO = p.stayMinRatio(); c.STAY_MIN_RISE = p.stayMinRise(); c.STAY_AT_BOOM = p.stayAtBoomAbove();
         c.BACKSTAYS = p.backstays(); c.BS_MIN_L = p.backstayMinBoom(); c.D_FRAC = p.backstayDistFactor();
         c.D_CAP = p.backstayDistCap(); c.BS_T_MIN = p.backstayMinTension(); c.BS_CAP = p.backstaySecondPair();
         return c;

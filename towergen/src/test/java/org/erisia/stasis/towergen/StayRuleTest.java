@@ -64,6 +64,60 @@ class StayRuleTest {
         assertEquals(1, g.check(p, SolverParams.fromJson(Json.parse("{\"stayCap\": \"any\"}"), g.c)).size());
     }
 
+    /**
+     * stayAtBoomAbove (off by default): booms 2-3 blocks apart on one face. The ring level under the upper boom is too
+     * low, so the lower boom's stays end at the upper boom's root nodes (merged by the stitch: mast and upper-boom
+     * members meet there). Known bad cases under the knob (the library is not trained for it, NOTES "Stays between
+     * rings") are pinned so a library rebuild shows them flipping.
+     */
+    @Test
+    void stackedBoomsHangFromTheBoomAbove() {
+        TowerGen g = new TowerGen(Library.shared());
+        SolverParams on = SolverParams.fromJson(Json.parse("{\"stayAtBoomAbove\": true}"), g.c);
+        // E y10 L6 under E y13 L8: ring 12 gives rise 2 < 0.35 x 6 = 2.1; y13 gives 3
+        Layout l = new Layout(40, List.of(new Layout.Boom(10, 0, 6), new Layout.Boom(13, 0, 8)));
+        assertEquals(1, g.check(l, null).size(), "refused by default");
+        assertTrue(g.check(l, on).isEmpty());
+        for (double q : new double[]{1.0, 0.3}) {
+            TowerGen.Result r = g.build(l, q, on);
+            assertEquals(13, r.spine.booms.get(0).ya);
+            assertCapped(r, false);
+            assertTrue(r.refusal == null && r.analysis.maxUtil <= 1.001, "util " + r.analysis.maxUtil);
+            Stitch.Tower t = r.raw;
+            for (int a : t.boomAnchors[0]) {
+                boolean mast = false, upper = false;
+                for (int b = 0; b < t.m; b++) {
+                    if (t.bi[b] != a && t.bj[b] != a) continue;
+                    if (t.ownerType[b] == 0) mast = true;
+                    if (t.ownerType[b] == 1 && t.ownerIdx[b] == 1) upper = true;
+                }
+                assertTrue(mast && upper, "anchor node " + a + " is a mast node at the upper boom's root");
+            }
+            System.out.printf("stacked E y10 L6 / y13 L8 q%.1f: util %.3f, vol %.1f%n", q, r.analysis.maxUtil, r.info.vol);
+        }
+        // one block apart: rise 1 < stayMinRise 2, still refused
+        assertEquals(1, g.check(new Layout(40, List.of(new Layout.Boom(10, 0, 4), new Layout.Boom(11, 0, 4))), on).size());
+        // under "any" a perpendicular boom caps the stays, but its roots are on another face: still refused
+        Layout p = new Layout(40, List.of(new Layout.Boom(10, 0, 6), new Layout.Boom(13, 1, 8)));
+        assertEquals(1, g.check(p, SolverParams.fromJson(Json.parse("{\"stayCap\": \"any\", \"stayAtBoomAbove\": true}"), g.c)).size());
+        // known bad under the knob: the hang node is a mid-leg root node braced only for the upper boom's reactions
+        Layout bad1 = new Layout(15, List.of(new Layout.Boom(3, 1, 6), new Layout.Boom(6, 1, 2)));
+        TowerGen.Result r1 = g.build(bad1, 1.0, on);
+        assertTrue(r1.refusal != null && r1.analysis.maxUtil > 5, "H15 S y3 L6 / y6 L2: util " + r1.analysis.maxUtil);
+        Layout bad2 = new Layout(40, List.of(new Layout.Boom(2, 1, 8), new Layout.Boom(5, 1, 6)));
+        assertThrows(RefusedException.class, () -> g.build(bad2, 1.0));
+        boolean failed;
+        try {
+            TowerGen.Result r2 = g.build(bad2, 1.0, on);
+            failed = r2.refusal != null || r2.analysis == null;      // a mechanism under build(.., sp): a warning, no analysis
+            System.out.println("H40 S y2 L8 / y5 L6 under stayAtBoomAbove: " + r2.refusal + ", warnings " + r2.warnings);
+        } catch (RuntimePass.MechanismException e) {
+            failed = true;
+            System.out.println("H40 S y2 L8 / y5 L6 under stayAtBoomAbove: " + e.getMessage());
+        }
+        assertTrue(failed, "H40 S y2 L8 / y5 L6: mechanism at the lower boom's tip");
+    }
+
     @Test
     void failedBoomKeyIsRefusedNotApproximated() {
         TowerGen g = new TowerGen(Library.shared());
@@ -87,8 +141,9 @@ class StayRuleTest {
     void randomLayoutRefusalRate() {
         Consts c = Library.shared().c;
         Random rng = new Random(20261013);
-        int n = 4000, same = 0, any = 0, withBooms = 0;
+        int n = 4000, same = 0, any = 0, ring = 0, withBooms = 0;
         Consts ca = c.forSpine(SolverParams.fromJson(Json.parse("{\"stayCap\": \"any\"}"), c));
+        Consts cr = c.forSpine(SolverParams.fromJson(Json.parse("{\"stayAtBoomAbove\": true}"), c));
         for (int i = 0; i < n; i++) {
             Layout l = LayoutGen.random(rng);
             if (!l.booms().isEmpty()) withBooms++;
@@ -98,9 +153,14 @@ class StayRuleTest {
             r.clear();
             Spine.anchorLevels(l, ca, r);
             if (!r.isEmpty()) any++;
+            r.clear();
+            Spine.anchorLevels(l, cr, r);
+            if (!r.isEmpty()) ring++;
         }
-        System.out.printf("stay rule: %d random layouts (%d with booms): refused %d (%.1f%%) under \"same\", %d (%.1f%%) under \"any\"%n",
-                n, withBooms, same, 100.0 * same / n, any, 100.0 * any / n);
+        System.out.printf("stay rule: %d random layouts (%d with booms): refused %d (%.1f%%) under \"same\", %d (%.1f%%) under \"any\", "
+                + "%d (%.1f%%) under \"same\" with stayAtBoomAbove%n",
+                n, withBooms, same, 100.0 * same / n, any, 100.0 * any / n, ring, 100.0 * ring / n);
+        assertTrue(ring <= same, "hanging from the boom above only accepts more");
         Layout b = LayoutGen.randomBuildable(new Random(5), c);
         assertTrue(new TowerGen(Library.shared()).check(b, null).isEmpty());
     }

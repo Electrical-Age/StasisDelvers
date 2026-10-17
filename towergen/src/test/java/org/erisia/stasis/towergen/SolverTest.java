@@ -95,10 +95,11 @@ class SolverTest {
                 double ms0 = (System.nanoTime() - t1) / 1e6;
                 assertNotNull(b.tower);
                 err.addAll(check(n + " q" + q, b));
-                System.out.printf("%-10s %4.1f | %-44s | %-44s | util %.3f -> %.3f, vol %.1f -> %.1f, %.1f -> %.1f ms (reduce %.1f ms, %d analyses; %d x singled, stays -%d +%d, util +%d)%s%n",
+                System.out.printf("%-10s %4.1f | %-44s | %-44s | util %.3f -> %.3f, vol %.1f -> %.1f, %.1f -> %.1f ms (reduce %.1f ms, %d analyses; %d x singled, stays -%d +%d (flat %d, mechanism %d, force %d), util +%d)%s%n",
                         n, q, WireReduction.Counts.of(a.tower), WireReduction.Counts.of(b.tower),
                         a.analysis.maxUtil, b.analysis == null ? Double.NaN : b.analysis.maxUtil, a.info.vol, b.info.vol, ms0, ms,
-                        b.msReduce(), b.reduction.analyses, b.reduction.xSingled, b.reduction.staysRemoved, b.reduction.staysReadded, b.reduction.utilReadded,
+                        b.msReduce(), b.reduction.analyses, b.reduction.xSingled, b.reduction.staysRemoved, b.reduction.staysReadded,
+                        b.reduction.readdFlat, b.reduction.readdMech, b.reduction.readdForce, b.reduction.utilReadded,
                         b.warnings.isEmpty() ? "" : "\n           warnings: " + b.warnings);
             }
         }

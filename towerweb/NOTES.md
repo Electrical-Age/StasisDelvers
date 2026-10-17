@@ -87,7 +87,8 @@ worker message handler, so the status stayed at "building…" and an old error s
 - Refusals: a layout the stay rule refuses (or a failed boom design) comes back as `{"error": "REFUSED (the game
   would not build this): ...", "refusal": {reason, message}}`; the status says "refused". An over-catalogue tower
   is drawn but `stats.refusal` is set and shown as a red REFUSED line (was a warning).
-- solver.json section "Stays": `stayCap` dropdown (same / any / none), `stayRise`, `stayMinRatio`, `stayMinRise`.
+- solver.json section "Stays": `stayCap` dropdown (same / any / none), `stayRise`, `stayMinRatio`, `stayMinRise`;
+  `stayAtBoomAbove` checkbox (2026-10-17, default off, see towergen/NOTES.md "Stays between rings").
 - Random uses `LayoutGen.randomBuildable` (never stay-refused; an over-catalogue random tower can still show up).
 - Mesh: watertight hubs and crossing offsets (towergen NOTES); new triangle counts q1: 1050 / 12024 / 17456 /
   55096 / 45718 / 109664 / 92184 (H16 / H24b / H40 / H40r3 / H40b4 / H64max / H100), identical to the JVM.
@@ -98,7 +99,10 @@ worker message handler, so the status stayed at "building…" and an old error s
 - Stats JSON gains `meshHash` (FNV-1a over the mesh float bits and parts, `Mesh.fnv`) and `meshHashParts` (per part,
   plus `STRUTS` = both strut colours without the part id). `/tmp/twtest/hull.py` compares them with the JVM's
   `towergen/build/mesh-fnv.json` (MeshTest.portableHashes) on the 7 presets: identical except H40b4, where geometry
-  matches but some strut colour (force sign) differs. The obsolete hub* visual keys give "obsolete key (ignored)"
+  matches but some strut colour (force sign) differs. (2026-10-17: with the x1.4 library 4 presets differed that
+  way; strut colour ties are now steel and all 7 are identical. Run: serve dist on 8765, then `env -u LD_LIBRARY_PATH
+  PLAYWRIGHT_BROWSERS_PATH=/nix/store/...-playwright-browsers nix-shell -p 'python3.withPackages(p: [p.playwright])'
+  --run 'python3 /var/lib/mclab/agent/scratch/twtest/hull.py'`; the script is in scratch, not /tmp.) The obsolete hub* visual keys give "obsolete key (ignored)"
   warnings. Screenshot `screenshot-hull.png`. Browser mesh times in towergen/NOTES.md. Not deployed.
 
 ## Numbers (tsugumi, headless Chromium 1243 via playwright, SwiftShader WebGL, localhost)

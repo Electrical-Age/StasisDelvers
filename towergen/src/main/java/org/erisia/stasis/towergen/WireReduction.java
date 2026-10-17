@@ -25,6 +25,8 @@ public final class WireReduction {
     /** What was done (for stats / tests). */
     public static final class Report {
         public int xSingled, xRestored, bayConverted, staysRemoved, staysReadded, globalReadded, utilReadded, analyses;
+        /** staysReadded by trigger: a boom node became flat, the boom alone was a mechanism, a member overloaded. */
+        public int readdFlat, readdMech, readdForce;
         public List<String> warnings = new ArrayList<>();
     }
 
@@ -137,17 +139,19 @@ public final class WireReduction {
             // boom-local stabilisation: the boom's own members, every node shared with another part held
             int guard = st.size();
             while (guard-- > 0) {
-                int node = flatNode(k, flat0);
+                int node = flatNode(k, flat0), why = 0;
                 if (node < 0) {
                     Stitch.Tower bt = boomOnly(k);
                     RuntimePass.Analysis a = pass.analyzeOrMechanism(bt);
                     rep.analyses++;
                     node = a.mechanism != null ? a.mechNode : overloaded(bt, a, idx(keepBoom(k)));
+                    why = a.mechanism != null ? 1 : 2;
                 }
                 if (node == -2) break;
                 int b = nearestRemoved(node, k);
                 if (b < 0) break;
                 keep[b] = true; removed[b] = false; rep.staysReadded++;
+                if (why == 0) rep.readdFlat++; else if (why == 1) rep.readdMech++; else rep.readdForce++;
             }
         }
     }

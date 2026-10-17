@@ -46,6 +46,8 @@ public record SolverParams(
         double stayMinRatio,         // refuse if the capped anchor rise is below this x boom length (0.35 = the
                                      // flattest stay angle the boom library is solved for, about 19 degrees)
         double stayMinRise,          // ... or below this many blocks
+        boolean stayAtBoomAbove,     // if no ring level under the cap gives that rise, anchor the stays at the root
+                                     // nodes of the capping boom (same face, between ring levels) instead of refusing
         // --- pretension and the sizing loop (runtime pass)
         double pretensionFactor,     // cable pretension = recorded library pretension x this, then raised as needed
         double pretensionMargin,     // raise target = this x the largest compression a cable would see (PRE_MARGIN)
@@ -90,7 +92,7 @@ public record SolverParams(
     public static SolverParams defaults(Consts c) {
         return new SolverParams(0, 2, "keep", 0,
                 true, c.BS_MIN_L, c.D_FRAC, c.D_CAP, c.BS_T_MIN, c.BS_CAP,
-                Consts.STAY_CAP_NAMES.get(c.STAY_CAP), c.STAY_RISE, c.STAY_MIN_RATIO, c.STAY_MIN_RISE,
+                Consts.STAY_CAP_NAMES.get(c.STAY_CAP), c.STAY_RISE, c.STAY_MIN_RATIO, c.STAY_MIN_RISE, c.STAY_AT_BOOM,
                 1.5, c.PRE_MARGIN, 60, 30, 1.0,
                 c.EMIT_W, c.EMIT_WIND0, c.CD0, c.TORQ0, c.RHO,
                 0);
@@ -99,7 +101,7 @@ public record SolverParams(
     /** A copy with other wire-reduction keys. */
     public SolverParams withWires(int maxStays, String x, int maxCables) {
         return new SolverParams(maxStays, minStaysPerBoom, x, maxCables, backstays, backstayMinBoom, backstayDistFactor,
-                backstayDistCap, backstayMinTension, backstaySecondPair, stayCap, stayRise, stayMinRatio, stayMinRise,
+                backstayDistCap, backstayMinTension, backstaySecondPair, stayCap, stayRise, stayMinRatio, stayMinRise, stayAtBoomAbove,
                 pretensionFactor, pretensionMargin, raiseIters,
                 maxRounds, utilLimit, emitterWeight, emitterWind, windDrag, torsion, density, extraWidthSteps);
     }

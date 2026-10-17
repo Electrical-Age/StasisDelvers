@@ -94,6 +94,18 @@ Known limits:
   gives, and collinear chord nodes need more. So `maxStaysPerBoom` 2 ends at about one stay per boom node (H40r3: 108
   -> 80; H24b's 8-block booms keep all 9). Fewer would need geometry changes (dropping chord stations and
   lengthening chords), not done.
+- Measured 2026-10-17 (x1.4 library, `maxStaysPerBoom` 2, xPanels keep; `Report.readdFlat / readdMech / readdForce`
+  count why each stay was put back, printed by `SolverTest.fewerWiresStillStand`): kept stays = free boom nodes, or
+  a few more where a node had a stay from each anchor. Per boom, stays before -> after / free boom nodes: H24b E L8
+  6 -> 4 / 3, N L6 3 -> 3 / 3; H40r3 L16 14 -> 12 / 9, L10 8 -> 6 / 5, L6 3 -> 3 / 3; H40b4 E L20 18 -> 15 / 11
+  (q0.3: 11), S L12 14 -> 11 / 10, W L6 4 -> 4 / 3, N L10 5 -> 5 / 5; H64max E L40 38 -> 24 / 27 (the 24 reach 23
+  free nodes; the flat test only fires on nodes the reduction made flatter). Triggers: H24b 3/3 flat; H40r3 60/60 flat (q0.3: 54 flat, 4 mechanism, 2 force); H40b4
+  21 flat, 3 mechanism, 3 force; H64max 18 flat, 4 mechanism. So the flat-node test (`FLAT`, smallest eigenvalue of
+  sum e e^T at a free boom node) does nearly all of it: every boom node lies in the boom plane, and a stay is its only
+  member out of that plane. Without the put-back the boom is a mechanism, so the target cannot simply be enforced.
+  A real cut needs boom geometry with fewer free nodes (longer chord panels) or out-of-plane depth (a top chord /
+  3D section), i.e. new boom designs and a library rebuild. No cheap runtime alternative: the warning already says
+  why stays came back; `maxStaysPerBoom` stays a target (polish.md).
 - Over-limit reduced towers cost several passes (each up to 60 rounds when it diverges).
 
 ## Stay rule and refusals (2026-10-13)
@@ -123,6 +135,52 @@ Known limits:
   failed boom keys, random refusal rate.
 - Random (slowTest, 400 x 2 q, seed 7): 645 pass, 19 over the catalogue (now refused), 136 refused by the stay rule
   (was 769 pass / 31 over); no exceptions.
+
+## Stays between rings: `stayAtBoomAbove` (2026-10-17, polish.md "Generator"; default OFF)
+- Wanted: booms stacked 2-3 blocks apart on one face are refused (the lower boom's stays may only anchor at a ring
+  level at or below the boom above, and rings are 4 blocks apart).
+- Done (Java only): `stayAtBoomAbove` (SolverParams, spine group; `Consts.STAY_AT_BOOM`). If the ring level under
+  the cap gives too small a rise and the cap is a same-direction boom, the stays anchor at the cap level itself:
+  `Spine.anchorLevels` returns ya = that boom's y, and the anchors (s = ring_s_at(ya), the same expression as the
+  upper boom's root s) land exactly on the upper boom's root nodes, which the stitch merges (mast + upper boom +
+  stays meet there). `sa` is now `ringSAt(ys, s, ya)` everywhere (bit-identical at ring levels); back-stays of such a
+  boom attach at the next ring up (booms this short are below `backstayMinBoom` 14 anyway). Same direction only:
+  under `stayCap "any"` a perpendicular cap's roots are on another face, so that stays refused. One block apart stays
+  refused (rise 1 < `stayMinRise` 2).
+- Effect on refusals (StayRuleTest, 4000 random layouts): 16.7% -> 11.1% under "same".
+- Why it is off: the library is not trained for it. 150 random layouts that the knob newly accepts (seed 7, q 1 and
+  0.3): 284 of 300 builds pass, 16 over the catalogue (baseline, 150 two-plus-boom layouts accepted by both: 293 /
+  7). Several failures are near-mechanisms, not just overload: H15 S y3 L6 under S y6 L2 (util 14, |Nt| = |Nc|
+  ~ 4000 in the lower boom), and `{"H": 40, "booms": [[2, "S", 8], [5, "S", 6]]}` is a mechanism (pivot at the
+  lower boom's tip; a plain `build(l, q)` throws MechanismException, which the game shows as FAILED rather than
+  REFUSED). Cause: the hang node is a mid-leg root node of the bay entry, braced only for the upper boom's root
+  reactions (no lateral bracing in the face plane), and a mid-bay ANCHOR load is credited to no bay key
+  (`baySpecs` adds TOP / ANCHOR / BS loads at the top ring only); the new (rho, sr4, sa4) boom keys also go to
+  `near` entries more often. Pinned in `StayRuleTest.stackedBoomsHangFromTheBoomAbove` (the y10 / y13 E pair
+  builds at util 0.99; the two bad layouts fail) so a library rebuild shows them flipping.
+- Options (designer's decision):
+  (a) the real fix: mirror the rule in tools/towerlib (`p3alib.anchor_levels`; `boom_key_int` uses `rings[ya]`, a
+  KeyError for a non-ring ya, so it needs ring_s_at), let `bay_specs` see the hang load at the root node (a key
+  change), train booms / bays on the newly accepted layouts and rebuild the library (incremental from the s140
+  cache: only the new keys solve). Then default it on.
+  (b) runtime bracing at the hang node (face diagonals to the bracketing ring nodes of both face-adjacent legs, as
+  the `patch` tier does), sized by the pass; moderate, unproven, a second fix-up layer.
+  (c) default on now with a mechanism turned into a refusal: accepts ~5% more layouts, with ~5% of those refused
+  at build time instead of at check time (`TowerGen.check` would no longer predict them).
+- Renders (q1, the y10 / y13 E pair, shots sideE, bjoint): /var/lib/mclab/agent/scratch/colourtie/hang/.
+
+## Strut colour: ties are steel (2026-10-17, polish.md "Generator")
+- A strut is rust (compression) when its largest compression over the load cases beats its largest tension, else
+  steel. Members loaded only by the mirrored wind / torsion cases (H40 top cap struts, H100 platform struts; |N| ~
+  0.03-0.12 either way) tie up to 1e-14 relative, so the old argmax(|N|) picked whichever the last bits favoured:
+  JVM and TeaVM differed on 4 presets (H40, H40b4, H64max, H100 with the x1.4 library), not just H40b4.
+- `MeshBuilder.forceColour`: rust only if max compression > max tension x (1 + 1e-6) + 1e-9, else steel (ties and
+  unloaded struts). The JVM colours of tie members change (a few thin struts rust -> steel; geometry unchanged);
+  no golden stores mesh hashes. Browser check (scratch/twtest/hull.py, headless Chromium): all 7 presets now have
+  identical mesh FNV (was 3 of 7). `MeshTest.strutColourStable`: unit ties / near-zero forces, and every golden strut
+  (3672, q 1 and 0.3) keeps its colour under a 1e-9 relative perturbation of its forces.
+- Render: /var/lib/mclab/agent/scratch/colourtie/crop_H40_close.png (H40 close, before | after: one inner diagonal
+  rust -> steel).
 
 ## Material strength x1.4 (2026-10-17, Baughn: the most ridiculous towers feel dense)
 - `tools/towerlib/fem.py`: `STRENGTH` (env `P3A_STRENGTH`, default now 1.4) multiplies every allowable stress:
@@ -290,7 +348,8 @@ Known limits:
   and boom-root joints (up to 33 ends) and the hulls themselves.
 - JVM vs browser: identical mesh FNV for H16, H24b, H40, H40r3, H64max, H100; H40b4 has identical geometry (strut
   triangles hashed without their colour match) but some strut(s) flip rust/steel: the force-sign colouring of a
-  member whose dominant force differs between JS and JVM arithmetic (runtime pass, not the mesh).
+  member whose dominant force differs between JS and JVM arithmetic (runtime pass, not the mesh). (Fixed
+  2026-10-17: ties are steel, all 7 identical; see "Strut colour: ties are steel".)
 - Renders: `renders/contact_hull_joints.png` (1920 x 1440; pairs before | after: H40r3 bjoint, ljoint, splice;
   H64max bjoint, ljoint, splice; H100 ljoint, splice). New towerview shot `splice` (a node where two laced members
   continue, nearest 0.3 H). Singles in renders/before_hull, renders/after_hull (git-ignored).
@@ -362,7 +421,8 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   800 pass, 31 have util 1.02-3.2, all with H >= 64 and long booms; no exceptions, no mechanisms. The game needs a
   policy for these (reject / "simplify" hint / bigger laced ladder).
 - The stay rule only anchors at ring levels (every 4 blocks), so booms stacked 1-3 blocks apart on one face are
-  refused even when short; hanging the lower boom from the upper one (or anchors between rings) would accept them.
+  refused even when short. `stayAtBoomAbove` (off) hangs the lower boom from the upper one's roots; it needs a
+  library rebuild to be safe (see "Stays between rings").
 - LP-infeasible boom solves are not cached, so they are not in `boom_failed` (only repair-gave-up ones are).
 - Joint look: section changes on laced legs show as chord-width splice cubes; big hubs where a laced boom truss
   tapers into a solid chord; hubs of braces sit inside laced legs (2026-10-17: in the member colour, no longer dark); hubs read as a dark band in colKnuckle on solid
