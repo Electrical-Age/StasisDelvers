@@ -830,8 +830,8 @@ public class TowerBlockEntity extends BlockEntity {
     String structureLine() {
         TowerStructure s = structure;
         return switch (s.status) {
-            case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top centre (each one widens the field); poles off "
-                + "the mast's side make booms. Feed power (FE, e.g. EA's exporter) into any face.";
+            case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top (each widens the field); poles off the mast "
+                + "make booms. Feed power into any face.";
             case WAITING, BUILDING -> "Building the tower...";
             case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
                 + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ". Draw: " + drawText() + ".";
@@ -856,8 +856,8 @@ public class TowerBlockEntity extends BlockEntity {
         sb.append(". ");
         TowerStructure s = structure;
         sb.append(switch (s.status) {
-            case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top centre (each one widens the field); poles off "
-                + "the mast's side make booms. Feed power (FE, e.g. EA's exporter) into any face.";
+            case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top (each widens the field); poles off the mast "
+                + "make booms. Feed power into any face.";
             case WAITING, BUILDING -> "Building the tower...";
             case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
                 + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ". Draw: " + drawText() + ".";
