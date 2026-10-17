@@ -95,6 +95,15 @@ public final class StilledLiquids {
         }
     }
 
+    /** ... or by digging at it (left-click), which is what players try first (Baughn: the spawn ocean couldn't be dug). */
+    static void dig(PlayerInteractEvent.LeftClickBlock e) {
+        if (e.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
+        if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
+        ItemStack tool = p.getMainHandItem();
+        if (!isTool(tool)) return;
+        if (take(p, level, e.getPos(), tool, net.minecraft.world.InteractionHand.MAIN_HAND)) e.setCanceled(true);
+    }
+
     static boolean take(ServerPlayer p, ServerLevel level, BlockPos pos, ItemStack tool, net.minecraft.world.InteractionHand hand) {
         BlockState st = level.getBlockState(pos);
         if (!(st.getBlock() instanceof LiquidBlock) || Stasis.isRunning(level, pos)) return false;
