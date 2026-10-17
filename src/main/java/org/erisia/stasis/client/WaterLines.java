@@ -67,18 +67,17 @@ public final class WaterLines {
             int w = size.width(), h = size.height();
             NativeImage out = new NativeImage(w, h, false);
             image.copyRect(out, 0, 0, 0, 0, w, h, false, false);
-            double a = Math.PI * orient / ORIENT, ca = Math.cos(a), sa = Math.sin(a);
+            // the lines' normal as an integer wave vector per 16-pixel tile, so the stripes run on across block edges
+            // (they restarted at each block: AdventurAgent); angles 0, 22, 45, 68, 90, 112, 135, 158 degrees
+            int[][] k = {{0, 4}, {-2, 5}, {-3, 3}, {-5, 2}, {-4, 0}, {-5, -2}, {-3, -3}, {-2, -5}};
+            int ka = k[orient][0], kb = k[orient][1];
             float lift = strength == 1 ? 0.95f : 0.7f;   // (0.55/0.28 were barely visible: AdventurAgent measured 13-15/255)
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++) {
-                    // across the lines (texture x = east, y = south) and along them; the lines repeat every 4 pixels of a
-                    // 16-pixel tile, broken into dashes like filings
-                    double fx = (x + 0.5) * 16.0 / w, fy = (y + 0.5) * 16.0 / h;
-                    double across = -fx * sa + fy * ca, along = fx * ca + fy * sa;
-                    double band = Math.abs(((across % 4) + 4) % 4 - 2) / 2;   // 1 on the line, 0 between
-                    int dash = (int) Math.floor((along + 64) / 3);
-                    int line = (int) Math.floor((across + 64) / 4);
-                    boolean on = band > 0.55 && hash(dash, line) > 0.25;
+                    int tx = x * 16 / w, ty = y * 16 / h;
+                    int across = Math.floorMod(ka * tx + kb * ty, 16);   // stripes every 16 / |k| pixels
+                    int along = Math.floorMod(kb * tx - ka * ty, 16);   // broken into dashes like filings
+                    boolean on = across < 6 && hash(along / 3, across / 6 + orient * 7) > 0.25;
                     if (!on) continue;
                     int c = out.getPixel(x, y);
                     int al = c >>> 24, r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;

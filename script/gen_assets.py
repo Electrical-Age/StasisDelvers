@@ -59,26 +59,44 @@ def layer(colors, path):
 
 def glove(colors, path):
     """First-person glove (client/SuitArm.java), 32x16, box UV: the cuff (4x1x4) at (0, 0), the glove (4x4x4) at
-    (0, 5). Side faces of a box sit in the row below its top/bottom faces; the glove's fingertips are its bottom."""
+    (0, 5). Side faces of a box sit in the row below its top/bottom faces (right, front, left, back, 4 px each); the
+    glove's fingertips are its bottom. Each side: a wrist strap, knuckle plates, four fingers with lighter tips; a
+    charge pip on the back of the hand and the outer side; the cuff gets a dark rim and glow studs."""
     rng = random.Random(path)
     im = Image.new('RGBA', (32, 16), (0, 0, 0, 0))
-    dark = tuple(int(v * 0.55) for v in colors['base'])
+    base, trim, glow = colors['base'], colors['trim'], colors['glow']
 
-    def px(x, y, c):
-        k = rng.uniform(0.88, 1.1)
-        im.putpixel((x, y), tuple(min(255, int(v * k)) for v in c) + (255,))
-    # cuff: trim band, a glow stud on each side face
-    for y in range(0, 5):
-        for x in range(16):
-            px(x, y, colors['trim'])
-    for x in (1, 6, 9, 14):
-        px(x, 4, colors['glow'])
-    # glove: dark (top/bottom faces in rows 5..8, sides in rows 9..12), a knuckle ridge in the base colour (row 10),
-    # finger seams below it
-    seam = tuple(int(v * 0.4) for v in colors['base'])
-    for y in range(5, 13):
-        for x in range(16):
-            px(x, y, colors['base'] if y == 10 else seam if y > 10 and x % 4 == 0 else dark)
+    def shade(c, k):
+        return tuple(min(255, int(v * k)) for v in c)
+
+    def px(x, y, c, jitter=0.06):
+        k = rng.uniform(1 - jitter, 1 + jitter)
+        im.putpixel((x, y), shade(c, k) + (255,))
+    # cuff: top/bottom faces (rows 0..3) trim with a darker rim, side band (row 4) trim with glow studs
+    for y in range(0, 4):
+        for x in range(4, 12):
+            rim = x in (4, 7, 8, 11) or y in (0, 3)
+            px(x, y, shade(trim, 0.7) if rim else trim)
+    for x in range(16):
+        px(x, 4, glow if x % 4 in (1, 2) and x // 4 in (1, 2) else shade(trim, 0.85))
+    # hand: top face (rows 5..8, x 4..7, under the cuff) dark; bottom face (fingertips, x 8..11) four finger pads
+    for y in range(5, 9):
+        for x in range(4, 8):
+            px(x, y, shade(base, 0.45))
+        for x in range(8, 12):
+            px(x, y, shade(base, 0.75) if (x - 8) % 2 == 0 else shade(base, 0.5))
+    # sides (rows 9..12): strap, knuckles, fingers, tips
+    for face in range(4):
+        x0 = face * 4
+        for i in range(4):
+            x = x0 + i
+            px(x, 9, shade(trim, 0.6))                                   # wrist strap
+            px(x, 10, shade(base, 1.15 if i in (1, 2) else 0.95))        # knuckle plate, lit in the middle
+            px(x, 11, shade(base, 0.62 if i % 2 == 0 else 0.5))          # fingers, seams between
+            px(x, 12, shade(base, 0.8 if i % 2 == 0 else 0.62))          # tips
+    # the charge pip: back of the hand (front face) and the outer side (right face), on the knuckle row
+    for x in (5, 6, 1):
+        px(x, 10, glow, 0.02)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     im.save(path)
 
