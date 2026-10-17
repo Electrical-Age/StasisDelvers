@@ -139,7 +139,11 @@ Known limits:
   is no hub: each member is cut where its section first reaches a lacing plane (the end face stays inside the leg)
   and capped. Other leg nodes (laced bracing: envelope joints; members wider than a 3-chord leg's hollow;
   near-parallel members) keep the hull joint. Hulls q1: H24b 172 -> 142, H40 235 -> 191, H40r3 351 -> 323, H40b4
-  333 -> 309, H64max 621 -> 573, H100 839 -> 699; triangles q1 -0.5 to -3% (H100 67094 -> 65944).
+  333 -> 309, H64max 621 -> 573, H100 839 -> 699; triangles q1 0 to -3% (H100 67094 -> 65944). Cables ending at
+  such a node are cut at the lacing planes too. Slow random sweep (100 layouts x 2 q, seed 7): 57032 hulls, 0
+  failed, no exceptions.
+- Known: where the hull covers a chord past 0.49 x its length (very short laced members), the end batten may sit
+  inside the hull (as before).
 - Not changed: the 4 -> 3 chord step. Tried giving the end batten ring to the 3-chord member (the wider member's
   square ring is the step): small changes (0.77 -> 0.45) look cleaner, but large ones (1.92 -> 0.64, H40 q0.3 node
   52) leave the unmatched 4th chord as a lone post and the wide member's lacing ends poke out of its chord cuts, so
