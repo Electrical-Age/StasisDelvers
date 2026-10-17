@@ -148,6 +148,11 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_DUST = ITEMS.registerSimpleItem("rift_dust");
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHARGED_RIFT_SHARD = ITEMS.registerSimpleItem("charged_rift_shard",
         p -> p.rarity(net.minecraft.world.item.Rarity.UNCOMMON));
+    /** Rift capacitors (Capacitors): take a stopped world's harm, vented with EA power. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<CapacitorItem> RIFT_CAPACITOR = ITEMS.registerItem("rift_capacitor",
+        p -> new CapacitorItem(p, Capacitors.CAPACITOR_SECONDS), p -> p.stacksTo(1));
+    public static final net.neoforged.neoforge.registries.DeferredItem<CapacitorItem> CHARGED_RIFT_CAPACITOR = ITEMS.registerItem("charged_rift_capacitor",
+        p -> new CapacitorItem(p, Capacitors.CHARGED_SECONDS), p -> p.stacksTo(1).rarity(net.minecraft.world.item.Rarity.UNCOMMON));
 
     static final DeferredRegister<net.minecraft.world.item.crafting.RecipeSerializer<?>> RECIPE_SERIALIZERS =
         DeferredRegister.create(Registries.RECIPE_SERIALIZER, StasisDelvers.MODID);

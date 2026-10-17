@@ -38,5 +38,7 @@
   "item.stasisdelvers.scrap": "Scrap",
   "block.stasisdelvers.surveyors_desk": "Surveyor's Desk",
   "key.stasisdelvers.bug_report": "Send bug report",
-  "key.category.stasisdelvers.keys": "Stasis Delvers"
+  "key.category.stasisdelvers.keys": "Stasis Delvers",
+  "item.stasisdelvers.rift_capacitor": "Rift Capacitor",
+  "item.stasisdelvers.charged_rift_capacitor": "Charged Rift Capacitor"
 }

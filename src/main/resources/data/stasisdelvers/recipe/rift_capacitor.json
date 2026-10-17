@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "S": "stasisdelvers:rift_shard",
+    "B": "eln:cost_oriented_battery",
+    "C": "eln:copper_coil"
+  },
+  "pattern": [
+    "CSC",
+    "SBS",
+    " S "
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:rift_capacitor",
+    "components": {
+      "minecraft:custom_data": {
+        "stasisdelvers_energy": 240000.0
+      }
+    }
+  }
+}

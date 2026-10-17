@@ -50,6 +50,13 @@ public final class Freezing {
         return p.isCreative() || p.isSpectator() || Suits.protect(p, drawFactor);
     }
 
+    /** ... with rift capacitors taking the weather's surcharge (Capacitors). */
+    static boolean isProtected(ServerPlayer p, double drawFactor, boolean capacitors) {
+        if (p.isCreative() || p.isSpectator()) return true;
+        if (!Suits.protectsWithoutDraw(p)) return Suits.protect(p, drawFactor);   // (no working suit: spend no capacitor)
+        return Suits.protect(p, capacitors ? Capacitors.drawFactor(p, drawFactor) : drawFactor);
+    }
+
     static void tick(PlayerTickEvent.Post e) {
         if (e.getEntity() instanceof ServerPlayer p) tick(p);
     }
@@ -98,9 +105,11 @@ public final class Freezing {
         } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
             suited = true;
-        } else if (stopped && !grace && !(suited = isProtected(p, zone == 1 ? 3 : deep ? 2 : 1))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
+        } else if (stopped && !grace && !(suited = isProtected(p, zone == 1 ? 3 : deep ? 2 : 1, true))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
         else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && Suits.delverOnly(p)) {
-            if (s.counted % 4 == 0) s.ticks++;
+            // a rift capacitor takes the freeze (a raw shard half of it: every 8th tick instead of every 4th)
+            double took = Capacitors.absorb(p, 1 / 20.0);
+            if (took < 1 && s.counted % (took > 0 ? 8 : 4) == 0) s.ticks++;
             // a static deep is no passing weather: there the Delver suit's freeze ends as a statue, as anywhere
             if (zone == 1 || strataMist) {
                 // (falls through to the statue check below)

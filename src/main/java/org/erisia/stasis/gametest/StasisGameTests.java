@@ -974,6 +974,33 @@ public final class StasisGameTests {
                 remove(h, in);
             };
         }));
+        // a rift capacitor (λ-Nero) takes the mist's surcharge on the suit and a Delver suit's slow freeze there
+        CASES.put("capacitor_takes_mist", new Spec(130, (h, c) -> {
+            var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
+            org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            ItemStack cap = new ItemStack(org.erisia.stasis.StasisRegistry.RIFT_CAPACITOR.get());
+            var ci = (org.erisia.stasis.CapacitorItem) cap.getItem();
+            ci.setEnergy(cap, ci.getEnergyMax(cap));
+            p.getInventory().add(cap);
+            double capFull = ci.getEnergyMax(cap);
+            return () -> {
+                org.erisia.stasis.Pockets.TEST.remove(box);
+                var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
+                double e = ((org.erisia.stasis.DelverSuitItem) head.getItem()).getEnergy(head);
+                double full = org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(head);
+                ItemStack held = ItemStack.EMPTY;
+                for (int i = 0; i < p.getInventory().getContainerSize(); i++)
+                    if (p.getInventory().getItem(i).getItem() instanceof org.erisia.stasis.CapacitorItem) held = p.getInventory().getItem(i);
+                double left = held.isEmpty() ? 0 : ci.getEnergy(held);
+                c.check("with a capacitor the Delver suit doesn't freeze in mist", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                c.check("and drains only at the plain rate (10 W)", e > full - 10 * 135 / 20.0 - 1, String.format("%.1f J of %.0f", e, full));
+                c.check("the capacitor took it", left < capFull - 1000, String.format("%.0f of %.0f J", left, capFull));
+                remove(h, p);
+            };
+        }, false, true));
         CASES.put("strata_mist_pocket", new Spec(130, (h, c) -> {
             var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
             org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));
