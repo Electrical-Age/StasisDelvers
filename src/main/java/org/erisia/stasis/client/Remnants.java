@@ -30,7 +30,12 @@ public final class Remnants {
         Entry old = BY_TOWER.get(be.getBlockPos());
         if (old != null && old.remnant().equals(r)) return;
         List<List<Vector3d[]>> bolts = new ArrayList<>();
-        for (var b : r.bolts()) bolts.add(BoltRenderer.strokes(b).stream().map(Remnants::thin).toList());
+        // only the trunk thinned: thinned branches (5 points) read as long dead-straight lines (AdventurAgent)
+        for (var b : r.bolts()) {
+            List<Vector3d[]> st = new ArrayList<>(BoltRenderer.strokes(b));
+            st.set(0, thin(st.get(0)));
+            bolts.add(st);
+        }
         BY_TOWER.put(be.getBlockPos().immutable(), new Entry(r, bolts));
     }
 
@@ -56,7 +61,7 @@ public final class Remnants {
         return l;
     }
 
-    /** Every other point (the ends kept): a held bolt costs the shader half as much. */
+    /** Every other point (the ends kept): a held trunk costs the shader half as much (~48 points a held bolt). */
     static Vector3d[] thin(Vector3d[] p) {
         List<Vector3d> l = new ArrayList<>();
         for (int i = 0; i < p.length; i += 2) l.add(p[i]);

@@ -132,9 +132,10 @@ public final class ConsoleScreen extends Screen {
         g.text(font, "80%", x + 232, by - 10, 0xFFB0B0B0);
         g.text(font, String.format("Charge %.0f%%  (%.0f of %.0f kJ)", 100 * share, v(1) / 1000, v(2) / 1000), x, by + 14, 0xFFE0E0E0);
         double in = v(3), draw = s == 1 ? v(4) : 0, net = in - draw;
-        g.text(font, String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" (x%.2f)", v(5)) : "", net),
-            x, by + 26, net < 0 ? 0xFFE0A060 : 0xFFE0E0E0);
-        if (net < 0 && s == 1) g.text(font, String.format("Empty in %s", time(v(1) / -net)), x + 220, by + 26, 0xFFE0A060);
+        String power = String.format("Power in %.0f W, draw %.0f W%s, net %+.0f W", in, draw, v(5) > 1.001 ? String.format(" (x%.2f)", v(5)) : "", net);
+        g.text(font, power, x, by + 26, net < 0 ? 0xFFE0A060 : 0xFFE0E0E0);
+        // (after the power line, however long it is: the x1.04 pushed it into "Empty in", AdventurAgent)
+        if (net < 0 && s == 1) g.text(font, String.format("Empty in %s", time(v(1) / -net)), x + Math.max(220, font.width(power) + 12), by + 26, 0xFFE0A060);
         g.text(font, String.format("Radius %.0f now, goal %.0f, target %.0f%s", v(10), v(11), v(9), v(13) > 0 ? " (by signal)" : ""), x, by + 42,
             v(13) > 0 ? 0xFF80C0FF : 0xFFE0E0E0);
         g.text(font, String.format("Preferred %.0f, range %.0f to %.0f (above %.0f: ruinous draw)", v(6), v(7), v(8), v(6)), x, by + 54, 0xFFA0A0B0);

@@ -67,7 +67,8 @@ public final class AntiSound {
         }
         if (d > 64 * 64) return;
         // in a burst, the sound gets a moment back between cuts (else a burst is one long silence)
-        if ((now - crackAt) / 1e9 < CUT + 0.25) return;
+        // (crackAt starts at Long.MIN_VALUE: now - crackAt would overflow and hold every crack back)
+        if (crackAt != Long.MIN_VALUE && (now - crackAt) / 1e9 < CUT + 0.25) return;
         mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.25F));
         crackAt = now;
     }

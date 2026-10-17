@@ -552,7 +552,8 @@ vec4 shieldAt(vec2 cell, vec3 n, vec3 cc, vec3 view, float r, float failing, flo
             int ei = int(ep);
             float z = hash32(k, ei, 3, seed) * 2.0 - 1.0, ph = hash32(k, ei, 4, seed) * 6.2832;
             vec3 sk = vec3(sqrt(1.0 - z * z) * cos(ph), z, sqrt(1.0 - z * z) * sin(ph));
-            float reach = env * (0.12 + 1.3 * failing) * (0.6 + 0.8 * hash32(k, ei, 5, seed));
+            // (0.9: at 1.3 a hard-failing shield vanished whole for ~20 s and came back all amber at the collapse)
+            float reach = env * (0.12 + 0.9 * failing) * (0.6 + 0.8 * hash32(k, ei, 5, seed));
             float dch = length(cc - sk) + (rnd - 0.5) * 0.18;
             f = max(f, (reach - dch) / 0.25);
         }
