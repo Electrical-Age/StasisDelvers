@@ -79,7 +79,7 @@ class StayRuleTest {
         } finally {
             g.c.BOOM_FAILED.remove(k);
         }
-        // the strength 1.4 library (2026-10-17) solved every boom key; at 1.0 it listed [9, 1, 6, 6] (header boom_failed)
+        // the strength 1.4 library (2026-10-17): no boom solve failed repair; at 1.0 the header listed [9, 1, 6, 6]
         assertTrue(Library.shared().c.BOOM_FAILED.isEmpty(), "the library header lists no failed boom solves");
     }
 

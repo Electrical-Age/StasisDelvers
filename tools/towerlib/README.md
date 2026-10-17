@@ -49,9 +49,10 @@ Env: `TOWERLIB_CACHE` (default `tools/towerlib/cache`, git-ignored), `TOWERLIB_O
 `P3A_PROCS` (8), `GRADLE` (default `./gradlew`; lab box: `/var/lib/mclab/agent/tools/stasis-build.sh`),
 `NO_INSTALL=1`, `TOWERLIB_DATE` (fixed provenance date). `P3A_STRENGTH` (default 1.4 in `fem.py`, 1.0 before 2026-10-17): a factor on
 every allowable stress (`SIG_T`, `SIG_C0`, `SIG_CAB`; not E); the library is built with it, so the cache is only valid
-for one value (use a new `TOWERLIB_CACHE` per value). The complete solve cache of the shipped library is
-`timestop-proto/towerlib/p3acache` (7748 pickles, 56 MB): `TOWERLIB_CACHE=.../p3acache build_library.sh export`
-re-exports the shipped library without solving. Single steps: `cd tools && python3 -m towerlib --help`
+for one value (use a new `TOWERLIB_CACHE` per value). The complete solve cache of the shipped library (strength x1.4, 2026-10-17) is
+`/var/lib/mclab/agent/scratch/towerlib-strength/s140/cache` on tsugumi (7797 pickles): `TOWERLIB_CACHE=... build_library.sh
+export` re-exports it without solving. (The x1.0 libraries: `timestop-proto/towerlib/p3acache`, 7748 pickles, and
+`scratch/wellfull2/cache`; the verification below is of x1.0.) Single steps: `cd tools && python3 -m towerlib --help`
 (`run NAME [seam] [q..]`, `cov booms|bays|seams|test|validate`, `pat count|solve`, `export`, `gold`, ...).
 
 **The library is the union of the cache**, and the shipped one was built in two regimes, so `full` replays both:

@@ -37,7 +37,8 @@ mesh. `towergen` has no Minecraft or NeoForge dependency (and no third-party dep
 - Viewer: `towerview/run.sh render ../towergen/layouts/H64max.json --q 1.0 --out /tmp/tv [--shots a215,close]
   [--orbit 72] [--size 1280x720] [--ss 2] [--params visual.json] [--solver solver.json]`; `run.sh params > visual.json` and
   `run.sh solver > solver.json` write the defaults;
-  `run.sh info LAYOUT.json` prints keys, tiers, util and timings; `run.sh obj LAYOUT.json out.obj`;
+  `run.sh info LAYOUT.json` prints keys, tiers, util, timings and a density line (members by kind, silhouette, triangles,
+  ladder top); `run.sh obj LAYOUT.json out.obj`;
   `run.sh contact sheet.png --cols 3 --width 1920 a.png b.png ...`.
 - Interactive (NixOS): `cd towerview && nix-shell --run './run.sh view ../towergen/layouts/H40r3.json --params visual.json'`.
   Left drag orbit, right drag target height, wheel zoom, Q/A q +/- 0.1, 1 / 3 q = 1 / 0.3, R rebuild, S save a PNG
@@ -130,7 +131,8 @@ Known limits:
   spine's leg / P1 sizing uses them too, so ring half-widths shift in ~2/3 of layouts, by up to 1.5 blocks; the
   ladder top never moved in 600 random layouts, nor in the goldens).
 - Library rebuilt from an empty cache (`full`, 12 procs, ~20 min): 7797 entries (199 booms; was 7845 / 214),
-  `boom_failed` now empty (L45 rho 0.5 [9, 1, 6, 6] solves), 6.0 MB gz JSON, TGLB1 1.71 MB gz. Both golden sets
+  `boom_failed` now empty (L45 rho 0.5 [9, 1, 6, 6] is in the cache without error), 6.0 MB gz JSON, TGLB1 1.71 MB gz.
+  Infeasible (LP) keys, not cached: bays 3, seams 1, patterns 0 (were 27 / 16 / 214). Both golden sets
   regenerated (P3a-rule recipe now in the towerlib README); `StayRuleTest` asserts an empty `boom_failed`.
 - Tried x1.25 first (cache /var/lib/mclab/agent/scratch/towerlib-strength/s125/cache): H100 / H40 / H24b got
   lighter but H64max did not (q1 vol 433 -> 420, laced silhouette 1163 -> 1399: its E-y24 L40 boom came out with a
@@ -153,9 +155,9 @@ Known limits:
   and H40b4 (3 -> 17), i.e. a few more thin struts where cables were. All 14 golden runs pass (util <= 1.0).
 - Random slowTest: default 60 x 2 q: 94 pass / 2 over / 24 refused -> 96 / 0 / 24. 400 x 2 q seed 7: 642 / 22 / 136
   -> 657 / 7 / 136 (17 over -> pass, 2 pass -> over: the H55 eight-boom layout #299 with an N L45 boom on a near
-  boom key, util 1.15 / 1.34). Volume of towers passing both: median x0.77 (p10 0.59, p90 0.96; 33 of 640 heavier).
-  Hull sweep: 0 failures. Old vs new library, 600 random layouts at q1 (scratch Cmp.java): 3 OK -> OVER_CATALOGUE,
-  10 OVER_CATALOGUE -> OK.
+  boom key, util 1.15 / 1.34 at the sweep's seed; it passes at seed 0, util 0.99). Volume of towers passing both: median x0.77 (p10 0.59, p90 0.96; 33 of 640 heavier).
+  Hull sweep: 0 failures. Old vs new library, 600 random layouts at q1, seed 0 (scratch Cmp.java): 3 OK ->
+  OVER_CATALOGUE, 10 OVER_CATALOGUE -> OK (the stitch seed matters near the limit; the game uses a per-tower seed).
 - Towers already standing in a world: the server stores layout, status, seed and `ladderTop` and does not rebuild
   until a pole changes; the client rebuilds the mesh from the layout with the jar's library. So every standing tower
   is redrawn with the new (thinner) geometry on the next client load; the only blocks placed from the geometry are
