@@ -21,7 +21,7 @@ final class StasisEvents {
     static void spawnCheck(MobSpawnEvent.PositionCheck e) {
         if (e.getSpawnType() == EntitySpawnReason.CHUNK_GENERATION) return;
         if (e.getLevel().getLevel() instanceof ServerLevel level
-            && !Stasis.isRunning(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
+            && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
             e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
     }
 
@@ -36,7 +36,7 @@ final class StasisEvents {
             && why != EntitySpawnReason.REINFORCEMENT && why != EntitySpawnReason.JOCKEY && why != EntitySpawnReason.SPAWNER
             && why != EntitySpawnReason.TRIAL_SPAWNER) return;
         if (e.getLevel().getLevel() instanceof ServerLevel level && Stasis.stops(level)
-            && !Stasis.isRunning(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
+            && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
             e.setSpawnCancelled(true);
     }
 

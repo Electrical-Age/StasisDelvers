@@ -143,9 +143,21 @@ public final class Stasis {
     }
 
     static double rateAt(Level level, int x, int y, int z, boolean eddies) {
+        return rateAt(level, x, y, z, eddies, true);
+    }
+
+    /**
+     * Does time run here for spawning? As isRunning, but a new chunk's grace doesn't count (λ-Nero: monsters and
+     * animals spawned out in the grey: natural spawning ran during the few seconds a new chunk settles).
+     */
+    public static boolean spawnsHere(Level level, BlockPos pos) {
+        return rateAt(level, pos.getX(), pos.getY(), pos.getZ(), true, false) > 0;
+    }
+
+    static double rateAt(Level level, int x, int y, int z, boolean eddies, boolean grace) {
         if (!stops(level)) return 1.0;
         int cx = x >> 4, cz = z >> 4;
-        if (inSpawn(level, cx, cz) || NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
+        if (inSpawn(level, cx, cz) || grace && NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
         if (fs == null) return 0.0;
         double rate = 0.0;
