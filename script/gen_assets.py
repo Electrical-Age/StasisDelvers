@@ -75,8 +75,9 @@ def layer(colors, path):
     rect(9, 10, 14, 13, shade(base, 0.22), 0.04)      # the visor: dark glass
     rect(9, 10, 14, 10, glow, 0.03)                   # its glow line
     px(8, 11, trim); px(15, 11, trim)                 # visor hinges
-    for x in (2, 5, 18, 21):                          # vents on the sides
-        rect(x, 11, x, 13, shade(base, 0.55))
+    for x0 in (1, 17):                                 # a grille low on each side (two vertical slots read as eyes)
+        for y in (12, 14):
+            rect(x0 + 1, y, x0 + 5, y, shade(base, 0.55))
     # body (box at 16,16; 8x12x4): right 16-19, front 20-27, left 28-31, back 32-39 (rows 20-31)
     rect(16, 20, 39, 20, trim)                        # collar
     rect(23, 21, 24, 29, shade(base, 0.7))            # centre seam
