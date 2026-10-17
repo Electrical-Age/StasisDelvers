@@ -25,7 +25,10 @@ import org.erisia.stasis.towergen.VisualParams.Part;
  * cut (a wide neighbour), the member is cut where its edges leave the hull and the hull rebuilt (no coplanar faces).
  * Cables do not size hubs: they end where they leave the hull (or are added to it when a crossing offset moved their
  * end outside). Laced chords at a free end are ordinary members of the node joint; where a laced member continues
- * into another (along a leg) each chord pair gets a two-member hull joint (flush when collinear). Members that cross
+ * into another (along a leg) each chord pair gets a two-member hull joint (flush when collinear). A laced member ending
+ * at a branch joins its node's hull by its envelope (a gusset, gussetLip wider than its chords); its chords' open ends
+ * sink into the gusset (chordSink) and its end batten stands just off the gusset face. Solid braces ending at a node
+ * inside a continuing laced leg stop at the leg's lacing planes, capped, with no hub (legBraces). Members that cross
  * without sharing a node (X-braces, crossing cables) are pushed apart along the common normal so no faces are
  * coplanar (no z-fighting).
  */
@@ -56,6 +59,8 @@ public final class MeshBuilder {
         boolean sealed;
         double[][] pl, vt;     // prism planes / vertices (clearance), computed on demand
         boolean envelope;      // a laced member's outer section (not drawn; its chords are cut at e)
+        double vis = -1;       // chord ends at a gusset: the visible cut (the gusset face; e is sunk below it)
+        boolean stub;          // a brace ending inside a laced leg: drawn from e, capped (no hub)
 
         End(double[] p, double[] d, double[] sd, double a, double len, boolean cable, Part part) {
             this.p = p; this.d = d; this.sd = sd; this.a = a; this.len = len; this.cable = cable; this.part = part;
@@ -70,6 +75,7 @@ public final class MeshBuilder {
         final List<double[]> env = new ArrayList<>();       // outer envelopes of laced members ending here (tests)
         Hull3 hull;
         Part part;
+        JointInfo info;                                     // tests
 
         void add(End e) { ends.add(e); }
     }
@@ -79,6 +85,8 @@ public final class MeshBuilder {
         Hull3 hull;
         final List<double[]> boxes = new ArrayList<>();     // p(3) d(3) u(3) v(3) a len
         final List<double[][]> sealed = new ArrayList<>();  // cut-face corners of the sealed ends
+        final List<double[][]> chordEnds = new ArrayList<>(); // gusset joints: corners of the chords' (sunk) open ends
+        final List<double[]> chordSink = new ArrayList<>();   // ... and per chord {sink, chord width, cut, envelope cut}
         double maxW;
     }
 
@@ -310,7 +318,7 @@ public final class MeshBuilder {
                     double aEnv = 0;
                     for (int k = 0; k < g.nc; k++)
                         aEnv = Math.max(aEnv, g.h * Math.max(Math.abs(V.dot(g.dir[k], env.u)), Math.abs(V.dot(g.dir[k], env.v))) + g.cw / 2);
-                    env = new End(node(P, nd), d, ax[b], aEnv, len[b], false, part[b]);
+                    env = new End(node(P, nd), d, ax[b], aEnv + Math.max(0, vp.gussetLip()) * g.cw, len[b], false, part[b]);
                     env.envelope = true;
                     envEnd[2 * b + e] = env;
                     joint(nodeHub, nd).add(env);
@@ -354,12 +362,58 @@ public final class MeshBuilder {
                 }
             }
         }
-        for (int nd = 0; nd < n; nd++) if (nodeHub[nd] != null) solve(nodeHub[nd], sink);
+        for (int nd = 0; nd < n; nd++) {
+            if (nodeHub[nd] == null) continue;
+            // braces inside a laced leg: where a laced member continues through the node (chord splices) and only
+            // narrower solid members / cables end there, their hub would float in the leg's hollow (a dark block seen
+            // through the lacing); they stop inside the leg instead, capped (legBraces)
+            List<double[]> legs = new ArrayList<>();
+            double legB = 1e300;
+            for (int b : at.get(nd)) {
+                if (type[b] != LACED) continue;
+                int e = t.bi[b] == nd ? 0 : 1;
+                if (cont[2 * b + e] >= 0) { legs.addAll(legPlanes(lg[b], node(P, nd))); legB = Math.min(legB, lg[b].b); }
+            }
+            if (!legBraces(nodeHub[nd], legs, legB)) solve(nodeHub[nd], sink);
+        }
         for (Joint hb : chordHubs) { solve(hb, sink); hb.part = hb.ends.get(0).part; }   // chord splices: a piece of chord
-        for (int k = 0; k < 2 * m; k++) {         // chords run straight to their envelope's cut
+        // chords run straight to their envelope's cut (the gusset face), and their open ends sink into the gusset by
+        // up to chordSink x their width, as far as every edge stays strictly inside the hull: no open chord end lies on
+        // a hull face (no slivers). Normally the hull is on the node side of the cut; where it reaches past the cut
+        // along the chords instead (a wide neighbour inside the leg), the ends sink forward into it. The visible cut
+        // (battens, lacing) is where the last chord edge leaves the hull.
+        double sinkF = Math.max(0, vp.chordSink());
+        for (int k = 0; k < 2 * m; k++) {
             End env = envEnd[k];
             if (env == null || !env.sealed) continue;
-            for (End ce : cEnd[k]) { ce.e = Math.min(env.e, 0.49 * ce.len); ce.sealed = true; }
+            Joint jt = nodeHub[k % 2 == 0 ? t.bi[k / 2] : t.bj[k / 2]];
+            Hull3 h = jt.hull;
+            for (End ce : cEnd[k]) {
+                double cut = Math.min(env.e, 0.49 * ce.len), e = cut, vis = cut;
+                if (h != null && h.dim == 3) {
+                    double lo = -1e300, hi = 1e300, hiMax = cut;
+                    for (int c = 0; c < 4; c++) {
+                        double[] iv = h.clip(corner(ce, 0, c), ce.d, -1e-6);
+                        if (iv == null) { lo = 1e300; break; }
+                        lo = Math.max(lo, iv[0]);
+                        hi = Math.min(hi, iv[1]);
+                        hiMax = Math.max(hiMax, iv[1]);
+                    }
+                    double sMax = sinkF * 2 * ce.a;
+                    if (lo < cut - 1e-6 && hi > cut - 1e-4) e = Math.max(Math.max(0, cut - sMax), lo);       // back into it
+                    else if (lo < cut + 1e-4 && hi > cut + 1e-6) e = cut + Math.min(sMax, 0.5 * (hi - cut));  // forward
+                    if (hiMax < 0.49 * ce.len) vis = hiMax;
+                }
+                ce.e = e;
+                ce.vis = vis;
+                ce.sealed = true;
+                if (jt.info != null) {
+                    double[][] f = new double[4][];
+                    for (int c = 0; c < 4; c++) f[c] = corner(ce, e, c);
+                    jt.info.chordEnds.add(f);
+                    jt.info.chordSink.add(new double[]{cut - e, 2 * ce.a, cut, env.e});
+                }
+            }
         }
 
         // --- members
@@ -377,7 +431,7 @@ public final class MeshBuilder {
                 continue;
             }
             End e0 = mEnd[2 * b], e1 = mEnd[2 * b + 1];
-            double t0 = e0.sealed ? e0.e : 0, t1 = e1.sealed ? e1.e : 0;
+            double t0 = e0.sealed || e0.stub ? e0.e : 0, t1 = e1.sealed || e1.stub ? e1.e : 0;
             if (len[b] - t0 - t1 < 1e-6) continue;
             double[] p0 = V.add(e0.p, V.mul(ax[b], t0)), p1 = V.sub(e1.p, V.mul(ax[b], t1));
             mesh.beam(p0, p1, dw[b], dw[b], part[b], !e0.sealed, !e1.sealed);
@@ -637,6 +691,7 @@ public final class MeshBuilder {
                     ji.sealed.add(f);
                 }
             }
+            jt.info = ji;
             synchronized (sink) { sink.add(ji); }
         }
     }
@@ -706,6 +761,68 @@ public final class MeshBuilder {
             for (int k = 0; k < 3; k++) { off[j][k] += push * dw[i] * nrm[k]; off[i][k] -= push * dw[j] * nrm[k]; }
         }
         return off;
+    }
+
+    /** Cosine of the smallest angle between a brace and the laced leg for {@link #legBraces} (10 degrees). */
+    static final double LEG_BRACE_COS = 0.985;
+
+    /**
+     * The lacing planes of laced member g's section around node c, as half-spaces n . x <= r (rows nx ny nz r, the
+     * last row the member's unit axis, flagged by r = NaN): one per face, through the chord centres.
+     */
+    private static List<double[]> legPlanes(Laced g, double[] c) {
+        List<double[]> out = new ArrayList<>();
+        for (int k = 0; k < g.nc; k++) {
+            double[] nn = V.unit(V.add(g.dir[k], g.dir[(k + 1) % g.nc]));
+            out.add(new double[]{nn[0], nn[1], nn[2], V.dot(nn, c) + g.h * V.dot(g.dir[k], nn)});
+        }
+        double[] a = V.mul(g.dv, 1 / g.L);
+        out.add(new double[]{a[0], a[1], a[2], Double.NaN});
+        return out;
+    }
+
+    /**
+     * Brace ends at a node inside a continuing laced leg (legs: the lacing half-spaces of the spliced members there,
+     * {@link #legPlanes}; legB the narrowest one's outer width): if every end of the joint is a solid member narrower
+     * than the leg or a cable, its whole section starts inside the leg's lacing planes (crossing offset included) and
+     * it leaves the leg at more than 10 degrees to its axis, each is cut where its section first reaches a lacing
+     * plane (its end face stays inside the leg) and capped there, and the joint gets no hub. Otherwise (laced ends,
+     * members wider than the leg's hollow, near-parallel members) false: the ordinary hull joint.
+     */
+    private boolean legBraces(Joint jt, List<double[]> legs, double legB) {
+        if (legs.isEmpty()) return false;
+        double maxF = Math.max(0, Math.min(0.49, vp.jointMaxSetbackFrac()));
+        double[] cut = new double[jt.ends.size()];
+        for (int i = 0; i < jt.ends.size(); i++) {
+            End en = jt.ends.get(i);
+            if (en.envelope) return false;
+            double sf = 1e300;
+            for (int k = 0; k < 4; k++) {
+                double[] x0 = corner(en, 0, k);
+                double best = 0;                  // the leaving parameter, over the leg members (union)
+                double lo = 1e300;                // within one member: the first plane reached
+                boolean inside = true;
+                for (double[] h : legs) {
+                    if (Double.isNaN(h[3])) {     // end of one member's planes: its axis
+                        if (Math.abs(V.dot(en.d, h)) > LEG_BRACE_COS) return false;
+                        if (inside) best = Math.max(best, lo);
+                        lo = 1e300;
+                        inside = true;
+                        continue;
+                    }
+                    double d0 = h[0] * x0[0] + h[1] * x0[1] + h[2] * x0[2] - h[3], d1 = V.dot(en.d, h);
+                    if (d0 > -1e-9) inside = false;
+                    else if (d1 > 1e-12) lo = Math.min(lo, -d0 / d1);
+                }
+                if (best <= 1e-9 || best >= 1e299) return false;
+                sf = Math.min(sf, best);
+            }
+            if (!en.cable && 2 * en.a >= legB) return false;
+            if (sf > maxF * en.len) return false;
+            cut[i] = sf;
+        }
+        for (int i = 0; i < jt.ends.size(); i++) { End en = jt.ends.get(i); en.e = cut[i]; en.stub = true; }
+        return true;
     }
 
     /** Continuing laced members: the bend between them below 30 degrees (leg kinks at the base flare included). */
@@ -802,24 +919,33 @@ public final class MeshBuilder {
         }
         double lw = Math.max(vp.lacingMinWidth(), vp.lacingWidthFrac() * cw);
         int npan = (int) Math.max(vp.lacingPanelsMin(), Math.min(vp.lacingPanelsMax(), Math.rint(g.L / Math.max(g.b * vp.lacingPanelPerWidth(), 0.3))));
-        // lacing and battens span the visible part: from the chords' cut at each end (gusset / splice hull face)
-        double tA = Math.min(0.45, cutFrac(end0, g)), tB = 1 - Math.min(0.45, cutFrac(end1, g));
+        // lacing and battens span the visible part: from the chords' cut at each end (splice hull face), or just off
+        // the gusset face (the batten stands on it, sunk 0.15 x its width: no face of it coplanar with the gusset's)
+        double bw = lw * vp.battenScale();
+        double tA = Math.min(0.45, cutFrac(end0, g, bw)), tB = 1 - Math.min(0.45, cutFrac(end1, g, bw));
         for (int fc = 0; fc < g.nc; fc++) {
             int oa = fc, ob = (fc + 1) % g.nc;
             for (int k = 0; k < npan; k++) {
                 double t0 = tA + (tB - tA) * k / npan, t1 = tA + (tB - tA) * (k + 1) / npan;
                 mesh.beam(g.at(k % 2 == 0 ? oa : ob, t0), g.at(k % 2 == 0 ? ob : oa, t1), lw, Part.LACING);
             }
-            if (!skip0) mesh.beam(g.at(oa, tA), g.at(ob, tA), lw * vp.battenScale(), Part.LACING);
-            if (!skip1) mesh.beam(g.at(oa, tB), g.at(ob, tB), lw * vp.battenScale(), Part.LACING);
+            if (!skip0) mesh.beam(g.at(oa, tA), g.at(ob, tA), bw, Part.LACING);
+            if (!skip1) mesh.beam(g.at(oa, tB), g.at(ob, tB), bw, Part.LACING);
         }
     }
 
-    /** Fraction of the member length cut off at one end (the smallest sealed chord cut; 0 if any chord is open). */
-    private static double cutFrac(End[] ends, Laced g) {
+    /** Fraction of the member length cut off at one end: the smallest sealed chord cut (0 if any chord is open); at a
+     *  gusset end the largest visible cut (where the chords leave the gusset) + 0.35 x the batten width bw. */
+    private static double cutFrac(End[] ends, Laced g, double bw) {
         if (ends == null) return 0;
-        double f = 1e300;
-        for (End en : ends) { if (en == null || !en.sealed) return 0; f = Math.min(f, en.e / g.L); }
+        double f = 1e300, fv = 0;
+        boolean gusset = false;
+        for (End en : ends) {
+            if (en == null || !en.sealed) return 0;
+            if (en.vis >= 0) { gusset = true; fv = Math.max(fv, en.vis / g.L); }
+            f = Math.min(f, en.e / g.L);
+        }
+        if (gusset) return fv + 0.35 * bw / g.L;
         return f == 1e300 ? 0 : f;
     }
 

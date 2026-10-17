@@ -173,6 +173,47 @@ class MeshTest {
         assertEquals(0, spiky, "spiky hub points (beyond 0.35 x widest member + 0.06 outside the member envelopes)");
     }
 
+    /**
+     * Gusset joints (laced envelope ends): every chord's open end lies strictly inside the gusset hull (sunk into it,
+     * not on its face: no slivers / z-fighting at the seam), and nearly all chords are sunk by a visible amount
+     * (goldens and the owner's H16 W4 / W5 layouts, q 1 and 0.3).
+     */
+    @Test
+    void gussetChordEndsSunk() throws Exception {
+        TowerGen g = new TowerGen(Library.shared());
+        MeshBuilder mb = new MeshBuilder(g.c, VisualParams.defaults());
+        java.util.LinkedHashMap<String, Layout> lays = new java.util.LinkedHashMap<>();
+        for (String nm : GOLDEN) lays.put(nm, Layout.read(java.nio.file.Path.of("layouts", nm + ".json")));
+        lays.put("H16W4@2", new Layout(16, List.of(new Layout.Boom(2, 2, 4))));
+        lays.put("H16W5@2", new Layout(16, List.of(new Layout.Boom(2, 2, 5))));
+        int ends = 0, sunk = 0, outside = 0;
+        double minRel = 1e300;
+        for (var le : lays.entrySet()) {
+            for (double q : new double[]{1.0, 0.3}) {
+                TowerGen.Result r = g.build(le.getValue(), q);
+                List<MeshBuilder.JointInfo> js = new java.util.ArrayList<>();
+                mb.build(r.tower, r.analysis, js);
+                for (MeshBuilder.JointInfo ji : js) {
+                    for (int i = 0; i < ji.chordEnds.size(); i++) {
+                        ends++;
+                        double[] sk = ji.chordSink.get(i);
+                        boolean in = true;
+                        for (double[] c : ji.chordEnds.get(i)) in &= ji.hull.contains(c, -1e-7);
+                        if (!in) {
+                            outside++;
+                            System.out.printf("chord end outside its gusset: %s q%.1f sink %.4f cw %.3f cut %.4f env %.4f%n", le.getKey(), q, sk[0], sk[1], sk[2], sk[3]);
+                        }
+                        if (Math.abs(sk[0]) >= 0.1 * sk[1]) sunk++;
+                        minRel = Math.min(minRel, Math.abs(sk[0]) / sk[1]);
+                    }
+                }
+            }
+        }
+        System.out.printf("gusset chord ends: %d, %d sunk >= 0.1 x chord width, smallest sink %.3f x chord width%n", ends, sunk, minRel);
+        assertEquals(0, outside, "chord ends at a gusset not strictly inside its hull");
+        assertTrue(ends > 0 && sunk >= 0.95 * ends, "chord ends sunk into their gussets");
+    }
+
     /** Mesh FNV hashes of the golden layouts (q 1, default params): compared with the web build's stats.meshHash. */
     @Test
     void portableHashes() throws Exception {

@@ -420,7 +420,7 @@ const RANGES = {
   density: [0.1, 10, 'log'], extraWidthSteps: [0, 12],
   sunAzimuth: [0, 360], sunElevation: [0, 90], fovDeg: [15, 110], ambient: [0, 1], lacingPanelsMin: [1, 10],
   lacingPanelsMax: [2, 40], groundGrid: [0, 16], lacedEndTaper: [0, 0.5], lacedEndFrac: [0, 1], lacingWidthFrac: [0.05, 1],
-  jointMargin: [0, 1], jointMaxSetbackFrac: [0, 0.49], jointMaxSetback: [0, 4], crossOffsetFrac: [0, 1], crossMinAngle: [0, 45],
+  jointMargin: [0, 1], jointMaxSetbackFrac: [0, 0.49], jointMaxSetback: [0, 4], gussetLip: [0, 1], chordSink: [0, 2], crossOffsetFrac: [0, 1], crossMinAngle: [0, 45],
 };
 const SECTION_NAMES = [
   ['wire reduction', 'Wires'], ['back-stays', 'Back-stays'], ['boom stays', 'Stays'], ['pretension', 'Pass'], ['loads', 'Loads'],

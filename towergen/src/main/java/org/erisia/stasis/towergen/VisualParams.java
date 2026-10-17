@@ -46,6 +46,10 @@ public record VisualParams(
         boolean jointMemberColour,   // hubs take the widest member's part (rust / steel / pole) instead of colKnuckle
                                      // (hubs on the pole, hubs where members only run straight through and the chord
                                      // splices where laced members continue always take the member's)
+        double gussetLip,            // a laced member's gusset (envelope) block is wider than its chords' outer faces by
+                                     // this x the chord width on every side (the chords stand on the block's face)
+        double chordSink,            // chords at a gusset end run on into the block by up to this x the chord width
+                                     // (as far as they stay inside it): no chord end on the block's face (no slivers)
         double crossOffsetFrac,      // crossing members closer than frac x (sum of drawn widths) are pushed apart to it
                                      // (no coplanar faces at X-braces / crossing cables: no z-fighting); 0 = off
         double crossMinAngle,        // degrees; crossings flatter than this (nearly parallel members) are not offset
@@ -117,7 +121,7 @@ public record VisualParams(
         return new VisualParams(
                 0.05, 0.30, 0.06, 1.0, 0.09,
                 0.4, 0.035, 1.3, 1.0, 2, 14, 0.0, 0.2,
-                0.1, 0.45, 1.0, false, 0.3, 10.0, 1.4, 0.04, 0.24,
+                0.1, 0.45, 1.0, false, 0.2, 0.5, 0.3, 10.0, 1.4, 0.04, 0.24,
                 1.6, 0.5, 0.30, 1.0, 0.65, 0.18, 0.40, 1.0, true, 3.0, 0.9,
                 c(0.40, 0.22, 0.13), c(0.48, 0.47, 0.45), c(0.30, 0.20, 0.14), c(0.55, 0.52, 0.47),
                 c(0.16, 0.15, 0.14), c(0.86, 0.84, 0.76), c(0.70, 0.66, 0.58), c(0.86, 0.84, 0.78),

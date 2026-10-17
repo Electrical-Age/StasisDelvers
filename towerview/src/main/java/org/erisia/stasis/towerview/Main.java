@@ -28,7 +28,7 @@ import org.erisia.stasis.towergen.WireReduction;
 /**
  * towerview: standalone tower viewer.
  * <pre>
- *   towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close,wide,legs,nodeN,nodeNin] [--orbit N]
+ *   towerview render LAYOUT.json [--q 1.0] [--out DIR] [--shots a215,a300,close,wide,legs,branchClose,nodeN,nodeNin,nodeN@DIST[:DEG[:UP]]] [--orbit N]
  *                    [--size 1280x720] [--ss 2] [--params visual.json] [--solver solver.json] [--name TAG]
  *                    [--lib library.json.gz]
  *   towerview view LAYOUT.json [--q 1.0] [--params visual.json] [--solver solver.json]   interactive window
@@ -234,6 +234,7 @@ public final class Main {
         if (br >= 0) {
             out.put("branch", jointCam(t.node(br), 4.5, 1.2, 35, fov));
             out.put("branchIn", jointCam(t.node(br), 3.0, 0.8, 160, fov));   // from inside the tower
+            out.put("branchClose", jointCam(t.node(br), 2.0, 0.6, 35, fov));   // gusset faces, chord ends, battens
         }
     }
 
@@ -284,9 +285,11 @@ public final class Main {
         for (String s : shots.split(",")) {
             if (s.isBlank()) continue;
             Raster.Camera cam = cams.get(s);
-            java.util.regex.Matcher nm = java.util.regex.Pattern.compile("node(\\d+)(in)?").matcher(s);
+            java.util.regex.Matcher nm = java.util.regex.Pattern.compile("node(\\d+)(in)?(?:@([0-9.]+)(?::(-?[0-9.]+))?(?::(-?[0-9.]+))?)?").matcher(s);
             if (cam == null && nm.matches() && Integer.parseInt(nm.group(1)) < r.tower.n)    // close-up of one node
-                cam = jointCam(r.tower.node(Integer.parseInt(nm.group(1))), nm.group(2) != null ? 3.0 : 4.5, 1.0, nm.group(2) != null ? 160 : 35, vp.fovDeg());
+                cam = jointCam(r.tower.node(Integer.parseInt(nm.group(1))), nm.group(3) != null ? Double.parseDouble(nm.group(3)) : nm.group(2) != null ? 3.0 : 4.5,
+                        nm.group(5) != null ? Double.parseDouble(nm.group(5)) : 1.0,
+                        nm.group(4) != null ? Double.parseDouble(nm.group(4)) : nm.group(2) != null ? 160 : 35, vp.fovDeg());
             if (cam == null) { System.out.println("no camera " + s + " (have " + cams.keySet() + ")"); continue; }
             long t0 = System.nanoTime();
             BufferedImage img = ras.render(mesh, cam, s.startsWith("a") || s.equals("wide") ? cap : name + " q" + q + " " + s);
