@@ -23,7 +23,7 @@
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
 // shape id;
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
-// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), mast top above the centre (a collapsing tower; else 0).
+// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved. Column 2: a frozen remnant.
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
 // lattice on each icosahedron face; the nearest lattice point is the cell, the gap to the second nearest its rim).
@@ -977,6 +977,7 @@ void main() {
         int n = int(data(24));
         for (int i = 0; i < n && i < 13; i++) {
             int o = 32 + 10 * i;
+            if (data(o + 6) > 1.5) continue;   // (a frozen remnant: time is stopped there)
             vec3 fc = vec3(data(o), data(o + 1), data(o + 2));
             float r = data(o + 3), collapse = data(o + 4);
             vec3 dv = p - fc;
@@ -1152,21 +1153,11 @@ void main() {
             int k = 32 + 10 * i;
             vec3 fc = vec3(data(k), data(k + 1), data(k + 2));
             float r = data(k + 3), collapse = data(k + 4), failing = data(k + 5);
-            bool column = data(k + 6) > 0.5;
-            // the collapse squeezed into the tower (Baughn; FAILURE-PLAN D): over its last quarter the sphere rises to
-            // the mast top and shrinks to a knot (u^3); then (collapse 1..2, ~2.5 s) the knot's mist drifts apart
-            float squeeze = collapse > 0.75 ? clamp((collapse - 0.75) / 0.25, 0.0, 1.0) : 0.0;
-            float tail = collapse > 1.0 ? min(1.0, collapse - 1.0) : 0.0;
-            float mastUp = data(k + 9) > 0.5 ? data(k + 9) : max(2.0, r / 8.0);   // (StasisPost: the tower's mast top)
-            if (squeeze > 0.0) {
-                fc.y += mastUp * squeeze;
-                r = mix(r, 1.2, squeeze * squeeze * squeeze);
-            }
-            if (tail > 0.0) {
-                if (tail >= 1.0) continue;
-                fc.y += mastUp;
-                r = mix(1.2, 8.0, sqrt(tail));
-            }
+            // a frozen remnant (Baughn: the collapse's last moment, stopped for good; StasisPost from Remnants): drawn
+            // like the field was then, at its own fixed time
+            bool frozen = data(k + 6) > 1.5;
+            bool column = data(k + 6) > 0.5 && !frozen;
+            float ftime = frozen ? 50.0 + mod(data(k + 7), 997.0) : time;
             vec3 oc = o - fc, vv = v;
             if (column) { oc.y = 0.0; vv.y = 0.0; }
             float aa = dot(vv, vv);
@@ -1181,28 +1172,22 @@ void main() {
                 // mist in spots (Baughn: mostly clear inside, fading in and out): where the eddies are (Eddies, the
                 // stopped pockets from failing 0.7), and before that sparse wisps that come and go, each region on its
                 // own slow pulse
-                float share = collapse > 0.0 || failing > 0.7 ? eddyShare(min(collapse, 1.0), failing) : 0.04 + 0.08 * (failing - 0.25) / 0.45;
-                share = mix(share, 0.95, max(squeeze, tail > 0.0 ? 1.0 : 0.0));   // the knot is all mist
+                float share = collapse > 0.0 || failing > 0.7 ? eddyShare(collapse, failing) : 0.04 + 0.08 * (failing - 0.25) / 0.45;
                 float thr = 0.5 + (0.5 - share) * 0.45;
                 float ta = max(t1, 0.0), tb = min(t2, tmax);
                 if (tb > ta) {
                     vec3 camI = vec3(data(16), data(17), data(18));
-                    float et = data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
+                    float et = frozen ? ftime : data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
                     int sd = int(data(k + 7));
                     for (int m = 0; m < 12; m++) {
                         vec3 wp = camI + o + v * (ta + (float(m) + 0.5) * stepLen);
                         float pulse = 0.5 + 0.5 * sin(et * 0.5 + hash13(floor(wp / 9.0)) * 6.2832);
                         float dn = smoothstep(thr - 0.03, thr + 0.03, eddy(wp, et, sd)) * pulse * pulse;
-                        if (squeeze > 0.0 || tail > 0.0) dn = smoothstep(thr - 0.03, thr + 0.03, eddy(wp, et * (1.0 + 3.0 * squeeze), sd));
-                        mist += (1.0 - mist) * dn * min(1.0, stepLen * ((collapse > 0.0 ? 0.025 : 0.008) + 0.4 * squeeze + 0.25 * (1.0 - tail) * step(0.001, tail)));
+                        mist += (1.0 - mist) * dn * min(1.0, stepLen * (collapse > 0.0 ? 0.025 : 0.008));
                     }
-                    // squeezed, the mist glows over-bright violet-white; in the tail it fades as it spreads
-                    vec3 mc = mix(vec3(0.78, 0.82, 0.88), vec3(0.95, 0.9, 1.0) * (1.0 + 1.5 * squeeze), max(squeeze, step(0.001, tail)));
-                    float ma = 0.6 * (tail > 0.0 ? (1.0 - tail) * (1.0 - tail) : 1.0);
-                    c = mix(c, mc, clamp(mist * ma, 0.0, 1.0));
+                    c = mix(c, vec3(0.78, 0.82, 0.88), clamp(mist * 0.6, 0.0, 1.0));
                 }
             }
-            if (tail > 0.0) continue;   // (the knot's mist only, no hexes)
             // far hit first, then near (back to front)
             for (int h2 = 0; h2 < 2; h2++) {
                 float t = h2 == 0 ? t2 : t1;
@@ -1238,18 +1223,18 @@ void main() {
                 // warm colour as the dropout starts (failing 0.4 = 60% charge), full amber in a collapse
                 // (the failing amber is per hex now, in shieldAt; a collapse is amber all over)
                 float warm = collapse > 0.0 ? 1.0 : 0.0;
-                vec4 sh = shieldAt(cell, nn, centre, -v, r, collapse > 0.0 ? 0.0 : failing, warm, time, h2 == 0 && !inside, int(data(k + 7)));
+                vec4 sh = shieldAt(cell, nn, centre, -v, r, collapse > 0.0 ? 0.0 : failing, warm, ftime, h2 == 0 && !inside, int(data(k + 7)));
                 if (data(31) > 0.0) {
                     // weather: where a deep crosses the field the hexes brighten (the opposite of dropout), pulsing
                     float dp = deepAt(fc + centre * r, vec3(data(16), data(17), data(18)));
                     if (dp > 0.05) sh = vec4(mix(sh.rgb, vec3(0.92, 0.96, 1.0), 0.6 * dp),
-                        min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(time * 3.0 + cell.y * 6.0)))));
+                        min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(ftime * 3.0 + cell.y * 6.0)))));
                 }
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 // about to die: the rim crackles white-gold (rim only, flickering; ~0.4 s in a real collapse)
                 if (brk < 0.015) {
                     float rimm = 1.0 - smoothstep(0.1, 0.4, cell.x);
-                    float fl = step(0.4, hash13(vec3(cell.y * 53.0, floor(time * 18.0), 9.1)));
+                    float fl = step(0.4, hash13(vec3(cell.y * 53.0, floor(ftime * 18.0), 9.1)));
                     sh = vec4(mix(sh.rgb, vec3(1.0, 0.95, 0.85), rimm * fl), min(0.9, sh.a + 0.5 * rimm * fl));
                 }
                 c = mix(c, sh.rgb, sh.a);

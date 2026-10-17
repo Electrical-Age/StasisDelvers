@@ -51,6 +51,7 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.LevelEvent.Unload.class, e -> {
             if (e.getLevel().isClientSide()) {
                 TowerRenderer.clear();
+                Remnants.clear();
                 org.erisia.stasis.LocalTime.Client.clear();
             }
         });
@@ -81,7 +82,13 @@ public final class StasisClient {
         modBus.addListener(net.neoforged.neoforge.client.event.TextureAtlasStitchedEvent.class, FrozenSprites::stitched);
         org.erisia.stasis.ClientFields.onChange = FrozenSprites::fieldsChanged;
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> FrozenSprites.tick(net.minecraft.client.Minecraft.getInstance()));
-        org.erisia.stasis.TowerClientHooks.onUpdate = TowerRenderer::updated;
-        org.erisia.stasis.TowerClientHooks.onRemove = TowerRenderer::removed;
+        org.erisia.stasis.TowerClientHooks.onUpdate = be -> {
+            TowerRenderer.updated(be);
+            Remnants.updated(be);
+        };
+        org.erisia.stasis.TowerClientHooks.onRemove = be -> {
+            TowerRenderer.removed(be);
+            Remnants.removed(be);
+        };
     }
 }

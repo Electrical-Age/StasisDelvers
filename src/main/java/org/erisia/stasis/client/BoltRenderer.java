@@ -32,6 +32,14 @@ public final class BoltRenderer {
     static int drawLogs;
 
     static void receive(StasisNet.Bolt b) {
+        List<Vector3d[]> strokes = strokes(b);
+        synchronized (LIVE) {
+            LIVE.add(new Live(strokes, System.nanoTime()));
+        }
+    }
+
+    /** The bolt's strokes (trunk first), the same on every client. */
+    static List<Vector3d[]> strokes(StasisNet.Bolt b) {
         List<Vector3d[]> strokes = new ArrayList<>();
         RandomSource rnd = RandomSource.create(b.seed());
         Vector3d from = new Vector3d(b.fx(), b.fy(), b.fz()), to = new Vector3d(b.tx(), b.ty(), b.tz());
@@ -45,10 +53,7 @@ public final class BoltRenderer {
                 .add(rnd.nextGaussian() * 0.8, rnd.nextGaussian() * 0.8, rnd.nextGaussian() * 0.8).normalize().mul(len);
             strokes.add(displace(start, new Vector3d(start).add(dir), 3, 0.3, rnd));
         }
-        synchronized (LIVE) {
-            LIVE.add(new Live(strokes, System.nanoTime()));
-        }
-        org.erisia.stasis.StasisDelvers.LOG.info("bolt received: {} points, {} strokes", trunk.length, strokes.size());
+        return strokes;
     }
 
     /** Midpoint displacement: 2^depth segments, sideways jitter of `rough` x the segment length. */
@@ -135,11 +140,23 @@ public final class BoltRenderer {
             LIVE.removeIf(l -> (now - l.born()) / 1e9 > LIFE);
             live = new ArrayList<>(LIVE);
         }
-        int n = 0;
-        org.joml.Vector4f v = new org.joml.Vector4f();
+        // live bolts first, then the frozen ones of tower remnants (held mid-strike, thinned to every other point)
+        List<List<Vector3d[]>> bolts = new ArrayList<>();
+        List<Float> alphas = new ArrayList<>();
         for (Live l : live) {
             double age = (now - l.born()) / 1e9;
-            float a = age < 0.12 ? (((int) (age * 60)) % 2 == 0 ? 1f : 0.6f) : (float) Math.max(0, 1 - (age - 0.12) / (LIFE - 0.12)) * 0.5f;
+            bolts.add(l.strokes());
+            alphas.add(age < 0.12 ? (((int) (age * 60)) % 2 == 0 ? 1f : 0.6f) : (float) Math.max(0, 1 - (age - 0.12) / (LIFE - 0.12)) * 0.5f);
+        }
+        for (List<Vector3d[]> f : Remnants.bolts(cam, 160)) {
+            bolts.add(f);
+            alphas.add(0.8f);
+        }
+        int n = 0;
+        org.joml.Vector4f v = new org.joml.Vector4f();
+        for (int li = 0; li < bolts.size(); li++) {
+            Live l = new Live(bolts.get(li), 0);
+            float a = alphas.get(li);
             for (int s = 0; s < l.strokes().size(); s++) {
                 float w = s == 0 ? 0.35f : 0.18f;
                 for (Vector3d p : l.strokes().get(s)) {
@@ -169,6 +186,6 @@ public final class BoltRenderer {
     }
 
     static boolean any() {
-        return !LIVE.isEmpty() && Minecraft.getInstance().level != null;
+        return (!LIVE.isEmpty() || !Remnants.BY_TOWER.isEmpty()) && Minecraft.getInstance().level != null;
     }
 }

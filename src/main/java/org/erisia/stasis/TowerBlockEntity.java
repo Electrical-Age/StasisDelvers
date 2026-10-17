@@ -288,11 +288,6 @@ public class TowerBlockEntity extends BlockEntity {
         return storeFor(designRadius());
     }
 
-    /** The mast top above the field centre (client: the collapse's knot; counted, since segments isn't synced). */
-    public int mastTop() {
-        return TowerBlock.HEIGHT + countSegments();
-    }
-
     int countSegments() {
         int n = 0;
         BlockPos p = TowerStructure.pole(worldPosition, 1);
@@ -394,10 +389,11 @@ public class TowerBlockEntity extends BlockEntity {
                     state = State.COLLAPSING;
                     collapseTicks = 0;
                     collapseProgress = 0;
-                    collapseTail = 0;
+                    freezeAt = 0.86 + 0.09 * sl.getRandom().nextDouble();
                     collapseSpeed = 1.0 / (10 + 15 * sl.getRandom().nextDouble());   // 10-25 s
                     boltBurst = 0;
-                    int seed = sl.getRandom().nextInt();
+                    int seed = sl.getRandom().nextInt() & 0xffffff;   // (24 bits: exact in the shader's floats)
+                    collapseSeed = seed;
                     FieldData.get(sl).update(sl, fieldId, f -> f.withSeed(seed));
                     StasisDelvers.LOG.info("Stasis tower at {} ran out of power: field {} collapses", worldPosition.toShortString(), fieldId);
                 }
@@ -407,31 +403,15 @@ public class TowerBlockEntity extends BlockEntity {
                 // it: the front pauses, lurches, now and then slips back a little, with lightning in bursts
                 var rnd = sl.getRandom();
                 collapseTicks++;
-                if (collapseTail > 0) {
-                    // the knot's mist drifts apart (collapse 1 -> 2, 2.5 s), then the field is gone (FAILURE-PLAN D)
-                    collapseTail++;
-                    double c = 1 + Math.min(1, collapseTail / 50.0);
-                    if (collapseTail % 4 == 0 || c >= 2) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
-                    if (c >= 2) stop(sl);
-                    break;
-                }
-                double step;
-                if (collapseProgress >= 0.75) step = 0.25 / 3.5;   // the squeeze into the tower: steady, ~3.5 s
-                else {
-                    double roll = rnd.nextDouble();
-                    step = collapseSpeed * (roll < 0.12 ? 0 : roll < 0.2 ? -1.5 : roll < 0.3 ? 3 : 1);
-                }
-                collapseProgress = Math.max(0, Math.min(1, collapseProgress + step / 20.0));
+                double roll = rnd.nextDouble();
+                double step = collapseSpeed * (roll < 0.12 ? 0 : roll < 0.2 ? -1.5 : roll < 0.3 ? 3 : 1);
+                collapseProgress = Math.max(0, Math.min(freezeAt, collapseProgress + step / 20.0));
                 if (rnd.nextInt(boltBurst > 0 ? 3 : 25) == 0) bolt(sl);
                 if (boltBurst > 0) boltBurst--;
                 else if (rnd.nextInt(60) == 0) boltBurst = 10 + rnd.nextInt(20);
-                double c = collapseTicks >= 25 * 20 ? 1.0 : collapseProgress;   // (never longer than 25 s)
-                if (collapseTicks % 4 == 0 || c >= 1) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
-                if (c >= 1) {
-                    // the pop: lightning lashes out from the knot
-                    for (int i = 0; i < 4; i++) boltOut(sl);
-                    collapseTail = 1;
-                }
+                double c = collapseTicks >= 25 * 20 ? freezeAt : collapseProgress;   // (never longer than 25 s)
+                if (collapseTicks % 4 == 0 || c >= freezeAt) FieldData.get(sl).update(sl, fieldId, f -> f.withCollapse(c).withFailing(1));
+                if (c >= freezeAt) freeze(sl, c);
             }
         }
         setChanged();
@@ -475,18 +455,26 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     void bolt(ServerLevel sl) {
+        StasisNet.sendBolt(sl, makeBolt(sl));
+    }
+
+    StasisNet.Bolt makeBolt(ServerLevel sl) {
         var rnd = sl.getRandom();
         double r = radius();
         double ux = rnd.nextGaussian(), uy = Math.abs(rnd.nextGaussian()) + 0.3, uz = rnd.nextGaussian();
         double ul = Math.sqrt(ux * ux + uy * uy + uz * uz);
         double cx = worldPosition.getX() + 0.5, cy = worldPosition.getY() + 0.5, cz = worldPosition.getZ() + 0.5;
         double top = worldPosition.getY() + TowerBlock.HEIGHT + segments + 0.5;
-        StasisNet.sendBolt(sl, new StasisNet.Bolt(cx + ux / ul * r * 0.97, cy + uy / ul * r * 0.97, cz + uz / ul * r * 0.97, cx, top, cz, rnd.nextInt()));
         // no sound: the client's anti-sound cuts every other sound for the crack (client.AntiSound)
+        return new StasisNet.Bolt(cx + ux / ul * r * 0.97, cy + uy / ul * r * 0.97, cz + uz / ul * r * 0.97, cx, top, cz, rnd.nextInt());
     }
 
     /** A bolt from the mast top outwards, through the shield to the land beyond it (an overcharged tower). */
     void boltOut(ServerLevel sl) {
+        StasisNet.sendBolt(sl, makeBoltOut(sl));
+    }
+
+    StasisNet.Bolt makeBoltOut(ServerLevel sl) {
         var rnd = sl.getRandom();
         double r = radius() * (1.05 + 0.3 * rnd.nextDouble());
         double a = rnd.nextDouble() * 2 * Math.PI;
@@ -495,10 +483,31 @@ public class TowerBlockEntity extends BlockEntity {
         int tx = (int) Math.floor(cx + Math.cos(a) * r), tz = (int) Math.floor(cz + Math.sin(a) * r);
         double ty = sl.hasChunkAt(new BlockPos(tx, 0, tz))
             ? sl.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, tx, tz) : worldPosition.getY();
-        StasisNet.sendBolt(sl, new StasisNet.Bolt(cx, top, cz, tx + 0.5, ty, tz + 0.5, rnd.nextInt()));
+        return new StasisNet.Bolt(cx, top, cz, tx + 0.5, ty, tz + 0.5, rnd.nextInt());
+    }
+
+    /** The end of a collapse: the field goes, and its last moment (a few bolts mid-strike) stays as the remnant. */
+    void freeze(ServerLevel sl, double c) {
+        var rnd = sl.getRandom();
+        java.util.List<StasisNet.Bolt> last = new java.util.ArrayList<>();
+        // (three: the shader takes 150 bolt points, about 36 per held bolt)
+        last.add(makeBolt(sl));
+        last.add(makeBolt(sl));
+        last.add(rnd.nextBoolean() ? makeBoltOut(sl) : makeBolt(sl));
+        last.forEach(b -> StasisNet.sendBolt(sl, b));
+        Remnant rem = new Remnant(radius(), collapseSeed, c, java.util.List.copyOf(last));
+        stop(sl);
+        remnant = rem;
+        setChanged();
+        sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        StasisDelvers.LOG.info("Stasis tower at {}: the collapse froze at {}", worldPosition.toShortString(), String.format("%.2f", c));
     }
 
     void start(ServerLevel sl) {
+        if (remnant != null) {
+            remnant = null;
+            sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
         effRadius = 0;
         effRadius = goalRadius();
         stepGoal = effRadius;
@@ -569,6 +578,22 @@ public class TowerBlockEntity extends BlockEntity {
         out.putBoolean("retreating", retreating);
         out.putDouble("retreatRadius", retreatRadius);
         out.putString("facing", facing.getSerializedName());
+        if (remnant != null) {
+            out.putDouble("remnantRadius", remnant.radius());
+            out.putInt("remnantSeed", remnant.seed());
+            out.putDouble("remnantCollapse", remnant.collapse());
+            var list = out.childrenList("remnantBolts");
+            for (StasisNet.Bolt b : remnant.bolts()) {
+                var o = list.addChild();
+                o.putDouble("fx", b.fx());
+                o.putDouble("fy", b.fy());
+                o.putDouble("fz", b.fz());
+                o.putDouble("tx", b.tx());
+                o.putDouble("ty", b.ty());
+                o.putDouble("tz", b.tz());
+                o.putInt("seed", b.seed());
+            }
+        }
         structure.save(out);
     }
 
@@ -594,13 +619,31 @@ public class TowerBlockEntity extends BlockEntity {
         stepGoal = effRadius;
         retreating = in.getBooleanOr("retreating", false);
         retreatRadius = in.getDoubleOr("retreatRadius", 0);
+        double rr = in.getDoubleOr("remnantRadius", 0);
+        remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.9),
+            in.childrenListOrEmpty("remnantBolts").stream().map(o -> new StasisNet.Bolt(o.getDoubleOr("fx", 0), o.getDoubleOr("fy", 0),
+                o.getDoubleOr("fz", 0), o.getDoubleOr("tx", 0), o.getDoubleOr("ty", 0), o.getDoubleOr("tz", 0), o.getIntOr("seed", 0))).toList());
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
 
     /** The collapse's own pace and progress (0..1), and a lightning burst in progress (ticks). */
     double collapseProgress, collapseSpeed = 1.0 / 15;
-    int boltBurst, collapseTail;
+    int boltBurst, collapseSeed;
+    double freezeAt = 0.9;
+
+    /**
+     * What's left of a collapsed field (Baughn: the tower never sees zero charge; no moment passes where it would):
+     * its last moment, stopped for good. Drawn by the client (Remnants) until the tower starts again or is broken.
+     */
+    public record Remnant(double radius, int seed, double collapse, java.util.List<StasisNet.Bolt> bolts) {
+    }
+
+    Remnant remnant;
+
+    public Remnant remnant() {
+        return remnant;
+    }
 
     /** Power coming in, W (an average over a few seconds), for the console. */
     double inAvgW;

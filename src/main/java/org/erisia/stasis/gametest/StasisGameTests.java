@@ -1351,6 +1351,10 @@ public final class StasisGameTests {
             return () -> {
                 c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());
                 c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.id() == fid[0]));
+                // Baughn: its last moment stays, frozen (three held bolts, a few hexes)
+                var rem = t.remnant();
+                c.check("collapsed: a frozen remnant", rem != null && rem.bolts().size() == 3 && rem.collapse() >= 0.85 && rem.collapse() <= 0.96,
+                    String.valueOf(rem));
             };
         }, false, true));
         // Electrical Age: nodes in stopped land leave the simulation; inside a field they run; cables and batteries in
