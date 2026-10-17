@@ -50,10 +50,10 @@ public final class SuitArm {
     }
 
     private static void build() {
-        // the vanilla armour arm (HumanoidModel.createMesh with the outer armour deformation, 1.0)
+        // the arm, a little bigger than the skin's (the vanilla armour deformation 1.0 was far too big in first person)
         MeshDefinition m = new MeshDefinition();
         PartDefinition r = m.getRoot();
-        CubeDeformation armour = new CubeDeformation(1.0F);
+        CubeDeformation armour = new CubeDeformation(0.3F);   // (the armour layer's 1.0 made a huge hand in first person: λ-Nero)
         r.addOrReplaceChild("right", CubeListBuilder.create().texOffs(40, 16).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 12.0F, 4.0F, armour), PartPose.ZERO);
         r.addOrReplaceChild("left", CubeListBuilder.create().texOffs(40, 16).mirror().addBox(-1.0F, -2.0F, -2.0F, 4.0F, 12.0F, 4.0F, armour), PartPose.ZERO);
         sleeves = LayerDefinition.create(m, 64, 32).bakeRoot();
@@ -61,7 +61,7 @@ public final class SuitArm {
         // a cuff band above it, bigger again
         MeshDefinition g = new MeshDefinition();
         PartDefinition gr = g.getRoot();
-        CubeDeformation cuff = new CubeDeformation(1.35F), hand = new CubeDeformation(1.2F);
+        CubeDeformation cuff = new CubeDeformation(0.55F), hand = new CubeDeformation(0.4F);
         gr.addOrReplaceChild("right", CubeListBuilder.create()
             .texOffs(0, 0).addBox(-3.0F, 5.0F, -2.0F, 4.0F, 1.0F, 4.0F, cuff)
             .texOffs(0, 5).addBox(-3.0F, 6.0F, -2.0F, 4.0F, 4.0F, 4.0F, hand), PartPose.ZERO);
