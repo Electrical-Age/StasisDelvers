@@ -18,7 +18,9 @@ public final class Capacitors {
     /** Venting cost: J of EA charge per second of protection taken; the rate an EA charger vents at. */
     static final double J_PER_SECOND = 500, VENT_W = 2000;
     /** Seconds of protection: a capacitor, a charged one, a raw shard (at half strength). */
-    static final double CAPACITOR_SECONDS = 480, CHARGED_SECONDS = 1800, SHARD_SECONDS = 30;
+    static final double CAPACITOR_SECONDS = 600, CHARGED_SECONDS = 2400, SHARD_SECONDS = 60;
+    // (seconds of one harm: a deep is two at once, the surcharge and the slow freeze, so there a capacitor lasts 5 min,
+    // a charged one 20, a shard 30 s: λ-Nero's numbers)
 
     /** Seconds the player's current shard has given (a shard crumbles when it reaches SHARD_SECONDS). */
     private static final Map<UUID, Double> SHARD_USED = new java.util.concurrent.ConcurrentHashMap<>();

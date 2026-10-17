@@ -16,7 +16,7 @@
     "id": "stasisdelvers:charged_rift_capacitor",
     "components": {
       "minecraft:custom_data": {
-        "stasisdelvers_energy": 900000.0
+        "stasisdelvers_energy": 1200000.0
       }
     }
   }

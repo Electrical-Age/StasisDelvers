@@ -56,6 +56,14 @@ public class CapacitorItem extends Item implements IItemEnergyBattery {
     }
 
     @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display,
+                                java.util.function.Consumer<net.minecraft.network.chat.Component> out, net.minecraft.world.item.TooltipFlag flag) {
+        double s = getEnergy(stack) / Capacitors.J_PER_SECOND;
+        out.accept(net.minecraft.network.chat.Component.literal(String.format("Takes %d:%02d more (%.0f of %.0f kJ); an EA charger vents it",
+            (int) s / 60, (int) s % 60, getEnergy(stack) / 1000, storage() / 1000)).withStyle(net.minecraft.ChatFormatting.GRAY));
+    }
+
+    @Override
     public boolean isBarVisible(ItemStack stack) {
         return true;
     }
