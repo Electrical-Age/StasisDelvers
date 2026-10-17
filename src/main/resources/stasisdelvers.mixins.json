@@ -17,7 +17,8 @@
     "BlockDisplayInvoker",
     "StructureTemplateMixin",
     "SpawnUseMixin",
-    "SpawnUseGameModeMixin"
+    "SpawnUseGameModeMixin",
+    "BucketItemMixin"
   ],
   "client": [
     "client.GameRendererMixin",

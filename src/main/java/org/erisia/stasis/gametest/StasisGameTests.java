@@ -689,6 +689,13 @@ public final class StasisGameTests {
                 t.setRemoved();
             };
         }, false, true));
+        // water poured in stopped land freezes as it lands (only crash-time water shows the water lines)
+        CASES.put("poured_water_freezes", new Spec(2, (h, c) -> () -> {
+            BlockPos at = h.absolutePos(new BlockPos(12, 1, 4));
+            ((net.minecraft.world.item.BucketItem) net.minecraft.world.item.Items.WATER_BUCKET).emptyContents(null, h.getLevel(), at, null, null);
+            c.check("stopped land: stilled water", h.getLevel().getBlockState(at).is(org.erisia.stasis.StasisRegistry.STILLED_WATER_BLOCK.get()),
+                h.getLevel().getBlockState(at).toString());
+        }, false));
         // a ruined cottage's tower comes dead and never drops as a core (the template processor)
         CASES.put("ruined_cottage_core", new Spec(1, (h, c) -> () -> {
             var nbt = new net.minecraft.nbt.CompoundTag();

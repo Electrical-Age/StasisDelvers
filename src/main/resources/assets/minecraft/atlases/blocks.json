@@ -9,6 +9,9 @@
       "type": "stasisdelvers:frozen_animated",
       "source": "entity/conduit",
       "prefix": "entity/conduit/"
+    },
+    {
+      "type": "stasisdelvers:water_lines"
     }
   ]
 }

@@ -113,6 +113,7 @@ public final class FrozenSprites {
 
     static void registerSource(RegisterSpriteSourcesEvent e) {
         e.register(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "frozen_animated"), Source.MAP_CODEC);
+        e.register(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "water_lines"), WaterLines.Source.MAP_CODEC);
     }
 
     // ---------------------------------------------------------------- animated sprite -> still copy
@@ -136,6 +137,7 @@ public final class FrozenSprites {
             else m.put(s, f);
         }
         frozen = java.util.Collections.unmodifiableMap(m);
+        WaterLines.stitched(all);
         generation++;
         LOG.info("Frozen textures: {} animated block sprites have still copies{}", m.size(),
             missing > 0 ? " (" + missing + " animated sprites from other atlas sources have none and keep moving)" : "");

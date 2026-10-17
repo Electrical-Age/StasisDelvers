@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalBooleanRef;
+import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.client.renderer.block.FluidRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -28,8 +29,19 @@ public abstract class FluidRendererMixin {
 
     @Inject(method = TESSELATE, at = @At("HEAD"))
     private void stasis$frozenFluid(BlockAndTintGetter level, BlockPos pos, FluidRenderer.Output output, BlockState blockState, FluidState fluidState,
-                                    CallbackInfo ci, @Share("stasisFrozen") LocalBooleanRef frozen) {
+                                    CallbackInfo ci, @Share("stasisFrozen") LocalBooleanRef frozen,
+                                    @Share("stasisLines") LocalRef<TextureAtlasSprite> lines) {
         frozen.set(FrozenSprites.stopped(level, pos));
+        // water lines (WaterLines): the still top of frozen water near a rift core
+        lines.set(frozen.get() && fluidState.is(net.minecraft.tags.FluidTags.WATER) ? org.erisia.stasis.client.WaterLines.sprite(pos) : null);
+    }
+
+    @WrapOperation(method = TESSELATE, require = 1, at = @At(value = "INVOKE", ordinal = 0,
+        target = "Lnet/minecraft/client/resources/model/sprite/Material$Baked;sprite()Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;"))
+    private TextureAtlasSprite stasis$waterLines(Material.Baked material, Operation<TextureAtlasSprite> original,
+                                                @Share("stasisLines") LocalRef<TextureAtlasSprite> lines) {
+        TextureAtlasSprite l = lines.get();
+        return l != null ? l : original.call(material);
     }
 
     @WrapOperation(method = TESSELATE, require = 1, allow = 5,
