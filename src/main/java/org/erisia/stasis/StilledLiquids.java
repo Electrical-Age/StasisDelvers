@@ -95,13 +95,26 @@ public final class StilledLiquids {
         }
     }
 
-    /** ... or by digging at it (left-click), which is what players try first (Baughn: the spawn ocean couldn't be dug). */
-    static void dig(PlayerInteractEvent.LeftClickBlock e) {
-        if (e.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
-        if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
+    /**
+     * ... or by digging at it (left-click), which players try first (Baughn: the spawn ocean couldn't be dug). The
+     * client's crosshair ignores fluids, so the client looks for stopped liquid itself and asks (StasisNet.DigStilled);
+     * the server looks again along the player's view, within reach.
+     */
+    public static void dig(ServerPlayer p) {
+        if (!(p.level() instanceof ServerLevel level)) return;
         ItemStack tool = p.getMainHandItem();
         if (!isTool(tool)) return;
-        if (take(p, level, e.getPos(), tool, net.minecraft.world.InteractionHand.MAIN_HAND)) e.setCanceled(true);
+        var hit = Item.getPlayerPOVHitResult(level, p, ClipContext.Fluid.ANY);
+        if (hit.getType() == HitResult.Type.BLOCK) take(p, level, hit.getBlockPos(), tool, net.minecraft.world.InteractionHand.MAIN_HAND);
+    }
+
+    /** Client: is the player digging (left-click) at a stopped liquid with a shovel? Then ask the server and swing. */
+    public static boolean clientDig(net.minecraft.world.entity.player.Player p) {
+        if (!isTool(p.getMainHandItem())) return false;
+        var hit = Item.getPlayerPOVHitResult(p.level(), p, ClipContext.Fluid.ANY);
+        if (hit.getType() != HitResult.Type.BLOCK) return false;
+        BlockPos at = hit.getBlockPos();
+        return p.level().getBlockState(at).getBlock() instanceof LiquidBlock && !Stasis.isRunning(p.level(), at);
     }
 
     static boolean take(ServerPlayer p, ServerLevel level, BlockPos pos, ItemStack tool, net.minecraft.world.InteractionHand hand) {

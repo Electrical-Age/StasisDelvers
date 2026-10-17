@@ -100,6 +100,17 @@ public final class StasisNet {
         }
     }
 
+    /** Client -> server: dig (left-click) at the stopped liquid in view (StilledLiquids.dig). */
+    public record DigStilled() implements CustomPacketPayload {
+        public static final Type<DigStilled> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "dig_stilled"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, DigStilled> CODEC = StreamCodec.unit(new DigStilled());
+
+        @Override
+        public Type<DigStilled> type() {
+            return TYPE;
+        }
+    }
+
     public record ConsoleSet(net.minecraft.core.BlockPos pos, double target, boolean override) implements CustomPacketPayload {
         public static final Type<ConsoleSet> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_set"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleSet> CODEC = StreamCodec.composite(
@@ -300,7 +311,10 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("8");
+            var r = e.registrar("9");
+            r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
+                if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
+            });
             r.playToServer(ConsoleQuery.TYPE, ConsoleQuery.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) {
                     TowerBlockEntity t = consoleTower(sp, p.pos());

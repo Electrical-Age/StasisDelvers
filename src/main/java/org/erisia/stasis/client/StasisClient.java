@@ -16,6 +16,7 @@ import org.erisia.stasis.StasisRegistry;
  *  bug-report key. */
 @Mod(value = StasisDelvers.MODID, dist = Dist.CLIENT)
 public final class StasisClient {
+    private static long lastDig;
     public StasisClient(IEventBus modBus, net.neoforged.fml.ModContainer container) {
         // the bug-report key (F7) and its client config (notes/bugreport/SPEC.md)
         container.registerConfig(net.neoforged.fml.config.ModConfig.Type.CLIENT, org.erisia.stasis.client.report.ReportConfig.SPEC);
@@ -49,6 +50,16 @@ public final class StasisClient {
         // a suited player's first-person arm is the suit (sleeve and glove); drawn after the desaturation in stopped
         // land (mixin/client/GameRendererMixin)
         NeoForge.EVENT_BUS.addListener(RenderArmEvent.class, SuitArm::renderArm);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.InputEvent.InteractionKeyMappingTriggered.class, e -> {
+            // digging stopped water/lava with a shovel (the crosshair ignores fluids): one block per click
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (!e.isAttack() || mc.player == null || !org.erisia.stasis.StilledLiquids.clientDig(mc.player)) return;
+            e.setCanceled(true);
+            if (mc.level.getGameTime() - lastDig < 5) return;
+            lastDig = mc.level.getGameTime();
+            e.setSwingHand(true);
+            net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new org.erisia.stasis.StasisNet.DigStilled());
+        });
         // the generated towers (P3d): meshes built off-thread, kept in GPU buffers, drawn after opaque terrain
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterRenderPipelinesEvent.class, TowerRenderer::registerPipelines);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.PrepareRenderBuffersEvent.class, TowerRenderer::prepare);
