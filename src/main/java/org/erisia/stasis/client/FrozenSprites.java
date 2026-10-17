@@ -123,6 +123,15 @@ public final class FrozenSprites {
     /** Bumped on each stitch: the per-thread quad caches drop their quads. */
     private static volatile int generation;
 
+    /** Bug reports: how many sprites have a frozen copy, and the atlas generation. */
+    static int frozenCount() {
+        return frozen.size();
+    }
+
+    static int generation() {
+        return generation;
+    }
+
     static void stitched(TextureAtlasStitchedEvent e) {
         TextureAtlas atlas = e.getAtlas();
         if (!atlas.location().equals(TextureAtlas.LOCATION_BLOCKS)) return;

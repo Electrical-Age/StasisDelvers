@@ -53,6 +53,12 @@ public final class StaticDeeps {
     }
 
     /** Is d a gate rift (no strata, no worldgen of its own)? */
+    /** Bug reports: the gate rifts known for this deep seed. */
+    public static int gateCount(int seed) {
+        List<Deep> g = GATES.get(seed);
+        return g == null ? 0 : g.size();
+    }
+
     public static boolean isGate(Deep d) {
         return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id());
     }

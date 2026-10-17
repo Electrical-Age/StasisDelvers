@@ -766,6 +766,11 @@ public class TowerBlockEntity extends BlockEntity {
     /** Power coming in, W (an average over a few seconds), for the console. */
     double inAvgW;
 
+    /** What each value of consoleState's v is (bug reports name them with this; keep it in step with consoleState). */
+    public static final java.util.List<String> CONSOLE_NAMES = java.util.List.of("state", "stored_J", "max_J", "in_W", "draw_W",
+        "weather_factor", "preferred_radius", "min_radius", "max_radius", "target_radius", "radius_now", "goal_radius", "override",
+        "target_by_signal", "retreating", "carry_radius", "failing", "locked", "feeding_from_asker", "kJ_fed");
+
     /** The console's readout (StasisNet.ConsoleState). */
     public StasisNet.ConsoleState consoleState() {
         return consoleState(null);

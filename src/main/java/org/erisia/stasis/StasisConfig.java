@@ -165,6 +165,40 @@ public final class StasisConfig {
         return old;
     }
 
+    /** The cached (synced) values, for bug reports (client/report). */
+    public static java.util.Map<String, Object> snapshot() {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("enabled", enabled);
+        m.put("stopped", stopped.stream().map(k -> k.identifier().toString()).sorted().toList());
+        m.put("spawnRadius", spawnRadius);
+        m.put("freezeTicks", freezeTicks);
+        m.put("graceTicks", graceTicks);
+        m.put("towerDrawK", towerDrawK);
+        m.put("towerStoreC", towerStoreC);
+        m.put("towerMaxSegments", towerMaxSegments);
+        m.put("towerFieldRate", towerFieldRate);
+        m.put("gutterChance", gutterChance);
+        m.put("debugMessages", debugMessages);
+        m.put("gutterMinTicks", gutterMinTicks);
+        m.put("gutterMaxTicks", gutterMaxTicks);
+        m.put("riftOres", riftOres);
+        m.put("riftOreRate", riftOreRate);
+        m.put("crystalStageSeconds", crystalStageSeconds);
+        m.put("riftScatterRate", riftScatterRate);
+        m.put("endPortalRifts", endPortalRifts);
+        m.put("storms", storms);
+        m.put("timeScars", timeScars);
+        m.put("ruins", ruins);
+        m.put("skyIslands", skyIslands);
+        m.put("skyMessyChance", skyMessyChance);
+        m.put("stormEveryHours", stormEveryHours);
+        m.put("stormMinutes", stormMinutes);
+        m.put("stormWarnMinutes", stormWarnMinutes);
+        m.put("delverSuitMinutes", delverSuitMinutes);
+        m.put("starterSuit", starterSuit);
+        return m;
+    }
+
     static void refresh() {
         enabled = ENABLED.get();
         stopped = STOPPED_DIMENSIONS.get().stream()

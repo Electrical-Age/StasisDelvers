@@ -19,17 +19,26 @@ public final class SuitGauge {
 
     static final EquipmentSlot[] ARMOR = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
 
-    static void render(GuiGraphicsExtractor g, DeltaTracker dt) {
-        var mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || !Stasis.stops(mc.level)) return;
+    /** {the emptiest time-suit piece's charge share (2 if none), the number of pieces}: what the gauge shows (bug
+     *  reports read it too, so the two agree). */
+    static double[] share(net.minecraft.world.entity.player.Player player) {
         double share = 2;
         int pieces = 0;
         for (EquipmentSlot s : ARMOR) {
-            ItemStack st = mc.player.getItemBySlot(s);
+            ItemStack st = player.getItemBySlot(s);
             if (!(st.getItem() instanceof TimeSuit) || !(st.getItem() instanceof mods.eln.item.electricalinterface.IItemEnergyBattery b)) continue;
             pieces++;
             share = Math.min(share, b.getEnergy(st) / Math.max(1, b.getEnergyMax(st)));
         }
+        return new double[]{share, pieces};
+    }
+
+    static void render(GuiGraphicsExtractor g, DeltaTracker dt) {
+        var mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null || !Stasis.stops(mc.level)) return;
+        double[] sp = share(mc.player);
+        double share = sp[0];
+        int pieces = (int) sp[1];
         if (pieces == 0) return;
         int w = g.guiWidth(), h = g.guiHeight();
         int x = w / 2 + 96, y = h - 22, bw = 40;

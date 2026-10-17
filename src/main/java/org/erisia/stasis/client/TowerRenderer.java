@@ -141,6 +141,14 @@ public final class TowerRenderer {
         }
     }
 
+    /** Bug reports: "pos key nFull nLod" per tower (client ticks run on the render thread, like the rest of this). */
+    static java.util.List<String> summary() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Entry e : TOWERS.values())
+            out.add(e.core.toShortString() + " " + e.key + " " + e.nFull + " " + e.nLod + (e.pending != null ? " pending=" + e.pendingKey : ""));
+        return out;
+    }
+
     public static void clear() {
         for (Entry e : TOWERS.values()) {
             if (e.pending != null) e.pending.thenAccept(TowerRenderer::free);
