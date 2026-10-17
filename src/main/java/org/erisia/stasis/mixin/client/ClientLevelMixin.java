@@ -47,10 +47,18 @@ public abstract class ClientLevelMixin {
         return Stasis.isRunning(level, BlockPos.containing(x, y, z)) && !org.erisia.stasis.ClientFields.underShield(x, y, z);
     }
 
-    @WrapWithCondition(method = "tickWeatherEffects", require = 2, at = @At(value = "INVOKE",
+    @com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(method = "tickWeatherEffects", require = 2, at = @At(value = "INVOKE",
         target = "Lnet/minecraft/client/multiplayer/ClientLevel;playLocalSound(Lnet/minecraft/core/BlockPos;Lnet/minecraft/sounds/SoundEvent;Lnet/minecraft/sounds/SoundSource;FFZ)V"))
-    private boolean stasis$rainSound(ClientLevel level, BlockPos pos, net.minecraft.sounds.SoundEvent sound, net.minecraft.sounds.SoundSource source,
-                                     float volume, float pitch, boolean delay) {
-        return Stasis.isRunning(level, pos.above());
+    private void stasis$rainSound(ClientLevel level, BlockPos pos, net.minecraft.sounds.SoundEvent sound, net.minecraft.sounds.SoundSource source,
+                                  float volume, float pitch, boolean delay,
+                                  com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+        if (!Stasis.isRunning(level, pos.above())) return;   // (stopped land: the rain hangs still and silent)
+        // under a field's shield the rain drums on it, muffled (Baughn)
+        var cam = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera().position();
+        if (org.erisia.stasis.ClientFields.underShield(cam.x, cam.y, cam.z)) {
+            volume *= 0.35f;
+            pitch *= 0.7f;
+        }
+        original.call(level, pos, sound, source, volume, pitch, delay);
     }
 }
