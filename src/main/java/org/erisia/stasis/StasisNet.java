@@ -141,6 +141,40 @@ public final class StasisNet {
         return t;
     }
 
+    // ---- bug reports (notes/bugreport/SPEC.md 4): the client asks for the server's view when the bug-report key is
+    // pressed (client/report/BugReport); the server answers with a JSON string (ReportResponder). Optional channels:
+    // a client or server without them still connects, and the report says "no_channel".
+
+    /** look: the block the player looks at (honoured within 8 blocks); face: its Direction ordinal, -1 if none. */
+    public record ReportQuery(int nonce, java.util.Optional<net.minecraft.core.BlockPos> look, byte face) implements CustomPacketPayload {
+        public static final Type<ReportQuery> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "report_query"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ReportQuery> CODEC = StreamCodec.composite(
+            ByteBufCodecs.INT, ReportQuery::nonce, net.minecraft.core.BlockPos.STREAM_CODEC.apply(ByteBufCodecs::optional), ReportQuery::look,
+            ByteBufCodecs.BYTE, ReportQuery::face, ReportQuery::new);
+
+        @Override
+        public Type<ReportQuery> type() {
+            return TYPE;
+        }
+    }
+
+    /** json: at most REPORT_MAX bytes (UTF-8). */
+    public record ReportState(int nonce, String json) implements CustomPacketPayload {
+        public static final int REPORT_MAX = 64 * 1024;
+        public static final Type<ReportState> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "report_state"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ReportState> CODEC = StreamCodec.composite(
+            ByteBufCodecs.INT, ReportState::nonce, ByteBufCodecs.stringUtf8(REPORT_MAX), ReportState::json, ReportState::new);
+
+        @Override
+        public Type<ReportState> type() {
+            return TYPE;
+        }
+    }
+
+    /** Client: where report replies go (client/report/BugReport). */
+    public static volatile java.util.function.Consumer<ReportState> reportSink = s -> {
+    };
+
     /** 0: fine .. 1: frozen. */
     public record Freeze(float progress) implements CustomPacketPayload {
         public static final Type<Freeze> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "freeze"));
@@ -304,6 +338,15 @@ public final class StasisNet {
             r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
+            // optional (per channel, same version): clients and servers from before bug reports still connect
+            var opt = r.optional();
+            opt.playToServer(ReportQuery.TYPE, ReportQuery.CODEC, (p, ctx) -> {
+                if (ctx.player() instanceof ServerPlayer sp) {
+                    String json = ReportResponder.answer(sp, p);
+                    if (json != null) send(sp, new ReportState(p.nonce(), json));
+                }
+            });
+            opt.playToClient(ReportState.TYPE, ReportState.CODEC, (p, ctx) -> reportSink.accept(p));
         });
     }
 
