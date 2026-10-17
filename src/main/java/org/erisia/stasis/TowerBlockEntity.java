@@ -225,6 +225,21 @@ public class TowerBlockEntity extends BlockEntity {
     public void toggleFeed(ServerPlayer p) {
         if (p.getUUID().equals(feeder)) feeder = null;
         else {
+            // a dead tower you can't start would only take your suit (AdventurAgent: 42 kJ into a spawn tower needing 353)
+            if (state == State.OFF) {
+                if (!sized) {
+                    sized = true;
+                    segments = countSegments();
+                    store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
+                }
+                double need = 0.5 * storeMaxJ() - storedJ(), have = Suits.available(p);
+                if (have < need) {
+                    p.sendSystemMessage(net.minecraft.network.chat.Component.literal(String.format(
+                        "This tower needs %.0f kJ more to start, and you carry %.0f kJ. Feeding it would only empty your suit.",
+                        need / 1000, have / 1000)).withStyle(net.minecraft.ChatFormatting.RED));
+                    return;
+                }
+            }
             feeder = p.getUUID();
             fed = 0;
             StasisDelvers.LOG.info("{} feeds the tower at {} from their suit", p.getName().getString(), worldPosition.toShortString());

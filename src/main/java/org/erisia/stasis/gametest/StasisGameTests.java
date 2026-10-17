@@ -710,7 +710,7 @@ public final class StasisGameTests {
                 new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings(), null) == dirt);
         }, false));
         // a locked tower (the spawn tower) keeps its settings; anyone can feed a tower from their suit (a jump-start)
-        CASES.put("tower_lock_and_feed", new Spec(70, (h, c) -> {
+        CASES.put("tower_lock_and_feed", new Spec(200, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             ServerPlayer p = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), false);
             wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
@@ -719,13 +719,21 @@ public final class StasisGameTests {
             double before = t.target();
             t.setControls(before + 8, true);
             c.check("locked: the console can't change the radius or OVERRIDE", t.target() == before && !t.override(), t.target() + " " + t.override());
+            ServerPlayer poor = survivalPlayer(h, new Vec3(1.5, 1.0, 4.5), false);
+            wear(poor, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            t.toggleFeed(poor);
+            c.check("a dead tower refuses a feed that can't start it", t.consoleState(poor).v().get(18) == 0.0);
+            remove(h, poor);
+            t.testCharge(0.45);   // (a dead tower a few kJ short of starting)
             t.toggleFeed(p);
+            c.check("a suit that can start it may feed it", t.consoleState(p).v().get(18) == 1.0, String.format("store %.0f of %.0f J", t.storedJ(), t.storeMaxJ()));
             return () -> {
                 var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
                 var d = (org.erisia.stasis.DelverSuitItem) head.getItem();
                 double given = 4 * (d.getEnergyMax(head) - d.getEnergy(head));
-                c.check("feeding: the store filled from the suit", t.storedJ() > 4000 && Math.abs(t.storedJ() - given) < 50,
-                    String.format("store %.0f J, suit gave %.0f J", t.storedJ(), given));
+                c.check("feeding: the suit gave its charge and the tower started", given > 4000
+                        && t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, String.format("suit gave %.0f J, %s", given, t.state()));
                 remove(h, p);
                 t.setRemoved();
             };

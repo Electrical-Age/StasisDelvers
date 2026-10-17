@@ -101,6 +101,21 @@ final class Suits {
         }
     }
 
+    /** What a player could feed a tower: carried batteries and the worn suit pieces, J. */
+    static double available(ServerPlayer p) {
+        double sum = 0;
+        var inv = p.getInventory();
+        for (int i = 0; i < 36; i++) {
+            ItemStack src = inv.getItem(i);
+            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && src.getItem() instanceof IItemEnergyBattery sb) sum += sb.getEnergy(src);
+        }
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b) sum += b.getEnergy(s);
+        }
+        return sum;
+    }
+
     /**
      * Take up to maxJ from a player (a tower console's feed, Baughn: a jump-start from the suit): carried batteries first
      * (at their discharge power), then the worn suit pieces, evenly, down to nothing. Returns the J taken.
