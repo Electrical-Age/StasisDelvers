@@ -33,7 +33,7 @@ public final class AntiSound {
 
     static long crackAt = Long.MIN_VALUE;
     static double strain;            // eased: the failing of the field the player is in
-    static long lastFrame, lastLog;
+    static long lastFrame;
     static float vol = 1, hf = 1, sag = 1;
     static float appliedVol = 1, appliedHf = 1;
     static int filter = -1;          // the EFX low-pass, -2 if EFX isn't available
@@ -60,11 +60,6 @@ public final class AntiSound {
         var p = ears(mc);
         double d = Math.min(p.distanceToSqr(b.fx(), b.fy(), b.fz()), p.distanceToSqr(b.tx(), b.ty(), b.tz()));
         long now = System.nanoTime();
-        if ((now - lastLog) / 1e9 > 1) {   // (lab diagnostics, at most once a second)
-            lastLog = now;
-            org.slf4j.LoggerFactory.getLogger("stasis-antisound").info("crack at {} blocks{}; vol {} hf {} strain {} efx {}",
-                (int) Math.sqrt(d), d > 64 * 64 ? " (too far, ignored)" : "", appliedVol, appliedHf, String.format("%.2f", strain), filter);
-        }
         if (d > 64 * 64) return;
         // in a burst, the sound gets a moment back between cuts (else a burst is one long silence)
         // (crackAt starts at Long.MIN_VALUE: now - crackAt would overflow and hold every crack back)
