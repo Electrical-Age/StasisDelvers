@@ -732,6 +732,8 @@ public final class StasisGameTests {
                 var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
                 var d = (org.erisia.stasis.DelverSuitItem) head.getItem();
                 double given = 4 * (d.getEnergyMax(head) - d.getEnergy(head));
+                c.check("the feed stopped as the tower started: the suit kept the rest", given > 4000 && given < 0.5 * 4 * d.getEnergyMax(head),
+                    String.format("suit gave %.0f J", given));
                 c.check("feeding: the suit gave its charge and the tower started", given > 4000
                         && t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, String.format("suit gave %.0f J, %s", given, t.state()));
                 remove(h, p);

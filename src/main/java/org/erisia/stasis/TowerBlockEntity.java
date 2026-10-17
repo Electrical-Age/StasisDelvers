@@ -220,7 +220,11 @@ public class TowerBlockEntity extends BlockEntity {
     /** Console: feeding the store from a player's batteries and suit (Baughn: a jump-start), 2 kW while it lasts. */
     java.util.@org.jspecify.annotations.Nullable UUID feeder;
     double fed;
+    /** The feed started on a dead tower: it stops as the tower starts (AdventurAgent: it emptied the suit regardless). */
+    boolean feedingDead;
     static final double FEED_W = 2000;
+    /** Feeding a running tower leaves a quarter in each suit piece (enough to walk home). */
+    static final double FEED_RESERVE = 0.25;
 
     public void toggleFeed(ServerPlayer p) {
         if (p.getUUID().equals(feeder)) feeder = null;
@@ -242,6 +246,7 @@ public class TowerBlockEntity extends BlockEntity {
             }
             feeder = p.getUUID();
             fed = 0;
+            feedingDead = state == State.OFF;
             StasisDelvers.LOG.info("{} feeds the tower at {} from their suit", p.getName().getString(), worldPosition.toShortString());
         }
     }
@@ -259,8 +264,15 @@ public class TowerBlockEntity extends BlockEntity {
             segments = countSegments();
             store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
         }
+        if (feedingDead && state != State.OFF) {
+            p.sendSystemMessage(net.minecraft.network.chat.Component.literal(String.format(
+                "The tower is up. You fed it %.1f kJ and kept the rest.", fed / 1000)));
+            feeder = null;
+            return;
+        }
         double room = (store.capacity() - store.amount()) / FE_PER_J;
-        double got = Suits.drain(p, Math.min(FEED_W, room));
+        if (feedingDead) room = Math.min(room, Math.max(0, 0.5 * storeMaxJ() - storedJ()) + 1);   // (just enough to start it)
+        double got = Suits.drain(p, Math.min(FEED_W, room), feedingDead ? 0 : FEED_RESERVE);
         if (got > 0) {
             store.set(Math.min(store.capacity(), store.amount() + (int) (got * FE_PER_J)));
             fed += got;
@@ -268,7 +280,8 @@ public class TowerBlockEntity extends BlockEntity {
         }
         if (got < 1 || room - got < 1) {
             p.sendSystemMessage(net.minecraft.network.chat.Component.literal(String.format("Fed the tower %.1f kJ%s.", fed / 1000,
-                room - got < 1 ? "; its store is full" : "; you have nothing left to give")));
+                room - got < 1 ? (feedingDead ? "; it starts now" : "; its store is full")
+                    : feedingDead ? "; you have nothing left to give" : "; your suit keeps a quarter to walk home on")));
             feeder = null;
         }
     }

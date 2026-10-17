@@ -121,6 +121,11 @@ final class Suits {
      * (at their discharge power), then the worn suit pieces, evenly, down to nothing. Returns the J taken.
      */
     static double drain(ServerPlayer p, double maxJ) {
+        return drain(p, maxJ, 0);
+    }
+
+    /** ... leaving each suit piece reserve (a share of its store). */
+    static double drain(ServerPlayer p, double maxJ, double reserve) {
         double left = maxJ;
         var inv = p.getInventory();
         for (int i = 0; i < 36 && left > 1e-6; i++) {
@@ -134,7 +139,7 @@ final class Suits {
         java.util.List<ItemStack> pieces = new java.util.ArrayList<>();
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
-            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b && b.getEnergy(s) > 0) pieces.add(s);
+            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b && b.getEnergy(s) > reserve * b.getEnergyMax(s) + 1e-6) pieces.add(s);
         }
         // in equal shares, so the pieces run down together
         while (left > 1e-6 && !pieces.isEmpty()) {
@@ -142,10 +147,11 @@ final class Suits {
             for (var it = pieces.iterator(); it.hasNext(); ) {
                 ItemStack s = it.next();
                 IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
-                double take = Math.min(share, b.getEnergy(s));
+                double floor = reserve * b.getEnergyMax(s);
+                double take = Math.min(share, b.getEnergy(s) - floor);
                 b.setEnergy(s, b.getEnergy(s) - take);
                 left -= take;
-                if (b.getEnergy(s) <= 1e-6) it.remove();
+                if (b.getEnergy(s) <= floor + 1e-6) it.remove();
             }
         }
         return maxJ - left;
