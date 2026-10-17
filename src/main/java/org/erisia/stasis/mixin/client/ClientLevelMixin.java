@@ -36,4 +36,20 @@ public abstract class ClientLevelMixin {
     private boolean stasis$drips(ClientLevel level, BlockPos below, BlockState state, net.minecraft.core.particles.ParticleOptions particle, boolean watertight) {
         return Stasis.isRunning(level, below.above());
     }
+
+    // rain hangs still in stopped land (WeatherEffectRendererMixin): no splashes there, and no rain sound from there
+    // (AdventurAgent: after a collapse froze, the rain went on sounding)
+    @WrapWithCondition(method = "tickWeatherEffects", at = @At(value = "INVOKE",
+        target = "Lnet/minecraft/client/multiplayer/ClientLevel;addParticle(Lnet/minecraft/core/particles/ParticleOptions;DDDDDD)V"))
+    private boolean stasis$rainSplash(ClientLevel level, net.minecraft.core.particles.ParticleOptions particle, double x, double y, double z,
+                                      double xd, double yd, double zd) {
+        return Stasis.isRunning(level, BlockPos.containing(x, y, z));
+    }
+
+    @WrapWithCondition(method = "tickWeatherEffects", require = 2, at = @At(value = "INVOKE",
+        target = "Lnet/minecraft/client/multiplayer/ClientLevel;playLocalSound(Lnet/minecraft/core/BlockPos;Lnet/minecraft/sounds/SoundEvent;Lnet/minecraft/sounds/SoundSource;FFZ)V"))
+    private boolean stasis$rainSound(ClientLevel level, BlockPos pos, net.minecraft.sounds.SoundEvent sound, net.minecraft.sounds.SoundSource source,
+                                     float volume, float pitch, boolean delay) {
+        return Stasis.isRunning(level, pos.above());
+    }
 }

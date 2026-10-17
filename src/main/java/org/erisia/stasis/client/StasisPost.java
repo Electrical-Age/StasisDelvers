@@ -113,14 +113,25 @@ public final class StasisPost {
             d[27] = 0;   // empty
         }
         int n = 0;
-        for (Field f : ClientFields.fields()) {
+        java.util.List<Field> fields = new java.util.ArrayList<>(ClientFields.fields());
+        // a collapsing field is held for a moment after it goes, until its remnant arrives (the block update can come a
+        // frame later: AdventurAgent saw the shield blank for a frame as it froze)
+        long nowN = System.nanoTime();
+        java.util.Set<Integer> live = new java.util.HashSet<>();
+        for (Field f : fields) live.add(f.id());
+        LAST_COLLAPSING.entrySet().removeIf(h -> !live.contains(h.getKey()) && (nowN - h.getValue().nanos() > 1_500_000_000L
+            || Remnants.has(net.minecraft.core.BlockPos.containing(h.getValue().field().x(), h.getValue().field().y(), h.getValue().field().z()))));
+        for (var h : LAST_COLLAPSING.entrySet()) if (!live.contains(h.getKey())) fields.add(h.getValue().field());
+        for (Field f : fields) {
             if (n == 13) break;
+            double sc = live.contains(f.id()) ? shownCollapse(f) : f.collapse();
+            if (f.collapse() > 0 && live.contains(f.id())) LAST_COLLAPSING.put(f.id(), new Held(f.withCollapse(sc), nowN));
             int o = 32 + 10 * n++;
             d[o] = (float) (f.x() - fx);
             d[o + 1] = (float) (f.y() - fy);
             d[o + 2] = (float) (f.z() - fz);
             d[o + 3] = (float) shownRadius(f);
-            d[o + 4] = (float) shownCollapse(f);
+            d[o + 4] = (float) sc;
             d[o + 5] = (float) f.failing();
             d[o + 6] = f.column() ? 1 : 0;
             d[o + 7] = f.seed();
@@ -145,11 +156,12 @@ public final class StasisPost {
             d[o + 6] = 2;
             d[o + 7] = rem.seed();
             d[o + 8] = -1;
-            d[o + 9] = 0;
             int sh = SHIELD_BASE + 4 * (n - 1);
             d[sh] = 1;
             d[sh + 1] = (float) rem.dropout();
             d[sh + 2] = (float) rem.side();
+            d[o + 9] = (float) ((rem.frozeAt() / 20.0) % 1200.0);              // (the clocks as it froze: [29], [30])
+            d[sh + 3] = (float) ((rem.frozeAt() / 20.0) % (1048576 / 20.0));
         }
         d[24] = n;
         // the client's render distance in blocks (terrain ends, and vanilla's render-distance fog with it, there)
@@ -353,6 +365,10 @@ public final class StasisPost {
         if (SHOWN.size() > 64) SHOWN.keySet().removeIf(id -> ClientFields.fields().stream().noneMatch(x -> x.id() == id));
         return e[0];
     }
+
+    record Held(Field field, long nanos) {}
+
+    static final java.util.Map<Integer, Held> LAST_COLLAPSING = new java.util.HashMap<>();
 
     /** The collapse as drawn: eased (the server sends it 5 times a second); 0 stays 0. */
     static final java.util.Map<Integer, double[]> SHOWN_C = new java.util.HashMap<>();

@@ -23,8 +23,10 @@
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
 // shape id;
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
-// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved. Column 2: a frozen remnant.
-// [1700 + 4i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused.
+// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
+// [29] as it froze). Column 2: a frozen remnant.
+// [1700 + 4i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
+// remnant: the eddy time [30] as it froze).
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
 // lattice on each icosahedron face; the nearest lattice point is the cell, the gap to the second nearest its rim).
@@ -1143,7 +1145,7 @@ void main() {
             // like the field was then, at its own fixed time
             bool frozen = data(k + 6) > 1.5;
             bool column = data(k + 6) > 0.5 && !frozen;
-            float ftime = frozen ? 50.0 + mod(data(k + 7), 997.0) : time;
+            float ftime = frozen ? data(k + 9) : time;   // (a remnant: the clocks as it froze, so it stays exactly as it was)
             vec3 oc = o - fc, vv = v;
             if (column) { oc.y = 0.0; vv.y = 0.0; }
             float aa = dot(vv, vv);
@@ -1159,13 +1161,13 @@ void main() {
                 // stopped pockets from failing 0.7), and before that sparse wisps that come and go, each region on its
                 // own slow pulse
                 float share = collapse > 0.0 || failing > 0.7 ? eddyShare(collapse, failing) : 0.04 + 0.08 * (failing - 0.25) / 0.45;
-                // (a remnant keeps thinner wisps: AdventurAgent saw the whole old field greyed out)
-                if (frozen) share *= 0.55;
+                // (thinner wisps in a collapse and its remnant: AdventurAgent saw the whole old field greyed out)
+                if (collapse > 0.0) share *= 0.7;
                 float thr = 0.5 + (0.5 - share) * 0.45;
                 float ta = max(t1, 0.0), tb = min(t2, tmax);
                 if (tb > ta) {
                     vec3 camI = vec3(data(16), data(17), data(18));
-                    float et = frozen ? ftime : data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
+                    float et = frozen ? data(1700 + 4 * i + 3) : data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
                     int sd = int(data(k + 7));
                     float jit = ign(gl_FragCoord.xy);   // (jittered steps: fixed ones left seams)
                     for (int m = 0; m < 12; m++) {
@@ -1207,9 +1209,6 @@ void main() {
                     if (dp > 0.05) sh = vec4(mix(sh.rgb, vec3(0.92, 0.96, 1.0), 0.6 * dp),
                         min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(ftime * 3.0 + cell.y * 6.0)))));
                 }
-                // a remnant's surviving hexes are shards of amber glass hanging in the air: filled and brighter
-                // (they were tiny and faint: AdventurAgent)
-                if (frozen && sh.a > 0.0) sh = vec4(mix(sh.rgb, vec3(1.0, 0.7, 0.35), 0.3), min(0.75, sh.a * 1.6 + 0.22));
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 c = mix(c, sh.rgb, sh.a);
             }

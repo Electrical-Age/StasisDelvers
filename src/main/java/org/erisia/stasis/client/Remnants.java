@@ -43,6 +43,10 @@ public final class Remnants {
         BY_TOWER.remove(be.getBlockPos());
     }
 
+    static synchronized boolean has(BlockPos pos) {
+        return BY_TOWER.containsKey(pos);
+    }
+
     static synchronized void clear() {
         BY_TOWER.clear();
     }

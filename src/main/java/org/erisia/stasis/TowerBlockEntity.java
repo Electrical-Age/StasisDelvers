@@ -507,7 +507,7 @@ public class TowerBlockEntity extends BlockEntity {
         last.add(makeBolt(sl));
         last.add(rnd.nextBoolean() ? makeBoltOut(sl) : makeBolt(sl));
         last.forEach(b -> StasisNet.sendBolt(sl, b));
-        Remnant rem = new Remnant(radius(), collapseSeed, c, dropout, side, java.util.List.copyOf(last));
+        Remnant rem = new Remnant(radius(), collapseSeed, c, dropout, side, sl.getGameTime(), java.util.List.copyOf(last));
         stop(sl);
         remnant = rem;
         setChanged();
@@ -602,6 +602,7 @@ public class TowerBlockEntity extends BlockEntity {
             out.putDouble("remnantCollapse", remnant.collapse());
             out.putDouble("remnantDropout", remnant.dropout());
             out.putDouble("remnantSide", remnant.side());
+            out.putLong("remnantFrozeAt", remnant.frozeAt());
             var list = out.childrenList("remnantBolts");
             for (StasisNet.Bolt b : remnant.bolts()) {
                 var o = list.addChild();
@@ -647,7 +648,7 @@ public class TowerBlockEntity extends BlockEntity {
         retreatRadius = in.getDoubleOr("retreatRadius", 0);
         double rr = in.getDoubleOr("remnantRadius", 0);
         remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.5),
-            in.getDoubleOr("remnantDropout", 0), in.getDoubleOr("remnantSide", 0),
+            in.getDoubleOr("remnantDropout", 0), in.getDoubleOr("remnantSide", 0), in.getLongOr("remnantFrozeAt", 0L),
             in.childrenListOrEmpty("remnantBolts").stream().map(o -> new StasisNet.Bolt(o.getDoubleOr("fx", 0), o.getDoubleOr("fy", 0),
                 o.getDoubleOr("fz", 0), o.getDoubleOr("tx", 0), o.getDoubleOr("ty", 0), o.getDoubleOr("tz", 0), o.getIntOr("seed", 0))).toList());
         structure.load(in);
@@ -665,7 +666,7 @@ public class TowerBlockEntity extends BlockEntity {
      * What's left of a collapsed field (Baughn: the tower never sees zero charge; no moment passes where it would):
      * its last moment, stopped for good. Drawn by the client (Remnants) until the tower starts again or is broken.
      */
-    public record Remnant(double radius, int seed, double collapse, double dropout, double side, java.util.List<StasisNet.Bolt> bolts) {
+    public record Remnant(double radius, int seed, double collapse, double dropout, double side, long frozeAt, java.util.List<StasisNet.Bolt> bolts) {
     }
 
     Remnant remnant;
