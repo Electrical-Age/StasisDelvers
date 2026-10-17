@@ -76,8 +76,8 @@ public final class WaterLines {
                 for (int x = 0; x < w; x++) {
                     int tx = x * 16 / w, ty = y * 16 / h;
                     int across = Math.floorMod(ka * tx + kb * ty, 16);   // stripes every 16 / |k| pixels
-                    int along = Math.floorMod(kb * tx - ka * ty, 16);   // broken into dashes like filings
-                    boolean on = across < 6 && hash(along / 3, across / 6 + orient * 7) > 0.25;
+                    // (no dashes: the dash index along a line jumps every pixel on diagonals, which left a dot grid)
+                    boolean on = across < 6 && hash(tx, ty + 16 * orient) > 0.12;
                     if (!on) continue;
                     int c = out.getPixel(x, y);
                     int al = c >>> 24, r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
