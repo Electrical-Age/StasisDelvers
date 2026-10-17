@@ -384,17 +384,29 @@ public class TowerBlockEntity extends BlockEntity {
                 double target = draining ? Math.min(1, (0.25 + 0.75 * (1 - share)) * Math.min(1, drain * 3)) : 0;
                 if (retreating) target = Math.max(target, 0.25);
                 failing += (target - failing) / 40.0;
-                if (level.getGameTime() % 5 == 0) FieldData.get(sl).update(sl, fieldId, f -> f.withFailing(failing));
+                // the shield's hexes (Baughn 2026-10-17, as shares of all hexes): draining, 5-15% orange by the drain;
+                // under half charge they start dropping out, 20% by 20% charge (80% always stay); orange spreads
+                // smoothly to the whole shield by 10%
+                double a0 = draining ? 0.05 + 0.10 * Math.min(1, drain) : 0;
+                double ta = Math.max(0, Math.min(1, (0.5 - share) / 0.4)), td = Math.max(0, Math.min(1, (0.5 - share) / 0.3));
+                amber += (a0 + (1 - a0) * ta * ta * (3 - 2 * ta) - amber) / 40.0;
+                dropout += (0.2 * td * td * (3 - 2 * td) - dropout) / 40.0;
+                if (level.getGameTime() % 5 == 0) FieldData.get(sl).update(sl, fieldId, f -> f.withFailing(failing).withShield(amber, dropout, 0));
                 if (store.amount() <= 0) {
                     state = State.COLLAPSING;
                     collapseTicks = 0;
                     collapseProgress = 0;
-                    freezeAt = 0.86 + 0.09 * sl.getRandom().nextDouble();
-                    collapseSpeed = 1.0 / (10 + 15 * sl.getRandom().nextDouble());   // 10-25 s
+                    // (Baughn 2026-10-17) a collapse loses hexes until half of the shield is gone, leaning to one side
+                    // (the storm's, else random), and time stops right then: lost = dropout + collapse (stasis.fsh)
+                    freezeAt = Math.max(0.05, 0.5 - dropout);
+                    collapseSpeed = freezeAt / (10 + 15 * sl.getRandom().nextDouble());   // 10-25 s
+                    double storm = storming ? FieldData.get(sl).get(fieldId).map(f -> Storms.side(sl, f)).orElse(Double.NaN) : Double.NaN;
+                    side = Double.isNaN(storm) ? sl.getRandom().nextDouble() * 2 * Math.PI : storm;
+                    double d0 = dropout, sd = side;
                     boltBurst = 0;
                     int seed = sl.getRandom().nextInt() & 0xffffff;   // (24 bits: exact in the shader's floats)
                     collapseSeed = seed;
-                    FieldData.get(sl).update(sl, fieldId, f -> f.withSeed(seed));
+                    FieldData.get(sl).update(sl, fieldId, f -> f.withSeed(seed).withShield(1, d0, sd));
                     StasisDelvers.LOG.info("Stasis tower at {} ran out of power: field {} collapses", worldPosition.toShortString(), fieldId);
                 }
             }
@@ -495,7 +507,7 @@ public class TowerBlockEntity extends BlockEntity {
         last.add(makeBolt(sl));
         last.add(rnd.nextBoolean() ? makeBoltOut(sl) : makeBolt(sl));
         last.forEach(b -> StasisNet.sendBolt(sl, b));
-        Remnant rem = new Remnant(radius(), collapseSeed, c, java.util.List.copyOf(last));
+        Remnant rem = new Remnant(radius(), collapseSeed, c, dropout, side, java.util.List.copyOf(last));
         stop(sl);
         remnant = rem;
         setChanged();
@@ -520,7 +532,7 @@ public class TowerBlockEntity extends BlockEntity {
         startedAt = now;
         sl.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.BEACON_ACTIVATE, net.minecraft.sounds.SoundSource.BLOCKS, 2.0F, 0.6F);
         state = State.RUNNING;
-        failing = 0;
+        failing = amber = dropout = 0;
         netAvg = 0;
         draining = false;
         Tickets.update(sl, this);
@@ -535,7 +547,7 @@ public class TowerBlockEntity extends BlockEntity {
         stepGoal = 0;
         retreating = false;
         collapseTicks = 0;
-        failing = 0;
+        failing = amber = dropout = 0;
         Tickets.update(sl, this);
     }
 
@@ -572,6 +584,12 @@ public class TowerBlockEntity extends BlockEntity {
         out.putInt("collapse", collapseTicks);
         out.putInt("energy", store.amount());
         out.putDouble("failing", failing);
+        out.putDouble("amber", amber);
+        out.putDouble("dropout", dropout);
+        out.putDouble("side", side);
+        out.putDouble("collapseProgress", collapseProgress);
+        out.putDouble("freezeAt", freezeAt);
+        out.putDouble("collapseSpeed", collapseSpeed);
         if (!Double.isNaN(targetRadius)) out.putDouble("target", targetRadius);
         out.putBoolean("override", override);
         out.putDouble("radius", effRadius);
@@ -582,6 +600,8 @@ public class TowerBlockEntity extends BlockEntity {
             out.putDouble("remnantRadius", remnant.radius());
             out.putInt("remnantSeed", remnant.seed());
             out.putDouble("remnantCollapse", remnant.collapse());
+            out.putDouble("remnantDropout", remnant.dropout());
+            out.putDouble("remnantSide", remnant.side());
             var list = out.childrenList("remnantBolts");
             for (StasisNet.Bolt b : remnant.bolts()) {
                 var o = list.addChild();
@@ -611,6 +631,12 @@ public class TowerBlockEntity extends BlockEntity {
         store.setCapacity(Integer.MAX_VALUE);
         store.set(in.getIntOr("energy", 0));
         failing = in.getDoubleOr("failing", 0);
+        amber = in.getDoubleOr("amber", 0);
+        dropout = in.getDoubleOr("dropout", 0);
+        side = in.getDoubleOr("side", 0);
+        collapseProgress = in.getDoubleOr("collapseProgress", 0);
+        freezeAt = in.getDoubleOr("freezeAt", 0.5);
+        collapseSpeed = in.getDoubleOr("collapseSpeed", freezeAt / 15);
         targetRadius = in.getDoubleOr("target", Double.NaN);
         override = in.getBooleanOr("override", false);
         effRadius = in.getDoubleOr("radius", 0);
@@ -620,7 +646,8 @@ public class TowerBlockEntity extends BlockEntity {
         retreating = in.getBooleanOr("retreating", false);
         retreatRadius = in.getDoubleOr("retreatRadius", 0);
         double rr = in.getDoubleOr("remnantRadius", 0);
-        remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.9),
+        remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.5),
+            in.getDoubleOr("remnantDropout", 0), in.getDoubleOr("remnantSide", 0),
             in.childrenListOrEmpty("remnantBolts").stream().map(o -> new StasisNet.Bolt(o.getDoubleOr("fx", 0), o.getDoubleOr("fy", 0),
                 o.getDoubleOr("fz", 0), o.getDoubleOr("tx", 0), o.getDoubleOr("ty", 0), o.getDoubleOr("tz", 0), o.getIntOr("seed", 0))).toList());
         structure.load(in);
@@ -630,13 +657,15 @@ public class TowerBlockEntity extends BlockEntity {
     /** The collapse's own pace and progress (0..1), and a lightning burst in progress (ticks). */
     double collapseProgress, collapseSpeed = 1.0 / 15;
     int boltBurst, collapseSeed;
-    double freezeAt = 0.9;
+    double freezeAt = 0.5;
+    /** The shield's look (Field.amber, dropout, side), eased; dropout and side held through a collapse. */
+    double amber, dropout, side;
 
     /**
      * What's left of a collapsed field (Baughn: the tower never sees zero charge; no moment passes where it would):
      * its last moment, stopped for good. Drawn by the client (Remnants) until the tower starts again or is broken.
      */
-    public record Remnant(double radius, int seed, double collapse, java.util.List<StasisNet.Bolt> bolts) {
+    public record Remnant(double radius, int seed, double collapse, double dropout, double side, java.util.List<StasisNet.Bolt> bolts) {
     }
 
     Remnant remnant;

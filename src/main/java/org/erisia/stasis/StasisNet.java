@@ -31,9 +31,12 @@ public final class StasisNet {
             buf.writeDouble(f.rate());
             buf.writeInt(f.seed());
             buf.writeLong(f.formedAt());
+            buf.writeFloat((float) f.amber());
+            buf.writeFloat((float) f.dropout());
+            buf.writeFloat((float) f.side());
         },
         buf -> new Field(buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(),
-            buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong()));
+            buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong(), buf.readFloat(), buf.readFloat(), buf.readFloat()));
 
     public record Fields(List<Field> fields, int deepSeed) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));
@@ -250,7 +253,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("7");
+            var r = e.registrar("8");
             r.playToServer(ConsoleQuery.TYPE, ConsoleQuery.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) {
                     TowerBlockEntity t = consoleTower(sp, p.pos());

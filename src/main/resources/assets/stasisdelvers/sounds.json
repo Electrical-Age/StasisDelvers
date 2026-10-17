@@ -143,13 +143,5 @@
     "stream": false
    }
   ]
- },
- "tower.crack_thump": {
-  "category": "master",
-  "sounds": [
-   {
-    "name": "stasisdelvers:crack_thump"
-   }
-  ]
  }
 }

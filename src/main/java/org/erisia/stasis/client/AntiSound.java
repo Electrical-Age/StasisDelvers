@@ -2,14 +2,12 @@ package org.erisia.stasis.client;
 
 import java.util.Map;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.sounds.SoundSource;
 import org.erisia.stasis.ClientFields;
 import org.erisia.stasis.Field;
 import org.erisia.stasis.StasisNet;
-import org.erisia.stasis.StasisRegistry;
 import org.erisia.stasis.mixin.client.ChannelAccessor;
 import org.erisia.stasis.mixin.client.SoundManagerAccessor;
 import org.lwjgl.openal.AL10;
@@ -17,7 +15,8 @@ import org.lwjgl.openal.EXTEfx;
 
 /**
  * A tower's lightning makes no sound: it makes an anti-sound (Baughn 2026-10-17, FAILURE-PLAN E). At each crack
- * near the player every other sound cuts out (a sub-thump as it goes), stays silent for the flash, then returns, the
+ * near the player every other sound cuts out (no thump, Baughn: the sound of lightning is that there is no sound),
+ * stays silent for the flash, then returns, the
  * lows first and the highs last. Inside a failing field all sound is dulled (quieter, low-passed, a slight pitch
  * sag) as the field weakens. Music and UI sounds are never touched.
  */
@@ -64,7 +63,6 @@ public final class AntiSound {
         // in a burst, the sound gets a moment back between cuts (else a burst is one long silence)
         // (crackAt starts at Long.MIN_VALUE: now - crackAt would overflow and hold every crack back)
         if (crackAt != Long.MIN_VALUE && (now - crackAt) / 1e9 < CUT + 0.25) return;
-        mc.getSoundManager().play(SimpleSoundInstance.forUI(StasisRegistry.CRACK_THUMP.get(), 1.0F, 0.25F));
         crackAt = now;
     }
 

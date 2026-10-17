@@ -29,7 +29,8 @@
     "client.FluidRendererMixin",
     "client.SoundManagerAccessor",
     "client.ChannelAccessor",
-    "client.SoundEngineMixin"
+    "client.SoundEngineMixin",
+    "client.WeatherEffectRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

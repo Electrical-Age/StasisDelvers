@@ -16,7 +16,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * field at StasisConfig.towerFieldRate.
  */
 public record Field(int id, double x, double y, double z, double radius, double failing, double collapse, boolean column,
-                    double rate, int seed, long formedAt) {
+                    double rate, int seed, long formedAt, double amber, double dropout, double side) {
     public static final Codec<Field> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.INT.fieldOf("id").forGetter(Field::id),
         Codec.DOUBLE.fieldOf("x").forGetter(Field::x),
@@ -28,42 +28,54 @@ public record Field(int id, double x, double y, double z, double radius, double 
         Codec.BOOL.optionalFieldOf("column", false).forGetter(Field::column),
         Codec.DOUBLE.optionalFieldOf("rate", 1.0).forGetter(Field::rate),
         Codec.INT.optionalFieldOf("seed", 0).forGetter(Field::seed),
-        Codec.LONG.optionalFieldOf("formed_at", 0L).forGetter(Field::formedAt)
+        Codec.LONG.optionalFieldOf("formed_at", 0L).forGetter(Field::formedAt),
+        Codec.DOUBLE.optionalFieldOf("amber", 0.0).forGetter(Field::amber),
+        Codec.DOUBLE.optionalFieldOf("dropout", 0.0).forGetter(Field::dropout),
+        Codec.DOUBLE.optionalFieldOf("side", 0.0).forGetter(Field::side)
     ).apply(i, Field::new));
 
     public Field(int id, double x, double y, double z, double radius) {
-        this(id, x, y, z, radius, 0, 0, false, 1.0, 0, 0);
+        this(id, x, y, z, radius, 0, 0, false, 1.0, 0, 0, 0, 0, 0);
     }
 
     /** column: a vertical cylinder from the bottom of the world to the top (λ-Nero's test variant). */
     public Field(int id, double x, double y, double z, double radius, boolean column) {
-        this(id, x, y, z, radius, 0, 0, column, 1.0, 0, 0);
+        this(id, x, y, z, radius, 0, 0, column, 1.0, 0, 0, 0, 0, 0);
     }
 
     public Field withRadius(double r) {
-        return new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formedAt);
+        return new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formedAt, amber, dropout, side);
     }
 
     public Field withFailing(double f) {
-        return new Field(id, x, y, z, radius, f, collapse, column, rate, seed, formedAt);
+        return new Field(id, x, y, z, radius, f, collapse, column, rate, seed, formedAt, amber, dropout, side);
     }
 
     public Field withCollapse(double c) {
-        return new Field(id, x, y, z, radius, failing, c, column, rate, seed, formedAt);
+        return new Field(id, x, y, z, radius, failing, c, column, rate, seed, formedAt, amber, dropout, side);
     }
 
     public Field withRate(double r) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, clampRate(r), seed, formedAt);
+        return new Field(id, x, y, z, radius, failing, collapse, column, clampRate(r), seed, formedAt, amber, dropout, side);
     }
 
     /** Formed at this game time: clients animate the start-up (towers only; 0 = no animation). */
     public Field withFormedAt(long t) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, t);
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, t, amber, dropout, side);
     }
 
     /** A new seed (24 bits: the shader gets it as an exact float): a fresh pattern, e.g. for a collapse. */
     public Field withSeed(int s) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, rate, s & 0xFFFFFF, formedAt);
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, s & 0xFFFFFF, formedAt, amber, dropout, side);
+    }
+
+    /**
+     * The shield's look (visual only, Baughn 2026-10-17): amber = the share of hexes gone orange, dropout = the share
+     * dropped out (the same hexes first: each hex has one random key), side = the yaw (radians) a collapse leans
+     * towards. In a collapse, dropout is held at its value when the store ran out.
+     */
+    public Field withShield(double a, double d, double sd) {
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, formedAt, a, d, sd);
     }
 
     /** Field rates live in (0, 1]: a field never stops time (that's the land outside) and never speeds it up. */
@@ -89,11 +101,12 @@ public record Field(int id, double x, double y, double z, double radius, double 
 
     /**
      * During a collapse: has this block stopped yet? Outer blocks first on average (45% distance), in patches (55%:
-     * two octaves of noise on the field's seed), plus 2-4 seeded "tears" (great-circle bands that fail early), so no
-     * two collapses look alike (Baughn). The shader draws the same rule (stasis.fsh: collapseScore).
+     * two octaves of noise on the field's seed), plus 2-4 seeded "tears" (great-circle bands that fail early), leaning
+     * towards the collapse's side (Baughn 2026-10-17). The shield's hexes follow their own rule (stasis.fsh: a collapse
+     * ends when half of them are lost, at collapse 0.3-0.5), so the land goes 1.6x as fast here.
      */
     boolean collapsed(int bx, int by, int bz, double dist) {
-        return 1 - collapseScore(bx, by, bz, dist) < collapse;
+        return 1 - collapseScore(bx, by, bz, dist) < 1.6 * collapse;
     }
 
     float collapseScore(int bx, int by, int bz, double dist) {
@@ -108,6 +121,7 @@ public record Field(int id, double x, double y, double z, double radius, double 
                 float band = Math.abs((dx * nx + dy * ny + dz * nz) / (len * nl));
                 if (band < 0.07f) score -= 0.35f * (1 - band / 0.07f);
             }
+            score += 0.25f * (float) ((dx * Math.cos(side) + dz * Math.sin(side)) / len);
         }
         return score;
     }

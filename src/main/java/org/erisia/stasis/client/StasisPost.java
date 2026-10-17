@@ -33,6 +33,8 @@ public final class StasisPost {
     /** Data texture size: 1024 x 4 (GL 3.3 only promises 1024-wide textures). */
     static final int WIDTH = 1024, ROWS = 4, SLOTS = WIDTH * ROWS;
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
+    /** Field i's shield (amber, dropout, side): 4 slots from SHIELD_BASE + 4i. */
+    static final int SHIELD_BASE = 1700;
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
     /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
     static final int G = 8, GROUND_BASE = 2048, STATIC_GROUND_BASE = GROUND_BASE + G * G * MAX_DEEPS;
@@ -124,6 +126,10 @@ public final class StasisPost {
             d[o + 7] = f.seed();
             d[o + 8] = f.formedAt() > 0
                 ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;
+            int sh = SHIELD_BASE + 4 * (n - 1);
+            d[sh] = (float) f.amber();
+            d[sh + 1] = (float) f.dropout();
+            d[sh + 2] = (float) f.side();
         }
         // frozen remnants of collapsed towers (column 2: the shader draws them at a fixed time, and time doesn't run there)
         for (var re : Remnants.all()) {
@@ -140,6 +146,10 @@ public final class StasisPost {
             d[o + 7] = rem.seed();
             d[o + 8] = -1;
             d[o + 9] = 0;
+            int sh = SHIELD_BASE + 4 * (n - 1);
+            d[sh] = 1;
+            d[sh + 1] = (float) rem.dropout();
+            d[sh + 2] = (float) rem.side();
         }
         d[24] = n;
         // the client's render distance in blocks (terrain ends, and vanilla's render-distance fog with it, there)

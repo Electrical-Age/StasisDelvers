@@ -217,6 +217,25 @@ public final class Storms {
         return new float[]{mist / (float) n, rift / (float) n};
     }
 
+    /** The storm's side of a field: the yaw (radians) towards its stormy samples (as overlap), or NaN if none. */
+    static double side(Level level, Field f) {
+        double sx = 0, sz = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    double l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    double k = 0.7 * f.radius() / l;
+                    int x = (int) Math.floor(f.x() + dx * k), y = (int) Math.floor(f.y() + dy * k), z = (int) Math.floor(f.z() + dz * k);
+                    int s = at(level, x, y, z);
+                    double w = s == 2 ? 2 : s == 1 || Deeps.at(level, x, y, z) > 0.5f ? 1 : 0;
+                    double h = Math.sqrt(dx * dx + dz * dz);
+                    sx += w * dx / h;
+                    sz += w * dz / h;
+                }
+        return sx * sx + sz * sz < 1e-6 ? Double.NaN : Math.atan2(sz, sx);
+    }
+
     // ---- level-side helpers
 
     public static double intensity(Level level) {

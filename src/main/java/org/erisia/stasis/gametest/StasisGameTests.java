@@ -714,7 +714,7 @@ public final class StasisGameTests {
         }, false, true));
         // Baughn: no two collapses alike; the outside still tends to go first
         CASES.put("collapse_differs_by_seed", new Spec(1, (h, c) -> () -> {
-            Field a = new Field(1, 0.5, 0.5, 0.5, 20).withSeed(12345).withCollapse(0.5), b = a.withSeed(987654);
+            Field a = new Field(1, 0.5, 0.5, 0.5, 20).withSeed(12345).withCollapse(0.25), b = a.withSeed(987654);   // (collapses end by 0.5)
             int differ = 0, n = 0, outerA = 0, outerN = 0, innerA = 0, innerN = 0;
             for (int x = -19; x <= 19; x += 2)
                 for (int y = -19; y <= 19; y += 2)
@@ -1346,14 +1346,16 @@ public final class StasisGameTests {
             h.runAfterDelay(160, () -> {
                 c.check("halfway through the collapse", t.state() == org.erisia.stasis.TowerBlockEntity.State.COLLAPSING, t.state().name());
                 var f = FieldData.get(h.getLevel()).fields().stream().filter(x -> x.id() == fid[0]).findFirst();
-                c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.05 && f.get().collapse() < 0.98, f.toString());
+                c.check("its field is partly collapsed", f.isPresent() && f.get().collapse() > 0.02 && f.get().collapse() < 0.5, f.toString());
             });
             return () -> {
                 c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());
                 c.check("collapsed: the field is gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.id() == fid[0]));
-                // Baughn: its last moment stays, frozen (three held bolts, a few hexes)
+                // Baughn: its last moment stays, frozen (three held bolts, a few hexes), stopped just as half of the
+                // shield's hexes are lost (dropout + collapse)
                 var rem = t.remnant();
-                c.check("collapsed: a frozen remnant", rem != null && rem.bolts().size() == 3 && rem.collapse() >= 0.85 && rem.collapse() <= 0.96,
+                c.check("collapsed: a frozen remnant at half the hexes lost", rem != null && rem.bolts().size() == 3
+                        && Math.abs(rem.collapse() + rem.dropout() - 0.5) < 1e-6,
                     String.valueOf(rem));
             };
         }, false, true));
