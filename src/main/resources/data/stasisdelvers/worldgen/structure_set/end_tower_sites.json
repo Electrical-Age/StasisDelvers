@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "stasisdelvers:end_tower_site",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 20,
+    "separation": 11,
+    "spread_type": "triangular",
+    "salt": 10387314
+  }
+}

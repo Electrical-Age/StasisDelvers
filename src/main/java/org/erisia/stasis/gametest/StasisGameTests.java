@@ -696,6 +696,17 @@ public final class StasisGameTests {
             c.check("stopped land: stilled water", h.getLevel().getBlockState(at).is(org.erisia.stasis.StasisRegistry.STILLED_WATER_BLOCK.get()),
                 h.getLevel().getBlockState(at).toString());
         }, false));
+        // the End (Baughn): end cities (and their ships) no longer generate; tower and airship sites do
+        CASES.put("end_sites_replace_cities", new Spec(1, (h, c) -> () -> {
+            var reg = h.getLevel().registryAccess();
+            var cityBiomes = reg.lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
+                .get(net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BIOME, Identifier.withDefaultNamespace("has_structure/end_city")));
+            c.check("no biome has end cities", cityBiomes.map(t -> t.size() == 0).orElse(true), String.valueOf(cityBiomes.map(t -> t.size())));
+            var structures = reg.lookupOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+            for (String n : new String[]{"end_tower_site", "airship_site"})
+                c.check(n + " registered", structures.get(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.STRUCTURE,
+                    Identifier.fromNamespaceAndPath(org.erisia.stasis.StasisDelvers.MODID, n))).isPresent());
+        }, false));
         // a ruined cottage's tower comes dead and never drops as a core (the template processor)
         CASES.put("ruined_cottage_core", new Spec(1, (h, c) -> () -> {
             var nbt = new net.minecraft.nbt.CompoundTag();

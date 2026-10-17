@@ -28,6 +28,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(NewChunkGrace::chunkLoad);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> StasisCommands.register(e.getDispatcher()));
         StasisRegistry.register(modBus);
+        EndSites.init();
         RuinedCottages.register(modBus);
         StasisNet.register(modBus);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post.class, Freezing::tick);

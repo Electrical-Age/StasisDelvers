@@ -1,0 +1,8 @@
+{
+  "type": "stasisdelvers:end_site",
+  "biomes": "#stasisdelvers:has_structure/airship_site",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "templates": "airship",
+  "air": true
+}

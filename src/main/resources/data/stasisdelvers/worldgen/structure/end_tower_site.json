@@ -1,0 +1,8 @@
+{
+  "type": "stasisdelvers:end_site",
+  "biomes": "#stasisdelvers:has_structure/end_tower_site",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "templates": "end_tower",
+  "air": false
+}

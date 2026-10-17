@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "stasisdelvers:airship_site",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 28,
+    "separation": 12,
+    "spread_type": "triangular",
+    "salt": 77010443
+  }
+}
