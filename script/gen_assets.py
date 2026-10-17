@@ -42,17 +42,61 @@ def icon(colors, rows, path):
 
 
 def layer(colors, path):
+    """Equipment layer (64x32, the vanilla humanoid armour UV): helmet with a dark visor and glow line, a chest plate with
+    a collar, a centre seam, a charge gauge and a belt, a power pack on the back, trim bands at elbows and wrists, knee
+    pads and boot cuffs. Leggings use the same texture (legs and the belt)."""
     rng = random.Random(path)
     im = Image.new('RGBA', (64, 32), (0, 0, 0, 0))
+    base, trim, glow = colors['base'], colors['trim'], colors['glow']
+
+    def shade(c, k):
+        return tuple(min(255, int(v * k)) for v in c)
+
+    def px(x, y, c, j=0.07):
+        im.putpixel((x, y), shade(c, rng.uniform(1 - j, 1 + j)) + (255,))
+
+    def rect(x0, y0, x1, y1, c, j=0.07):
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                px(x, y, c, j)
+    # everything first: the base plate, faintly mottled
     for y in range(32):
         for x in range(64):
-            k = rng.uniform(0.85, 1.1)
-            c = colors['base']
-            if y % 8 == 7 or x % 16 == 0:
-                c = colors['trim']
-            if (x + y) % 23 == 0:
-                c = colors['glow']
-            im.putpixel((x, y), tuple(min(255, int(v * k)) for v in c) + (255,))
+            px(x, y, base, 0.1)
+    # the hat overlay (32-63, rows 0-15) stays clear, or it would cover the helmet's face
+    for y in range(16):
+        for x in range(32, 64):
+            im.putpixel((x, y), (0, 0, 0, 0))
+    # head (box at 0,0; 8x8x8): faces right 0-7, front 8-15, left 16-23, back 24-31 (rows 8-15); top 8-15, bottom 16-23
+    rect(0, 15, 31, 15, trim)                         # neck ring
+    rect(8, 0, 15, 7, shade(base, 1.08))              # crown
+    rect(11, 0, 12, 7, trim)                          # crest ridge over the top
+    rect(8, 8, 15, 8, trim)                           # brow
+    rect(9, 10, 14, 13, shade(base, 0.22), 0.04)      # the visor: dark glass
+    rect(9, 10, 14, 10, glow, 0.03)                   # its glow line
+    px(8, 11, trim); px(15, 11, trim)                 # visor hinges
+    for x in (2, 5, 18, 21):                          # vents on the sides
+        rect(x, 11, x, 13, shade(base, 0.55))
+    # body (box at 16,16; 8x12x4): right 16-19, front 20-27, left 28-31, back 32-39 (rows 20-31)
+    rect(16, 20, 39, 20, trim)                        # collar
+    rect(23, 21, 24, 29, shade(base, 0.7))            # centre seam
+    rect(21, 22, 22, 25, shade(base, 0.35), 0.03)     # charge gauge
+    rect(21, 23, 22, 25, glow, 0.03)
+    rect(16, 30, 39, 31, trim)                        # belt
+    rect(25, 30, 26, 31, shade(trim, 1.25))           # buckle
+    rect(33, 22, 38, 28, shade(base, 0.6))            # power pack on the back
+    for y in (23, 25, 27):
+        rect(34, y, 37, y, glow, 0.03)                # its vents
+    # arms (box at 40,16; 4x12x4): right 40-43, front 44-47, left 48-51, back 52-55 (rows 20-31)
+    rect(40, 20, 55, 20, trim)                        # shoulder rim
+    rect(40, 25, 55, 25, trim)                        # elbow band
+    rect(40, 31, 55, 31, trim)                        # wrist cuff
+    rect(41, 21, 41, 30, glow, 0.03)                  # a glow line down the outer side
+    # legs (box at 0,16; 4x12x4): right 0-3, front 4-7, left 8-11, back 12-15 (rows 20-31)
+    rect(4, 24, 7, 26, shade(trim, 0.95))             # knee pad
+    rect(5, 25, 6, 25, glow, 0.03)
+    rect(0, 28, 15, 31, shade(base, 0.6))             # boots
+    rect(0, 28, 15, 28, trim)                         # boot cuff
     os.makedirs(os.path.dirname(path), exist_ok=True)
     im.save(path)
 
