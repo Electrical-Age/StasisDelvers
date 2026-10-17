@@ -84,7 +84,12 @@ public final class StilledLiquids {
      */
     static void useOnBlock(PlayerInteractEvent.RightClickBlock e) {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level) || !isTool(e.getItemStack())) return;
-        if (take(p, level, e.getPos(), e.getItemStack(), e.getHand())) {
+        BlockPos at = e.getPos();
+        if (!(level.getBlockState(at).getBlock() instanceof LiquidBlock)) {   // (lava isn't solid: the click went through it)
+            var hit = Item.getPlayerPOVHitResult(level, p, ClipContext.Fluid.ANY);
+            if (hit.getType() == HitResult.Type.BLOCK) at = hit.getBlockPos();
+        }
+        if (take(p, level, at, e.getItemStack(), e.getHand())) {
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.SUCCESS);
         }
