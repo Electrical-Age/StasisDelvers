@@ -46,7 +46,8 @@ public final class Redactor {
             .forEach(f -> gameForms.add(Pattern.compile(Pattern.quote(f), Pattern.CASE_INSENSITIVE)));
         if (serverAddress != null && !serverAddress.isBlank()) {
             String s = serverAddress.strip();
-            serverForms.add(Pattern.compile(Pattern.quote(s), Pattern.CASE_INSENSITIVE));
+            // (with boundaries: a short server-list name like "home" must not eat "homeward")
+            serverForms.add(Pattern.compile("(?<![\\w.\\-])" + Pattern.quote(s) + "(?![\\w\\-])", Pattern.CASE_INSENSITIVE));
             String host = hostOf(s);
             if (host.length() >= 4 && !host.equalsIgnoreCase(s))
                 serverForms.add(Pattern.compile("(?<![\\w.\\-])" + Pattern.quote(host) + "(?![\\w\\-])", Pattern.CASE_INSENSITIVE));

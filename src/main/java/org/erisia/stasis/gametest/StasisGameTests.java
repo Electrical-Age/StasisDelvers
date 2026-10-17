@@ -1943,6 +1943,9 @@ public final class StasisGameTests {
             eq.accept("user Alice and ALICE but not Alicesmith", "user <user> and <user> but not Alicesmith");
             eq.accept("--username Bob --accessToken eyJhbGciOi.xyz --version 26.3", "--username Bob --accessToken <redacted> --version 26.3");
             eq.accept("password=hunter2 token: abc session=s1", "password=<redacted> token: <redacted> session=<redacted>");
+            var shortServer = new org.erisia.stasis.client.report.Redactor(java.util.List.of(), "home", null);
+            c.check("a short server name only as a whole word", shortServer.redact("welcome home, homeward").equals("welcome <server>, homeward"),
+                shortServer.redact("welcome home, homeward"));
             var shortUser = new org.erisia.stasis.client.report.Redactor(java.util.List.of(), null, "bob");
             c.check("a user name under 4 characters stays", shortUser.redact("bob builds").equals("bob builds"));
             c.check("no game dir, no server: plain text unchanged", shortUser.redact("Stasis tower at 12, 64, -30").equals("Stasis tower at 12, 64, -30"));
