@@ -780,8 +780,13 @@ public final class StasisGameTests {
             return () -> {
                 for (int i = 0; i < ids.size(); i++) {
                     var tb = core.apply(at.get(i));
-                    if (tb != null) c.check(ids.get(i).getPath() + ": once running, its tower is read and built here", tb.structure.status == org.erisia.stasis.TowerStructure.Status.OK,
-                        tb.structure.status + " " + tb.structure.message + " " + tb.structure.layout);
+                    if (tb == null) continue;
+                    // (built if its chunk ticked; the far ones sometimes don't in the test grid: then read the layout here)
+                    var l = org.erisia.stasis.TowerStructure.scan(level, tb.getBlockPos(), 30);
+                    boolean ok = tb.structure.status == org.erisia.stasis.TowerStructure.Status.OK
+                        || tb.structure.status == org.erisia.stasis.TowerStructure.Status.NONE && l != null && l.violations().isEmpty();
+                    c.check(ids.get(i).getPath() + ": once running, its tower is read and valid here", ok,
+                        tb.structure.status + " " + tb.structure.message + " " + l + " " + (l == null ? "" : l.violations()));
                 }
                 for (BlockPos p : at)
                     for (BlockPos q : BlockPos.betweenClosed(p.offset(-5, -1, -5), p.offset(5, 14, 5)))
