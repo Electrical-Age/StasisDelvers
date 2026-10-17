@@ -22,8 +22,8 @@ import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * The surveyor's desk at spawn (Baughn 2026-10-17): each player gets a map to a ruined cottage nobody else has a map
- * to (vanilla's one-map-per-structure rule), nearest first; another one after StasisConfig.mapDeskHours. Not craftable:
- * it's part of the spawn cottage.
+ * to (vanilla's one-map-per-structure rule), nearest first. One map per player, ever (Baughn). Not craftable: it's part
+ * of the spawn cottage.
  */
 public class MapDeskBlock extends Block {
     public static final TagKey<Structure> COTTAGES = TagKey.create(Registries.STRUCTURE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "on_cottage_maps"));
@@ -37,10 +37,8 @@ public class MapDeskBlock extends Block {
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (!(level instanceof ServerLevel sl) || !(player instanceof ServerPlayer p)) return InteractionResult.SUCCESS;
         CompoundTag persisted = p.getPersistentData().getCompoundOrEmpty(Player.PERSISTED_NBT_TAG);
-        long now = System.currentTimeMillis(), last = persisted.getLongOr(LAST, 0L);
-        long wait = last + StasisConfig.mapDeskHours * 3_600_000L - now;
-        if (wait > 0) {
-            p.sendSystemMessage(Component.literal(String.format("You have your map. Another in %.1f hours.", wait / 3_600_000.0)));
+        if (persisted.getBooleanOr(LAST, false)) {
+            p.sendSystemMessage(Component.literal("The surveyor's desk has given you your map: one to each delver."));
             return InteractionResult.SUCCESS_SERVER;
         }
         ItemStack map = map(sl, pos);
@@ -48,7 +46,7 @@ public class MapDeskBlock extends Block {
             p.sendSystemMessage(Component.literal("The surveyor's notes hold no unclaimed ruins within reach."));
             return InteractionResult.SUCCESS_SERVER;
         }
-        persisted.putLong(LAST, now);
+        persisted.putBoolean(LAST, true);
         p.getPersistentData().put(Player.PERSISTED_NBT_TAG, persisted);
         p.getInventory().placeItemBackInInventory(map, net.minecraft.util.Prediction.SERVER_ONLY);
         p.sendSystemMessage(Component.literal("A map to a ruined cottage: someone's tower that broke down. Bring power."));

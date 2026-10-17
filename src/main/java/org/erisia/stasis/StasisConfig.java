@@ -48,7 +48,6 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue STORM_WARN_MINUTES;
     static final ModConfigSpec.DoubleValue DELVER_SUIT_MINUTES;
     static final ModConfigSpec.BooleanValue STARTER_SUIT;
-    static final ModConfigSpec.IntValue MAP_DESK_HOURS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -116,7 +115,6 @@ public final class StasisConfig {
         DELVER_SUIT_MINUTES = b.comment("Minutes a fully charged Delver suit lasts in stopped land (Baughn: 30). Its store scales with it",
                 "(10 W per piece: 18 kJ at 30 minutes).").defineInRange("delverSuitMinutes", 30.0, 1.0, 600.0);
         STARTER_SUIT = b.comment("Give each player a full, charged Delver suit on their first join.").define("starterSuit", true);
-        MAP_DESK_HOURS = b.comment("Real hours before the map desk gives the same player another map.").defineInRange("mapDeskHours", 24, 0, 8760);
         SPEC = b.build();
     }
 
@@ -148,7 +146,6 @@ public final class StasisConfig {
     static volatile int stormMinutes = 20, stormWarnMinutes = 60;
     static volatile double delverSuitMinutes = 30;
     static volatile boolean starterSuit = true;
-    static volatile int mapDeskHours = 24;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -200,6 +197,5 @@ public final class StasisConfig {
         stormWarnMinutes = STORM_WARN_MINUTES.get();
         delverSuitMinutes = DELVER_SUIT_MINUTES.get();
         starterSuit = STARTER_SUIT.get();
-        mapDeskHours = MAP_DESK_HOURS.get();
     }
 }
