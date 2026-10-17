@@ -178,16 +178,7 @@ public final class MeshBuilder {
                 part[b] = k == 1 ? Part.CABLE : Part.BACKSTAY;
                 continue;
             }
-            Part col = Part.STRUT_T;
-            if (an != null) {
-                int kk = 0;
-                double best = -1;
-                for (int q = 0; q < an.dN.length; q++) {
-                    double v = Math.abs(an.N0[b] + an.dN[q][b]);
-                    if (v > best) { best = v; kk = q; }
-                }
-                col = an.N0[b] + an.dN[kk][b] > 0 ? Part.STRUT_T : Part.STRUT_C;
-            }
+            Part col = an != null ? forceColour(an, b) : Part.STRUT_T;
             double ww;
             if (poleSeg.contains(pk(i, j))) {
                 type[b] = POLE;
@@ -759,6 +750,25 @@ public final class MeshBuilder {
 
     /** Continuing laced members: the bend between them below 30 degrees (leg kinks at the base flare included). */
     static final double CONT_DOT = -0.866;
+
+    /** Relative margin by which the larger of max tension / max compression must win to set the colour. */
+    static final double COLOUR_TIE = 1e-6;
+
+    /**
+     * Strut colour from its forces over the load cases: compression (rust) if the largest compression beats the
+     * largest tension by more than {@link #COLOUR_TIE} (relative), else tension (steel). Ties (members loaded only by
+     * the mirrored wind / torsion cases, |N+| = |N-| up to rounding) and unloaded members are steel, so the colour does
+     * not hang on the last bits of the solve (the JVM and the TeaVM build round differently; H40b4 flipped).
+     */
+    static Part forceColour(RuntimePass.Analysis an, int b) {
+        double mt = 0, mc = 0;
+        for (int q = 0; q < an.dN.length; q++) {
+            double v = an.N0[b] + an.dN[q][b];
+            if (v > mt) mt = v;
+            if (-v > mc) mc = -v;
+        }
+        return mc > mt * (1 + COLOUR_TIE) + 1e-9 ? Part.STRUT_C : Part.STRUT_T;
+    }
 
     private static long pk(int a, int b) { return ((long) Math.min(a, b) << 32) | Math.max(a, b); }
 

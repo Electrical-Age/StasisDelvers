@@ -214,6 +214,57 @@ class MeshTest {
         assertTrue(ends > 0 && sunk >= 0.95 * ends, "chord ends sunk into their gussets");
     }
 
+    /**
+     * Strut colour (polish.md, H40b4: one strut differed between JS and the JVM). Unit cases: zero / near-zero forces
+     * and mirrored-load ties are steel whatever the rounding; a clear compression stays rust. Goldens (q 1 and 0.3):
+     * every strut keeps its colour when its forces are perturbed by 1e-9 relative (far beyond JS / JVM rounding).
+     */
+    @Test
+    void strutColourStable() throws Exception {
+        RuntimePass.Analysis a = new RuntimePass.Analysis();
+        double[][] cases = {
+            {0, 0, 0}, {1e-15, -1e-15, 0}, {-1e-13, -2e-13, 0},                         // unloaded / noise
+            {0.034875000000004, -0.034875000000003}, {0.034875000000003, -0.034875000000004},  // mirrored wind tie
+        };
+        for (double[] dn : cases) {
+            a.N0 = new double[]{0};
+            a.dN = new double[dn.length][];
+            for (int q = 0; q < dn.length; q++) a.dN[q] = new double[]{dn[q]};
+            assertEquals(VisualParams.Part.STRUT_T, MeshBuilder.forceColour(a, 0), java.util.Arrays.toString(dn));
+        }
+        a.N0 = new double[]{-2};
+        a.dN = new double[][]{{0.5}, {-0.5}};
+        assertEquals(VisualParams.Part.STRUT_C, MeshBuilder.forceColour(a, 0));
+        a.N0 = new double[]{2};
+        assertEquals(VisualParams.Part.STRUT_T, MeshBuilder.forceColour(a, 0));
+
+        TowerGen g = new TowerGen(Library.shared());
+        java.util.Random rnd = new java.util.Random(1);
+        int struts = 0, rust = 0;
+        for (String nm : GOLDEN) {
+            for (double q : new double[]{1.0, 0.3}) {
+                TowerGen.Result r = g.build(Layout.read(java.nio.file.Path.of("layouts", nm + ".json")), q);
+                RuntimePass.Analysis an = r.analysis;
+                Stitch.Tower t = r.tower != null ? r.tower : r.raw;
+                for (int b = 0; b < t.m; b++) {
+                    if (t.kind[b] == 1 || t.kind[b] == 3) continue;
+                    VisualParams.Part col = MeshBuilder.forceColour(an, b);
+                    struts++;
+                    if (col == VisualParams.Part.STRUT_C) rust++;
+                    for (int rep = 0; rep < 4; rep++) {
+                        RuntimePass.Analysis p = new RuntimePass.Analysis();
+                        p.N0 = new double[]{an.N0[b] * (1 + 1e-9 * rnd.nextGaussian()) + 1e-12 * rnd.nextGaussian()};
+                        p.dN = new double[an.dN.length][];
+                        for (int k = 0; k < an.dN.length; k++)
+                            p.dN[k] = new double[]{an.dN[k][b] * (1 + 1e-9 * rnd.nextGaussian()) + 1e-12 * rnd.nextGaussian()};
+                        assertEquals(col, MeshBuilder.forceColour(p, 0), nm + " q" + q + " member " + b);
+                    }
+                }
+            }
+        }
+        System.out.printf("strut colours: %d struts, %d rust, all stable under 1e-9 perturbation%n", struts, rust);
+    }
+
     /** Mesh FNV hashes of the golden layouts (q 1, default params): compared with the web build's stats.meshHash. */
     @Test
     void portableHashes() throws Exception {
