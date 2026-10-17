@@ -338,6 +338,33 @@ public final class Main {
                 r.analysis.maxUtil, r.info.rawUtil, java.util.Arrays.toString(r.analysis.utilPerCase), r.analysis.minSlack,
                 r.info.volRaw, r.info.vol, r.info.rounds, r.info.converted, r.info.legFix, r.msStatics(), r.msPass());
         printWires(r);
+        printDensity(r, opt);
+    }
+
+    /** Member counts by kind, length, silhouette (sum of length x outer width), triangles and the ladder top. */
+    static void printDensity(TowerGen.Result r, Map<String, String> opt) throws IOException {
+        var t = r.tower;
+        int[] cnt = new int[4];
+        double[] len = new double[4], sil = new double[4];
+        for (int i = 0; i < t.m; i++) {
+            int a = t.bi[i], b = t.bj[i], k = t.kind[i];
+            double dx = t.P[3 * a] - t.P[3 * b], dy = t.P[3 * a + 1] - t.P[3 * b + 1], dz = t.P[3 * a + 2] - t.P[3 * b + 2];
+            double L = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            double w = switch (k) {
+                case 1 -> r.c.CAB_W[t.ws[i]];
+                case 3 -> r.c.BS_W[t.ws[i]];
+                default -> r.c.WEXT[t.ws[i]];
+            };
+            cnt[k]++; len[k] += L; sil[k] += L * w;
+        }
+        int[] ys = r.spine.ys; double[] s = r.spine.s; int top = -1;
+        for (int i = 0; i + 1 < ys.length; i++) if (s[i] > 0 && s[i + 1] <= 0) { top = ys[i]; break; }
+        if (top < 0 && s.length > 0 && s[s.length - 1] > 0) top = ys[ys.length - 1];
+        Mesh mesh = new MeshBuilder(r.c, params(opt)).build(r);
+        System.out.printf("  density: members %d (solid %d, laced %d, cable %d, back-stay %d), length solid %.1f laced %.1f,"
+                        + " silhouette solid %.1f laced %.1f cable %.1f, triangles %d, ladder top %d, rings %s%n",
+                t.m, cnt[0], cnt[2], cnt[1], cnt[3], len[0], len[2], sil[0], sil[2], sil[1] + sil[3], mesh.tris, top,
+                java.util.Arrays.toString(ys));
     }
 
     static void printWires(TowerGen.Result r) {

@@ -109,7 +109,7 @@ Known limits:
   `TowerGen.check(layout, sp)` gives the same answer before building. 17% of random layouts (`LayoutGen`, mostly
   booms stacked 1-4 blocks apart on one face) are refused; `LayoutGen.randomBuildable` redraws (web Random button).
 - `NO_BOOM_DESIGN`: a boom key whose offline solve failed (header `boom_failed`, now [9, 1, 6, 6]: L45 at rho 0.5,
-  repair gave up, util 1.12, reactions 12x its neighbours) is refused instead of approximated by the nearest entry.
+  repair gave up, util 1.12, reactions 12x its neighbours) is refused instead of approximated by the nearest entry. (Empty since the x1.4 strength library, 2026-10-17.)
 - `OVER_CATALOGUE`: `Result.refusal` (was a warning) when util > utilLimit after all fallbacks; the tower is kept
   for previews. The game must not build if `refusal != null` or a `RefusedException` was thrown.
 - SolverParams: `stayCap`, `stayRise`, `stayMinRatio`, `stayMinRise` (spine group; defaults from the library header
@@ -122,6 +122,49 @@ Known limits:
   failed boom keys, random refusal rate.
 - Random (slowTest, 400 x 2 q, seed 7): 645 pass, 19 over the catalogue (now refused), 136 refused by the stay rule
   (was 769 pass / 31 over); no exceptions.
+
+## Material strength x1.4 (2026-10-17, Baughn: the most ridiculous towers feel dense)
+- `tools/towerlib/fem.py`: `STRENGTH` (env `P3A_STRENGTH`, default now 1.4) multiplies every allowable stress:
+  SIG_T 300 -> 420, SIG_C0 150 -> 210 (so sig_c(L), laced buckling and the pole bending cap SIG_B), SIG_CAB 600 ->
+  840 (so BS_CAP). E (240000) and L0 unchanged. Java has no copy: `Consts` reads them from the library header (the
+  spine's leg / P1 sizing uses them too, so ring half-widths shift in ~2/3 of layouts, by up to 1.5 blocks; the
+  ladder top never moved in 600 random layouts, nor in the goldens).
+- Library rebuilt from an empty cache (`full`, 12 procs, ~20 min): 7797 entries (199 booms; was 7845 / 214),
+  `boom_failed` now empty (L45 rho 0.5 [9, 1, 6, 6] solves), 6.0 MB gz JSON, TGLB1 1.71 MB gz. Both golden sets
+  regenerated (P3a-rule recipe now in the towerlib README); `StayRuleTest` asserts an empty `boom_failed`.
+- Tried x1.25 first (cache /var/lib/mclab/agent/scratch/towerlib-strength/s125/cache): H100 / H40 / H24b got
+  lighter but H64max did not (q1 vol 433 -> 420, laced silhouette 1163 -> 1399: its E-y24 L40 boom came out with a
+  larger back-stay tension, 39 -> 48, which raised the mast's demand classes one step). x1.4 halves it.
+- Numbers (towerview `info`, new `density:` line; q1 / q0.3; silhouette = sum of length x outer width of solid +
+  laced members, blocks^2; "before" is x1.0):
+
+| layout | vol x1.0 -> x1.25 -> x1.4 | members (laced) x1.0 -> x1.4 | silhouette x1.0 -> x1.4 | triangles x1.0 -> x1.4 |
+|---|---|---|---|---|
+| H16 | 7.6 -> 6.8 -> 5.9 / 7.8 -> 8.3 -> 7.5 | 59 (0) -> 55 (0) / 51 (8) -> 46 (3) | 21 -> 18 / 36 -> 29 | 1250 -> 1218 / 3858 -> 2318 |
+| H24b | 35.3 -> 30.3 -> 25.3 / 43.1 -> 34.5 -> 32.1 | 196 (34) -> 209 (25) / 175 (51) -> 182 (41) | 133 -> 104 / 231 -> 159 | 11278 -> 9642 / 16118 -> 12950 |
+| H40 | 32.4 -> 26.2 -> 23.1 / 39.3 -> 36.8 -> 30.2 | 235 (48) -> 227 (44) / 200 (54) -> 194 (46) | 134 -> 107 / 246 -> 178 | 15142 -> 14436 / 16342 -> 14074 |
+| H40r3 | 167 -> 150 -> 131 / 205 -> 199 -> 153 | 536 (101) -> 514 (96) / 508 (136) -> 480 (110) | 631 -> 559 / 932 -> 759 | 43030 -> 41360 / 55282 -> 44156 |
+| H40b4 | 105 -> 93 -> 90 / 125 -> 118 -> 108 | 399 (106) -> 410 (95) / 373 (132) -> 375 (113) | 439 -> 407 / 685 -> 613 | 38732 -> 35170 / 46490 -> 39836 |
+| H64max | 433 -> 420 -> 208 / 522 -> 531 -> 265 | 555 (252) -> 560 (178) / 513 (267) -> 505 (198) | 1270 -> 768 / 1962 -> 1170 | 83602 -> 58160 / 87180 -> 63814 |
+| H100 | 287 -> 195 -> 178 / 403 -> 300 -> 236 | 715 (212) -> 707 (188) / 601 (248) -> 591 (203) | 872 -> 644 / 1433 -> 1090 | 67136 -> 58410 / 75092 -> 61760 |
+
+  Member counts barely move (the topology is the library's; mostly laced -> solid and thinner members), so the
+  look is thinner and more open rather than fewer members. Cable -> strut conversions rise on H64max (6 -> 36 at q1)
+  and H40b4 (3 -> 17), i.e. a few more thin struts where cables were. All 14 golden runs pass (util <= 1.0).
+- Random slowTest: default 60 x 2 q: 94 pass / 2 over / 24 refused -> 96 / 0 / 24. 400 x 2 q seed 7: 642 / 22 / 136
+  -> 657 / 7 / 136 (17 over -> pass, 2 pass -> over: the H55 eight-boom layout #299 with an N L45 boom on a near
+  boom key, util 1.15 / 1.34). Volume of towers passing both: median x0.77 (p10 0.59, p90 0.96; 33 of 640 heavier).
+  Hull sweep: 0 failures. Old vs new library, 600 random layouts at q1 (scratch Cmp.java): 3 OK -> OVER_CATALOGUE,
+  10 OVER_CATALOGUE -> OK.
+- Towers already standing in a world: the server stores layout, status, seed and `ladderTop` and does not rebuild
+  until a pole changes; the client rebuilds the mesh from the layout with the jar's library. So every standing tower
+  is redrawn with the new (thinner) geometry on the next client load; the only blocks placed from the geometry are
+  the pole parts (LADDER up to `ladderTop`, HIDDEN above), and the ladder top is unchanged, so no block changes. A
+  stored OK tower whose layout is now over the catalogue keeps standing (the client draws refused results too) until
+  its poles are touched, then it is refused.
+- Renders: `renders/contact_strength_x14.png` (1920 x 3240, before | after: H64max a215, close, sideW, ljoint; H100
+  close; H40r3 close). x1.25 renders and the comparison sheets are in /var/lib/mclab/agent/scratch/towerlib-strength.
+- Solve cache: /var/lib/mclab/agent/scratch/towerlib-strength/s140/cache (7797 pickles).
 
 ## Gusset seams and brace hubs inside laced legs (2026-10-17, polish.md "Tower mesh")
 - Gusset seams (Baughn: slivers / faint z-fighting where chords meet a gusset): the chords' open ends lay exactly on
@@ -343,4 +386,4 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   patterns 214. Both golden sets regenerated (the main one under the stay rule, p3arule under stayCap none). All
   14 pass with 0 members in the well below the ladder top. Steel volume changes by -25% to +30%.
   Random slowTest: 94/120 pass, 2 over, 24 refused, the same as the old library.
-- Solve cache: /var/lib/mclab/agent/scratch/wellfull2/cache on tsugumi (rebuilt 2026-10-13 with the npole fix and the lattice-top cap; 7843 entries).
+- Solve cache: /var/lib/mclab/agent/scratch/wellfull2/cache on tsugumi (rebuilt 2026-10-13 with the npole fix and the lattice-top cap; 7843 entries); strength x1.0, superseded 2026-10-17 by the x1.4 cache, see "Material strength x1.4").
