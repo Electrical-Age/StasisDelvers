@@ -33,7 +33,8 @@
     "client.SoundManagerAccessor",
     "client.ChannelAccessor",
     "client.SoundEngineMixin",
-    "client.WeatherEffectRendererMixin"
+    "client.WeatherEffectRendererMixin",
+    "client.ChatComponentAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

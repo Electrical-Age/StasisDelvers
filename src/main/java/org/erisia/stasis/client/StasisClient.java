@@ -12,10 +12,14 @@ import net.neoforged.neoforge.common.NeoForge;
 import org.erisia.stasis.StasisDelvers;
 import org.erisia.stasis.StasisRegistry;
 
-/** Client side: statue model, shield geometry, the desaturation post effect, the freeze warning and the suit arm. */
+/** Client side: statue model, shield geometry, the desaturation post effect, the freeze warning, the suit arm and the
+ *  bug-report key. */
 @Mod(value = StasisDelvers.MODID, dist = Dist.CLIENT)
 public final class StasisClient {
-    public StasisClient(IEventBus modBus) {
+    public StasisClient(IEventBus modBus, net.neoforged.fml.ModContainer container) {
+        // the bug-report key (F7) and its client config (notes/bugreport/SPEC.md)
+        container.registerConfig(net.neoforged.fml.config.ModConfig.Type.CLIENT, org.erisia.stasis.client.report.ReportConfig.SPEC);
+        org.erisia.stasis.client.report.BugReport.init(modBus);
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterGuiLayersEvent.class, e -> e.registerAbove(
             net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "suit_gauge"),
             SuitGauge::render));
