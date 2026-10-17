@@ -25,6 +25,21 @@ final class StasisEvents {
             e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
     }
 
+    /**
+     * Spawns that skip the position check (phantoms, patrols, wandering traders, other mods' spawners, reinforcements):
+     * none in stopped land either (λ-Nero: lots of things spawned out there). Worldgen, eggs, commands, breeding,
+     * conversions and the like stay allowed.
+     */
+    static void finalizeSpawn(net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent e) {
+        var why = e.getSpawnType();
+        if (why != EntitySpawnReason.NATURAL && why != EntitySpawnReason.PATROL && why != EntitySpawnReason.EVENT
+            && why != EntitySpawnReason.REINFORCEMENT && why != EntitySpawnReason.JOCKEY && why != EntitySpawnReason.SPAWNER
+            && why != EntitySpawnReason.TRIAL_SPAWNER) return;
+        if (e.getLevel().getLevel() instanceof ServerLevel level && Stasis.stops(level)
+            && !Stasis.isRunning(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
+            e.setSpawnCancelled(true);
+    }
+
     /** Load the fields on the main thread (the light engine reads them from its own: FieldData.peek). */
     static void levelLoad(LevelEvent.Load e) {
         if (e.getLevel() instanceof ServerLevel level) {
