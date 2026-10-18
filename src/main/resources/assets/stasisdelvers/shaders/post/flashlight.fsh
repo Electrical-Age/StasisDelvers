@@ -41,7 +41,7 @@ void main() {
     vec3 p = h.xyz / h.w;                                   // world position minus the camera
     // the near cut (the hand is merged into the depth buffer): faded in over 0.2 m, so a wall right in front isn't
     // cut out in a hard circle
-    float nearFade = smoothstep(data(21), data(21) + 0.2, length(p));
+    float nearFade = smoothstep(data(21), data(21) + 0.12, length(p));
     if (nearFade <= 0.0) {
         fragColor = vec4(c, 1.0);
         return;
@@ -70,5 +70,8 @@ void main() {
     float lum = dot(c, vec3(0.299, 0.587, 0.114));
     float gain = data(17) * light * nearFade * (1.0 - smoothstep(0.05, 0.6, lum));
     vec3 tint = vec3(data(18), data(19), data(20));
-    fragColor = vec4(min(c * (1.0 + gain * tint), vec3(1.0)), 1.0);
+    // the added light with a soft shoulder (about the plain sum while dim, never past white), so a close wall isn't
+    // washed out (AdventurAgent); pixels outside the beam are unchanged
+    vec3 add = c * gain * tint, room = max(1.0 - c, vec3(1e-3));
+    fragColor = vec4(c + room * (1.0 - exp(-add / room)), 1.0);
 }

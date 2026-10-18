@@ -40,8 +40,9 @@ public final class FlashlightPost {
     static final int MAX = 5;
     /** Tuning (later: client config). Beam length = light level x LENGTH_PER_LIGHT blocks. */
     // (Baughn 2026-10-18: half as bright, covering most of the screen; near walls no longer cut a dark hole: the near
-    // cut, which keeps the hand unlit, now fades in from 0.35 to 0.55 m instead of a hard 0.9)
-    static final float STRENGTH = 4.5F, LENGTH_PER_LIGHT = 2.0F, HALF_ANGLE_DEG = 50.0F, NEAR = 0.35F;
+    // cut, which keeps the hand unlit, now fades in from 0.14 to 0.26 m instead of a hard 0.9: a player stands 0.3 from
+    // a wall at the closest)
+    static final float STRENGTH = 4.5F, LENGTH_PER_LIGHT = 2.0F, HALF_ANGLE_DEG = 50.0F, NEAR = 0.14F;
     static final float[] TINT = {1.0F, 0.93F, 0.78F};
     static final double SEE_RANGE = 64.0;
 
