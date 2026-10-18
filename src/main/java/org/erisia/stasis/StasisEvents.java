@@ -15,7 +15,10 @@ public final class StasisEvents {
         // a mob killed in stopped land still finishes dying (else it lies there forever at 0 health: Baughn's pigs)
         if (e.getEntity() instanceof net.minecraft.world.entity.LivingEntity le && le.isDeadOrDying()) return;
         boolean frozen = Stasis.isFrozen(e.getEntity());
-        if (frozen) e.setCanceled(true);
+        if (frozen) {
+            e.setCanceled(true);
+            leashed(e.getEntity());
+        }
         // (tell the client, which then holds it still: no guessing, no judder)
         var en = e.getEntity();
         if (!en.level().isClientSide() && !(en instanceof net.minecraft.world.entity.player.Player)
@@ -42,6 +45,23 @@ public final class StasisEvents {
             PUSHING.set(false);
         }
         return true;
+    }
+
+    /**
+     * A frozen mob on a lead held by a player is dragged along (λ-Nero: leads should let players drag mobs through
+     * stopped land): the lead's pull for this tick, moved at once, no momentum kept, nothing else of the mob's tick.
+     */
+    static void leashed(net.minecraft.world.entity.Entity en) {
+        if (!(en instanceof net.minecraft.world.entity.Leashable l) || !(en.level() instanceof net.minecraft.server.level.ServerLevel level)
+            || !(l.getLeashHolder() instanceof net.minecraft.world.entity.player.Player) || en.isRemoved()) return;
+        net.minecraft.world.entity.Leashable.tickLeash(level, (net.minecraft.world.entity.Entity & net.minecraft.world.entity.Leashable) en);
+        var v = en.getDeltaMovement();
+        if (v.lengthSqr() > 1e-6) {
+            en.setOldPosAndRot();
+            en.move(net.minecraft.world.entity.MoverType.SELF, v);
+            en.needsSync = true;
+        }
+        en.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
     }
 
     /** No natural spawns where time is stopped (chunk generation still places its animals). */

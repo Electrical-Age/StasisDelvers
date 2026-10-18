@@ -131,4 +131,28 @@ public final class StilledLiquids {
         level.playSound(null, pos, net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_BREAK, net.minecraft.sounds.SoundSource.BLOCKS, 0.8f, lava ? 0.6f : 1.3f);
         return true;
     }
+
+    /**
+     * In stopped land water and lava are solid, but the crosshair passes through them, so a block couldn't be placed
+     * against them (λ-Nero: players got stuck in holes dug into stilled water). A block item used at a stopped liquid
+     * goes into the space in front of the face aimed at, as against any block.
+     */
+    static void placeAgainst(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickItem e) {
+        var p = e.getEntity();
+        ItemStack stack = e.getItemStack();
+        if (!(stack.getItem() instanceof net.minecraft.world.item.BlockItem bi)) return;
+        var hit = Item.getPlayerPOVHitResult(p.level(), p, ClipContext.Fluid.ANY);
+        if (hit.getType() != HitResult.Type.BLOCK) return;
+        BlockPos at = hit.getBlockPos();
+        if (!(p.level().getBlockState(at).getBlock() instanceof LiquidBlock) || Stasis.isRunning(p.level(), at)) return;
+        if (p.distanceToSqr(hit.getLocation()) > p.blockInteractionRange() * p.blockInteractionRange()) return;
+        e.setCanceled(true);
+        if (p.level().isClientSide()) {
+            e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
+            return;
+        }
+        var front = new net.minecraft.world.phys.BlockHitResult(hit.getLocation(), hit.getDirection(), at.relative(hit.getDirection()), false);
+        var r = bi.place(new net.minecraft.world.item.context.BlockPlaceContext(p, e.getHand(), stack, front));
+        e.setCancellationResult(r);
+    }
 }

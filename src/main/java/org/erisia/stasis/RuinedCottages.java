@@ -102,6 +102,17 @@ public final class RuinedCottages {
             if (top != land) return Optional.empty();   // (water over it: dry land only)
             Identifier id = ts.get(context.random().nextInt(ts.size()));
             Rotation rot = Rotation.getRandom(context.random());
+            // flat, dry ground under the whole footprint (Baughn: not on hillsides, not under water): its corners and
+            // edge midpoints within 2 blocks of the centre's height, none under water
+            var fp = context.structureTemplateManager().getOrCreate(id).getSize(rot);
+            int hx = fp.getX() / 2, hz = fp.getZ() / 2;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++) {
+                    int sx = x + dx * hx, sz = z + dz * hz;
+                    int t = gen.getFirstOccupiedHeight(sx, sz, Heightmap.Types.WORLD_SURFACE_WG, context.heightAccessor(), context.randomState());
+                    int l = gen.getFirstOccupiedHeight(sx, sz, Heightmap.Types.OCEAN_FLOOR_WG, context.heightAccessor(), context.randomState());
+                    if (t != l || Math.abs(t - top) > 2) return Optional.empty();
+                }
             return Optional.of(new GenerationStub(new BlockPos(x, top, z), b -> {
                 var t = context.structureTemplateManager().getOrCreate(id);
                 var size = t.getSize(rot);

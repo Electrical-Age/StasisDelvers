@@ -186,6 +186,39 @@ public final class StasisGameTests {
             };
         }));
         // Baughn: mobs avoid stopped land: a step into it costs (a running mob's path), inside it doesn't
+        // λ-Nero: blocks go against stopped water (the crosshair passes through it), so a hole in it isn't a trap
+        CASES.put("place_against_stopped_water", new Spec(2, (h, c) -> {
+            BlockPos w = new BlockPos(12, 1, 4);
+            h.setBlock(w, Blocks.WATER);
+            var player = h.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+            Vec3 eye = h.absoluteVec(new Vec3(12.5, 1.5, 7.5));
+            player.setPos(eye.x, eye.y - player.getEyeHeight(), eye.z);
+            player.setYRot(180);   // (facing north, -z: at the water's south face)
+            player.setXRot(0);
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.COBBLESTONE, 4));
+            var r = net.neoforged.neoforge.common.CommonHooks.onItemRightClick(player, net.minecraft.world.InteractionHand.MAIN_HAND);
+            return () -> c.check("cobblestone went in front of the water's face", h.getBlockState(w.south()).is(Blocks.COBBLESTONE)
+                && h.getBlockState(w).is(Blocks.WATER), r + " " + h.getBlockState(w.south()) + " / " + h.getBlockState(w));
+        }));
+        // λ-Nero: a lead lets a player drag a mob through stopped land (frozen, it moves only by the lead's pull)
+        CASES.put("lead_drags_frozen_mob", new Spec(40, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 p = h.absoluteVec(new Vec3(14.5, 1.0, 4.5));
+            var cow = new net.minecraft.world.entity.animal.cow.Cow(net.minecraft.world.entity.EntityTypes.COW, level);
+            cow.setPos(p.x, p.y, p.z);
+            level.addFreshEntity(cow);
+            var player = h.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+            Vec3 pp = h.absoluteVec(new Vec3(6.5, 1.0, 4.5));
+            player.setPos(pp.x, pp.y, pp.z);
+            cow.setLeashedTo(player, true);
+            double x0 = cow.getX();
+            return () -> {
+                c.check("the leashed cow was dragged towards the player", cow.getX() < x0 - 1, String.format("%.2f -> %.2f", x0 - p.x + 14.5, cow.getX() - p.x + 14.5));
+                c.check("frozen, it keeps no momentum", cow.getX() < h.absoluteVec(new Vec3(7, 0, 0)).x
+                    || cow.getDeltaMovement().horizontalDistanceSqr() < 1e-6, cow.getDeltaMovement().toString());
+                cow.discard();
+            };
+        }));
         CASES.put("mobs_avoid_stopped_land", new Spec(5, (h, c) -> {
             ServerLevel level = h.getLevel();
             Vec3 p = h.absoluteVec(new Vec3(3.5, 1.0, 4.5));
