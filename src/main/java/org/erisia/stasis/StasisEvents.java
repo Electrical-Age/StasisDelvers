@@ -7,14 +7,36 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 /** Entity ticks and natural spawning, where NeoForge has events for them. */
-final class StasisEvents {
+public final class StasisEvents {
     private StasisEvents() {
     }
 
     static void entityTick(EntityTickEvent.Pre e) {
         // a mob killed in stopped land still finishes dying (else it lies there forever at 0 health: Baughn's pigs)
         if (e.getEntity() instanceof net.minecraft.world.entity.LivingEntity le && le.isDeadOrDying()) return;
-        if (Stasis.isFrozen(e.getEntity())) e.setCanceled(true);
+        boolean frozen = Stasis.isFrozen(e.getEntity());
+        if (frozen) e.setCanceled(true);
+        // (tell the client, which then holds it still: no guessing, no judder)
+        var en = e.getEntity();
+        if (!en.level().isClientSide() && !(en instanceof net.minecraft.world.entity.player.Player)
+            && en.getData(StasisRegistry.FROZEN.get()) != frozen) en.setData(StasisRegistry.FROZEN.get(), frozen);
+    }
+
+    /** A frozen entity being pushed (by a furnace cart, a player walking into it, an explosion) moves as far as one tick
+     *  of that push takes it, and keeps no momentum (λ-Nero: carts at the border blocked furnace carts; Baughn). */
+    private static final ThreadLocal<Boolean> PUSHING = ThreadLocal.withInitial(() -> false);
+
+    public static boolean pushFrozen(net.minecraft.world.entity.Entity en, double x, double y, double z) {
+        if (en.level().isClientSide() || PUSHING.get() || !Stasis.isFrozen(en) || en.isRemoved()) return false;
+        PUSHING.set(true);
+        try {
+            en.setDeltaMovement(x, y, z);
+            en.tick();
+            en.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        } finally {
+            PUSHING.set(false);
+        }
+        return true;
     }
 
     /** No natural spawns where time is stopped (chunk generation still places its animals). */

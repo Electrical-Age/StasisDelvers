@@ -18,7 +18,10 @@
     "StructureTemplateMixin",
     "SpawnUseMixin",
     "SpawnUseGameModeMixin",
-    "BucketItemMixin"
+    "BucketItemMixin",
+    "EntityPushMixin",
+    "PathfindingContextMixin",
+    "WalkNodeEvaluatorMixin"
   ],
   "client": [
     "client.GameRendererMixin",

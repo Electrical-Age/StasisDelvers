@@ -195,7 +195,17 @@ public final class StasisRegistry {
     public static final ResourceKey<DamageType> FROZEN_IN_TIME =
         ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "frozen_in_time"));
 
+    /**
+     * Entities held still in stopped land, as the server sees it, sent to the client (Baughn: frozen items juddered and
+     * ender pearls became stuck streaks: the client guessed differently). The client holds them exactly still.
+     */
+    static final DeferredRegister<net.neoforged.neoforge.attachment.AttachmentType<?>> ATTACHMENTS =
+        DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.ATTACHMENT_TYPES, StasisDelvers.MODID);
+    public static final java.util.function.Supplier<net.neoforged.neoforge.attachment.AttachmentType<Boolean>> FROZEN = ATTACHMENTS.register("frozen",
+        () -> net.neoforged.neoforge.attachment.AttachmentType.builder(() -> false).sync(net.minecraft.network.codec.ByteBufCodecs.BOOL).build());
+
     static void register(IEventBus modBus) {
+        ATTACHMENTS.register(modBus);
         ENTITY_TYPES.register(modBus);
         FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);

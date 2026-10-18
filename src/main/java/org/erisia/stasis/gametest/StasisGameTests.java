@@ -135,6 +135,43 @@ public final class StasisGameTests {
                 c.check("outside: the item hangs where it was", out.getY() == outY, String.format("%.2f -> %.2f", outY, out.getY()));
             };
         }));
+        // λ-Nero/Baughn: a furnace cart inside a field pushes a cart frozen at the border out (one tick's worth per push,
+        // no momentum kept)
+        CASES.put("furnace_cart_pushes_frozen_cart", new Spec(100, (h, c) -> {
+            for (int x = 1; x <= 15; x++) h.setBlock(new BlockPos(x, 1, 4), Blocks.RAIL);
+            ServerLevel level = h.getLevel();
+            Vec3 cp = h.absoluteVec(new Vec3(7.3, 1.1, 4.5));   // (just past the border, in the first stopped block: frozen)
+            var cart = new net.minecraft.world.entity.vehicle.minecart.Minecart(net.minecraft.world.entity.EntityTypes.MINECART, level);
+            cart.setPos(cp.x, cp.y, cp.z);
+            level.addFreshEntity(cart);
+            Vec3 fp = h.absoluteVec(new Vec3(4.5, 1.1, 4.5));
+            var furnace = new net.minecraft.world.entity.vehicle.minecart.MinecartFurnace(net.minecraft.world.entity.EntityTypes.FURNACE_MINECART, level);
+            furnace.setPos(fp.x, fp.y, fp.z);
+            level.addFreshEntity(furnace);
+            furnace.addFuel(fp.add(-1, 0, 0), new ItemStack(Items.COAL));
+            double x0 = cart.getX();
+            return () -> {
+                c.check("the frozen cart was pushed out (east)", cart.getX() > x0 + 0.5, String.format("%.2f -> %.2f; the furnace cart at %.2f, fuel push %s", x0, cart.getX(), furnace.getX(), furnace.push));
+                c.check("it keeps no momentum", cart.getDeltaMovement().horizontalDistanceSqr() < 1e-6, cart.getDeltaMovement().toString());
+                c.check("the server marks it frozen for the client", cart.getData(org.erisia.stasis.StasisRegistry.FROZEN.get()), "");
+            };
+        }));
+        // Baughn: mobs avoid stopped land: a step into it costs (a running mob's path), inside it doesn't
+        CASES.put("mobs_avoid_stopped_land", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 p = h.absoluteVec(new Vec3(3.5, 1.0, 4.5));
+            var cow = new net.minecraft.world.entity.animal.cow.Cow(net.minecraft.world.entity.EntityTypes.COW, level);
+            cow.setPos(p.x, p.y, p.z);
+            level.addFreshEntity(cow);
+            var ctx = new net.minecraft.world.level.pathfinder.PathfindingContext(level, cow);
+            var in = net.minecraft.world.level.pathfinder.WalkNodeEvaluator.getPathTypeStatic(ctx, h.absolutePos(new BlockPos(4, 1, 4)).mutable());
+            var out = net.minecraft.world.level.pathfinder.WalkNodeEvaluator.getPathTypeStatic(ctx, h.absolutePos(new BlockPos(13, 1, 4)).mutable());
+            return () -> {
+                c.check("inside: plain walkable", in == net.minecraft.world.level.pathfinder.PathType.WALKABLE, in.toString());
+                c.check("outside: costly", out == net.minecraft.world.level.pathfinder.PathType.DAMAGING_IN_NEIGHBOR, out.toString());
+                cow.discard();
+            };
+        }));
         // block entities
         CASES.put("furnace_burns_only_inside", new Spec(20, (h, c) -> {
             FurnaceBlockEntity in = furnace(h, new BlockPos(3, 1, 4)), out = furnace(h, new BlockPos(12, 1, 4));

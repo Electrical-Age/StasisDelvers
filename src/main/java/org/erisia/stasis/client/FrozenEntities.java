@@ -18,13 +18,20 @@ public final class FrozenEntities {
     static void tick(EntityTickEvent.Pre e) {
         Entity en = e.getEntity();
         if (!en.level().isClientSide() || en instanceof Player) return;
-        if (frozen(en)) e.setCanceled(true);
+        if (!frozen(en)) return;
+        e.setCanceled(true);
+        // held exactly still (no lerp between an old and a new position every frame: the judder and the pearl streaks);
+        // a move the server makes (a push) still comes through, one tick's worth
+        en.setOldPosAndRot();
+        en.getInterpolation().interpolate();
     }
 
-    /** Is this client-side entity in stopped land (whole-block rule, no eddies: they mustn't flicker)? */
+    /** Is this client-side entity frozen: as the server says (StasisRegistry.FROZEN), else in stopped land by the
+     *  whole-block rule without eddies (they mustn't flicker)? */
     public static boolean frozen(Entity en) {
         var level = Minecraft.getInstance().level;
         if (level == null || en.level() != level || en instanceof Player || !Stasis.stops(level)) return false;
+        if (en.hasData(org.erisia.stasis.StasisRegistry.FROZEN.get())) return en.getData(org.erisia.stasis.StasisRegistry.FROZEN.get());
         return !Stasis.isRunningSteady(level, en.blockPosition());
     }
 }
