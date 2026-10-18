@@ -71,6 +71,12 @@ public final class SpawnCottage {
         int[] site = findSite(level, around.getX() - size.getX() / 2, around.getZ() - size.getZ() / 2, size.getX(), size.getZ());
         BlockPos origin = new BlockPos(site[0], site[2] - ground, site[1]);
         // what was there: the surface round the site, for the blend (before the template changes it)
+        // every chunk round the site generated first, a chunk beyond the blend too: an unloaded chunk's height reads as the
+        // bottom of the world (a trench all round, in the lab), and a neighbour generated later puts its features and
+        // terrain edge into the placed site (a stone ridge through the east edge)
+        int margin = BLEND + 32;
+        for (int cx = (origin.getX() - margin) >> 4; cx <= (origin.getX() + size.getX() + margin) >> 4; cx++)
+            for (int cz = (origin.getZ() - margin) >> 4; cz <= (origin.getZ() + size.getZ() + margin) >> 4; cz++) level.getChunk(cx, cz);
         StructurePlaceSettings settings = new StructurePlaceSettings();
         t.placeInWorld(level, origin, origin, settings, RandomSource.create(0), net.minecraft.world.level.block.Block.UPDATE_ALL);
         // the template's top is above the ground; terrain higher than it inside the footprint goes
@@ -128,7 +134,7 @@ public final class SpawnCottage {
 
     static boolean goodBiome(ServerLevel level, int x, int y, int z) {
         var b = level.getUncachedNoiseBiome(x >> 2, y >> 2, z >> 2);
-        return b.is(net.minecraft.tags.BiomeTags.IS_FOREST) || b.is(net.minecraft.world.level.biome.Biomes.PLAINS)
+        return b.is(net.minecraft.tags.BiomeTags.IS_FOREST) || b.is(net.minecraft.tags.BiomeTags.IS_TAIGA) || b.is(net.minecraft.world.level.biome.Biomes.PLAINS)
             || b.is(net.minecraft.world.level.biome.Biomes.SUNFLOWER_PLAINS) || b.is(net.minecraft.world.level.biome.Biomes.MEADOW);
     }
 
@@ -194,6 +200,7 @@ public final class SpawnCottage {
      */
     static void blend(ServerLevel level, BlockPos origin, int w, int d, int siteY) {
         int n = w + 2 * BLEND, m = d + 2 * BLEND;
+
         int[][] land = new int[n][m];
         double[][] target = new double[n][m];
         boolean[][] ring = new boolean[n][m];
