@@ -29,10 +29,18 @@ public class MinimapHighlighter extends ChunkHighlighter {
         return resultStore;
     }
 
+    /**
+     * The line is about the block the player stands on: Xaero passes block coordinates here and chunk coordinates to
+     * addChunkHighlightTooltips (it shifted them; we read the chunk numbers as blocks, so the line answered for a
+     * spot far away: λ-Nero and AdventurAgent saw it disagree with the field).
+     */
     @Override
-    public void addChunkHighlightTooltips(InfoDisplayCompiler compiler, ResourceKey<Level> dim, int x, int z, int width) {
-        // the chunk's centre decides its tint, but the line is about where the player stands (AdventurAgent: it said
-        // "Time stopped" in a small field whose chunk centre was outside)
-        if (StoppedLand.stoppedAt(dim, x, z)) compiler.addLine(Component.literal("Time stopped"));
+    public void addBlockHighlightTooltips(InfoDisplayCompiler compiler, ResourceKey<Level> dim, int blockX, int blockZ, int width) {
+        if (StoppedLand.stoppedAt(dim, blockX, blockZ)) compiler.addLine(Component.literal("Time stopped"));
+    }
+
+    @Override
+    public void addChunkHighlightTooltips(InfoDisplayCompiler compiler, ResourceKey<Level> dim, int chunkX, int chunkZ, int width) {
+        // (unused: addBlockHighlightTooltips answers for the player's block)
     }
 }

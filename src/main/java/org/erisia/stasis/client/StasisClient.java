@@ -60,6 +60,15 @@ public final class StasisClient {
             e.setSwingHand(true);
             net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new org.erisia.stasis.StasisNet.DigStilled());
         });
+        // ... and holding the button keeps digging, a block every 5 ticks (Baughn: on the ocean it took one only; the key
+        // event fires per click, and vanilla's held attack goes to blocks the crosshair hits, not the fluid)
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.player == null || mc.level == null || mc.gui.screen() != null || !mc.options.keyAttack.isDown()) return;
+            if (mc.level.getGameTime() - lastDig < 5 || !org.erisia.stasis.StilledLiquids.clientDig(mc.player)) return;
+            lastDig = mc.level.getGameTime();
+            net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new org.erisia.stasis.StasisNet.DigStilled());
+        });
         // the generated towers (P3d): meshes built off-thread, kept in GPU buffers, drawn after opaque terrain
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterRenderPipelinesEvent.class, TowerRenderer::registerPipelines);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.PrepareRenderBuffersEvent.class, TowerRenderer::prepare);
