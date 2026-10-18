@@ -171,6 +171,22 @@ final class StasisCommands {
                         + Ruins.describe(level, sd) + (DeepFeature.messiness(sd) > 0 ? String.format(", messy %.2f", DeepFeature.messiness(sd)) : "")), false);
                 return list.size();
             }))
+            // a structure template from the world, saved to disk at once (structure blocks only save to disk from their
+            // screen): world/generated/stasisdelvers/structure/<name>.nbt (the spawn site, Baughn 2026-10-18)
+            .then(Commands.literal("savetemplate").then(Commands.argument("from", BlockPosArgument.blockPos())
+                .then(Commands.argument("to", BlockPosArgument.blockPos()).then(Commands.argument("name", com.mojang.brigadier.arguments.StringArgumentType.word())
+                    .executes(c -> {
+                        BlockPos a = BlockPosArgument.getLoadedBlockPos(c, "from"), b = BlockPosArgument.getLoadedBlockPos(c, "to");
+                        BlockPos lo = new BlockPos(Math.min(a.getX(), b.getX()), Math.min(a.getY(), b.getY()), Math.min(a.getZ(), b.getZ()));
+                        var size = new net.minecraft.core.Vec3i(Math.abs(a.getX() - b.getX()) + 1, Math.abs(a.getY() - b.getY()) + 1, Math.abs(a.getZ() - b.getZ()) + 1);
+                        var id = net.minecraft.resources.Identifier.fromNamespaceAndPath(StasisDelvers.MODID, com.mojang.brigadier.arguments.StringArgumentType.getString(c, "name"));
+                        var mgr = c.getSource().getLevel().getStructureTemplateManager();
+                        var t = mgr.getOrCreate(id);
+                        t.fillFromWorld(c.getSource().getLevel(), lo, size, true, java.util.List.of(net.minecraft.world.level.block.Blocks.STRUCTURE_VOID));
+                        boolean ok = mgr.save(id);
+                        c.getSource().sendSuccess(() -> Component.literal("template " + id + " " + size.toShortString() + (ok ? " saved" : " NOT saved")), false);
+                        return ok ? 1 : 0;
+                    })))))
             .then(Commands.literal("strata").executes(c -> {
                 // what the strata is here (each static deep nearby), and the worldgen time spent on rift chunks
                 var src = c.getSource();
