@@ -40,5 +40,15 @@ public final class StarterKit {
             if (p.getItemBySlot(slots[i]).isEmpty()) p.setItemSlot(slots[i], st);
             else p.getInventory().placeItemBackInInventory(st, net.minecraft.util.Prediction.SERVER_ONLY);   // (dropped if the inventory is full)
         }
+        // and a charged small flashlight (Baughn: torches don't burn where time stands still)
+        var d = mods.eln.Eln.sharedItemStackOne.getDescriptor(FLASHLIGHT);
+        if (d != null) {
+            ItemStack fl = d.newItemStack();
+            if (d instanceof IItemEnergyBattery b) b.setEnergy(fl, b.getEnergyMax(fl));
+            p.getInventory().placeItemBackInInventory(fl, net.minecraft.util.Prediction.SERVER_ONLY);
+        }
     }
+
+    /** EA's Small Flashlight (1.12 id: sub 0 of electrical tools, 121). */
+    static final int FLASHLIGHT = 7744;
 }

@@ -364,7 +364,7 @@ public final class StasisGameTests {
                 double full = org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
                 c.check("the suit drew power (10 W per piece)", e < full && e > full - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
                 c.check("a full Delver suit lasts 30 minutes (Baughn)", Math.abs(full - 10 * 60 * 30) < 1e-6, full + " J");
-                c.check("suited in stopped land: Mining Fatigue I", p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
+                c.check("a full suit: no Mining Fatigue (Baughn)", !p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
                 remove(h, p);
             };
         }));
@@ -387,6 +387,7 @@ public final class StasisGameTests {
             double full = item.getEnergy(chest);
             return () -> {
                 c.check("a chest piece alone: no freezing in the plain Grey", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                c.check("but digging is slow (Mining Fatigue I: a full suit takes it away)", p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
                 double used = full - item.getEnergy(chest), perPiece = item.stasisDraw(chest) * 130 / 20.0;
                 c.check("it draws for the whole suit (4 pieces' worth)", used > 3.8 * perPiece && used < 4.3 * perPiece,
                     String.format("%.1f J, one piece's share %.1f J", used, perPiece));

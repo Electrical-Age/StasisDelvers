@@ -40,7 +40,7 @@ public final class SpawnCottage {
         if (template.isEmpty()) return;
         data.markCottage();
         BlockPos spawn = level.getRespawnData().pos();
-        place(level, template.get(), spawn);
+        place(level, template.get(), spawn, eln(level));
     }
 
     /** The EA data shipped with the template, or null. */
@@ -61,8 +61,12 @@ public final class SpawnCottage {
      * generated surface over the footprint and its blend ring varies by at most 3 blocks and is dry.
      */
     public static BlockPos place(ServerLevel level, StructureTemplate t, BlockPos around) {
+        return place(level, t, around, null);
+    }
+
+    /** eln: the EA data that goes with the template (eln()), or null. */
+    public static BlockPos place(ServerLevel level, StructureTemplate t, BlockPos around, CompoundTag eln) {
         var size = t.getSize();
-        CompoundTag eln = eln(level);
         int ground = eln != null && eln.contains("ground") ? eln.getIntOr("ground", 0) : 0;
         int[] site = findSite(level, around.getX() - size.getX() / 2, around.getZ() - size.getZ() / 2, size.getX(), size.getZ());
         BlockPos origin = new BlockPos(site[0], site[2] - ground, site[1]);

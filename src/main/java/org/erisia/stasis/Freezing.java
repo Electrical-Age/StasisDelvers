@@ -132,7 +132,7 @@ public final class Freezing {
             }
         } else s.ticks = Math.max(0, s.ticks - 3);
         // a suited player digs slowly in stopped land (Mining Fatigue I; the EA mining drill ignores it: onBreakSpeed)
-        if (stopped && suited && !p.isCreative() && !p.isSpectator()) {
+        if (stopped && suited && !p.isCreative() && !p.isSpectator() && Suits.missing(p) > 0) {   // (a full set: none, Baughn)
             var fatigue = p.getEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE);
             if (fatigue == null || fatigue.getDuration() < 20)
                 p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MINING_FATIGUE, 40, 0, true, true));

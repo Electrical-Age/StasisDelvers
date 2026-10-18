@@ -3,7 +3,7 @@
 
 // Stasis Delvers: flashlight beams (EA flashlights), drawn per pixel so they follow the view with no lag (Baughn).
 // Data in a 128x1 texture of packed floats (FlashlightPost.java): [0..15] inverse(projection * view rotation);
-// [16] beam count; [17] strength; [18..20] tint; [21] near cut (m: the hand's depth is merged into the main buffer);
+// [16] beam count; [17] strength; [18..20] tint; [21] near cut (m, faded in over 0.2: the hand's depth is merged into the main buffer);
 // [24 + 9i ..] beam i: origin - camera (3), direction (3), length (blocks: the falloff), cos of the cone's half
 // angle, cut (blocks: where the beam ends, just past the first block it hits; = length if nothing).
 // The scene's albedo isn't known here, so the beam multiplies what is there, guarded by luminance: dark surfaces
@@ -39,7 +39,10 @@ void main() {
                     data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
     vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
     vec3 p = h.xyz / h.w;                                   // world position minus the camera
-    if (length(p) < data(21)) {
+    // the near cut (the hand is merged into the depth buffer): faded in over 0.2 m, so a wall right in front isn't
+    // cut out in a hard circle
+    float nearFade = smoothstep(data(21), data(21) + 0.2, length(p));
+    if (nearFade <= 0.0) {
         fragColor = vec4(c, 1.0);
         return;
     }
@@ -65,7 +68,7 @@ void main() {
         light += cone * fall * lambert;
     }
     float lum = dot(c, vec3(0.299, 0.587, 0.114));
-    float gain = data(17) * light * (1.0 - smoothstep(0.05, 0.6, lum));
+    float gain = data(17) * light * nearFade * (1.0 - smoothstep(0.05, 0.6, lum));
     vec3 tint = vec3(data(18), data(19), data(20));
     fragColor = vec4(min(c * (1.0 + gain * tint), vec3(1.0)), 1.0);
 }
