@@ -77,8 +77,16 @@ public final class NodeFreezer {
     static boolean infrastructure(NodeBase n) {
         if (n instanceof EnergyConverterElnToOtherNode || n instanceof TowerSignalNode) return true;
         if (n instanceof TransparentNode t) return t.element instanceof BatteryElement;
+        // EA voxel blocks: their cables are wiring; anything else in them (pipes) isn't (yet)
+        boolean anyPart = false;
+        if (n instanceof mods.eln.node.voxel.VoxelNode v) {
+            for (var p : v.parts) {
+                if (!(p instanceof mods.eln.node.voxel.CablePart)) return false;
+                anyPart = true;
+            }
+        }
         if (n instanceof SixNode s) {
-            boolean any = false;
+            boolean any = anyPart;
             for (SixNodeElement el : s.sideElementList) {
                 if (el == null) continue;
                 // wiring: cables, and the passive line parts in them (switches, relays, fuses, diodes, ground)
