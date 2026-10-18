@@ -26,6 +26,12 @@ float data(int i) {
     return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
 }
 
+// world position minus the camera of the pixel at uv (from the depth buffer)
+vec3 worldAt(mat4 inv, vec2 uv) {
+    vec4 h = inv * vec4(uv * 2.0 - 1.0, texture(DepthSampler, uv).r, 1.0);
+    return h.xyz / h.w;
+}
+
 void main() {
     vec3 c = texture(InSampler, texCoord).rgb;
     float depth = texture(DepthSampler, texCoord).r;
@@ -46,8 +52,14 @@ void main() {
         fragColor = vec4(c, 1.0);
         return;
     }
-    // the surface normal from the neighbouring pixels' positions (facing the camera)
-    vec3 nrm = cross(dFdx(p), dFdy(p));
+    // the surface normal from the neighbouring pixels' positions, each axis from the side whose depth is closer (Baughn:
+    // dFdx/dFdy mixed two planes at every corner, a bright or dark line along each, plain in a 1-wide corridor)
+    vec2 px = 1.0 / InSize;
+    vec3 pr = worldAt(inv, texCoord + vec2(px.x, 0.0)), pl = worldAt(inv, texCoord - vec2(px.x, 0.0));
+    vec3 pu = worldAt(inv, texCoord + vec2(0.0, px.y)), pd = worldAt(inv, texCoord - vec2(0.0, px.y));
+    vec3 dx = length(pr - p) < length(p - pl) ? pr - p : p - pl;
+    vec3 dy = length(pu - p) < length(p - pd) ? pu - p : p - pd;
+    vec3 nrm = cross(dx, dy);
     float nl = length(nrm);
     nrm = nl > 1e-6 ? nrm / nl : -normalize(p);
     if (dot(nrm, p) > 0.0) nrm = -nrm;
