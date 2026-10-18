@@ -51,8 +51,8 @@ public final class GateRoom {
             var fields = FieldData.get(level).fields();
             if (fields.isEmpty()) continue;
             for (Field f : fields) {
-                var box = new net.minecraft.world.phys.AABB(f.x() - f.radius(), f.y() - f.radius(), f.z() - f.radius(),
-                    f.x() + f.radius(), f.y() + f.radius(), f.z() + f.radius());
+                var box = new net.minecraft.world.phys.AABB(f.minX(), f.y() - f.radius(), f.minZ(),
+                    f.maxX(), f.y() + f.radius(), f.maxZ());
                 // (tagged, or untagged but beside a gate rift: rooms made before the tag existed, AdventurAgent)
                 int seed = Deeps.seed(level);
                 for (Display.BlockDisplay d : level.getEntitiesOfClass(Display.BlockDisplay.class, box, x -> x.entityTags().contains(DEBRIS)

@@ -4,7 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 /**
- * A stasis field: a sphere where time runs. A block is inside only if all of it is (Baughn: a block the boundary
+ * A stasis field: a sphere (stretched by a tower's booms: Stretch) where time runs. A block is inside only if all of it is (Baughn: a block the boundary
  * cuts through counts as outside), so the test uses the block's corner farthest from the centre.
  * <p>
  * failing (0..1): how far the shield has failed while its tower runs short of power (visual only). collapse (0..1):
@@ -16,7 +16,33 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * field at StasisConfig.towerFieldRate.
  */
 public record Field(int id, double x, double y, double z, double radius, double failing, double collapse, boolean column,
-                    double rate, int seed, long formedAt, double amber, double dropout, double side) {
+                    double rate, int seed, long formedAt, double amber, double dropout, double side, Stretch stretch) {
+    /**
+     * How far the field reaches each way along the ground, as multiples of radius (Baughn: a tower's booms stretch its
+     * field towards their side, notes/tower/PLAN-stretch.md): east (+x), south (+z), west (-x), north (-z); up and down
+     * stay at radius. The shape is an ellipsoid in quarters: (dx/ax)^2 + (dy/r)^2 + (dz/az)^2 <= 1 with ax the east or
+     * west reach by the side dx is on (and z alike). The quarters meet with the same section and a vertical tangent,
+     * so the surface has no crease, and it is convex.
+     */
+    public record Stretch(double e, double s, double w, double n) {
+        public static final Stretch ONE = new Stretch(1, 1, 1, 1);
+        public static final Codec<Stretch> CODEC = Codec.DOUBLE.listOf(4, 4).xmap(
+            l -> new Stretch(l.get(0), l.get(1), l.get(2), l.get(3)), t -> java.util.List.of(t.e, t.s, t.w, t.n));
+
+        public double max() {
+            return Math.max(Math.max(e, s), Math.max(w, n));
+        }
+
+        public boolean isOne() {
+            return e == 1 && s == 1 && w == 1 && n == 1;
+        }
+
+        /** Does any side reach less far than in o? */
+        public boolean lessThan(Stretch o) {
+            return e < o.e || s < o.s || w < o.w || n < o.n;
+        }
+    }
+
     public static final Codec<Field> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.INT.fieldOf("id").forGetter(Field::id),
         Codec.DOUBLE.fieldOf("x").forGetter(Field::x),
@@ -31,42 +57,43 @@ public record Field(int id, double x, double y, double z, double radius, double 
         Codec.LONG.optionalFieldOf("formed_at", 0L).forGetter(Field::formedAt),
         Codec.DOUBLE.optionalFieldOf("amber", 0.0).forGetter(Field::amber),
         Codec.DOUBLE.optionalFieldOf("dropout", 0.0).forGetter(Field::dropout),
-        Codec.DOUBLE.optionalFieldOf("side", 0.0).forGetter(Field::side)
+        Codec.DOUBLE.optionalFieldOf("side", 0.0).forGetter(Field::side),
+        Stretch.CODEC.optionalFieldOf("stretch", Stretch.ONE).forGetter(Field::stretch)
     ).apply(i, Field::new));
 
     public Field(int id, double x, double y, double z, double radius) {
-        this(id, x, y, z, radius, 0, 0, false, 1.0, 0, 0, 0, 0, 0);
+        this(id, x, y, z, radius, 0, 0, false, 1.0, 0, 0, 0, 0, 0, Stretch.ONE);
     }
 
     /** column: a vertical cylinder from the bottom of the world to the top (λ-Nero's test variant). */
     public Field(int id, double x, double y, double z, double radius, boolean column) {
-        this(id, x, y, z, radius, 0, 0, column, 1.0, 0, 0, 0, 0, 0);
+        this(id, x, y, z, radius, 0, 0, column, 1.0, 0, 0, 0, 0, 0, Stretch.ONE);
     }
 
     public Field withRadius(double r) {
-        return new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formedAt, amber, dropout, side);
+        return new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formedAt, amber, dropout, side, stretch);
     }
 
     public Field withFailing(double f) {
-        return new Field(id, x, y, z, radius, f, collapse, column, rate, seed, formedAt, amber, dropout, side);
+        return new Field(id, x, y, z, radius, f, collapse, column, rate, seed, formedAt, amber, dropout, side, stretch);
     }
 
     public Field withCollapse(double c) {
-        return new Field(id, x, y, z, radius, failing, c, column, rate, seed, formedAt, amber, dropout, side);
+        return new Field(id, x, y, z, radius, failing, c, column, rate, seed, formedAt, amber, dropout, side, stretch);
     }
 
     public Field withRate(double r) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, clampRate(r), seed, formedAt, amber, dropout, side);
+        return new Field(id, x, y, z, radius, failing, collapse, column, clampRate(r), seed, formedAt, amber, dropout, side, stretch);
     }
 
     /** Formed at this game time: clients animate the start-up (towers only; 0 = no animation). */
     public Field withFormedAt(long t) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, t, amber, dropout, side);
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, t, amber, dropout, side, stretch);
     }
 
     /** A new seed (24 bits: the shader gets it as an exact float): a fresh pattern, e.g. for a collapse. */
     public Field withSeed(int s) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, rate, s & 0xFFFFFF, formedAt, amber, dropout, side);
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, s & 0xFFFFFF, formedAt, amber, dropout, side, stretch);
     }
 
     /**
@@ -75,7 +102,64 @@ public record Field(int id, double x, double y, double z, double radius, double 
      * towards. In a collapse, dropout is held at its value when the store ran out.
      */
     public Field withShield(double a, double d, double sd) {
-        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, formedAt, a, d, sd);
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, formedAt, a, d, sd, stretch);
+    }
+
+    /** Booms' reach (Stretch; column fields stay round). */
+    public Field withStretch(Stretch st) {
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, formedAt, amber, dropout, side, st);
+    }
+
+    /** Half-axis along x on the side of dx (east if dx >= 0), and along z alike. */
+    public double ax(double dx) {
+        return radius * (column ? 1 : dx >= 0 ? stretch.e : stretch.w);
+    }
+
+    public double az(double dz) {
+        return radius * (column ? 1 : dz >= 0 ? stretch.s : stretch.n);
+    }
+
+    /** The farthest the field reaches horizontally from its centre (bounds: chunk index, tickets, re-meshing). */
+    public double reach() {
+        return column ? radius : radius * stretch.max();
+    }
+
+    /** The westmost, eastmost, northmost and southmost x/z the field reaches. */
+    public double minX() { return x - (column ? radius : radius * stretch.w); }
+    public double maxX() { return x + (column ? radius : radius * stretch.e); }
+    public double minZ() { return z - (column ? radius : radius * stretch.n); }
+    public double maxZ() { return z + (column ? radius : radius * stretch.s); }
+
+    /** Distance from the centre in units of the field's size: 1 on the surface (the sphere's d / r). */
+    public double norm(double dx, double dy, double dz) {
+        double u = dx / ax(dx), v = column ? 0 : dy / radius, w = dz / az(dz);
+        return Math.sqrt(u * u + v * v + w * w);
+    }
+
+    /** The point at `frac` of the way from the centre to the surface in direction (dx, dy, dz) (any length; samplers,
+     *  bolts). The direction is taken in the unit-sphere space, so 26 directions spread over the stretched shape. */
+    public double[] toward(double dx, double dy, double dz, double frac) {
+        double l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (l == 0) return new double[]{x, y, z};
+        double ux = dx / l, uy = dy / l, uz = dz / l;
+        return new double[]{x + ux * ax(ux) * frac, y + uy * radius * frac, z + uz * az(uz) * frac};
+    }
+
+    /**
+     * The nearest and farthest |coordinate| of the span [a0, a1] on axis (0 x, 1 y, 2 z) from the centre, in units of
+     * the half-axis on that side ({nearest, farthest}; y is 0 for a column field). For conservative box tests.
+     */
+    public double[] normSpan(int axis, double a0, double a1) {
+        if (axis == 1 && column) return new double[]{0, 0};
+        double c = axis == 0 ? x : axis == 1 ? y : z;
+        double u0 = a0 - c, u1 = a1 - c;
+        double v0 = Math.abs(u0) / half(axis, u0), v1 = Math.abs(u1) / half(axis, u1);
+        double near = u0 <= 0 && u1 >= 0 ? 0 : Math.min(v0, v1);
+        return new double[]{near, Math.max(v0, v1)};
+    }
+
+    private double half(int axis, double d) {
+        return axis == 0 ? ax(d) : axis == 1 ? radius : az(d);
     }
 
     /** Field rates live in (0, 1]: a field never stops time (that's the land outside) and never speeds it up. */
@@ -83,20 +167,19 @@ public record Field(int id, double x, double y, double z, double radius, double 
         return Math.max(0.001, Math.min(1.0, r));
     }
 
-    /** True if the whole block at (bx, by, bz) lies inside the sphere (and hasn't stopped in a collapse). */
+    /** True if the whole block at (bx, by, bz) lies inside the field (and hasn't stopped in a collapse). */
     public boolean containsBlock(int bx, int by, int bz) {
         double dx = (bx + 0.5 >= x ? bx + 1 : bx) - x;
         double dy = column ? 0 : (by + 0.5 >= y ? by + 1 : by) - y;
         double dz = (bz + 0.5 >= z ? bz + 1 : bz) - z;
-        double d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 > radius * radius) return false;
-        return collapse <= 0 || !collapsed(bx, by, bz, Math.sqrt(d2));
+        double n = norm(dx, dy, dz);
+        if (n > 1) return false;
+        return collapse <= 0 || !collapsed(bx, by, bz, n);
     }
 
-    /** True if the point is inside the sphere (entities: their feet). */
+    /** True if the point is inside the field (entities: their feet). */
     public boolean containsPoint(double px, double py, double pz) {
-        double dx = px - x, dy = column ? 0 : py - y, dz = pz - z;
-        return dx * dx + dy * dy + dz * dz <= radius * radius;
+        return norm(px - x, column ? 0 : py - y, pz - z) <= 1;
     }
 
     /**
@@ -105,14 +188,17 @@ public record Field(int id, double x, double y, double z, double radius, double 
      * towards the collapse's side (Baughn 2026-10-17). The shield's hexes follow their own rule (stasis.fsh: a collapse
      * ends when half of them are lost, at collapse 0.3-0.5), so the land goes 1.6x as fast here.
      */
-    boolean collapsed(int bx, int by, int bz, double dist) {
-        return 1 - collapseScore(bx, by, bz, dist) < 1.6 * collapse;
+    boolean collapsed(int bx, int by, int bz, double norm) {
+        return 1 - collapseScore(bx, by, bz, norm) < 1.6 * collapse;
     }
 
-    float collapseScore(int bx, int by, int bz, double dist) {
-        float dx = (float) (bx + 0.5 - x), dy = column ? 0 : (float) (by + 0.5 - y), dz = (float) (bz + 0.5 - z);
+    /** norm: the block's far corner's Field.norm. Directions are taken in the unit-sphere space (stretch divided out),
+     *  so tears and the lean follow the stretched shape; stasis.fsh collapseScore mirrors this. */
+    float collapseScore(int bx, int by, int bz, double norm) {
+        double ox = bx + 0.5 - x, oz = bz + 0.5 - z;
+        float dx = (float) (ox / ax(ox) * radius), dy = column ? 0 : (float) (by + 0.5 - y), dz = (float) (oz / az(oz) * radius);
         float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        float score = 0.45f * (float) Math.min(1, dist / radius) + 0.55f * Noise.fbm32(bx / 6f, by / 6f, bz / 6f, seed);
+        float score = 0.45f * (float) Math.min(1, norm) + 0.55f * Noise.fbm32(bx / 6f, by / 6f, bz / 6f, seed);
         if (len > 1e-3f) {
             int tears = 2 + (int) (Noise.hash32(seed, 7, 0, 0) * 3);
             for (int i = 0; i < tears; i++) {

@@ -111,7 +111,7 @@ public final class FieldData extends SavedData {
     }
 
     public Field add(ServerLevel level, double x, double y, double z, double radius, boolean column, double rate) {
-        Field f = new Field(nextId++, x, y, z, radius, 0, 0, column, Field.clampRate(rate), level.getRandom().nextInt() & 0xFFFFFF, 0, 0, 0, 0);
+        Field f = new Field(nextId++, x, y, z, radius, 0, 0, column, Field.clampRate(rate), level.getRandom().nextInt() & 0xFFFFFF, 0, 0, 0, 0, Field.Stretch.ONE);
         fields.add(f);
         changed(level);
         return f;
@@ -124,7 +124,7 @@ public final class FieldData extends SavedData {
                 Field old = fields.get(i);
                 Field f = change.apply(old);
                 if (!f.equals(old)) {
-                    var safe = f.radius() < old.radius() ? Freezing.running(level) : null;
+                    var safe = f.radius() < old.radius() || f.stretch().lessThan(old.stretch()) ? Freezing.running(level) : null;
                     fields.set(i, f);
                     changed(level);
                     if (safe != null) Freezing.graceIfStopped(level, safe);

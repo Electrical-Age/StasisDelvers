@@ -164,8 +164,10 @@ public final class LocalTime {
                 double[] c = FIELDS.get(f.id());
                 if (c == null) continue;
                 double dx = x - f.x(), dy = f.column() ? 0 : y - f.y(), dz = z - f.z();
-                double d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                double w = Math.max(0, Math.min(1, (f.radius() - d) / 3.0)) * (1 - f.collapse());
+                // blocks to the edge, along the line from the centre (stretched fields: Field.norm)
+                double d = Math.sqrt(dx * dx + dy * dy + dz * dz), n = f.norm(dx, dy, dz);
+                double edge = n < 1e-6 ? f.radius() : (1 - n) * d / n;
+                double w = Math.max(0, Math.min(1, edge / 3.0)) * (1 - f.collapse());
                 if (w > best) {
                     best = w;
                     inside = c[0] + (level.getGameTime() - c[2] + partial) * c[1];

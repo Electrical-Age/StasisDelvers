@@ -283,8 +283,8 @@ public final class Flames {
     }
 
     private static void relight(Level level, Field f) {
-        int x0 = (int) Math.floor(f.x() - f.radius()) >> 4, x1 = (int) Math.floor(f.x() + f.radius()) >> 4;
-        int z0 = (int) Math.floor(f.z() - f.radius()) >> 4, z1 = (int) Math.floor(f.z() + f.radius()) >> 4;
+        int x0 = (int) Math.floor(f.minX()) >> 4, x1 = (int) Math.floor(f.maxX()) >> 4;
+        int z0 = (int) Math.floor(f.minZ()) >> 4, z1 = (int) Math.floor(f.maxZ()) >> 4;
         int[] ys = f.column() ? null : new int[]{(int) Math.floor(f.y() - f.radius()), (int) Math.floor(f.y() + f.radius())};
         for (int cx = x0; cx <= x1; cx++)
             for (int cz = z0; cz <= z1; cz++) relightChunk(level, cx, cz, ys);

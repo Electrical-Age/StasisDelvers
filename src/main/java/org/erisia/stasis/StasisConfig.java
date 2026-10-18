@@ -25,6 +25,7 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue TOWER_DRAW_K;
     static final ModConfigSpec.DoubleValue TOWER_STORE_C;
     static final ModConfigSpec.IntValue TOWER_MAX_SEGMENTS;
+    static final ModConfigSpec.DoubleValue TOWER_BOOM_STRETCH;
     static final ModConfigSpec.DoubleValue TOWER_FIELD_RATE;
     static final ModConfigSpec.DoubleValue GUTTER_CHANCE;
     static final ModConfigSpec.BooleanValue DEBUG_MESSAGES;
@@ -72,6 +73,9 @@ public final class StasisConfig {
             .defineInRange("towerStoreC", 306.25, 1.0, 1e9);
         TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 4 * (segments + 2)).")
             .defineInRange("towerMaxSegments", 30, 0, 254);
+        TOWER_BOOM_STRETCH = b.comment("How far a tower's booms stretch its field towards their side: that side reaches",
+                "r * (1 + k * the longest boom's share of its allowed length). Baughn 2026-10-18: 0.5 (a full-length boom: 1.5 r).")
+            .defineInRange("towerBoomStretch", 0.5, 0.0, 4.0);
         TOWER_FIELD_RATE = b.comment("Tick rate a tower's field starts at, as a share of 20 TPS (0.6 = 12 TPS). Blocks inside and the",
                 "clients of players inside run at it. Set at tower start; /stasis field rate changes a running field.")
             .defineInRange("towerFieldRate", 0.6, 0.05, 1.0);
@@ -127,6 +131,7 @@ public final class StasisConfig {
     static volatile double towerDrawK = 1.77;
     static volatile double towerStoreC = 306.25;
     static volatile int towerMaxSegments = 30;
+    static volatile double towerBoomStretch = 0.5;
     static volatile double towerFieldRate = 0.6;
     static volatile double gutterChance = 0.25;
     static volatile boolean debugMessages = false;
@@ -199,6 +204,11 @@ public final class StasisConfig {
         return m;
     }
 
+    /** towerBoomStretch (GameTests). */
+    public static double boomStretch() {
+        return towerBoomStretch;
+    }
+
     static void refresh() {
         enabled = ENABLED.get();
         stopped = STOPPED_DIMENSIONS.get().stream()
@@ -209,6 +219,7 @@ public final class StasisConfig {
         towerDrawK = TOWER_DRAW_K.get();
         towerStoreC = TOWER_STORE_C.get();
         towerMaxSegments = TOWER_MAX_SEGMENTS.get();
+        towerBoomStretch = TOWER_BOOM_STRETCH.get();
         towerFieldRate = TOWER_FIELD_RATE.get();
         gutterChance = GUTTER_CHANCE.get();
         debugMessages = DEBUG_MESSAGES.get();

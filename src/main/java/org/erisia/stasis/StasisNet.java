@@ -34,9 +34,15 @@ public final class StasisNet {
             buf.writeFloat((float) f.amber());
             buf.writeFloat((float) f.dropout());
             buf.writeFloat((float) f.side());
+            var st = f.stretch();
+            buf.writeFloat((float) st.e());
+            buf.writeFloat((float) st.s());
+            buf.writeFloat((float) st.w());
+            buf.writeFloat((float) st.n());
         },
         buf -> new Field(buf.readVarInt(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(),
-            buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong(), buf.readFloat(), buf.readFloat(), buf.readFloat()));
+            buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong(), buf.readFloat(), buf.readFloat(), buf.readFloat(),
+            new Field.Stretch(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat())));
 
     public record Fields(List<Field> fields, int deepSeed) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));

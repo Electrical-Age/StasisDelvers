@@ -35,6 +35,8 @@ public final class StasisPost {
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     /** Field i's shield (amber, dropout, side): 4 slots from SHIELD_BASE + 4i. */
     static final int SHIELD_BASE = 1700;
+    /** Field i's reach east, south, west, north as multiples of its radius (Field.Stretch): 4 slots from STRETCH_BASE + 4i. */
+    static final int STRETCH_BASE = 1752;
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
     /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
     static final int G = 8, GROUND_BASE = 2048, STATIC_GROUND_BASE = GROUND_BASE + G * G * MAX_DEEPS;
@@ -141,6 +143,7 @@ public final class StasisPost {
             d[sh] = (float) f.amber();
             d[sh + 1] = (float) f.dropout();
             d[sh + 2] = (float) f.side();
+            putStretch(d, n - 1, shownStretch(f));
         }
         // frozen remnants of collapsed towers (column 2: the shader draws them at a fixed time, and time doesn't run there)
         for (var re : Remnants.all()) {
@@ -160,6 +163,7 @@ public final class StasisPost {
             d[sh] = 1;
             d[sh + 1] = (float) rem.dropout();
             d[sh + 2] = (float) rem.side();
+            putStretch(d, n - 1, rem.stretch() == null ? Field.Stretch.ONE : rem.stretch());
             d[o + 9] = (float) ((rem.frozeAt() / 20.0) % 1200.0);              // (the clocks as it froze: [29], [30])
             d[sh + 3] = (float) ((rem.frozeAt() / 20.0) % (1048576 / 20.0));
         }
@@ -364,6 +368,33 @@ public final class StasisPost {
         if (Math.abs(f.radius() - e[0]) < 0.01) e[0] = f.radius();
         if (SHOWN.size() > 64) SHOWN.keySet().removeIf(id -> ClientFields.fields().stream().noneMatch(x -> x.id() == id));
         return e[0];
+    }
+
+    static void putStretch(float[] d, int i, Field.Stretch st) {
+        int b = STRETCH_BASE + 4 * i;
+        d[b] = (float) st.e();
+        d[b + 1] = (float) st.s();
+        d[b + 2] = (float) st.w();
+        d[b + 3] = (float) st.n();
+    }
+
+    /** The stretch as drawn: eased like the radius (a tower rebuilt with a new boom grows that side over ~2 s). */
+    static final java.util.Map<Integer, double[]> SHOWN_STRETCH = new java.util.HashMap<>();
+
+    static Field.Stretch shownStretch(Field f) {
+        long now = System.nanoTime();
+        var t = f.stretch();
+        double[] e = SHOWN_STRETCH.computeIfAbsent(f.id(), k -> new double[]{t.e(), t.s(), t.w(), t.n(), now});
+        double dt = Math.min(0.25, (now - e[4]) / 1e9);
+        e[4] = now;
+        double[] want = {t.e(), t.s(), t.w(), t.n()};
+        for (int i = 0; i < 4; i++) {
+            double tc = want[i] < e[i] ? 0.45 : 2.0;
+            e[i] += (want[i] - e[i]) * Math.min(1, dt / tc);
+            if (Math.abs(want[i] - e[i]) < 0.001) e[i] = want[i];
+        }
+        if (SHOWN_STRETCH.size() > 64) SHOWN_STRETCH.keySet().removeIf(id -> ClientFields.fields().stream().noneMatch(x -> x.id() == id));
+        return new Field.Stretch(e[0], e[1], e[2], e[3]);
     }
 
     record Held(Field field, long nanos) {}

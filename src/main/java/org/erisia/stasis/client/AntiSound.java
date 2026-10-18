@@ -86,8 +86,7 @@ public final class AntiSound {
         if (mc.player != null && mc.level != null) {
             var p = ears(mc);
             for (Field f : ClientFields.fields()) {
-                double dx = p.x - f.x(), dy = p.y - f.y(), dz = p.z - f.z();
-                if (dx * dx + dy * dy + dz * dz < f.radius() * f.radius()) s = Math.max(s, f.failing());
+                if (f.containsPoint(p.x, p.y, p.z)) s = Math.max(s, f.failing());
             }
         }
         strain += (s - strain) * Math.min(1, dt / 0.6);

@@ -56,10 +56,9 @@ public class TowerBlockEntity extends BlockEntity {
         for (int dx = -1; dx <= 1; dx++)
             for (int dy = -1; dy <= 1; dy++)
                 for (int dz = -1; dz <= 1; dz++) {
-                    double l = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                    double k = l == 0 ? 0 : 0.7 * f.radius() / l;
+                    double[] p = f.toward(dx, dy, dz, 0.7);
                     n++;
-                    if (StaticDeeps.zone(level, (int) Math.floor(f.x() + dx * k), (int) Math.floor(f.y() + dy * k), (int) Math.floor(f.z() + dz * k)) > 0) in++;
+                    if (StaticDeeps.zone(level, (int) Math.floor(p[0]), (int) Math.floor(p[1]), (int) Math.floor(p[2])) > 0) in++;
                 }
         return in / (float) n;
     }
@@ -317,7 +316,7 @@ public class TowerBlockEntity extends BlockEntity {
     public double carryRadius() {
         double w = weatherFactor();
         for (double r = Math.floor(target()); r >= minRadius(); r -= 1)
-            if (drawFor(r) * drawPenalty(r) * w <= 0.9 * inAvgW) return r;
+            if (drawAt(r) * w <= 0.9 * inAvgW) return r;
         return -1;
     }
 
@@ -348,6 +347,45 @@ public class TowerBlockEntity extends BlockEntity {
 
     public static double radiusFor(int segments) {
         return 8.0 * (segments + 2);   // Baughn 2026-10-14: twice the old 4 (segments + 2)
+    }
+
+    /**
+     * The field's reach each way along the ground (Field.Stretch): from the built tower's booms (Baughn 2026-10-18).
+     * Kept while the tower rebuilds or a pole is invalid; saved.
+     */
+    public Field.Stretch stretch = Field.Stretch.ONE;
+
+    /** A side reaches 1 + k * (its longest boom's share of its allowed length, H - y). */
+    public static Field.Stretch stretchFor(org.erisia.stasis.towergen.Layout layout) {
+        double[] f = new double[4];
+        for (var b : layout.booms()) {
+            int room = layout.H() - b.y();
+            if (room > 0) f[b.dir()] = Math.max(f[b.dir()], Math.min(1.0, b.length() / (double) room));
+        }
+        double k = StasisConfig.towerBoomStretch;
+        return new Field.Stretch(1 + k * f[0], 1 + k * f[1], 1 + k * f[2], 1 + k * f[3]);
+    }
+
+    /** The radius of the sphere with the stretched field's volume, per unit radius: cbrt(mean of the four ground
+     *  quarters' sx * sz). The draw follows volume (Baughn: yes); the store stays on the base radius. */
+    public double volumeScale() {
+        var t = stretch;
+        return Math.cbrt((t.e() * t.s() + t.s() * t.w() + t.w() * t.n() + t.n() * t.e()) / 4);
+    }
+
+    /** Draw in W at radius r, with this tower's stretch and the penalty above the preferred range. */
+    public double drawAt(double r) {
+        return drawFor(r * volumeScale()) * drawPenalty(r);
+    }
+
+    void updateStretch(ServerLevel sl) {
+        if (ruined || structure.status != TowerStructure.Status.OK || structure.layout == null) return;
+        Field.Stretch want = stretchFor(structure.layout);
+        if (want.equals(stretch)) return;
+        stretch = want;
+        if (fieldId != 0) FieldData.get(sl).update(sl, fieldId, f -> f.withStretch(want));
+        Tickets.update(sl, this);
+        setChanged();
     }
 
     /** Draw in W. */
@@ -391,6 +429,7 @@ public class TowerBlockEntity extends BlockEntity {
             setChanged();
             sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
+        if (ticks % 20 == 7) updateStretch(sl);
         if (level.getGameTime() % 20 == 0) feed(sl);
         if (level.getGameTime() % 20 == 0 || segments == 0) {
             int s = countSegments();
@@ -435,7 +474,7 @@ public class TowerBlockEntity extends BlockEntity {
             weather = staticWeather = stormMist = stormRift = 0;
             storming = false;
         }
-        double perTick = drawFor(r) * drawPenalty(r) * testDrawFactor * weatherFactor() / 20.0;
+        double perTick = drawAt(r) * testDrawFactor * weatherFactor() / 20.0;
         switch (state) {
             case OFF -> {
                 if (storedJ() >= 0.5 * storeMaxJ()) start(sl);
@@ -563,7 +602,8 @@ public class TowerBlockEntity extends BlockEntity {
         double cx = worldPosition.getX() + 0.5, cy = worldPosition.getY() + 0.5, cz = worldPosition.getZ() + 0.5;
         double top = worldPosition.getY() + TowerBlock.HEIGHT + segments + 0.5;
         // no sound: the client's anti-sound cuts every other sound for the crack (client.AntiSound)
-        return new StasisNet.Bolt(cx + ux / ul * r * 0.97, cy + uy / ul * r * 0.97, cz + uz / ul * r * 0.97, cx, top, cz, rnd.nextInt());
+        double sx = ux >= 0 ? stretch.e() : stretch.w(), sz = uz >= 0 ? stretch.s() : stretch.n();
+        return new StasisNet.Bolt(cx + ux / ul * r * sx * 0.97, cy + uy / ul * r * 0.97, cz + uz / ul * r * sz * 0.97, cx, top, cz, rnd.nextInt());
     }
 
     /** A bolt from the mast top outwards, through the shield to the land beyond it (an overcharged tower). */
@@ -577,7 +617,8 @@ public class TowerBlockEntity extends BlockEntity {
         double a = rnd.nextDouble() * 2 * Math.PI;
         double cx = worldPosition.getX() + 0.5, cz = worldPosition.getZ() + 0.5;
         double top = worldPosition.getY() + TowerBlock.HEIGHT + segments + 0.5;
-        int tx = (int) Math.floor(cx + Math.cos(a) * r), tz = (int) Math.floor(cz + Math.sin(a) * r);
+        double sx = Math.cos(a) >= 0 ? stretch.e() : stretch.w(), sz = Math.sin(a) >= 0 ? stretch.s() : stretch.n();
+        int tx = (int) Math.floor(cx + Math.cos(a) * r * sx), tz = (int) Math.floor(cz + Math.sin(a) * r * sz);
         double ty = sl.hasChunkAt(new BlockPos(tx, 0, tz))
             ? sl.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, tx, tz) : worldPosition.getY();
         return new StasisNet.Bolt(cx, top, cz, tx + 0.5, ty, tz + 0.5, rnd.nextInt());
@@ -592,7 +633,7 @@ public class TowerBlockEntity extends BlockEntity {
         last.add(makeBolt(sl));
         last.add(rnd.nextBoolean() ? makeBoltOut(sl) : makeBolt(sl));
         last.forEach(b -> StasisNet.sendBolt(sl, b));
-        Remnant rem = new Remnant(radius(), collapseSeed, c, dropout, side, sl.getGameTime(), java.util.List.copyOf(last));
+        Remnant rem = new Remnant(radius(), collapseSeed, c, dropout, side, sl.getGameTime(), java.util.List.copyOf(last), stretch);
         stop(sl);
         remnant = rem;
         setChanged();
@@ -612,6 +653,8 @@ public class TowerBlockEntity extends BlockEntity {
         Field f = FieldData.get(sl).add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, radius(), false,
             StasisConfig.towerFieldRate);
         fieldId = f.id();
+        updateStretch(sl);
+        if (!stretch.isOne()) FieldData.get(sl).update(sl, fieldId, x -> x.withStretch(stretch));
         // start-up: visual only (Baughn); clients animate from formedAt, about 3 s, with a hum and a lock-on sound
         long now = sl.getGameTime();
         FieldData.get(sl).update(sl, fieldId, x -> x.withFormedAt(now));
@@ -682,6 +725,10 @@ public class TowerBlockEntity extends BlockEntity {
         if (!Double.isNaN(targetRadius)) out.putDouble("target", targetRadius);
         out.putBoolean("override", override);
         out.putDouble("radius", effRadius);
+        out.putDouble("stretchE", stretch.e());
+        out.putDouble("stretchS", stretch.s());
+        out.putDouble("stretchW", stretch.w());
+        out.putDouble("stretchN", stretch.n());
         out.putBoolean("retreating", retreating);
         out.putDouble("retreatRadius", retreatRadius);
         out.putString("facing", facing.getSerializedName());
@@ -733,6 +780,8 @@ public class TowerBlockEntity extends BlockEntity {
         targetRadius = in.getDoubleOr("target", Double.NaN);
         override = in.getBooleanOr("override", false);
         effRadius = in.getDoubleOr("radius", 0);
+        stretch = new Field.Stretch(in.getDoubleOr("stretchE", 1), in.getDoubleOr("stretchS", 1), in.getDoubleOr("stretchW", 1),
+            in.getDoubleOr("stretchN", 1));
         var fd = net.minecraft.core.Direction.byName(in.getStringOr("facing", "south"));
         facing = fd != null && fd.getAxis().isHorizontal() ? fd : net.minecraft.core.Direction.SOUTH;
         stepGoal = effRadius;
@@ -742,7 +791,8 @@ public class TowerBlockEntity extends BlockEntity {
         remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.5),
             in.getDoubleOr("remnantDropout", 0), in.getDoubleOr("remnantSide", 0), in.getLongOr("remnantFrozeAt", 0L),
             in.childrenListOrEmpty("remnantBolts").stream().map(o -> new StasisNet.Bolt(o.getDoubleOr("fx", 0), o.getDoubleOr("fy", 0),
-                o.getDoubleOr("fz", 0), o.getDoubleOr("tx", 0), o.getDoubleOr("ty", 0), o.getDoubleOr("tz", 0), o.getIntOr("seed", 0))).toList());
+                o.getDoubleOr("fz", 0), o.getDoubleOr("tx", 0), o.getDoubleOr("ty", 0), o.getDoubleOr("tz", 0), o.getIntOr("seed", 0))).toList(),
+            stretch);   // (the tower's: a ruin isn't rebuilt, so it is the remnant's)
         structure.load(in);
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
     }
@@ -758,7 +808,8 @@ public class TowerBlockEntity extends BlockEntity {
      * What's left of a collapsed field (Baughn: the tower never sees zero charge; no moment passes where it would):
      * its last moment, stopped for good. Drawn by the client (Remnants) until the tower starts again or is broken.
      */
-    public record Remnant(double radius, int seed, double collapse, double dropout, double side, long frozeAt, java.util.List<StasisNet.Bolt> bolts) {
+    public record Remnant(double radius, int seed, double collapse, double dropout, double side, long frozeAt, java.util.List<StasisNet.Bolt> bolts,
+                          Field.Stretch stretch) {
     }
 
     Remnant remnant;
@@ -784,7 +835,7 @@ public class TowerBlockEntity extends BlockEntity {
     public StasisNet.ConsoleState consoleState(@org.jspecify.annotations.Nullable ServerPlayer asker) {
         double r = radius();
         java.util.List<Double> v = java.util.List.of((double) state.ordinal(), storedJ(), storeMaxJ(), inAvgW,
-            drawFor(r) * drawPenalty(r) * weatherFactor(), weatherFactor(), designRadius(), minRadius(), maxRadius(), target(),
+            drawAt(r) * weatherFactor(), weatherFactor(), designRadius(), minRadius(), maxRadius(), target(),
             state == State.OFF ? 0 : r, goalRadius(), override ? 1.0 : 0.0, signalSet ? 1.0 : 0.0, retreating ? 1.0 : 0.0, carryRadius(),
             failing, locked ? 1.0 : 0.0, asker != null && asker.getUUID().equals(feeder) ? 1.0 : 0.0, fed / 1000);
         return new StasisNet.ConsoleState(worldPosition, v, structureLine());
@@ -827,7 +878,7 @@ public class TowerBlockEntity extends BlockEntity {
 
     /** What the tower will draw at its target radius (Baughn: known before it's powered), e.g. "4.3 kW". */
     String drawText() {
-        double t = target(), w = drawFor(t) * drawPenalty(t) * weatherFactor();
+        double t = target(), w = drawAt(t) * weatherFactor();
         return w >= 1000 ? String.format("%.1f kW", w / 1000) : String.format("%.0f W", w);
     }
 
@@ -855,7 +906,7 @@ public class TowerBlockEntity extends BlockEntity {
             case COLLAPSING -> "COLLAPSING";
         });
         sb.append(String.format(". Store %.0f%% (%.0f of %.0f kJ), draw %.0f W", 100 * stored / Math.max(1, max), stored / 1000,
-            max / 1000, drawFor(r) * weatherFactor()));
+            max / 1000, drawFor(r * volumeScale()) * weatherFactor()));
         // (the draw shows what a deep adds, unexplained: Baughn wants no messages about deeps)
         sb.append(". ");
         TowerStructure s = structure;

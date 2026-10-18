@@ -219,9 +219,8 @@ public final class Deeps {
         for (int dx = -1; dx <= 1; dx++)
             for (int dy = -1; dy <= 1; dy++)
                 for (int dz = -1; dz <= 1; dz++) {
-                    double l = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                    double k = l == 0 ? 0 : 0.7 * f.radius() / l;
-                    int x = (int) Math.floor(f.x() + dx * k), y = (int) Math.floor(f.y() + dy * k), z = (int) Math.floor(f.z() + dz * k);
+                    double[] p = f.toward(dx, dy, dz, 0.7);
+                    int x = (int) Math.floor(p[0]), y = (int) Math.floor(p[1]), z = (int) Math.floor(p[2]);
                     n++;
                     if (at(level, x, y, z) > 0.5f) in++;
                 }

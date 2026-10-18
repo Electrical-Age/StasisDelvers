@@ -90,8 +90,8 @@ public final class Stasis {
             }
             Long2ObjectOpenHashMap<List<Field>> lists = new Long2ObjectOpenHashMap<>();
             for (Field f : fields) {
-                int x0 = (int) Math.floor(f.x() - f.radius()) >> 4, x1 = (int) Math.floor(f.x() + f.radius()) >> 4;
-                int z0 = (int) Math.floor(f.z() - f.radius()) >> 4, z1 = (int) Math.floor(f.z() + f.radius()) >> 4;
+                int x0 = (int) Math.floor(f.minX()) >> 4, x1 = (int) Math.floor(f.maxX()) >> 4;
+                int z0 = (int) Math.floor(f.minZ()) >> 4, z1 = (int) Math.floor(f.maxZ()) >> 4;
                 for (int cx = x0; cx <= x1; cx++)
                     for (int cz = z0; cz <= z1; cz++) lists.computeIfAbsent(ChunkPos.pack(cx, cz), k -> new ArrayList<>()).add(f);
             }
@@ -188,16 +188,13 @@ public final class Stasis {
         double x0 = sx << 4, y0 = sy << 4, z0 = sz << 4, x1 = x0 + 16, y1 = y0 + 16, z1 = z0 + 16;
         boolean touched = false;
         for (Field f : fs) {
-            double r2 = f.radius() * f.radius();
-            // nearest and farthest point of the section's box from the centre (a column field ignores y)
-            double nx = Math.max(Math.max(x0 - f.x(), f.x() - x1), 0), fx = Math.max(Math.abs(x0 - f.x()), Math.abs(x1 - f.x()));
-            double ny = Math.max(Math.max(y0 - f.y(), f.y() - y1), 0), fy = Math.max(Math.abs(y0 - f.y()), Math.abs(y1 - f.y()));
-            double nz = Math.max(Math.max(z0 - f.z(), f.z() - z1), 0), fz = Math.max(Math.abs(z0 - f.z()), Math.abs(z1 - f.z()));
-            if (f.column()) ny = fy = 0;
-            if (nx * nx + ny * ny + nz * nz > r2) continue;   // no block of the section can be whole inside
+            // nearest and farthest point of the section's box, in the field's unit-sphere space (Field.norm: the
+            // stretch is monotone per axis, so the box's ends map to the ends); a column field ignores y
+            double[] ex = f.normSpan(0, x0, x1), ey = f.normSpan(1, y0, y1), ez = f.normSpan(2, z0, z1);
+            if (ex[0] * ex[0] + ey[0] * ey[0] + ez[0] * ez[0] > 1) continue;   // no block of the section can be whole inside
             touched = true;
             // every block's farthest corner is inside: the whole section runs, unless a collapse or a rift cuts it
-            if (fx * fx + fy * fy + fz * fz <= r2 && f.collapse() <= 0) {
+            if (ex[1] * ex[1] + ey[1] * ey[1] + ez[1] * ez[1] <= 1 && f.collapse() <= 0) {
                 int seed = Deeps.seed(level);
                 if (seed == 0 || !StaticDeeps.sectionMayHave(seed, sx, sy, sz)) return SECTION_RUNNING;
             }

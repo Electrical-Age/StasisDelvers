@@ -304,8 +304,8 @@ public final class FrozenSprites {
         if (Stasis.stops(level) && !frozen.isEmpty()) {
             int minY = level.getMinSectionY(), maxY = level.getMaxSectionY();
             for (Field f : PENDING) {
-                int x0 = (int) Math.floor(f.x() - f.radius()) >> 4, x1 = (int) Math.floor(f.x() + f.radius()) >> 4;
-                int z0 = (int) Math.floor(f.z() - f.radius()) >> 4, z1 = (int) Math.floor(f.z() + f.radius()) >> 4;
+                int x0 = (int) Math.floor(f.minX()) >> 4, x1 = (int) Math.floor(f.maxX()) >> 4;
+                int z0 = (int) Math.floor(f.minZ()) >> 4, z1 = (int) Math.floor(f.maxZ()) >> 4;
                 int y0 = minY, y1 = maxY;
                 if (!f.column()) {
                     y0 = Math.max(minY, (int) Math.floor(f.y() - f.radius()) >> 4);

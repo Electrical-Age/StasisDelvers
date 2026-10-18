@@ -45,9 +45,10 @@ public abstract class WeatherEffectRendererMixin {
         double cx = x + 0.5, cz = z + 0.5;
         for (var f : org.erisia.stasis.ClientFields.fields()) {
             if (f.column()) continue;
-            double dx = cx - f.x(), dz = cz - f.z(), r2 = f.radius() * f.radius(), d2 = dx * dx + dz * dz;
-            if (d2 >= r2) continue;
-            double h = Math.sqrt(r2 - d2), top = f.y() + h, bottom = f.y() - h;
+            // (in the field's unit-sphere space: booms stretch it along the ground, Field.Stretch)
+            double dx = cx - f.x(), dz = cz - f.z(), u = dx / f.ax(dx), w = dz / f.az(dz), q = u * u + w * w;
+            if (q >= 1) continue;
+            double h = f.radius() * Math.sqrt(1 - q), top = f.y() + h, bottom = f.y() - h;
             if (bottomY >= top || topY <= bottom) continue;   // (the column misses the sphere)
             bottomY = Math.min(topY, Math.max(bottomY, (int) Math.ceil(top)));
         }

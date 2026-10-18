@@ -387,6 +387,9 @@ public final class StasisReport {
             f.addProperty("amber", d[StasisPost.SHIELD_BASE + 4 * k]);
             f.addProperty("dropout", d[StasisPost.SHIELD_BASE + 4 * k + 1]);
             f.addProperty("side", d[StasisPost.SHIELD_BASE + 4 * k + 2]);
+            JsonArray st = new JsonArray();
+            for (int j = 0; j < 4; j++) st.add(d[StasisPost.STRETCH_BASE + 4 * k + j]);
+            f.add("shown_stretch_eswn", st);
             fields.add(f);
         }
         o.add("fields", fields);

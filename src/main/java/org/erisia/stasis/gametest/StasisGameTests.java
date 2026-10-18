@@ -86,6 +86,35 @@ public final class StasisGameTests {
             c.check("outside the field time is stopped here", !Stasis.isRunning(level, out));
             c.check("inside it runs", Stasis.isRunning(level, h.absolutePos(new BlockPos(3, 2, 4))));
         }));
+        // Baughn: a tower's booms stretch its field towards their side (Field.Stretch; notes/tower/PLAN-stretch.md)
+        CASES.put("stretched_field_shape", new Spec(1, (h, c) -> () -> {
+            Field f = new Field(0, 0.5, 0.5, 0.5, 10).withStretch(new Field.Stretch(1.5, 1, 1, 1.25));
+            c.check("east reaches 1.5 r (whole blocks to x 14)", f.containsBlock(14, 0, 0) && !f.containsBlock(15, 0, 0));
+            c.check("west stays at r", f.containsBlock(-9, 0, 0) && !f.containsBlock(-10, 0, 0));
+            c.check("north reaches 1.25 r, south r", f.containsBlock(0, 0, -11) && !f.containsBlock(0, 0, -12) && !f.containsBlock(0, 0, 10));
+            c.check("up and down stay at r", f.containsBlock(0, 9, 0) && !f.containsBlock(0, 10, 0) && !f.containsBlock(0, -10, 0));
+            c.check("points: on the stretched axis", f.containsPoint(15.4, 0.5, 0.5) && !f.containsPoint(15.6, 0.5, 0.5));
+            c.check("a diagonal follows the ellipse", f.containsPoint(0.5 + 15 * 0.7, 0.5, 0.5 - 12.5 * 0.7) && !f.containsPoint(0.5 + 15 * 0.72, 0.5, 0.5 - 12.5 * 0.72));
+            c.check("bounds", f.minX() == -9.5 && f.maxX() == 15.5 && f.minZ() == -12 && f.maxZ() == 10.5, f.minX() + " " + f.maxX() + " " + f.minZ() + " " + f.maxZ());
+            var enc = Field.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE, f).getOrThrow();
+            c.check("codec round trip keeps the stretch", Field.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, enc).getOrThrow().equals(f), enc.toString());
+            var old = enc.getAsJsonObject().deepCopy();
+            old.remove("stretch");
+            c.check("a field saved before stretch loads round", Field.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE, old).getOrThrow().stretch().isOne());
+            Field round = new Field(0, 0.5, 0.5, 0.5, 10);
+            boolean same = true;
+            for (int x = -12; x <= 12; x++) for (int y = -12; y <= 12; y++) for (int z = -12; z <= 12; z++) {
+                double dx = (x + 0.5 >= 0.5 ? x + 1 : x) - 0.5, dy = (y + 0.5 >= 0.5 ? y + 1 : y) - 0.5, dz = (z + 0.5 >= 0.5 ? z + 1 : z) - 0.5;
+                if (round.containsBlock(x, y, z) != (dx * dx + dy * dy + dz * dz <= 100)) same = false;
+            }
+            c.check("an unstretched field is the same sphere as before", same);
+            var lay = new org.erisia.stasis.towergen.Layout(4, List.of(new org.erisia.stasis.towergen.Layout.Boom(2, 2, 2),
+                new org.erisia.stasis.towergen.Layout.Boom(2, 3, 1)));
+            var st = org.erisia.stasis.TowerBlockEntity.stretchFor(lay);
+            c.check("booms: a full-length one stretches its side 1 + k, a half one 1 + k/2 (k " + org.erisia.stasis.StasisConfig.boomStretch() + ")",
+                Math.abs(st.w() - (1 + org.erisia.stasis.StasisConfig.boomStretch())) < 1e-9 && Math.abs(st.n() - (1 + 0.5 * org.erisia.stasis.StasisConfig.boomStretch())) < 1e-9
+                    && st.e() == 1 && st.s() == 1, st.toString());
+        }));
         // scheduled block ticks and the falling-block entity
         CASES.put("sand_falls_only_inside", new Spec(40, (h, c) -> {
             h.setBlock(new BlockPos(3, 3, 4), Blocks.SAND);
@@ -407,6 +436,9 @@ public final class StasisGameTests {
             return () -> {
                 var s = t.structure;
                 c.check("built OK", s.status == org.erisia.stasis.TowerStructure.Status.OK, s.status + " " + s.message);
+                double bk = org.erisia.stasis.StasisConfig.boomStretch();
+                c.check("the boom E 4 at y 8 (of 6 allowed) stretches the field east only", Math.abs(t.stretch.e() - (1 + bk * 4 / 6.0)) < 1e-9
+                    && t.stretch.s() == 1 && t.stretch.w() == 1 && t.stretch.n() == 1, t.stretch.toString());
                 c.check("ladder top inside the mast", s.ladderTop > 2 && s.ladderTop <= 14, "ladder top " + s.ladderTop);
                 boolean ok = true;
                 StringBuilder sb = new StringBuilder();
@@ -633,6 +665,31 @@ public final class StasisGameTests {
                 c.check("time runs next to the tower", Stasis.isRunning(h.getLevel(), h.absolutePos(new BlockPos(6, 1, 4))));
                 t.setRemoved();   // breaking the tower takes its field down
                 c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 40.0));
+            };
+        }, false, true));
+        // Baughn: booms stretch the running tower's field their way, and the draw follows the volume
+        CASES.put("tower_booms_stretch_field", new Spec(80, (h, c) -> {
+            org.erisia.stasis.TowerStructure.syncBuild = true;
+            c.cleanup.add(() -> org.erisia.stasis.TowerStructure.syncBuild = false);
+            BlockPos base = new BlockPos(3, 1, 4);
+            var t = tower(h, base, 3);                                             // H 5, r 40
+            var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
+                .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
+            h.setBlock(base.above().west(1), boomPole);
+            h.setBlock(base.above().west(2), boomPole);                            // W 2 at y 2: 2 of 3 allowed
+            t.testCharge(1.0);
+            return () -> {
+                double k = org.erisia.stasis.StasisConfig.boomStretch(), want = 1 + k * 2 / 3.0;
+                c.check("built", t.structure.status == org.erisia.stasis.TowerStructure.Status.OK, t.structure.status + " " + t.structure.message);
+                var f = FieldData.get(h.getLevel()).get(t.fieldId()).orElse(null);
+                c.check("its field reaches further west", f != null && Math.abs(f.stretch().w() - want) < 1e-9 && f.stretch().e() == 1
+                    && f.stretch().n() == 1 && f.stretch().s() == 1, String.valueOf(f));
+                Vec3 cp = h.absoluteVec(new Vec3(3.5, 1.5, 4.5));
+                c.check("a point 45 west is inside, 45 east isn't", f != null && f.containsPoint(cp.x - 45, cp.y, cp.z) && !f.containsPoint(cp.x + 45, cp.y, cp.z));
+                double vs = Math.cbrt((1 + want + want + 1) / 4);
+                c.check("draw by volume", Math.abs(t.volumeScale() - vs) < 1e-9 && Math.abs(t.drawAt(40) - org.erisia.stasis.TowerBlockEntity.drawFor(40 * vs)) < 1e-6,
+                    t.volumeScale() + " vs " + vs);
+                t.setRemoved();
             };
         }, false, true));
         // the tower's range (console): the preferred range from the mast; a target from the tower's own size up to +25%
@@ -899,8 +956,11 @@ public final class StasisGameTests {
                 && changed.stream().noneMatch(f -> f.id() == 1), changed.toString());
         }, false));
         // frozen textures mesh per section where they can: a section said to be all stopped / all running must be
-        CASES.put("section_state_matches_blocks", new Spec(1, (h, c) -> {
-            Field f = field(h, c, new Vec3(3.5, 2.5, 4.5), 30, 1.0);
+        for (boolean stretched : new boolean[]{false, true})
+        CASES.put(stretched ? "section_state_matches_stretched" : "section_state_matches_blocks", new Spec(1, (h, c) -> {
+            Field f0 = field(h, c, new Vec3(3.5, 2.5, 4.5), stretched ? 22 : 30, 1.0);
+            if (stretched) FieldData.get(h.getLevel()).update(h.getLevel(), f0.id(), x -> x.withStretch(new Field.Stretch(1.5, 1.2, 1, 1.4)));
+            Field f = FieldData.get(h.getLevel()).get(f0.id()).orElse(f0);
             return () -> {
                 ServerLevel level = h.getLevel();
                 int sx = (int) Math.floor(f.x()) >> 4, sy = (int) Math.floor(f.y()) >> 4, sz = (int) Math.floor(f.z()) >> 4;

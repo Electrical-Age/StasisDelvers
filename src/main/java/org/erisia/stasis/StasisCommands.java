@@ -99,7 +99,8 @@ final class StasisCommands {
                     var fields = FieldData.get(c.getSource().getLevel()).fields();
                     c.getSource().sendSuccess(() -> Component.literal(fields.size() + " field(s)"), false);
                     for (Field f : fields)
-                        c.getSource().sendSuccess(() -> Component.literal(String.format("  %d: %.1f %.1f %.1f r %.1f rate %.3f%s", f.id(), f.x(), f.y(), f.z(), f.radius(), f.rate(), f.column() ? " column" : "")), false);
+                        c.getSource().sendSuccess(() -> Component.literal(String.format("  %d: %.1f %.1f %.1f r %.1f rate %.3f%s%s", f.id(), f.x(), f.y(), f.z(), f.radius(), f.rate(), f.column() ? " column" : "",
+                            f.stretch().isOne() ? "" : String.format(" stretch E%.2f S%.2f W%.2f N%.2f", f.stretch().e(), f.stretch().s(), f.stretch().w(), f.stretch().n()))), false);
                     return fields.size();
                 })))
             .then(Commands.literal("deeps").executes(c -> {

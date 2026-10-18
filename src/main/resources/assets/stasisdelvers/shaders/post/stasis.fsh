@@ -26,7 +26,8 @@
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
 // [1700 + 4i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
-// remnant: the eddy time [30] as it froze).
+// remnant: the eddy time [30] as it froze). [1752 + 4i ..] field i's reach east, south, west, north as multiples of
+// its radius (Field.Stretch: a tower's booms stretch it; 1 = round).
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
 // lattice on each icosahedron face; the nearest lattice point is the cell, the gap to the second nearest its rim).
@@ -116,6 +117,43 @@ float collapseScore(vec3 block, vec3 off, float dist, float r, int seed, float s
         score += 0.25 * (off.x * cos(side) + off.z * sin(side)) / len;
     }
     return score;
+}
+
+// Field.Stretch of field i (east, south, west, north)
+vec4 stretchOf(int i) {
+    int b = 1752 + 4 * i;
+    return vec4(data(b), data(b + 1), data(b + 2), data(b + 3));
+}
+
+// d (from a field's centre) in the field's round space: the stretch on d's side divided out (Field.norm * r)
+vec3 unstretch(vec3 d, vec4 st) {
+    return vec3(d.x / (d.x >= 0.0 ? st.x : st.z), d.y, d.z / (d.z >= 0.0 ? st.y : st.w));
+}
+
+// The view ray's span through a stretched field (oc = ray origin - centre): each quarter (by the signs of x and z) is
+// the sphere of radius r scaled, so the ray is cut at x = 0 and z = 0 and each piece solved as a sphere; the shape is
+// convex, so the pieces' spans join into one (t1 the entry, t2 the exit).
+bool fieldSpan(vec3 oc, vec3 v, float r, vec4 st, out float t1, out float t2) {
+    float bx = abs(v.x) > 1e-7 ? -oc.x / v.x : 1e30, bz = abs(v.z) > 1e-7 ? -oc.z / v.z : 1e30;
+    float b0 = min(bx, bz), b1 = max(bx, bz);
+    t1 = 1e30;
+    t2 = -1e30;
+    for (int j = 0; j < 3; j++) {
+        float lo = j == 0 ? -1e30 : j == 1 ? b0 : b1, hi = j == 0 ? b0 : j == 1 ? b1 : 1e30;
+        if (hi <= lo) continue;
+        // a point inside the piece, to tell its quarter
+        float tm = j == 0 ? (b0 < 1e29 ? b0 - 1.0 : 0.0) : j == 1 ? (b1 < 1e29 ? 0.5 * (b0 + b1) : b0 + 1.0) : b1 + 1.0;
+        vec3 pm = oc + v * tm;
+        vec3 sc = vec3(pm.x >= 0.0 ? st.x : st.z, 1.0, pm.z >= 0.0 ? st.y : st.w);
+        vec3 o2 = oc / sc, v2 = v / sc;
+        float aa = dot(v2, v2), b = dot(o2, v2), cc = dot(o2, o2) - r * r, disc = b * b - aa * cc;
+        if (disc <= 0.0) continue;
+        float sq = sqrt(disc), e1 = max((-b - sq) / aa, lo), e2 = min((-b + sq) / aa, hi);
+        if (e2 <= e1) continue;
+        t1 = min(t1, e1);
+        t2 = max(t2, e2);
+    }
+    return t2 > t1;
 }
 
 // Eddies.value: the drifting eddy noise of a weak field (wind from the seed, 0.7 blocks/s)
@@ -970,14 +1008,16 @@ void main() {
             float r = data(o + 3), collapse = data(o + 4);
             vec3 dv = p - fc;
             if (data(o + 6) > 0.5) dv.y = 0.0;
-            float d = length(dv);
-            float inside = 1.0 - smoothstep(r - 1.2, r, d);
+            vec4 st = stretchOf(i);
+            float d = length(unstretch(dv, st));            // (round space: Field.norm * r)
+            float edge = d < 1e-3 ? r : (r - d) * length(dv) / d;   // blocks to the shell along the line from the centre
+            float inside = smoothstep(0.0, 1.2, edge);
             if (collapse > 0.0) {
                 // the same rule as Field.collapsed (patches and tears on the field's seed)
                 vec3 blk = floor(w);
                 vec3 off = blk + 0.5 - (camInt + fc);
                 if (data(o + 6) > 0.5) off.y = 0.0;
-                float score = collapseScore(blk, off, d, r, int(data(o + 7)), data(1700 + 4 * i + 2));
+                float score = collapseScore(blk, unstretch(off, st), d, r, int(data(o + 7)), data(1700 + 4 * i + 2));
                 inside *= 1.0 - smoothstep(-0.02, 0.02, 1.6 * collapse - (1.0 - score));
             }
             float age = data(o + 8);
@@ -1148,13 +1188,11 @@ void main() {
             float ftime = frozen ? data(k + 9) : time;   // (a remnant: the clocks as it froze, so it stays exactly as it was)
             vec3 oc = o - fc, vv = v;
             if (column) { oc.y = 0.0; vv.y = 0.0; }
-            float aa = dot(vv, vv);
-            if (aa < 1e-8) continue;
-            float b = dot(oc, vv), cc = dot(oc, oc) - r * r, disc = b * b - aa * cc;
-            if (disc <= 0.0) continue;
-            float sq = sqrt(disc);
-            float t1 = (-b - sq) / aa, t2 = (-b + sq) / aa;
-            bool inside = cc < 0.0;
+            if (dot(vv, vv) < 1e-8) continue;
+            vec4 st = stretchOf(i);
+            float t1, t2;
+            if (!fieldSpan(oc, vv, r, st, t1, t2)) continue;
+            bool inside = length(unstretch(oc, st)) < r;
             float f = max(4.0, floor(r / 2.3 + 0.5));
             if (collapse > 0.0 || failing > 0.25) {
                 // mist in spots (Baughn: mostly clear inside, fading in and out): where the eddies are (Eddies, the
@@ -1186,11 +1224,14 @@ void main() {
                 float t = h2 == 0 ? t2 : t1;
                 if (t <= 0.0 || t >= tmax) continue;
                 vec3 hp = o + v * t - fc;
-                vec3 nn = hp;
-                if (column) nn.y = 0.0;
-                nn = normalize(nn);
+                vec3 hq = hp;
+                if (column) hq.y = 0.0;
+                // the cell grid on the round shape (cells stretch with the field), the gap in blocks at the local
+                // radius; the true normal (the gradient) for the shading
+                vec3 nn = normalize(unstretch(hq, st));
+                vec3 nrm = normalize(unstretch(unstretch(hq, st), st));
                 vec3 centre = nn;
-                vec2 cell = column ? hexColumn(nn, hp.y + fc.y + camY, r) : hexCell(nn, f, centre) * vec2(r, 1.0);
+                vec2 cell = column ? hexColumn(nn, hp.y + fc.y + camY, r) : hexCell(nn, f, centre) * vec2(length(hq), 1.0);
                 float age = data(k + 8);
                 float pop = 1.0;
                 if (age >= 0.0 && age < 3.5) {
@@ -1202,10 +1243,10 @@ void main() {
                 // (a collapse is amber all over)
                 float warm = collapse > 0.0 ? 1.0 : 0.0;
                 int sb = 1700 + 4 * i;
-                vec4 sh = shieldAt(cell, nn, centre, -v, r, data(sb), data(sb + 1), collapse, data(sb + 2), warm, ftime, h2 == 0 && !inside);
+                vec4 sh = shieldAt(cell, nrm, centre, -v, r, data(sb), data(sb + 1), collapse, data(sb + 2), warm, ftime, h2 == 0 && !inside);
                 if (data(31) > 0.0) {
                     // weather: where a deep crosses the field the hexes brighten (the opposite of dropout), pulsing
-                    float dp = deepAt(fc + centre * r, vec3(data(16), data(17), data(18)));
+                    float dp = deepAt(fc + hp, vec3(data(16), data(17), data(18)));
                     if (dp > 0.05) sh = vec4(mix(sh.rgb, vec3(0.92, 0.96, 1.0), 0.6 * dp),
                         min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(ftime * 3.0 + cell.y * 6.0)))));
                 }

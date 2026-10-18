@@ -228,6 +228,8 @@ public final class ReportResponder {
             o.addProperty("segments", t.segments());
             o.addProperty("radius", t.radius());
             o.addProperty("design_radius", t.designRadius());
+            o.addProperty("stretch", String.format("E%.2f S%.2f W%.2f N%.2f", t.stretch.e(), t.stretch.s(), t.stretch.w(), t.stretch.n()));
+            o.addProperty("volume_scale", t.volumeScale());
             o.addProperty("min_radius", t.minRadius());
             o.addProperty("max_radius", t.maxRadius());
             o.addProperty("target", t.target());
