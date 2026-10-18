@@ -19,7 +19,11 @@ public final class StasisEvents {
         // (tell the client, which then holds it still: no guessing, no judder)
         var en = e.getEntity();
         if (!en.level().isClientSide() && !(en instanceof net.minecraft.world.entity.player.Player)
-            && en.getData(StasisRegistry.FROZEN.get()) != frozen) en.setData(StasisRegistry.FROZEN.get(), frozen);
+            && en.getData(StasisRegistry.FROZEN.get()) != frozen) {
+            en.setData(StasisRegistry.FROZEN.get(), frozen);
+            // (and where it stopped, now: items sync position only every 20 ticks, so the client held them short of it)
+            en.needsSync = true;
+        }
     }
 
     /** A frozen entity being pushed (by a furnace cart, a player walking into it, an explosion) moves as far as one tick
@@ -31,6 +35,7 @@ public final class StasisEvents {
         PUSHING.set(true);
         try {
             en.setDeltaMovement(x, y, z);
+            en.setOldPosAndRot();   // (as Level.tickNonPassenger does: a cart turns by where it was, and one that never ran had 0 0 0)
             en.tick();
             en.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         } finally {
