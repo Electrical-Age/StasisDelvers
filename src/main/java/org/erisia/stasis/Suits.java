@@ -5,7 +5,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
-/** Suits that let a player move in stopped land: a full set of {@link TimeSuit} pieces, each with charge left. */
+/**
+ * Suits that let a player move in stopped land: {@link TimeSuit} pieces with charge left. In the plain Grey a chest
+ * piece is enough (λ-Nero, Baughn 2026-10-18); in mist, deeps and near rifts each missing piece makes it worse
+ * (Freezing: faster drain, and the freeze creeps in).
+ */
 final class Suits {
     private Suits() {
     }
@@ -23,13 +27,27 @@ final class Suits {
             ItemStack s = p.getItemBySlot(slot);
             if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b) {
                 pieces++;
-                if (b.getEnergy(s) < t.stasisDraw(s) / 20.0 && empty == null) empty = s.getHoverName().getString();
+                if (b.getEnergy(s) < share(p) * t.stasisDraw(s) / 20.0 && empty == null) empty = s.getHoverName().getString();
             } else if (missing == null) missing = slot.getName();
         }
         if (pieces == 0) return null;
-        if (missing != null) return "Suit incomplete: no " + missing + " piece";
+        if (!(p.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof TimeSuit)) return "Suit incomplete: no chest piece";
         if (empty != null) return "Suit piece out of charge: " + empty;
         return null;
+    }
+
+    /** Each worn piece carries the draw of the missing ones too (Baughn: the same or worse drain in all cases; a partial
+     *  suit is for other armour and enchantments, not to economise): 4 / worn pieces. */
+    static double share(ServerPlayer p) {
+        int worn = 4 - missing(p);
+        return worn == 0 ? 1 : 4.0 / worn;
+    }
+
+    /** Suit pieces not worn (0..4; a chest piece alone: 3). */
+    static int missing(ServerPlayer p) {
+        int n = 0;
+        for (EquipmentSlot slot : ARMOR) if (!(p.getItemBySlot(slot).getItem() instanceof TimeSuit)) n++;
+        return n;
     }
 
     /** Seconds of protection left: the emptiest piece (a full charged suit assumed). */
@@ -38,7 +56,7 @@ final class Suits {
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
             if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b && t.stasisDraw(s) > 0)
-                left = Math.min(left, b.getEnergy(s) / t.stasisDraw(s));
+                left = Math.min(left, b.getEnergy(s) / (t.stasisDraw(s) * share(p)));
         }
         return left;
     }
@@ -157,12 +175,14 @@ final class Suits {
         return maxJ - left;
     }
 
-    /** Would the suit protect (full and charged), without drawing power? */
+    /** Would the suit protect (a chest piece, every worn piece charged), without drawing power? */
     static boolean protectsWithoutDraw(ServerPlayer p) {
+        if (!(p.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof TimeSuit)) return false;
+        double f = share(p);
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
-            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) return false;
-            if (b.getEnergy(s) < t.stasisDraw(s) / 20.0) return false;
+            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
+            if (b.getEnergy(s) < f * t.stasisDraw(s) / 20.0) return false;
         }
         return true;
     }
@@ -177,15 +197,19 @@ final class Suits {
         return true;
     }
 
-    /** Is the player wearing a full charged suit? If so, draw one tick's power (x factor: deeps) from each piece. */
+    /** Is the player wearing a charged suit (a chest piece; every worn piece charged)? If so, draw one tick's power
+     *  (x factor: deeps) from each worn piece. */
     static boolean protect(ServerPlayer p, double factor) {
+        if (!(p.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof TimeSuit)) return false;
+        factor *= share(p);
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
-            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) return false;
+            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
             if (b.getEnergy(s) < factor * t.stasisDraw(s) / 20.0) return false;
         }
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
+            if (!(s.getItem() instanceof TimeSuit)) continue;
             IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
             b.setEnergy(s, b.getEnergy(s) - factor * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0);
         }

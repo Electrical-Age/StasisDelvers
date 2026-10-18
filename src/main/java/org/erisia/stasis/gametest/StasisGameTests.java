@@ -335,12 +335,45 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // λ-Nero, Baughn 2026-10-18: in the plain Grey a chest piece is enough (for other armour and enchantments), but it
+        // carries the whole suit's draw; without one the suit doesn't work
         CASES.put("partial_suit_freezes", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
-            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
-                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), null);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), null,
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
             return () -> {
-                c.check("three pieces of four: the player froze", !p.isAlive());
+                c.check("three pieces but no chest piece: the player froze", !p.isAlive());
+                remove(h, p);
+            };
+        }));
+        CASES.put("chest_piece_alone_protects", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, null, org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(), null, null);
+            var chest = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+            var item = (org.erisia.stasis.DelverSuitItem) chest.getItem();
+            double full = item.getEnergy(chest);
+            return () -> {
+                c.check("a chest piece alone: no freezing in the plain Grey", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                double used = full - item.getEnergy(chest), perPiece = item.stasisDraw(chest) * 130 / 20.0;
+                c.check("it draws for the whole suit (4 pieces' worth)", used > 3.8 * perPiece && used < 4.3 * perPiece,
+                    String.format("%.1f J, one piece's share %.1f J", used, perPiece));
+                remove(h, p);
+            };
+        }));
+        CASES.put("chest_piece_alone_in_mist", new Spec(60, (h, c) -> {
+            var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
+            org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, null, org.erisia.stasis.StasisRegistry.STASIS_CHEST.get(), null, null);
+            var chest = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+            var item = (org.erisia.stasis.StasisArmorItem) chest.getItem();
+            double full = item.getEnergy(chest);
+            return () -> {
+                org.erisia.stasis.Pockets.TEST.remove(box);
+                c.check("in mist a lone chest piece (even stasis armour) lets the freeze creep in", p.isAlive() && Freezing.ticks(p) > 20,
+                    "ticks " + Freezing.ticks(p));
+                double used = full - item.getEnergy(chest), plain = 4 * item.stasisDraw(chest) * 60 / 20.0;
+                c.check("and drains x2 x (1 + 3 missing) over the whole suit's draw", used > 7 * plain, String.format("%.1f J vs %.1f", used, plain));
                 remove(h, p);
             };
         }));

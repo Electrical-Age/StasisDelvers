@@ -33,6 +33,8 @@ public final class Freezing {
         /** Held by a deep until this game time (a full freeze in a drifting deep: no statue, Baughn). */
         long heldUntil;
         float sent;
+        /** The freeze's fractional ticks while a weak suit lets it creep in (a Delver suit or missing pieces in a deep). */
+        double creep;
     }
 
     private static final Map<UUID, State> STATES = new HashMap<>();
@@ -95,6 +97,9 @@ public final class Freezing {
             s.heldUntil = 0;
             s.ticks = 0;
         }
+        // missing suit pieces (a chest piece is enough in the plain Grey: λ-Nero, Baughn): in a deep each one adds to the
+        // drain and lets the freeze creep in a quarter faster
+        int missing = deep && !p.isCreative() && !p.isSpectator() ? Math.min(3, Suits.missing(p)) : 0;
         if (zone == 2 && !grace && !p.isCreative() && !p.isSpectator()) {
             // a rift: nothing protects, a statue in about 3 s (Baughn). No messages for deeps, rifts or eddies: fear of
             // the unknown is part of the theme (Baughn)
@@ -105,11 +110,19 @@ public final class Freezing {
         } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
             suited = true;
-        } else if (stopped && !grace && !(suited = isProtected(p, zone == 1 ? 3 : deep ? 2 : 1, true))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
-        else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && Suits.delverOnly(p)) {
-            // a rift capacitor takes the freeze (a raw shard half of it: every 8th tick instead of every 4th)
+        } else if (stopped && !grace && !(suited = isProtected(p, (zone == 1 ? 3 : deep ? 2 : 1) * (1 + missing), true))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
+        else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && (Suits.delverOnly(p) || missing > 0)) {
+            // the freeze creeps in: a quarter rate for a Delver suit, a quarter per missing piece (the worse wins); a
+            // rift capacitor takes it (a raw shard half of it)
+            double rate = Math.max(Suits.delverOnly(p) ? 0.25 : 0, missing / 4.0);
             double took = Capacitors.absorb(p, 1 / 20.0);
-            if (took < 1 && s.counted % (took > 0 ? 8 : 4) == 0) s.ticks++;
+            if (took < 1) {
+                s.creep += took > 0 ? rate / 2 : rate;
+                while (s.creep >= 1) {
+                    s.creep -= 1;
+                    s.ticks++;
+                }
+            }
             // a static deep is no passing weather: there the Delver suit's freeze ends as a statue, as anywhere
             if (zone == 1 || strataMist) {
                 // (falls through to the statue check below)
