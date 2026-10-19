@@ -41,7 +41,7 @@
   "subtitles.stasisdelvers.storm.wind": "Storm wind",
   "item.stasisdelvers.rift_compass": "Rift Compass",
   "item.stasisdelvers.stability_compass": "Stability Compass",
-  "item.stasisdelvers.stability_compass.tooltip": "Points to the nearest place of 90 % temporal stability or more, where time runs longest",
+  "item.stasisdelvers.stability_compass.tooltip": "Points to the nearest place of safety",
   "item.stasisdelvers.stability_compass.here": "Temporal stability here: %s %% (the stillness covers %s %%)",
   "item.stasisdelvers.stability_compass.none": "The needle spins: no stillness is spreading here",
   "block.stasisdelvers.rift_barometer": "Rift Barometer",
