@@ -19,7 +19,7 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   nodes stop), at the threshold Freezing uses (`Deeps.at > Deeps.THRESHOLD` = 0.5). `rateAtLand` (flame light,
   meshing, map overlays) ignores them. Static deeps' outer zones don't stop running land; their rifts do.
 - The world spawn moves once (Baughn 2026-10-19, Discord 1561784319549374485): when the stillness reaches the
-  world spawn's column, it moves to the nearest still-viable place, and never again (if the new spawn stills too, in
+  world spawn's column, it moves to a still-viable place near the peak of the nearest qualifying island, and never again (if the new spawn stills too, in
   hard mode, it stays). Players with their own bed or anchor keep it (`Freezing.respawnPosition`'s rules); players
   respawning at world spawn go to the new one, and the spawn area (`spawnRadius`) moves with it. Online players read
   "The world's spawn has moved to the highlands at X, Z: the old spawn has stilled."
@@ -45,6 +45,9 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   - Sort keys are S exactly (float bits made sortable), then the cell index: deterministic, no ties.
   - Cells outside the radius are -1 (stilled from the start).
   - `nearestAtLeast(map, x, z, minRank, rings)`: the nearest cell centre at or above a rank, ring by ring (the compass).
+  - `climb(map, x, z)`: steepest ascent over the 4 neighbours to a local maximum of the ranks, the island's peak (stills
+    last). The compass points at climb(nearestAtLeast(...)) (Baughn: "the highest point of the nearest island that reaches
+    90 %"); the spawn move searches outward from climb of its nearest qualifying cell.
   - `cellsAtLeast(map, x, z, minRank)`: every cell at or above a rank, nearest first (ties by index): the spawn move's
     candidates.
   - `rank1024(SpreadRanks, x, z)`: **the** lookup, bilinear between cell centres (32i+16) in integer arithmetic.

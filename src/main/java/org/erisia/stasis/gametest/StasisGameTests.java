@@ -2288,13 +2288,14 @@ public final class StasisGameTests {
             org.erisia.stasis.StabilityCompassItem.update(compass, level, p);
             var tr = compass.get(net.minecraft.core.component.DataComponents.LODESTONE_TRACKER);
             int min = (int) Math.ceil(org.erisia.stasis.StabilityCompassItem.TARGET * m.count);
-            int[] want = org.erisia.stasis.SpreadMap.nearestAtLeast(m, p.getBlockX(), p.getBlockZ(), min, m.n * 2);
+            int[] near = org.erisia.stasis.SpreadMap.nearestAtLeast(m, p.getBlockX(), p.getBlockZ(), min, m.n * 2);
+            int[] want = near == null ? null : org.erisia.stasis.SpreadMap.climb(m, near[0], near[1]);
             c.check("a target is set", tr != null && tr.target().isPresent(), "" + tr);
             if (tr != null && tr.target().isPresent()) {
                 BlockPos t = tr.target().get().pos();
                 c.check("the target's stability is >= 90 %", m.rank1024(t.getX(), t.getZ()) >= (long) min * org.erisia.stasis.SpreadMap.SCALE,
                     "rank " + m.rank1024(t.getX(), t.getZ()) / org.erisia.stasis.SpreadMap.SCALE + " of " + m.count);
-                c.check("it is the nearest such cell", want != null && t.getX() == want[0] && t.getZ() == want[1], t.toShortString());
+                c.check("it is the peak of the nearest such island", want != null && t.getX() == want[0] && t.getZ() == want[1], t.toShortString());
                 c.check("in the overworld", tr.target().get().dimension() == net.minecraft.world.level.Level.OVERWORLD);
             }
             org.erisia.stasis.Spread.testReset();

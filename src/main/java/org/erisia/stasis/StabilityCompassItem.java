@@ -30,7 +30,8 @@ import java.util.function.Consumer;
  * <p>
  * Like the rift compass it uses the vanilla compass's lodestone needle (an untracked target), so the client needs nothing
  * but the item model. The target only depends on the player's cell (and the threshold), so it is cached per player and
- * searched again when the player changes cell (SpreadMap.nearestAtLeast, ring by ring out from the player).
+ * searched again when the player changes cell (SpreadMap.nearestAtLeast, ring by ring out from the player, then
+ * SpreadMap.climb to that island's highest point).
  */
 public class StabilityCompassItem extends Item {
     /** The stability the needle looks for (Baughn: >= 90 %). */
@@ -79,6 +80,9 @@ public class StabilityCompassItem extends Item {
         // up to twice the map's width in rings: the whole map from anywhere within a radius of its edge (and a bounded
         // search from far beyond it, where the needle spins)
         int[] t = SpreadMap.nearestAtLeast(m, owner.getBlockX(), owner.getBlockZ(), min, 2 * m.n);
+        // the highest point of the nearest island that reaches 90 % (Baughn 2026-10-19): it stills last, where the
+        // nearest qualifying spot is an edge, which late in the game stills within seconds (AdventurAgent)
+        if (t != null) t = SpreadMap.climb(m, t[0], t[1]);
         LodestoneTracker want = t == null ? SPIN
             : new LodestoneTracker(Optional.of(GlobalPos.of(level.dimension(), new BlockPos(t[0], owner.getBlockY(), t[1]))), false);
         CACHE.put(owner.getUUID(), new Cached(m, cx, cz, min, want));

@@ -317,4 +317,24 @@ public final class SpreadMap implements SpreadRanks {
         for (int j = 0; j < t; j++) out[j] = (int) (keys[j] & 0x7FFFFF);
         return out;
     }
+
+    /**
+     * Steepest ascent over the 4 neighbours from the cell holding block (x, z) to a local maximum of the ranks: the
+     * peak of the running island it is on, the part that stills last. Returns that cell's centre {x, z}. (Late in the
+     * game "the nearest place that still runs" is the edge of a shrinking island, which stills first: AdventurAgent.)
+     */
+    public static int[] climb(SpreadMap m, int x, int z) {
+        int ci = Math.floorDiv(x, CELL), ck = Math.floorDiv(z, CELL);
+        int r = m.rank(ci, ck);
+        while (true) {
+            int bi = ci, bk = ck, br = r;
+            int[][] d = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (int[] e : d) {
+                int q = m.rank(ci + e[0], ck + e[1]);
+                if (q > br) { br = q; bi = ci + e[0]; bk = ck + e[1]; }
+            }
+            if (br == r) return new int[]{ci * CELL + HALF, ck * CELL + HALF};
+            ci = bi; ck = bk; r = br;
+        }
+    }
 }

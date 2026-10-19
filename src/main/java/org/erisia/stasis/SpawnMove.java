@@ -80,7 +80,10 @@ public final class SpawnMove {
         if (search == null || search.map() != m) {
             if (m.rank1024(sx, sz) < 0 || !SpreadMap.stilled(m, sx, sz, s.p())) return;
             int min = Math.max((int) Math.ceil(TARGET * s.count()), s.p() + 1);
-            search = new Search(m, min, SpreadMap.cellsAtLeast(m, sx, sz, min), sx, sz);
+            // nearest qualifying cell, then up to its island's peak (it stills last), and candidates nearest that peak
+            int[] near = SpreadMap.nearestAtLeast(m, sx, sz, min, 2 * m.n);
+            int[] peak = near == null ? new int[]{sx, sz} : SpreadMap.climb(m, near[0], near[1]);
+            search = new Search(m, min, SpreadMap.cellsAtLeast(m, peak[0], peak[1], min), sx, sz);
             next = 0;
             offset = 0;
             lastLog = System.nanoTime();

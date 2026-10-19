@@ -412,4 +412,16 @@ class SpreadMapTest {
         assertEquals(800, Spread.progress(Spread.coverage(48 * 3600, false, 0, 48, 48, 0.8), 1000));
         assertEquals(800, Spread.progress(Spread.coverage(1e9, false, 0, 48, 48, 0.8), 1000));
     }
+
+    /** climb ends on a local maximum of the ranks, never lower than where it started (the peak stills last). */
+    @Property(tries = 200)
+    void climbEndsOnALocalMaximum(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -500, max = 500) int x,
+                                  @ForAll @IntRange(min = -500, max = 500) int z) {
+        SpreadMap m = map(seed, 10, -20, 500);
+        int[] p = SpreadMap.climb(m, x, z);
+        int ci = Math.floorDiv(p[0], SpreadMap.CELL), ck = Math.floorDiv(p[1], SpreadMap.CELL);
+        int r = m.rank(ci, ck);
+        assertTrue(r >= m.rank(Math.floorDiv(x, SpreadMap.CELL), Math.floorDiv(z, SpreadMap.CELL)));
+        for (int[] e : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) assertTrue(m.rank(ci + e[0], ck + e[1]) <= r);
+    }
 }

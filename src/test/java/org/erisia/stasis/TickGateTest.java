@@ -94,7 +94,7 @@ class TickGateTest {
                                           @ForAll @DoubleRange(min = -0.2, max = 1.2) double u) {
         Storms.Storm s = new Storms.Storm(start, len);
         double t = start + u * len;
-        int steps = 4000;
+        int steps = 40000;
         double a = start, h = (Math.max(a, Math.min(t, s.end())) - a) / steps, sum = 0;
         for (int i = 0; i < steps; i++) {
             double i0 = Storms.intensity(s, a + i * h), i1 = Storms.intensity(s, a + (i + 1) * h);
