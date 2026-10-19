@@ -46,6 +46,7 @@ class EndRiftPlanTest {
             for (long b : pl.blocks(p)) {
                 int x = BlockPos.getX(b), y = BlockPos.getY(b), z = BlockPos.getZ(b);
                 assertTrue(seen.add(b), "one block, one part");
+                assertTrue(pl.isIsland(b));
                 double d = Math.sqrt(x * x + Math.pow(y - StaticDeeps.END_RIFT_Y, 2) + z * z);
                 assertTrue(d >= EndRiftPlan.SHELL_MIN - 1 && d <= EndRiftPlan.SHELL_MAX + 1, x + " " + y + " " + z + " at " + d);
                 assertTrue(y >= 0 && y < 256);

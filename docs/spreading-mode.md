@@ -211,8 +211,10 @@ islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
   destroying removal reason, inside that pillar's `getTopBoundingBox`; vanilla's pillar crystals show their bottom,
   a player's never do, so placed crystals are ignored) records that pillar once (`broken` bit) and queues its part:
   - Lift: its columns lose their end stone (only end stone: players' blocks, the arrival platform's obsidian, chests
-    stay, floating; writes skip neighbour and shape updates so nothing pops). With players in the End, each chunk is
-    warned `WARN_TICKS` (30) ahead with end-stone dust and a crumbling sound (two chunks ahead are warned with it), and a
+    stay, floating; writes skip neighbour and shape updates so nothing pops), except where a rift island's block goes
+    (`EndRiftPlan.isIsland`): islands already placed over a column lifted later stay, and island end stone where the old
+    island stood stays put. With players in the End, each chunk is warned `WARN_TICKS` (30) before it goes with
+    end-stone dust and a crumbling sound (as a chunk begins, the next two are warned), and a
     column within 2 blocks of a player's feet is put off with dust and "The ground crumbles under your feet!" until they
     step away or 3 s pass (then it goes: falling into the void is the End's usual risk). The stage starts with a boom
     and an action-bar line, "The island shudders: that crystal was holding part of it together."
@@ -228,7 +230,8 @@ islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
   flash the core heaves (4 shards a tick thrown from its surface to the core's islands, purely cosmetic, reverse-portal
   particles round the rift's centre) and nothing under the players goes; at the flash the shards are dropped
   (`EndRift.flash`) and from then on every remaining part is lifted (the core also loses the pillars' obsidian, the
-  fountain's bedrock and torches, iron bars, fire, any portal block and the egg) and every island placed, at 4096 writes
+  fountain's bedrock and torches, iron bars, fire, any portal block and the egg, and a pillar's own crystal still
+  standing is discarded with its pillar) and every island placed, at 4096 writes
   a tick (512 if a creative visitor is there). A stage running at the kill goes on at its pace.
 - Chunks: the work goes chunk by chunk; a chunk not loaded is force-loaded through the `stasisdelvers:end_rift` ticket
   controller (non-ticking), with the next one prefetched, and released when done (all released when the queue empties).
@@ -237,7 +240,8 @@ islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
 - Restart: the jobs come back from `end_rift` (pillars broken, parts lifted and placed, and per part the chunks done),
   so a part resumes from its next chunk; a chunk redone after a crash changes nothing (only the island's own blocks go,
   only air is filled). Shards are memory only: a saved one loading again is dropped (`EntityJoinLevelEvent`).
-- Cost: the plan is built once per seed (~0.1-0.5 s, cached); the island scan reads each column once; a vanilla island
+- Cost: the plan is built once per seed (~0.1-0.5 s, cached; built when the first player is in the End, not at the
+  first crystal mid-fight); the island scan reads each column once; a vanilla island
   is a few hundred thousand block writes in all, most of them at the finale with nobody there (about a minute with
   chunk loads).
 - Lab procedure (AdventurAgent; a lab server in spreading mode, a copy of a world whose dragon is alive, not the live
@@ -399,8 +403,9 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
   player's crystal or one away from the pillars doesn't, the command's path records another, the lifts are queued);
   `end_rift_stage_builds` (two stages carried out with nobody there, a restart after 25 slow ticks resuming from the
   saved chunks: the sectors hold no end stone but the islands', the islands stand, the core is untouched, no chunk
-  stays forced); `end_rift_finale_builds` (the dragon's death: everything lifted and placed, a pillar stump and the
-  fountain's bedrock gone, a player's block floating, the rift's core registered). The test End is flat (bedrock and
+  stays forced); `end_rift_finale_builds` (the dragon's death, built in a stilled End as after the flash: everything
+  lifted and placed, a pillar stump, its crystal and the fountain's bedrock gone, a player's block floating, a shard
+  landing in stopped time, the rift's core registered). The test End is flat (bedrock and
   three end stone, no pillars): the tests use `getSpikesForLevel`'s positions and lay the flat ground back after.
   Not tested: the shards' look, the warnings with real players on the island, a real island's numbers (lab).
 - Eyes of Ender: nothing here changes where strongholds are placed or `#eye_of_ender_located`; the portal room's

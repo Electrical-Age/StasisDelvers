@@ -56,6 +56,8 @@ public final class EndRiftPlan {
     private final long[][] blocks;
     private final Kind[][] kinds;
     private final int total;
+    /** Every island block, for the lifts to leave alone. */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet all = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
 
     private EndRiftPlan(int seed, List<int[]> spikes) {
         this.seed = seed;
@@ -127,6 +129,7 @@ public final class EndRiftPlan {
             l.sort(Comparator.<long[]>comparingLong(b -> ChunkPos.pack((int) b[0] >> 4, (int) b[2] >> 4)).thenComparingLong(b -> b[1])
                 .thenComparingLong(b -> b[0]).thenComparingLong(b -> b[2]));
             blocks[p] = l.stream().mapToLong(b -> BlockPos.asLong((int) b[0], (int) b[1], (int) b[2])).toArray();
+            for (long b : blocks[p]) all.add(b);
             kinds[p] = l.stream().map(b -> Kind.values()[(int) b[3]]).toArray(Kind[]::new);
         }
     }
@@ -285,6 +288,15 @@ public final class EndRiftPlan {
 
     public Kind kind(int p, int i) {
         return kinds[p][i];
+    }
+
+    /**
+     * Is this (a BlockPos long) one of the islands' blocks? A lift leaves it alone: an island placed already (over a
+     * column lifted later, or the core's placed while a sector still lifts) stays, and island end stone where the old
+     * island stood simply stays put.
+     */
+    public boolean isIsland(long pos) {
+        return all.contains(pos);
     }
 
     /** All the islands' blocks. */

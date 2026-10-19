@@ -2539,6 +2539,18 @@ public final class StasisGameTests {
             end.setBlock(mine, Blocks.COBBLESTONE.defaultBlockState(), 2);
             int[] pillar = column.apply(spike.getCenterX(), spike.getCenterZ()), mid = column.apply(20, 12);
             c.check("before: a pillar and island under it", pillar[1] >= 8 && mid[0] >= 3, pillar[1] + " obsidian, " + mid[0] + " end stone");
+            // as after the flash: hard mode (no End event) and the End stilled; the build happens in stopped time
+            double[] was = org.erisia.stasis.Spread.testClock(server, 100, true, 50);
+            c.cleanup.add(0, () -> org.erisia.stasis.Spread.testClockRestore(server, was));
+            c.check("the End is stilled", Stasis.stops(end));
+            // a pillar's crystal still standing, and a shard flying in the stilled End
+            var standing = new net.minecraft.world.entity.boss.enderdragon.EndCrystal(end, spike.getCenterX() + 0.5, 12, spike.getCenterZ() + 0.5);
+            end.addFreshEntity(standing);
+            // (beyond the island's columns, so no lift takes its block again)
+            BlockPos shardTo = new BlockPos(org.erisia.stasis.EndRiftPlan.ISLAND_RADIUS + 5, 30, 0);
+            end.getChunk(shardTo.getX() >> 4, 0);
+            if (end.setChunkForced(shardTo.getX() >> 4, 0, true)) c.cleanup.add(() -> end.setChunkForced(shardTo.getX() >> 4, 0, false));
+            org.erisia.stasis.EndRift.testShard(end, new BlockPos(org.erisia.stasis.EndRiftPlan.ISLAND_RADIUS + 5, 8, 0), shardTo, Blocks.END_STONE.defaultBlockState());
             org.erisia.stasis.EndRift.testFinale(end);
             return () -> {
                 int[] st = org.erisia.stasis.EndRift.testState(end);
@@ -2554,6 +2566,10 @@ public final class StasisGameTests {
                 c.check("the island is gone", stoneLeft == 0, stoneLeft + " end stone left");
                 c.check("its pillar and the fountain too", pillarsLeft == 0, pillarsLeft + " obsidian/bedrock left");
                 c.check("a player's block stays, floating", end.getBlockState(mine).is(Blocks.COBBLESTONE));
+                c.check("the pillar's crystal went with it", standing.isRemoved());
+                c.check("a shard flew and landed in the stilled End", end.getBlockState(shardTo).is(Blocks.END_STONE) && org.erisia.stasis.EndRift.testShards() == 0,
+                    end.getBlockState(shardTo) + ", " + org.erisia.stasis.EndRift.testShards() + " shards");
+                end.setBlock(shardTo, Blocks.AIR.defaultBlockState(), 2);
                 int missing = 0;
                 for (long b : islands) if (end.getBlockState(BlockPos.of(b)).isAir()) missing++;
                 c.check("the rift's islands stand", missing == 0, missing + " of " + islands.size() + " missing");

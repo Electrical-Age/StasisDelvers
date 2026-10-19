@@ -162,6 +162,8 @@ public final class EndRift {
         final boolean waitEmpty;
         long notBefore;
         int idx;
+        /** The chunk being lifted (its key), to warn the next ones as it begins. */
+        long chunk = -1;
         int shards;
         /** Columns put off under a player's feet: column -> first tick. */
         final Map<Long, Long> deferred = new HashMap<>();
@@ -204,7 +206,7 @@ public final class EndRift {
     private static final List<Job> JOBS = new ArrayList<>();
     private static final List<Shard> SHARDS = new ArrayList<>();
     private static final Set<Long> FORCED = new HashSet<>();
-    private static boolean started;
+    private static boolean started, warmed;
     private static long heaveUntil;
 
     static void serverStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent e) {
@@ -212,6 +214,7 @@ public final class EndRift {
         SHARDS.clear();
         FORCED.clear();
         started = false;
+        warmed = false;
         heaveUntil = 0;
         StaticDeeps.clearEndRifts();
     }
@@ -329,6 +332,11 @@ public final class EndRift {
         if (end == null) return;
         if (Spread.hard(srv)) StaticDeeps.addEndRift(FieldData.get(end).deepSeed());
         if (!started) {
+            // (the plan takes a moment to build: when someone arrives, not at the first crystal mid-fight)
+            if (!warmed && !end.players().isEmpty()) {
+                warmed = true;
+                plan(end);
+            }
             Data d = Data.get(end);
             if (d.broken == 0 && !d.finale) return;
             ensureStarted(end);
@@ -397,7 +405,12 @@ public final class EndRift {
                 Long w = j.warned.get(key);
                 if (w == null) {
                     warnChunk(end, pl, j, j.idx, now);
-                    // and the next two chunks, so the front doesn't stop at each
+                    return false;
+                }
+                if (now - w < WARN_TICKS) return false;
+                if (j.chunk != key) {
+                    // this chunk begins: warn the next two now, so the front doesn't stop at each
+                    j.chunk = key;
                     int k = j.idx, seen = 0;
                     long last = ChunkPos.pack(cx, cz);
                     while (++k < cols.length && seen < 2) {
@@ -408,9 +421,7 @@ public final class EndRift {
                             if (!j.warned.containsKey(key(j.part, ChunkPos.getX(ck), ChunkPos.getZ(ck)))) warnChunk(end, pl, j, k, now);
                         }
                     }
-                    return false;
                 }
-                if (now - w < WARN_TICKS) return false;
                 if (underFoot(end, x, z)) {
                     Long first = j.deferred.putIfAbsent(c, now);
                     if (first == null || now - first < UNDER_FOOT_TICKS) {
@@ -439,8 +450,14 @@ public final class EndRift {
             }
             budget[0] -= 2 + liftColumn(end, pl, j, x, z, watched, now);
             it.remove();
-            d.liftDone.add(key(j.part, x >> 4, z >> 4));
-            release(end, x >> 4, z >> 4);
+            // its chunk is done once no other column there waits
+            boolean more = false;
+            for (long o : j.deferred.keySet()) more |= BlockPos.getX(o) >> 4 == x >> 4 && BlockPos.getZ(o) >> 4 == z >> 4;
+            if (!more) {
+                d.liftDone.add(key(j.part, x >> 4, z >> 4));
+                d.setDirty();
+                release(end, x >> 4, z >> 4);
+            }
         }
         return j.deferred.isEmpty();
     }
@@ -477,7 +494,12 @@ public final class EndRift {
     /** Lift column (x, z) of job j's part: its island blocks go; some of its top end stone flies (players watching). */
     private static int liftColumn(ServerLevel end, EndRiftPlan pl, Job j, int x, int z, boolean watched, long now) {
         BlockPos[] stone = new BlockPos[1];
-        int n = liftColumn(end, x, z, j.part == pl.core, end.getMinY(), stone);
+        int n = liftColumn(end, x, z, j.part == pl.core, end.getMinY(), pl::isIsland, stone);
+        if (j.part == pl.core)
+            // a pillar's own crystal still standing (the dragon died first) goes with its pillar, not left in the air
+            for (EndSpikeFeature.EndSpike sp : EndSpikeFeature.getSpikesForLevel(end))
+                if (sp.getCenterX() == x && sp.getCenterZ() == z)
+                    for (EndCrystal c : end.getEntitiesOfClass(EndCrystal.class, sp.getTopBoundingBox(), EndCrystal::showsBottom)) c.discard();
         if (!watched || stone[0] == null) return n;
         long[] cols = pl.columns(j.part);
         float chance = Math.min(1f, SHARDS_PER_PART / (float) Math.max(1, cols.length));
@@ -497,15 +519,18 @@ public final class EndRift {
         return n;
     }
 
-    /** Remove column (x, z)'s island blocks (terrain); stone[0] gets the topmost end stone. Returns blocks written. */
-    static int liftColumn(ServerLevel level, int x, int z, boolean core, int minY, BlockPos[] stone) {
+    /**
+     * Remove column (x, z)'s island blocks (terrain) but those `keep` says are the rift's islands; stone[0] gets the
+     * topmost end stone removed. Returns blocks written.
+     */
+    static int liftColumn(ServerLevel level, int x, int z, boolean core, int minY, java.util.function.LongPredicate keep, BlockPos[] stone) {
         LevelChunk ch = level.getChunk(x >> 4, z >> 4);
         int top = ch.getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15);
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         int n = 0;
         for (int y = top; y >= minY; y--) {
             BlockState st = ch.getBlockState(p.set(x, y, z));
-            if (st.isAir() || !terrain(st, core, x, z)) continue;
+            if (st.isAir() || !terrain(st, core, x, z) || keep.test(p.asLong())) continue;
             if (stone[0] == null && st.is(Blocks.END_STONE)) stone[0] = p.immutable();
             level.setBlock(p, Blocks.AIR.defaultBlockState(), FLAGS);
             n++;
@@ -711,7 +736,7 @@ public final class EndRift {
 
     /** Tests: lift one column down to minY (a pillar's sector's or the core's rule), returning blocks removed. */
     public static int testLiftColumn(ServerLevel level, int x, int z, boolean core, int minY) {
-        return liftColumn(level, x, z, core, minY, new BlockPos[1]);
+        return liftColumn(level, x, z, core, minY, q -> false, new BlockPos[1]);
     }
 
     /** Tests: a shard from `from` to `to` that places `place` when it lands; its flight's length in ticks. */
