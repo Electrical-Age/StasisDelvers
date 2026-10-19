@@ -515,8 +515,6 @@ public final class StasisGameTests {
                     if (part != want) { ok = false; sb.append(k).append('=').append(part).append(' '); }
                 }
                 c.check("mast poles: ladder up to the ladder top, hidden above", ok, sb.toString());
-                c.check("core blocks stay visible (the console: Baughn)", !h.getBlockState(base).getValue(org.erisia.stasis.TowerBlock.HIDDEN)
-                    && !h.getBlockState(base.above()).getValue(org.erisia.stasis.TowerBlock.HIDDEN));
                 c.check("boom poles hidden", h.getBlockState(base.above(7).east(3)).getValue(org.erisia.stasis.TowerPoleBlock.PART)
                     == org.erisia.stasis.TowerPoleBlock.Part.HIDDEN);
             };
@@ -2276,7 +2274,7 @@ public final class StasisGameTests {
 
     static org.erisia.stasis.TowerBlockEntity tower(GameTestHelper h, BlockPos base, int segments) {
         for (int i = 1; i <= segments; i++) h.setBlock(base.above(1 + i), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());
-        if (!org.erisia.stasis.TowerBlock.placeCore(h.getLevel(), h.absolutePos(base), null)) throw new IllegalStateException("no room for the core");
+        if (!org.erisia.stasis.TowerBlock.placeCore(h.getLevel(), h.absolutePos(base))) throw new IllegalStateException("no room for the core");
         return (org.erisia.stasis.TowerBlockEntity) h.getLevel().getBlockEntity(h.absolutePos(base));
     }
 

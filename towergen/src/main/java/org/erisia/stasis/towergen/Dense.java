@@ -29,54 +29,11 @@ public final class Dense {
     }
 
     /**
-     * Cholesky factorisation A = L L^T, in place on the lower triangle of a row-major n x n array. Returns false if
-     * a pivot is not positive. Blocked by rows for cache locality (right-looking, j-outer).
+     * Profile (skyline) Cholesky, A = L L^T in place on a row-major n x n array: loops start at the first structurally
+     * non-zero column of each row, so the skipped terms are exact zeros (the inner products use 4 partial sums).
+     * first[i] = first non-zero column of row i (lower triangle). On return the upper triangle holds L^T within the
+     * profile. Returns -1 on success, else the row of the first non-positive pivot.
      */
-    public static boolean cholesky(double[] a, int n) {
-        for (int j = 0; j < n; j++) {
-            int rj = j * n;
-            double d = a[rj + j];
-            for (int k = 0; k < j; k++) d -= a[rj + k] * a[rj + k];
-            if (!(d > 0)) return false;
-            double ljj = Math.sqrt(d);
-            a[rj + j] = ljj;
-            double inv = 1.0 / ljj;
-            for (int i = j + 1; i < n; i++) {
-                int ri = i * n;
-                double s = a[ri + j];
-                for (int k = 0; k < j; k++) s -= a[ri + k] * a[rj + k];
-                a[ri + j] = s * inv;
-            }
-        }
-        for (int i = 0; i < n; i++) for (int k = i + 1; k < n; k++) a[i * n + k] = a[k * n + i];   // L^T above
-        return true;
-    }
-
-    /** Solves L L^T x = b in place (b overwritten with x); l from {@link #cholesky} (L below, L^T above). */
-    public static void cholSolve(double[] l, int n, double[] b) {
-        for (int i = 0; i < n; i++) {
-            int ri = i * n;
-            double s = b[i];
-            for (int k = 0; k < i; k++) s -= l[ri + k] * b[k];
-            b[i] = s / l[ri + i];
-        }
-        for (int i = n - 1; i >= 0; i--) {
-            double s = b[i];
-            int ri = i * n;
-            for (int k = i + 1; k < n; k++) s -= l[ri + k] * b[k];
-            b[i] = s / l[i * n + i];
-        }
-    }
-
-    /**
-     * Profile (skyline) Cholesky: the same operations as {@link #cholesky} but loops start at the first structurally
-     * non-zero column of each row, so the skipped terms are exact zeros (the same factor up to
-     * summation order: the inner products use 4 partial sums). first[i] = first
-     * non-zero column of row i (lower triangle). On return the upper triangle holds L^T within the profile.
-     */
-    public static boolean choleskyProfile(double[] a, int n, int[] first) { return choleskyProfileAt(a, n, first) < 0; }
-
-    /** As {@link #choleskyProfile}; returns -1 on success, else the row of the first non-positive pivot. */
     public static int choleskyProfileAt(double[] a, int n, int[] first) {
         for (int j = 0; j < n; j++) {
             int rj = j * n, fj = first[j];

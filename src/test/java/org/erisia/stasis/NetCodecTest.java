@@ -126,14 +126,12 @@ class NetCodecTest {
     }
 
     @Property(tries = 200)
-    void clockMapsRoundTrip(@ForAll @Size(max = 20) Map<Integer, Double> fieldTimes, @ForAll @Size(max = 20) Map<Long, Double> chunks,
-                            @ForAll @Size(max = 20) Map<Long, Byte> lights) {
+    void clockMapsRoundTrip(@ForAll @Size(max = 20) Map<Integer, Double> fieldTimes, @ForAll @Size(max = 20) Map<Long, Byte> lights) {
         Map<Integer, double[]> clocks = new HashMap<>();
         fieldTimes.forEach((id, t) -> clocks.put(id, new double[]{t, t / 7}));
         var back = trip(StasisNet.FieldClocks.CODEC, new StasisNet.FieldClocks(clocks)).clocks();
         assertEquals(clocks.keySet(), back.keySet());
         clocks.forEach((id, v) -> assertArrayEquals(v, back.get(id)));
-        assertEquals(new StasisNet.ChunkClocks(chunks), trip(StasisNet.ChunkClocks.CODEC, new StasisNet.ChunkClocks(chunks)));
         assertEquals(new StasisNet.Gutters(lights), trip(StasisNet.Gutters.CODEC, new StasisNet.Gutters(lights)));
     }
 

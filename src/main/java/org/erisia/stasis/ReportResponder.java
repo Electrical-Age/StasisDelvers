@@ -10,7 +10,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
@@ -188,7 +187,6 @@ public final class ReportResponder {
             if (a.size() >= 64) break;
         }
         o.add("near", a);
-        o.addProperty("chunk_clock_here", LocalTime.ChunkClocks.get(level).at(ChunkPos.pack(sp.blockPosition().getX() >> 4, sp.blockPosition().getZ() >> 4)));
         return o;
     }
 

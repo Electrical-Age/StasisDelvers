@@ -7,12 +7,11 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.FrameGraphSetupEvent;
 import net.neoforged.neoforge.client.event.RenderArmEvent;
-import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.erisia.stasis.StasisDelvers;
 import org.erisia.stasis.StasisRegistry;
 
-/** Client side: statue model, shield geometry, the desaturation post effect, the freeze warning, the suit arm and the
+/** Client side: statue model, the desaturation post effect, the freeze warning, the suit arm and the
  *  bug-report key. */
 @Mod(value = StasisDelvers.MODID, dist = Dist.CLIENT)
 public final class StasisClient {
@@ -25,8 +24,7 @@ public final class StasisClient {
             net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "suit_gauge"),
             SuitGauge::render));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
-        // the shield is drawn by the post effect now (so the desaturation can't grey it); ShieldRenderer is kept for
-        // a possible later geometry version (falling cells)
+        // the shield is drawn by the post effect (so the desaturation can't grey it)
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, StasisPost::frame);
         // flames' light in chunk meshes (smooth lighting) depends on where they are
         org.erisia.stasis.Flames.clientResolver = g -> g instanceof net.minecraft.client.renderer.chunk.RenderSectionRegion r ? r.level : null;
@@ -38,12 +36,11 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.ChunkEvent.Load.class, e -> {
             if (e.getLevel() instanceof net.minecraft.world.level.Level l && l.isClientSide()) org.erisia.stasis.Flames.clientChunkLoad(l, e.getChunk().getPos());
         });
-        // lightning from the shield to the tower (visual only)
+        // lightning from the shield to the tower (visual only; drawn by the post shader from BoltRenderer.fill)
         BoltRenderer.init();
         AntiSound.init();
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.RenderFrameEvent.Pre.class, e -> AntiSound.frame());
         ConsoleScreen.hook();
-        // (drawn by the post shader from BoltRenderer.fill: the custom-geometry path showed nothing in a real client)
         // EA flashlight beams, per pixel (Baughn)
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, FlashlightPost::frame);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, FlashlightPost::tick);

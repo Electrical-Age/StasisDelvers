@@ -52,7 +52,7 @@ import java.util.function.Supplier;
  * The bug-report key (notes/bugreport/SPEC.md): F7 (Controls: "Send bug report") takes a screenshot, collects the
  * client's state, asks the server for its view (StasisNet.ReportQuery, 3 s), then packages a zip in
  * &lt;game&gt;/bugreports/pending off-thread and says so in chat. Shift+F7 asks for a one-line note first. Uploading is
- * manual for now (Uploader.NONE: post the zip in Discord, then /bugreport sent). One report at a time; 5 s between.
+ * manual (post the zip in Discord, then /bugreport sent). One report at a time; 5 s between.
  * Every collector is caught on its own and lands in "errors" instead of breaking the report or the game.
  */
 public final class BugReport {
@@ -68,9 +68,6 @@ public final class BugReport {
     static final int REPORT_SECTION_CAP = 256 * 1024;
     /** When this game session started (the class loads at mod construction): crash reports newer than this are included. */
     static final long SESSION_START = System.currentTimeMillis();
-
-    /** Option B/A later: set an uploader here. */
-    public static volatile Uploader uploader = Uploader.NONE;
 
     /** The report in flight (client thread), or null. */
     private static Report cur;
@@ -484,32 +481,8 @@ public final class BugReport {
             .append(Component.literal(" - includes " + parts + "."));
         if (!"ok".equals(serverStatus)) msg.append(Component.literal(" (server info unavailable: " + serverStatus + ")").withStyle(ChatFormatting.GRAY));
         say(mc, msg);
-        if (uploader.enabled()) upload(mc, r, zip);
-        else say(mc, Component.literal("Please post it in the Discord bug channel, then run ").append(sent).append(Component.literal(".")));
+        say(mc, Component.literal("Please post it in the Discord bug channel, then run ").append(sent).append(Component.literal(".")));
         if (warn != null) say(mc, Component.literal(warn).withStyle(ChatFormatting.YELLOW));
-    }
-
-    /** (Not used yet: Uploader.NONE.) Upload, then move the zip to sent/ with its receipt. */
-    static void upload(Minecraft mc, Report r, Path zip) {
-        try {
-            uploader.upload(zip, r.id, res -> {
-                String msg;
-                if (res.receiptId() != null) {
-                    try {
-                        Path dest = Packager.sent(r.root).resolve(zip.getFileName());
-                        Files.createDirectories(dest.getParent());
-                        Files.move(zip, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                        Files.writeString(dest.resolveSibling(r.id + ".receipt.txt"), res.receiptId() + "\n");
-                    } catch (IOException e) {
-                        StasisDelvers.LOG.warn("Bug report {}: uploaded but not moved to sent/", r.id, e);
-                    }
-                    msg = "Bug report uploaded (id " + res.receiptId() + ")";
-                } else msg = "Upload failed: " + res.failure() + " (kept in bugreports/pending)";
-                mc.execute(() -> say(mc, Component.literal(msg)));
-            });
-        } catch (RuntimeException e) {
-            say(mc, Component.literal("Upload failed: " + e + " (kept in bugreports/pending)"));
-        }
     }
 
     static void fail(Minecraft mc, Report r, Throwable t) {

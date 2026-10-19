@@ -62,11 +62,6 @@ public final class TowerStructure {
     record Outcome(Status status, String message, int ladderTop) {
     }
 
-    /** A pole next to this tower changed: rescan on the next tick. */
-    public void markDirty() {
-        dirty = true;
-    }
-
     /** Server tick. Returns true if the synced state changed (the block entity then sends an update). */
     boolean tick(ServerLevel level, BlockPos core, int every) {
         boolean changed = false;
@@ -78,15 +73,10 @@ public final class TowerStructure {
                 quietTicks = 0;
                 status = l == null ? Status.NONE : Status.WAITING;
                 message = "";
-                if (l == null) {
-                    changed |= resetParts(level, List.of());
-                    TowerBlock.setHidden(level, core, false);
-                }
+                if (l == null) changed |= resetParts(level, List.of());
                 changed = true;
             }
         }
-        // towers built before core hiding existed (and any drift): keep the core hidden exactly while the tower stands
-        if (every % 20 == 10) TowerBlock.setHidden(level, core, false);   // (Baughn: the core stays visible: it's the console)
         if (status == Status.WAITING && ++quietTicks >= DEBOUNCE && pending == null) {
             List<String> v = layout.violations();
             if (!v.isEmpty()) {
@@ -152,7 +142,6 @@ public final class TowerStructure {
             }
         }
         resetParts(level, parts);
-        TowerBlock.setHidden(level, core, false);
     }
 
     /** Sets the given poles' parts and resets the poles of the previous build that aren't in the list. */

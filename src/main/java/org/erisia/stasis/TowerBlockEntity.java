@@ -197,8 +197,6 @@ public class TowerBlockEntity extends BlockEntity {
     boolean override;
     /** The radius the field has now; 0 while off. */
     double effRadius;
-    /** The stepped goal (hysteresis: it moves only by whole steps). */
-    double stepGoal;
 
     public double target() {
         return Math.max(minRadius(), Math.min(maxRadius(), Double.isNaN(targetRadius) ? designRadius() : targetRadius));
@@ -441,7 +439,7 @@ public class TowerBlockEntity extends BlockEntity {
         // the field's radius follows its goal, a block a second (shrinking gives grace to land left stopped)
         if (state == State.RUNNING && level.getGameTime() % 20 == 10) {
             if (effRadius <= 0)   // (a save from before the console: take the field as it is)
-                effRadius = stepGoal = FieldData.get(sl).get(fieldId).map(Field::radius).orElse(designRadius());
+                effRadius = FieldData.get(sl).get(fieldId).map(Field::radius).orElse(designRadius());
             safety();
             double g = goalRadius();
             // coarse steps on the server (each one re-meshes the shell's chunks): a retreat in two jumps, growth
@@ -649,7 +647,6 @@ public class TowerBlockEntity extends BlockEntity {
         }
         effRadius = 0;
         effRadius = goalRadius();
-        stepGoal = effRadius;
         Field f = FieldData.get(sl).add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, radius(), false,
             StasisConfig.towerFieldRate);
         fieldId = f.id();
@@ -673,7 +670,6 @@ public class TowerBlockEntity extends BlockEntity {
         fieldId = 0;
         state = State.OFF;
         effRadius = 0;
-        stepGoal = 0;
         retreating = false;
         collapseTicks = 0;
         failing = amber = dropout = 0;
@@ -784,7 +780,6 @@ public class TowerBlockEntity extends BlockEntity {
             in.getDoubleOr("stretchN", 1));
         var fd = net.minecraft.core.Direction.byName(in.getStringOr("facing", "south"));
         facing = fd != null && fd.getAxis().isHorizontal() ? fd : net.minecraft.core.Direction.SOUTH;
-        stepGoal = effRadius;
         retreating = in.getBooleanOr("retreating", false);
         retreatRadius = in.getDoubleOr("retreatRadius", 0);
         double rr = in.getDoubleOr("remnantRadius", 0);

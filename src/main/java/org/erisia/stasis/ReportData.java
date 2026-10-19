@@ -3,7 +3,6 @@ package org.erisia.stasis;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.ChunkPos;
 
 import java.util.Map;
 
@@ -15,7 +14,7 @@ public final class ReportData {
     private ReportData() {
     }
 
-    /** LocalTime.Client: all field clocks; chunk clocks of the player's chunk and its 8 neighbours, and the count. */
+    /** LocalTime.Client: all field clocks. */
     public static JsonObject localClocks(int cx, int cz) {
         JsonObject o = new JsonObject();
         JsonObject fields = new JsonObject();
@@ -28,14 +27,6 @@ public final class ReportData {
             fields.add(String.valueOf(e.getKey()), f);
         }
         o.add("fields", fields);
-        JsonObject chunks = new JsonObject();
-        for (int dx = -1; dx <= 1; dx++)
-            for (int dz = -1; dz <= 1; dz++) {
-                Double t = LocalTime.Client.CHUNKS.get(ChunkPos.pack(cx + dx, cz + dz));
-                if (t != null) chunks.addProperty((cx + dx) + "," + (cz + dz), t);
-            }
-        o.add("chunks_near", chunks);
-        o.addProperty("chunks_count", LocalTime.Client.CHUNKS.size());
         return o;
     }
 

@@ -25,34 +25,20 @@ import org.jspecify.annotations.Nullable;
  */
 public class TowerBlock extends Block implements EntityBlock {
     /** Which cell of a formed core: 0 the master (bottom), 1 the top; LOOSE: a core block not (yet) part of a core.
-     *  (States of the old 3x3x2 core, cells up to 18, load as the default: loose.) */
+     *  (States of the old 3x3x2 core, cells up to 18, load as the default: loose; so does the dropped "hidden"
+     *  property of the abandoned core hiding.) */
     public static final IntegerProperty CELL = IntegerProperty.create("cell", 0, 2);
     public static final int MASTER = 0, TOP = 1, LOOSE = 2, CELLS = 2;
     public static final int HEIGHT = 2;
-    /** Set while a built tower stands on the core: the tower's mesh draws the core instead (Baughn). */
-    public static final net.minecraft.world.level.block.state.properties.BooleanProperty HIDDEN =
-        net.minecraft.world.level.block.state.properties.BooleanProperty.create("hidden");
 
     public TowerBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(CELL, LOOSE).setValue(HIDDEN, false));
+        registerDefaultState(stateDefinition.any().setValue(CELL, LOOSE));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(CELL, HIDDEN);
-    }
-
-    static int dx(int cell) {
-        return 0;
-    }
-
-    static int dz(int cell) {
-        return 0;
-    }
-
-    static int dy(int cell) {
-        return cell;
+        builder.add(CELL);
     }
 
     /** The top block of a formed core (booms may start from its sides). */
@@ -64,46 +50,31 @@ public class TowerBlock extends Block implements EntityBlock {
         return s.getValue(CELL) != LOOSE;
     }
 
-    /** The master (bottom centre) of the core this formed cell belongs to. */
+    /** The master (the bottom block) of the core this formed cell belongs to. */
     public static BlockPos master(BlockPos pos, BlockState state) {
         int c = state.getValue(CELL);
-        return c == LOOSE ? pos : pos.offset(-dx(c), -dy(c), -dz(c));
-    }
-
-    @Override
-    protected net.minecraft.world.level.block.RenderShape getRenderShape(BlockState state) {
-        return state.getValue(HIDDEN) ? net.minecraft.world.level.block.RenderShape.INVISIBLE : net.minecraft.world.level.block.RenderShape.MODEL;
-    }
-
-    /** Shows or hides a formed core's blocks (collision and clicks stay). */
-    public static void setHidden(Level level, BlockPos master, boolean hidden) {
-        for (int c = 0; c < CELLS; c++) {
-            BlockPos p = master.offset(dx(c), dy(c), dz(c));
-            BlockState s = level.getBlockState(p);
-            if (s.is(StasisRegistry.TOWER.get()) && formed(s) && s.getValue(HIDDEN) != hidden)
-                level.setBlock(p, s.setValue(HIDDEN, hidden), Block.UPDATE_CLIENTS);
-        }
+        return c == LOOSE ? pos : pos.below(c);
     }
 
     /** Places a whole formed core with its master at pos, if both places are free (tests, /stasis core). */
-    public static boolean placeCore(Level level, BlockPos master, @Nullable Object unused) {
+    public static boolean placeCore(Level level, BlockPos master) {
         for (int c = 0; c < CELLS; c++) {
-            BlockPos p = master.offset(dx(c), dy(c), dz(c));
+            BlockPos p = master.above(c);
             if (!level.isInWorldBounds(p) || !level.getBlockState(p).canBeReplaced()) return false;
         }
         BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
-        for (int c = 0; c < CELLS; c++) level.setBlock(master.offset(dx(c), dy(c), dz(c)), loose, Block.UPDATE_CLIENTS);
+        for (int c = 0; c < CELLS; c++) level.setBlock(master.above(c), loose, Block.UPDATE_CLIENTS);
         form(level, master);
         return true;
     }
 
-    /** A loose core block was placed: if it completes a 3x3x2 of loose core blocks, they form a core. */
+    /** A loose core block was placed: if it completes a stack of two loose core blocks, they form a core. */
     @Override
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState old, boolean moved) {
         super.onPlace(state, level, pos, old, moved);
         if (level.isClientSide() || old.is(this) || formed(state)) return;
         for (int c = 0; c < CELLS; c++) {
-            BlockPos m = pos.offset(-dx(c), -dy(c), -dz(c));
+            BlockPos m = pos.below(c);
             if (complete(level, m)) {
                 form(level, m);
                 return;
@@ -113,7 +84,7 @@ public class TowerBlock extends Block implements EntityBlock {
 
     static boolean complete(Level level, BlockPos master) {
         for (int c = 0; c < CELLS; c++) {
-            BlockState s = level.getBlockState(master.offset(dx(c), dy(c), dz(c)));
+            BlockState s = level.getBlockState(master.above(c));
             if (!s.is(StasisRegistry.TOWER.get()) || formed(s)) return false;
         }
         return true;
@@ -122,7 +93,7 @@ public class TowerBlock extends Block implements EntityBlock {
     static void form(Level level, BlockPos master) {
         BlockState base = StasisRegistry.TOWER.get().defaultBlockState();
         for (int c = 0; c < CELLS; c++) {
-            BlockPos p = master.offset(dx(c), dy(c), dz(c));
+            BlockPos p = master.above(c);
             BlockState s = base.setValue(CELL, c);
             level.setBlock(p, s, Block.UPDATE_ALL);
             // a cell formed from a pre-fix loose block may still hold the old proxy entity: make it a tower entity
@@ -154,7 +125,7 @@ public class TowerBlock extends Block implements EntityBlock {
         if (level.getBlockEntity(master) instanceof TowerBlockEntity t) t.unform();
         BlockState loose = StasisRegistry.TOWER.get().defaultBlockState();
         for (int c = 0; c < CELLS; c++) {
-            BlockPos p = master.offset(dx(c), dy(c), dz(c));
+            BlockPos p = master.above(c);
             BlockState s = level.getBlockState(p);
             if (!s.is(this) || !formed(s)) continue;
             level.setBlock(p, loose, Block.UPDATE_ALL);

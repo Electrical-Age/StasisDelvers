@@ -225,39 +225,9 @@ public final class StasisNet {
         }
     }
 
-    /** Chunk clocks (LocalTime): packed chunk pos -> frozen time of day. */
-    public record ChunkClocks(java.util.Map<Long, Double> clocks) implements CustomPacketPayload {
-        public static final Type<ChunkClocks> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "chunk_clocks"));
-        public static final StreamCodec<RegistryFriendlyByteBuf, ChunkClocks> CODEC = StreamCodec.of(
-            (buf, p) -> {
-                buf.writeVarInt(p.clocks().size());
-                p.clocks().forEach((k, v) -> { buf.writeLong(k); buf.writeDouble(v); });
-            },
-            buf -> {
-                int n = buf.readVarInt();
-                java.util.Map<Long, Double> m = new java.util.HashMap<>();
-                for (int i = 0; i < n; i++) m.put(buf.readLong(), buf.readDouble());
-                return new ChunkClocks(m);
-            });
-
-        @Override
-        public Type<ChunkClocks> type() {
-            return TYPE;
-        }
-    }
-
     static void sendFieldClocks(ServerLevel level, java.util.Map<Integer, double[]> clocks) {
         FieldClocks f = new FieldClocks(clocks);
         for (ServerPlayer p : level.players()) send(p, f);
-    }
-
-    static void sendChunkClocks(ServerLevel level, java.util.Map<Long, Double> clocks) {
-        ChunkClocks c = new ChunkClocks(clocks);
-        for (ServerPlayer p : level.players()) send(p, c);
-    }
-
-    static void sendChunkClocks(ServerPlayer player, java.util.Map<Long, Double> clocks) {
-        send(player, new ChunkClocks(clocks));
     }
 
     /** Client side: the latest freeze progress, for the screen effect. */
@@ -317,7 +287,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("9");
+            var r = e.registrar("10");   // 10: the unused chunk_clocks payload is gone
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -355,7 +325,6 @@ public final class StasisNet {
             r.playToClient(StormOverride.TYPE, StormOverride.CODEC, (p, ctx) ->
                 Storms.clientOverride = p.active() ? new double[]{p.start(), p.end(), p.folded()} : null);
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
-            r.playToClient(ChunkClocks.TYPE, ChunkClocks.CODEC, (p, ctx) -> LocalTime.Client.chunkClocks(p.clocks()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
             // optional (per channel, same version): clients and servers from before bug reports still connect

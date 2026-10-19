@@ -334,7 +334,6 @@ public final class StasisReport {
         synchronized (BoltRenderer.LIVE) {
             br.addProperty("live", BoltRenderer.LIVE.size());
         }
-        br.addProperty("draw_logs", BoltRenderer.drawLogs);
         o.add("bolts", br);
         JsonArray tr = new JsonArray();
         for (String s : TowerRenderer.summary()) {

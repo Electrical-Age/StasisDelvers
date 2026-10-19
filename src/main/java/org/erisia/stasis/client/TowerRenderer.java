@@ -65,7 +65,7 @@ public final class TowerRenderer {
     /** Beyond this distance (blocks) the LOD without lacing is drawn. */
     static final double LOD_DIST = 48;
     static final int VERTEX_BYTES = 20;
-    /** No drawn core: the girders reach the ground, as on towers.brage.info (the 1x1x2 core blocks hide while the tower stands). */
+    /** No drawn core: the girders reach the ground, as on towers.brage.info (the 1x1x2 core blocks stay visible: they are the console). */
     static final VisualParams VP = VisualParams.fromJson(org.erisia.stasis.towergen.Json.parse(
         "{\"drawCore\": false}"));
 

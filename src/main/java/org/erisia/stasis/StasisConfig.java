@@ -159,15 +159,8 @@ public final class StasisConfig {
         if (NO_SPAWN_AREA) spawnRadius = -1;
     }
 
-    /** Tests: set the tower draw constant (returns the old one). */
     public static int freezeTicks() {
         return freezeTicks;
-    }
-
-    public static double testTowerDrawK(double k) {
-        double old = towerDrawK;
-        towerDrawK = k;
-        return old;
     }
 
     /** The cached (synced) values, for bug reports (client/report). */

@@ -39,7 +39,7 @@ final class StasisCommands {
             // a whole 3x3x2 tower core with its bottom centre at pos (setblock would place a single cell)
             .then(Commands.literal("core").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
                 BlockPos p = BlockPosArgument.getLoadedBlockPos(c, "pos");
-                if (!TowerBlock.placeCore(c.getSource().getLevel(), p, null)) {
+                if (!TowerBlock.placeCore(c.getSource().getLevel(), p)) {
                     c.getSource().sendFailure(Component.literal("No room for a 3x3x2 core at " + p.toShortString()));
                     return 0;
                 }

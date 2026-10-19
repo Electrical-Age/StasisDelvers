@@ -1,12 +1,8 @@
 package org.erisia.stasis;
 
-import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.level.saveddata.SavedDataType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,35 +32,6 @@ public final class LocalTime {
     }
 
     // ---------------------------------------------------------------- server
-
-    /** Chunk -> the time of day it froze at: no longer written or drawn (the grey has one time); kept so old saves load. */
-    public static final class ChunkClocks extends SavedData {
-        public static final Codec<ChunkClocks> CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE)
-            .xmap(ChunkClocks::new, c -> {
-                Map<String, Double> m = new HashMap<>();
-                c.clocks.forEach((k, v) -> m.put(Long.toString(k), v));
-                return m;
-            });
-        public static final SavedDataType<ChunkClocks> TYPE = new SavedDataType<>(
-            Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "chunk_clocks"), ChunkClocks::new, CODEC);
-
-        final Map<Long, Double> clocks = new HashMap<>();
-
-        public ChunkClocks() {
-        }
-
-        ChunkClocks(Map<String, Double> m) {
-            m.forEach((k, v) -> clocks.put(Long.parseLong(k), v));
-        }
-
-        public static ChunkClocks get(ServerLevel level) {
-            return level.getDataStorage().computeIfAbsent(TYPE);
-        }
-
-        public double at(long chunk) {
-            return clocks.getOrDefault(chunk, DEFAULT_TOD);
-        }
-    }
 
     /** Field id -> its clock (absolute ticks: day count and time of day), per level; kept with FieldData. A new field
      *  starts from the grey's time. */
@@ -129,13 +96,12 @@ public final class LocalTime {
 
     // ---------------------------------------------------------------- client
 
-    /** Client side: field clocks (clock, step per tick, game time received) and chunk clocks, as last sent. */
+    /** Client side: field clocks (clock, step per tick, game time received), as last sent. */
     public static final class Client {
         private Client() {
         }
 
         static final Map<Integer, double[]> FIELDS = new java.util.concurrent.ConcurrentHashMap<>();
-        static final Map<Long, Double> CHUNKS = new java.util.concurrent.ConcurrentHashMap<>();
 
         static void fieldClocks(Map<Integer, double[]> m, Level level) {
             long now = level == null ? 0 : level.getGameTime();
@@ -143,13 +109,8 @@ public final class LocalTime {
             m.forEach((id, v) -> FIELDS.put(id, new double[]{v[0], v[1], now}));
         }
 
-        static void chunkClocks(Map<Long, Double> m) {
-            CHUNKS.putAll(m);
-        }
-
         public static void clear() {
             FIELDS.clear();
-            CHUNKS.clear();
         }
 
         /**
