@@ -300,7 +300,7 @@ public class LanceBlockEntity extends BlockEntity {
     /** The klaxon (every 2 s of the grace): the gate is about to slip. */
     void klaxon(ServerLevel sl, Lance.Gate g) {
         sl.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_DIDGERIDOO.value(), SoundSource.BLOCKS, 4f, 0.5f);
-        int left = (int) Math.ceil((Lance.drive(g.r(), false, false, false, testSpeed).graceTicks() - g.grace()) / 20.0);
+        int left = Math.max(1, (int) Math.ceil((Lance.drive(g.r(), false, false, false, testSpeed).graceTicks() - g.grace()) / 20.0));   // (never "in 0 s")
         Component m = Component.literal("The lance has lost power: the gate slips in " + left + " s").withStyle(ChatFormatting.RED);
         for (ServerPlayer p : sl.players())
             if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition)) < 48 * 48) p.sendOverlayMessage(m);
