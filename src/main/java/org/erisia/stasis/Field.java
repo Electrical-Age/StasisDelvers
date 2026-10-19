@@ -158,6 +158,14 @@ public record Field(int id, double x, double y, double z, double radius, double 
         return new double[]{near, Math.max(v0, v1)};
     }
 
+    /** Of the block's two faces on this axis (offsets d0 and d0 + 1 from the centre), the one farther in units of the
+     *  half-axis on its side. Per axis, since norm is a sum over axes; on a stretched axis the block straddling the
+     *  centre can reach farther on its shorter side, so the Euclidean far side isn't enough. */
+    private double far(int axis, double d0) {
+        double d1 = d0 + 1;
+        return Math.abs(d0) / half(axis, d0) > Math.abs(d1) / half(axis, d1) ? d0 : d1;
+    }
+
     private double half(int axis, double d) {
         return axis == 0 ? ax(d) : axis == 1 ? radius : az(d);
     }
@@ -169,9 +177,7 @@ public record Field(int id, double x, double y, double z, double radius, double 
 
     /** True if the whole block at (bx, by, bz) lies inside the field (and hasn't stopped in a collapse). */
     public boolean containsBlock(int bx, int by, int bz) {
-        double dx = (bx + 0.5 >= x ? bx + 1 : bx) - x;
-        double dy = column ? 0 : (by + 0.5 >= y ? by + 1 : by) - y;
-        double dz = (bz + 0.5 >= z ? bz + 1 : bz) - z;
+        double dx = far(0, bx - x), dy = column ? 0 : far(1, by - y), dz = far(2, bz - z);
         double n = norm(dx, dy, dz);
         if (n > 1) return false;
         return collapse <= 0 || !collapsed(bx, by, bz, n);
