@@ -371,28 +371,59 @@ class SpreadMapTest {
         assertEquals(12345.5, kb.seconds);
         assertTrue(kb.hard);
         assertEquals(99.25, kb.hardAt);
+        // hard mode's coverage and storm origin: unknown (-1) in older saves, the cap stands in for the coverage
+        assertEquals(-1, k.hardCoverage);
+        assertEquals(-1, k.hardGame);
+        assertEquals(StasisConfig.spreadCap, k.hardCoverage());
+        k.hardCoverage = 0.375;
+        k.hardGame = 4321.5;
+        kb = Spread.Clock.CODEC.parse(ops, Spread.Clock.CODEC.encodeStart(ops, k).getOrThrow()).getOrThrow();
+        assertEquals(0.375, kb.hardCoverage());
+        assertEquals(4321.5, kb.hardGame);
     }
 
     // ---- the clock -------------------------------------------------------------------------------------------------
 
-    /** Coverage: cap * t / H up to the cap; in hard mode cap + (1 - cap) * the share of hardHours since; monotone. */
+    /**
+     * Coverage: cap * t / H up to the cap; in hard mode cHard + (1 - cHard) * the share of hardHours since, where cHard is
+     * the coverage at the hard-mode instant (step 4a: no jump to the cap when the dragon dies early); monotone, and
+     * continuous across hard mode's entry.
+     */
     @Property(tries = 500)
     void coverageFormulaAndMonotone(@ForAll @DoubleRange(min = 0, max = 1e6) double t, @ForAll @DoubleRange(min = 0, max = 1e5) double dt,
                                     @ForAll @DoubleRange(min = 0.01, max = 100) double hours, @ForAll @DoubleRange(min = 0.01, max = 100) double hardHours,
                                     @ForAll @DoubleRange(min = 0, max = 1) double cap, @ForAll @DoubleRange(min = 0, max = 1e6) double tHard) {
-        double c = Spread.coverage(t, false, 0, hours, hardHours, cap);
+        double c = Spread.coverage(t, false, 0, 0, hours, hardHours, cap);
         assertEquals(Math.min(cap, cap * t / (hours * 3600)), c, 1e-12);
         assertTrue(c <= cap && c >= 0);
-        assertTrue(Spread.coverage(t + dt, false, 0, hours, hardHours, cap) >= c);
+        assertTrue(Spread.coverage(t + dt, false, 0, 0, hours, hardHours, cap) >= c);
+        double cHard = Spread.coverage(tHard, false, 0, 0, hours, hardHours, cap);
+        // continuity at the instant, whether the cap was reached or not
+        assertEquals(cHard, Spread.coverage(tHard, true, tHard, cHard, hours, hardHours, cap), 1e-12);
         if (t >= tHard) {
-            double h = Spread.coverage(t, true, tHard, hours, hardHours, cap);
-            assertEquals(cap + (1 - cap) * Math.min(1, (t - tHard) / (hardHours * 3600)), h, 1e-12);
-            assertTrue(h >= cap && h <= 1 + 1e-12);
-            assertTrue(Spread.coverage(t + dt, true, tHard, hours, hardHours, cap) >= h);
+            double h = Spread.coverage(t, true, tHard, cHard, hours, hardHours, cap);
+            assertEquals(cHard + (1 - cHard) * Math.min(1, (t - tHard) / (hardHours * 3600)), h, 1e-12);
+            assertTrue(h >= cHard && h <= 1 + 1e-12);
+            assertTrue(Spread.coverage(t + dt, true, tHard, cHard, hours, hardHours, cap) >= h);
+            // a tiny step after the instant moves the coverage by a tiny amount (no jump)
+            assertTrue(Spread.coverage(tHard + 1e-3, true, tHard, cHard, hours, hardHours, cap) - cHard <= 1e-3 / (hardHours * 3600) + 1e-12);
         }
         int n = 196_000;
         int p = Spread.progress(c, n);
         assertTrue(p >= 0 && p <= n && p == (int) Math.floor(c * n));
+    }
+
+    /** Hard mode early (half way to the cap): P stays where it was at the instant, then goes on to N over hardHours. */
+    @Example
+    void hardModeBeforeTheCapGoesOnFromWhereItWas() {
+        int n = 1000;
+        double tHard = 24 * 3600, cHard = Spread.coverage(tHard, false, 0, 0, 48, 48, 0.8);
+        assertEquals(0.4, cHard, 1e-12);
+        assertEquals(400, Spread.progress(Spread.coverage(tHard, true, tHard, cHard, 48, 48, 0.8), n));
+        assertEquals(700, Spread.progress(Spread.coverage(tHard + 24 * 3600, true, tHard, cHard, 48, 48, 0.8), n));
+        assertEquals(n, Spread.progress(Spread.coverage(tHard + 48 * 3600, true, tHard, cHard, 48, 48, 0.8), n));
+        // the estimate: a column of rank 549 stills at P 550, coverage 0.55: a quarter of the 48 h after the instant
+        assertEquals(0.25 * 48 * 3600, Spread.secondsUntilStill(549L * SpreadMap.SCALE, n, tHard, true, tHard, cHard, 48, 48, 0.8), 1e-6);
     }
 
     /** A tick adds at most a second, nothing with nobody on, never anything negative (a stalled server doesn't jump). */
@@ -416,9 +447,10 @@ class SpreadMapTest {
                                           @ForAll @DoubleRange(min = 0.05, max = 0.95) double cap) {
         long r = (long) (where * (n - 1) * SpreadMap.SCALE);
         double tHard = hard ? when * hours * 3600 * 1.5 : 0;
+        double cHard = Spread.coverage(tHard, false, 0, 0, hours, hardHours, cap);
         double t = hard ? tHard + when * hardHours * 3600 : when * hours * 3600 * 1.2;
-        int p = Spread.progress(Spread.coverage(t, hard, tHard, hours, hardHours, cap), n);
-        double left = Spread.secondsUntilStill(r, n, t, hard, tHard, hours, hardHours, cap);
+        int p = Spread.progress(Spread.coverage(t, hard, tHard, cHard, hours, hardHours, cap), n);
+        double left = Spread.secondsUntilStill(r, n, t, hard, tHard, cHard, hours, hardHours, cap);
         boolean stilled = r < (long) p * SpreadMap.SCALE;
         if (stilled) {
             assertEquals(0, left);
@@ -429,15 +461,15 @@ class SpreadMapTest {
         if (!hard && k > cap * n + 1e-9) {
             assertTrue(Double.isInfinite(left), "above the cap before hard mode: " + left);
             // hard mode now: P moves again, so it stills in finite time
-            assertTrue(Double.isFinite(Spread.secondsUntilStill(r, n, t, true, t, hours, hardHours, cap)));
+            assertTrue(Double.isFinite(Spread.secondsUntilStill(r, n, t, true, t, Spread.coverage(t, false, 0, 0, hours, hardHours, cap), hours, hardHours, cap)));
             return;
         }
         assertTrue(Double.isFinite(left));
         double eps = 1e-6 * (hours + hardHours) * 3600;
-        int after = Spread.progress(Spread.coverage(t + left + eps, hard, tHard, hours, hardHours, cap), n);
+        int after = Spread.progress(Spread.coverage(t + left + eps, hard, tHard, cHard, hours, hardHours, cap), n);
         assertTrue(r < (long) after * SpreadMap.SCALE, "stilled after " + left + " s: P " + after + " rank " + r / (double) SpreadMap.SCALE);
         if (left > eps) {
-            int before = Spread.progress(Spread.coverage(t + left - eps, hard, tHard, hours, hardHours, cap), n);
+            int before = Spread.progress(Spread.coverage(t + left - eps, hard, tHard, cHard, hours, hardHours, cap), n);
             assertTrue(r >= (long) before * SpreadMap.SCALE, "not before: P " + before + " rank " + r / (double) SpreadMap.SCALE);
         }
     }
@@ -446,21 +478,21 @@ class SpreadMapTest {
     @Example
     void secondsUntilStillAtThePlateau() {
         long r500 = 500L * SpreadMap.SCALE;   // stills at P 501: coverage 0.501, 30.06 h
-        assertEquals(30.06 * 3600 - 3600, Spread.secondsUntilStill(r500, 1000, 3600, false, 0, 48, 48, 0.8), 1e-6);
-        assertEquals(0, Spread.secondsUntilStill(r500, 1000, 31 * 3600, false, 0, 48, 48, 0.8));
+        assertEquals(30.06 * 3600 - 3600, Spread.secondsUntilStill(r500, 1000, 3600, false, 0, 0, 48, 48, 0.8), 1e-6);
+        assertEquals(0, Spread.secondsUntilStill(r500, 1000, 31 * 3600, false, 0, 0, 48, 48, 0.8));
         long r900 = 900L * SpreadMap.SCALE;   // stills at P 901: above the cap
-        assertTrue(Double.isInfinite(Spread.secondsUntilStill(r900, 1000, 100 * 3600, false, 0, 48, 48, 0.8)));
+        assertTrue(Double.isInfinite(Spread.secondsUntilStill(r900, 1000, 100 * 3600, false, 0, 0, 48, 48, 0.8)));
         // hard mode at 100 h: (0.901 - 0.8) / 0.2 of 48 h later
-        assertEquals(0.505 * 48 * 3600, Spread.secondsUntilStill(r900, 1000, 100 * 3600, true, 100 * 3600, 48, 48, 0.8), 1e-6);
-        assertEquals(0, Spread.secondsUntilStill(-SpreadMap.SCALE, 1000, 0, false, 0, 48, 48, 0.8));   // outside the map
+        assertEquals(0.505 * 48 * 3600, Spread.secondsUntilStill(r900, 1000, 100 * 3600, true, 100 * 3600, 0.8, 48, 48, 0.8), 1e-6);
+        assertEquals(0, Spread.secondsUntilStill(-SpreadMap.SCALE, 1000, 0, false, 0, 0, 48, 48, 0.8));   // outside the map
     }
 
     /** At c = 1, P = N: everything is stilled (the spread is complete). */
     @Example
     void fullCoverageStillsEverything() {
-        assertEquals(1000, Spread.progress(Spread.coverage(1e9, true, 0, 48, 48, 0.8), 1000));
-        assertEquals(800, Spread.progress(Spread.coverage(48 * 3600, false, 0, 48, 48, 0.8), 1000));
-        assertEquals(800, Spread.progress(Spread.coverage(1e9, false, 0, 48, 48, 0.8), 1000));
+        assertEquals(1000, Spread.progress(Spread.coverage(1e9, true, 0, 0, 48, 48, 0.8), 1000));
+        assertEquals(800, Spread.progress(Spread.coverage(48 * 3600, false, 0, 0, 48, 48, 0.8), 1000));
+        assertEquals(800, Spread.progress(Spread.coverage(1e9, false, 0, 0, 48, 48, 0.8), 1000));
     }
 
     /** climb ends on a local maximum of the ranks, never lower than where it started (the peak stills last). */

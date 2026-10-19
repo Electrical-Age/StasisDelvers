@@ -2217,7 +2217,7 @@ public final class StasisGameTests {
             org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, at.getX(), at.getZ(), 200);
             org.erisia.stasis.Spread.testInstall(m, 0);
             double[] was = org.erisia.stasis.Spread.testClock(server, 0, false, 0);
-            c.cleanup.add(0, () -> org.erisia.stasis.Spread.testClock(server, was[0], was[1] != 0, was[2]));
+            c.cleanup.add(0, () -> org.erisia.stasis.Spread.testClockRestore(server, was));
             double tAt = org.erisia.stasis.Spread.testSecondsUntilStill(server, at.getX(), at.getZ());
             boolean hard = Double.isInfinite(tAt);
             if (hard) {   // above the cap: only hard mode stills it

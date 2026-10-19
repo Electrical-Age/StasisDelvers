@@ -68,7 +68,9 @@ warnings) too. Hard mode's effects come later.
   - `active(level)`: spreading, overworld, not complete. `runs(level, x, z)`, `chunk(level, cx, cz)` (1/0/2),
     `holdsOff(level)` (the Nether and the End).
   - Clock: `tick` adds real seconds while a player is on, at most 1 s per tick (`tickSeconds`). `coverage`:
-    `min(cap, cap t / H)`; in hard mode `cap + (1 - cap) min(1, (t - tHard) / H_hard)`. `progress` = floor(c N).
+    `min(cap, cap t / H)`; in hard mode `cHard + (1 - cHard) min(1, (t - tHard) / H_hard)`, where cHard is the coverage
+    at the hard-mode instant (saved as `hard_c`), so a dragon killed before the cap doesn't jump the front: the
+    stillness goes on from where it stood. `progress` = floor(c N).
   - `update`: on a change of P relights flames in loaded chunks the front crossed and tells `SpreadSync`; on
     completion invalidates every level and gives safe players grace (`Freezing.graceIfStopped`). It doesn't bump
     `Stasis.version`: nothing on the server caches a P-dependent answer (the field index is fields only,
@@ -112,8 +114,8 @@ warnings) too. Hard mode's effects come later.
     whose mouth stills first is warned by its own column). The column stills at P = k = r1024 / SCALE + 1, coverage
     k / N, read back through the coverage formula. 0 once stilled; infinite above the cap before hard mode (P stands
     still at the 80 % plateau, so nothing is warned there); hard mode moves P again and the warnings come back.
-    Columns in [P, cap N) when hard mode begins early jump straight to stilled (coverage jumps to the cap): those get
-    only the grace message. `/stasis spread status` uses the same estimate.
+    In hard mode the time to coverage k / N is read back through cHard's course. `/stasis spread status` uses the same
+    estimate.
   - Who: overworld players in running spread land, not creative or spectator, where time runs now (`Stasis.isRunning`:
     in stilled land, a rift, a drifting deep or an eddy Freezing's messages own the action bar), and not inside a field
     or the spawn area (`Stasis.heldOff`: the spot keeps running when the column stills).
@@ -153,7 +155,8 @@ warnings) too. Hard mode's effects come later.
 - Overworld SavedData `stasisdelvers:spread_map` (`algorithm`, `spawn_x`, `spawn_z`, `radius`, `ranks` int array),
   written once. A saved map is never rebuilt, whatever its algorithm: a world made with v1 keeps its v1 map (logged at
   load). A missing `algorithm` reads as 1 (DFU drops fields equal to their default, so v1 saves lack it). Delete
-  `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`, and the spawn move: `spawn_move` 0 not moved / 1
+  `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`, `hard_c` (coverage at the instant, -1 in older saves:
+  the cap), `hard_game` (game seconds at the instant: the storms' origin, -1 unknown), and the spawn move: `spawn_move` 0 not moved / 1
   moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
 - SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre}`.
 
@@ -175,7 +178,8 @@ warnings) too. Hard mode's effects come later.
   follow S and every low cell is at most as stable as the least high one; below the split, BFS from spawn's cell
   reaches every running low cell, and block by block (the bilinear) every running low cell's centre column; the compass
   search equals brute force; `cellsAtLeastAreOrdered` (the spawn move's candidates are exactly the cells >= minRank,
-  by distance then index, the first at nearestAtLeast's distance); chunk extremes are exact; coverage formula, monotone, capped tick; `secondsUntilStillMatchesTheClock` (after the
+  by distance then index, the first at nearestAtLeast's distance); chunk extremes are exact; coverage formula, monotone and
+  continuous across hard mode's entry (`hardModeBeforeTheCapGoesOnFromWhereItWas`), capped tick; `secondsUntilStillMatchesTheClock` (after the
   estimate the column is stilled, a moment before it isn't; infinite above the cap before hard mode, finite in it; 0
   once stilled) and `secondsUntilStillAtThePlateau` (worked numbers).
   `coherenceReport` logs, at 20/50/80/90/95 %, the running cells' components, those of >= 100 cells (~320 x 320
@@ -206,7 +210,8 @@ warnings) too. Hard mode's effects come later.
   (S dips there), and they are 3D, so there is usually a way round, but nothing guarantees it.
 - Above the split (default 50 %) running regions can be cut off from spawn and from each other, on purpose.
 - Spawn's own region can still at the split: the spawn raise is mild (on the lab seed spawn sits in a low area).
-- Entering hard mode before the coverage reached the cap jumps it to the cap at once (the formula as designed).
+- Entering hard mode before the cap goes on from the coverage of that instant (`hard_c`). A save already in hard mode
+  from before `hard_c` was kept reads it as the cap, as it then behaved.
 - Changing `spreadRadius` or `spreadConnectedUntil` after the map is built changes nothing; delete `spread_map` to
   rebuild.
 - `Deeps.at` is cached per tick by 256-block region (from `within`, a superset of `near`): it is asked per block in

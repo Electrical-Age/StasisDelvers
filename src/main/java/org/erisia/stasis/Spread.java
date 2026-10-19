@@ -138,11 +138,13 @@ public final class Spread {
 
     /**
      * The coverage at online time t (s): spreadCap * t / spreadHours up to the cap; after hard mode (entered at online
-     * time tHard) it rises from the cap to 1 over hardSpreadHours.
+     * time tHard, with coverage cHard then) it rises from cHard to 1 over hardSpreadHours. cHard is the coverage at the
+     * instant, so a dragon killed before the cap is reached doesn't jump the front to the cap (step 4a: the stillness
+     * goes on from where it was, only on a steeper course).
      */
-    static double coverage(double t, boolean hard, double tHard, double hours, double hardHours, double cap) {
+    static double coverage(double t, boolean hard, double tHard, double cHard, double hours, double hardHours, double cap) {
         if (!hard) return Math.min(cap, cap * Math.max(0, t) / (hours * 3600));
-        return cap + (1 - cap) * Math.min(1, Math.max(0, t - tHard) / (hardHours * 3600));
+        return cHard + (1 - cHard) * Math.min(1, Math.max(0, t - tHard) / (hardHours * 3600));
     }
 
     /**
@@ -152,14 +154,14 @@ public final class Spread {
      * P = k = r1024 / SCALE + 1, coverage k / n. 0 if it is stilled already; +Infinity if the coverage it needs lies
      * above the cap and hard mode hasn't begun (P stands still at the cap: nothing more stills).
      */
-    static double secondsUntilStill(long r1024, int n, double t, boolean hard, double tHard, double hours, double hardHours, double cap) {
+    static double secondsUntilStill(long r1024, int n, double t, boolean hard, double tHard, double cHard, double hours, double hardHours, double cap) {
         long k = Math.floorDiv(r1024, SpreadMap.SCALE) + 1;
-        if (k <= progress(coverage(t, hard, tHard, hours, hardHours, cap), n)) return 0;
+        if (k <= progress(coverage(t, hard, tHard, cHard, hours, hardHours, cap), n)) return 0;
         double cAt = k / (double) n;
         double tAt;
         if (cAt <= cap && !hard) tAt = cap <= 0 ? 0 : cAt / cap * hours * 3600;
         else if (!hard) return Double.POSITIVE_INFINITY;
-        else tAt = tHard + (cap >= 1 ? 0 : Math.max(0, cAt - cap) / (1 - cap) * hardHours * 3600);
+        else tAt = tHard + (cHard >= 1 ? 0 : Math.max(0, cAt - cHard) / (1 - cHard) * hardHours * 3600);
         return Math.max(0, tAt - t);
     }
 
@@ -168,7 +170,7 @@ public final class Spread {
         State s = server;
         if (s.map() == null) return Double.NaN;
         Clock k = Clock.get(srv.overworld());
-        return secondsUntilStill(SpreadMap.rank1024(s.map(), x, z), s.count(), k.seconds, k.hard, k.hardAt,
+        return secondsUntilStill(SpreadMap.rank1024(s.map(), x, z), s.count(), k.seconds, k.hard, k.hardAt, k.hardCoverage(),
             StasisConfig.spreadHours, StasisConfig.hardSpreadHours, StasisConfig.spreadCap);
     }
 
@@ -186,7 +188,7 @@ public final class Spread {
     private static long lastNanos;
 
     static double coverage(Clock k) {
-        return coverage(k.seconds, k.hard, k.hardAt, StasisConfig.spreadHours, StasisConfig.hardSpreadHours, StasisConfig.spreadCap);
+        return coverage(k.seconds, k.hard, k.hardAt, k.hardCoverage(), StasisConfig.spreadHours, StasisConfig.hardSpreadHours, StasisConfig.spreadCap);
     }
 
     /** ServerTickEvent.Post: run the online clock and move P. */
@@ -323,8 +325,9 @@ public final class Spread {
             if (c > cap) return "Coverage above the cap (" + cap + ") needs hard mode: /stasis spread hardmode";
             k.seconds = cap <= 0 ? 0 : c / cap * StasisConfig.spreadHours * 3600;
         } else {
-            if (c < cap) return "In hard mode the coverage is at least the cap (" + cap + ")";
-            k.seconds = k.hardAt + (cap >= 1 ? 0 : (c - cap) / (1 - cap) * StasisConfig.hardSpreadHours * 3600);
+            double ch = k.hardCoverage();
+            if (c < ch) return "In hard mode the coverage is at least what it was when hard mode began (" + ch + ")";
+            k.seconds = k.hardAt + (ch >= 1 ? 0 : (c - ch) / (1 - ch) * StasisConfig.hardSpreadHours * 3600);
         }
         k.setDirty();
         update(srv.overworld(), k);
@@ -335,6 +338,7 @@ public final class Spread {
     static boolean enterHardMode(MinecraftServer srv) {
         Clock k = Clock.get(srv.overworld());
         if (k.hard) return false;
+        k.hardCoverage = coverage(k);   // (before hard is set: the coverage as it stands, the course goes on from it)
         k.hard = true;
         k.hardAt = k.seconds;
         k.setDirty();
@@ -352,7 +356,7 @@ public final class Spread {
         if (!StasisConfig.spreading) return b.toString();
         double c = coverage(k);
         b.append(String.format(java.util.Locale.ROOT, ", coverage %.4f, P %d / %d, online %.2f h, hard mode %s%s", c, s.p(), s.count(),
-            k.seconds / 3600, k.hard ? "since " + String.format(java.util.Locale.ROOT, "%.2f h", k.hardAt / 3600) : "no",
+            k.seconds / 3600, k.hard ? String.format(java.util.Locale.ROOT, "since %.2f h (from coverage %.4f)", k.hardAt / 3600, k.hardCoverage()) : "no",
             s.complete() ? ", complete" : ""));
         if (s.map() == null) return b.append(", no map yet").toString();
         b.append("; ").append(SpawnMove.status(k));
@@ -398,16 +402,32 @@ public final class Spread {
         Stasis.bumpVersion();
     }
 
-    /** GameTests: set the online clock (and move P to match it on the installed map); returns {seconds, hard, hardAt} as it was. */
+    /**
+     * GameTests: set the online clock (and move P to match it on the installed map); returns {seconds, hard, hardAt,
+     * hardCoverage, hardGame} as it was. Hard mode set here starts from the coverage its instant had (continuity).
+     */
     public static double[] testClock(MinecraftServer srv, double seconds, boolean hard, double hardAt) {
         Clock k = Clock.get(srv.overworld());
-        double[] was = {k.seconds, k.hard ? 1 : 0, k.hardAt};
+        double[] was = {k.seconds, k.hard ? 1 : 0, k.hardAt, k.hardCoverage, k.hardGame};
         k.seconds = seconds;
         k.hard = hard;
         k.hardAt = hardAt;
+        k.hardCoverage = coverage(hardAt, false, 0, 0, StasisConfig.spreadHours, StasisConfig.hardSpreadHours, StasisConfig.spreadCap);
         k.setDirty();
         update(srv.overworld(), k);
         return was;
+    }
+
+    /** GameTests: put the clock back as testClock returned it. */
+    public static void testClockRestore(MinecraftServer srv, double[] was) {
+        Clock k = Clock.get(srv.overworld());
+        k.seconds = was[0];
+        k.hard = was[1] != 0;
+        k.hardAt = was[2];
+        k.hardCoverage = was[3];
+        k.hardGame = was[4];
+        k.setDirty();
+        update(srv.overworld(), k);
     }
 
     /** GameTests: the online seconds until column (x, z) stills (NaN without a map). */
@@ -423,6 +443,10 @@ public final class Spread {
             Codec.DOUBLE.optionalFieldOf("seconds", 0.0).forGetter(k -> k.seconds),
             Codec.BOOL.optionalFieldOf("hard", false).forGetter(k -> k.hard),
             Codec.DOUBLE.optionalFieldOf("hard_at", 0.0).forGetter(k -> k.hardAt),
+            // the coverage when hard mode began (-1: a save from before it was kept, which went on from the cap)
+            Codec.DOUBLE.optionalFieldOf("hard_c", -1.0).forGetter(k -> k.hardCoverage),
+            // the game time (s, Deeps.realTime) when hard mode began: the storm schedule's origin (-1: not yet known)
+            Codec.DOUBLE.optionalFieldOf("hard_game", -1.0).forGetter(k -> k.hardGame),
             // the world spawn's one move (SpawnMove): 0 not moved, 1 moved, 2 no site found; from (old x, z) to (x, y, z)
             Codec.INT.optionalFieldOf("spawn_move", SpawnMove.NONE).forGetter(k -> k.spawnMove),
             Codec.INT.optionalFieldOf("spawn_old_x", 0).forGetter(k -> k.spawnOldX),
@@ -439,16 +463,23 @@ public final class Spread {
         boolean hard;
         /** Online seconds when hard mode began. */
         double hardAt;
+        /** The coverage when hard mode began (-1: unknown, an older save: the cap, as it then was). */
+        double hardCoverage = -1;
+        /** Game time (s) when hard mode began: the storms' origin (Storms; -1 unknown). */
+        double hardGame = -1;
         /** The world spawn's move (SpawnMove; once only, Baughn 2026-10-19). */
         int spawnMove, spawnOldX, spawnOldZ, spawnX, spawnY, spawnZ;
 
         public Clock() {
         }
 
-        private Clock(double seconds, boolean hard, double hardAt, int spawnMove, int spawnOldX, int spawnOldZ, int spawnX, int spawnY, int spawnZ) {
+        private Clock(double seconds, boolean hard, double hardAt, double hardCoverage, double hardGame, int spawnMove, int spawnOldX, int spawnOldZ,
+                      int spawnX, int spawnY, int spawnZ) {
             this.seconds = seconds;
             this.hard = hard;
             this.hardAt = hardAt;
+            this.hardCoverage = hardCoverage;
+            this.hardGame = hardGame;
             this.spawnMove = spawnMove;
             this.spawnOldX = spawnOldX;
             this.spawnOldZ = spawnOldZ;
@@ -471,6 +502,11 @@ public final class Spread {
                 k.setDirty();
             }
             return was;
+        }
+
+        /** The coverage hard mode went on from: as saved, or the cap for a save from before it was kept. */
+        double hardCoverage() {
+            return hardCoverage < 0 ? StasisConfig.spreadCap : hardCoverage;
         }
 
         static Clock get(ServerLevel overworld) {
