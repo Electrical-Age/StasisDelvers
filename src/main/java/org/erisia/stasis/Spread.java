@@ -235,6 +235,10 @@ public final class Spread {
         MapData d = MapData.get(level);
         if (d.ranks == null) return;
         try {
+            // a map made by an older algorithm is kept as it is: it is the world's map (its spawn is pinned, and
+            // rebuilding would move the front under existing bases); only new worlds get the current algorithm
+            if (d.algorithm != SpreadMap.ALGORITHM)
+                StasisDelvers.LOG.info("Keeping this world's spread map of algorithm {} (current {})", d.algorithm, SpreadMap.ALGORITHM);
             install(level, new SpreadMap(d.spawnX, d.spawnZ, d.radius, d.ranks));
         } catch (IllegalArgumentException ex) {
             StasisDelvers.LOG.error("Spread map unreadable ({}); the overworld runs until it is rebuilt", ex.getMessage());
@@ -400,7 +404,9 @@ public final class Spread {
     /** The map (overworld, stasisdelvers:spread_map): written once. */
     public static final class MapData extends SavedData {
         static final Codec<MapData> CODEC = RecordCodecBuilder.create(i -> i.group(
-            Codec.INT.optionalFieldOf("algorithm", SpreadMap.ALGORITHM).forGetter(d -> d.algorithm),
+            // a missing field is algorithm 1: DFU leaves out a field equal to its default, and 1 was the default while
+            // it was the only one, so every v1 save lacks it
+            Codec.INT.optionalFieldOf("algorithm", 1).forGetter(d -> d.algorithm),
             Codec.INT.optionalFieldOf("spawn_x", 0).forGetter(d -> d.spawnX),
             Codec.INT.optionalFieldOf("spawn_z", 0).forGetter(d -> d.spawnZ),
             Codec.INT.optionalFieldOf("radius", 0).forGetter(d -> d.radius),
