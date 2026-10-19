@@ -278,6 +278,12 @@ public final class StasisPost {
                         want = Math.atan2(dx, dz);
                     }
                 }
+                // a lance pouring power into it: the eye fixes on the boom's tip (LANCE-v2 point 2)
+                for (var l : org.erisia.stasis.LanceBlockEntity.CLIENT.values())
+                    if (l.beam() && l.boundId() == sd.id() && l.tip() != null && l.getLevel() == mc.level) {
+                        want = Math.atan2(l.tip().getX() + 0.5 - core[0], l.tip().getZ() + 0.5 - core[2]);
+                        break;
+                    }
                 double yaw = saccade(sd.id(), want, clock);
                 String dest = org.erisia.stasis.Gates.destination(sd);
                 int destCode = dest.equals("minecraft:the_end") ? 0 : dest.equals("minecraft:the_nether") ? 1 : 2;
@@ -285,6 +291,22 @@ public final class StasisPost {
             }
         }
         d[218] = ns;
+        // the nearest lance beam (LanceBlockEntity: on while it pours power into its rift): boom tip and eye - floor(camera)
+        double bestBeam = 192 * 192;
+        for (var l : org.erisia.stasis.LanceBlockEntity.CLIENT.values()) {
+            if (!l.beam() || l.tip() == null || l.getLevel() != mc.level) continue;
+            double dd = l.tip().distToCenterSqr(cam.x, cam.y, cam.z);
+            if (dd >= bestBeam) continue;
+            bestBeam = dd;
+            float[] eye = l.eye();
+            d[244] = (float) (l.tip().getX() + 0.5 - fx);
+            d[245] = (float) (l.tip().getY() + 0.5 - fy);
+            d[246] = (float) (l.tip().getZ() + 0.5 - fz);
+            d[247] = (float) (eye[0] - fx);
+            d[248] = (float) (eye[1] - fy);
+            d[249] = (float) (eye[2] - fz);
+            d[250] = 1;
+        }
         // rift core surroundings (λ-Nero): each core's place on screen (for the lens pull) and the strain on reality,
         // stronger nearer a core, so players can home in by following "darker and greyer"
         Matrix4f fwd0 = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);

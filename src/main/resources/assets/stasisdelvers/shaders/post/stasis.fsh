@@ -25,6 +25,7 @@
 // floor(camera y), row = z); [3584 + 64i ..] static deep i's (corner centre - (1.3 r + 10), spacing 2 (1.3 r + 10) / 7);
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
 // shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
+// [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
@@ -1218,6 +1219,23 @@ void main() {
             // on the sky and, like fog, on far terrain (a sky-only glow cut hard along the skyline: AdventurAgent)
             float far = depth > 0.0 ? smoothstep(rd * 0.35, rd * 1.0, length(rel)) : 1.0;
             c += vec3(0.45, 0.2, 0.75) * data(1313) * pow(facing, 2.0) * low * 0.5 * far;
+        }
+        // a lance's beam (LanceBlockEntity; slots 244-250): violet, from the boom's tip into the rift's eye while the lance
+        // pours power into it; a thin hot core in a soft halo, flickering, hidden behind the scene
+        if (data(250) > 0.5) {
+            vec3 A = vec3(data(244), data(245), data(246)) - camFrac, B = vec3(data(247), data(248), data(249)) - camFrac;
+            float L = length(B - A);
+            vec3 u = (B - A) / max(L, 1e-4);
+            // the closest points of the view ray (0..tLim along dir, from the camera) and the segment A + s u
+            float tLim = depth > 0.0 ? tScene : 1e4;
+            float bb = dot(dir, u), dA = dot(dir, A), uA = dot(u, A), den = 1.0 - bb * bb;
+            float sB = den > 1e-5 ? clamp((bb * dA - uA) / den, 0.0, L) : 0.0;
+            float tB = clamp(dA + sB * bb, 0.0, tLim);
+            sB = clamp(dot(dir * tB - A, u), 0.0, L);
+            float dist = length(dir * tB - A - u * sB);
+            float fl = 0.8 + 0.2 * sin(data(29) * 23.0 + sB * 1.7) * sin(data(29) * 7.3 - sB * 0.9);
+            float glow = (exp(-dist * dist / 0.012) + 0.35 * exp(-dist * dist / 0.3)) * fl * smoothstep(0.0, 0.6, sB);
+            c += vec3(0.62, 0.3, 1.0) * glow;
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }
