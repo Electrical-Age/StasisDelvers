@@ -59,7 +59,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 - `FieldData.deep_seed` (time-stop.md).
 - SavedData: `storm_override`, `rift_crystals`, `storm_crystals`, `rift_gates` (`Gates`, see
   deeps-strata-worldgen.md).
-- Config: `storms`, `stormEveryHours`, `stormMinutes`, `stormWarnMinutes`, `crystalStageSeconds`.
+- Config: `storms` (forced off in spreading mode, spreading-mode.md), `stormEveryHours`, `stormMinutes`, `stormWarnMinutes`, `crystalStageSeconds`.
 
 ## Client / server split
 - Synced: the deep seed (in `StasisNet.Fields`), gate rifts (`GateRifts`), the storm override (`StormOverride`).

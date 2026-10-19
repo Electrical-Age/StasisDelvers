@@ -119,7 +119,8 @@ public final class Spread {
     static void tick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post e) {
         if (!StasisConfig.spreading || testing) return;
         MinecraftServer srv = e.getServer();
-        Clock k = Clock.get(srv.overworld());
+        ServerLevel ow = srv.overworld();
+        Clock k = Clock.get(ow);
         long now = System.nanoTime();
         double dt = tickSeconds(lastNanos, now, srv.getPlayerCount());
         lastNanos = now;
@@ -127,11 +128,12 @@ public final class Spread {
             k.seconds += dt;
             k.setDirty();
         }
-        update(srv, k);
+        update(ow, k);
     }
 
     /** Recompute P and completion from the clock; P changes bump Stasis.version, completion invalidates every level. */
-    static void update(MinecraftServer srv, Clock k) {
+    static void update(ServerLevel ow, Clock k) {
+        MinecraftServer srv = ow.getServer();
         State s = server;
         double c = coverage(k);
         int p = s.map() == null ? 0 : progress(c, s.count());
@@ -150,7 +152,7 @@ public final class Spread {
         if (p != s.p() && s.map() != null) {
             long lo = (long) Math.min(p, s.p()) * SpreadMap.SCALE, hi = (long) Math.max(p, s.p()) * SpreadMap.SCALE;
             SpreadRanks m = s.map();
-            relightNearPlayers(srv, srv.overworld(), (cx, cz) -> SpreadMap.chunkMin1024(m, cx, cz) < hi && SpreadMap.chunkMax1024(m, cx, cz) >= lo);
+            relightNearPlayers(srv, ow, (cx, cz) -> SpreadMap.chunkMin1024(m, cx, cz) < hi && SpreadMap.chunkMax1024(m, cx, cz) >= lo);
         }
         if (complete != s.complete()) {
             for (ServerLevel l : srv.getAllLevels()) Stasis.invalidate(l);
@@ -181,7 +183,7 @@ public final class Spread {
         MapData d = MapData.get(level);
         if (d.ranks == null) return;
         try {
-            install(level.getServer(), new SpreadMap(d.spawnX, d.spawnZ, d.radius, d.ranks));
+            install(level, new SpreadMap(d.spawnX, d.spawnZ, d.radius, d.ranks));
         } catch (IllegalArgumentException ex) {
             StasisDelvers.LOG.error("Spread map unreadable ({}); the overworld runs until it is rebuilt", ex.getMessage());
         }
@@ -195,8 +197,9 @@ public final class Spread {
     static void serverStarted(net.neoforged.neoforge.event.server.ServerStartedEvent e) {
         if (!StasisConfig.spreading) return;
         ServerLevel ow = e.getServer().overworld();
+        if (server.map() == null) levelLoad(ow);   // (a saved map is never rebuilt: its spawn is pinned)
         if (server.map() != null) {
-            update(e.getServer(), Clock.get(ow));
+            update(ow, Clock.get(ow));
             return;
         }
         int seed = FieldData.get(ow).deepSeed();
@@ -207,13 +210,13 @@ public final class Spread {
             m.count, SpreadMap.CELL, m.radius, spawn.getX(), spawn.getZ());
         MapData d = MapData.get(ow);
         d.set(m);
-        install(e.getServer(), m);
+        install(ow, m);
     }
 
-    private static void install(MinecraftServer srv, SpreadMap m) {
+    private static void install(ServerLevel ow, SpreadMap m) {
         server = new State(m, m.count, 0, false, false);
         lastNanos = 0;
-        update(srv, Clock.get(srv.overworld()));
+        update(ow, Clock.get(ow));
     }
 
     static void serverStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent e) {
@@ -236,7 +239,7 @@ public final class Spread {
             k.seconds = k.hardAt + (cap >= 1 ? 0 : (c - cap) / (1 - cap) * StasisConfig.hardSpreadHours * 3600);
         }
         k.setDirty();
-        update(srv, k);
+        update(srv.overworld(), k);
         return null;
     }
 
@@ -247,7 +250,7 @@ public final class Spread {
         k.hard = true;
         k.hardAt = k.seconds;
         k.setDirty();
-        update(srv, k);
+        update(srv.overworld(), k);
         StasisDelvers.LOG.info("Hard mode at {} h online", k.seconds / 3600);
         return true;
     }

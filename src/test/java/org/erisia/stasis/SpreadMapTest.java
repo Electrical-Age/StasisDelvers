@@ -268,6 +268,36 @@ class SpreadMapTest {
         return best;
     }
 
+    // ---- saved data ----------------------------------------------------------------------------------------------
+
+    /** The map and the clock survive a save (NBT) round trip; an empty or old save gives defaults (no map). */
+    @Example
+    void savedDataRoundTrip() {
+        var ops = net.minecraft.nbt.NbtOps.INSTANCE;
+        SpreadMap m = map(99, 40, -70, 200);
+        Spread.MapData d = new Spread.MapData();
+        d.set(m);
+        var tag = Spread.MapData.CODEC.encodeStart(ops, d).getOrThrow();
+        Spread.MapData back = Spread.MapData.CODEC.parse(ops, tag).getOrThrow();
+        assertArrayEquals(m.ranks, back.ranks);
+        assertEquals(40, back.spawnX);
+        assertEquals(-70, back.spawnZ);
+        assertEquals(200, back.radius);
+        assertArrayEquals(m.ranks, new SpreadMap(back.spawnX, back.spawnZ, back.radius, back.ranks).ranks);
+        Spread.MapData empty = Spread.MapData.CODEC.parse(ops, new net.minecraft.nbt.CompoundTag()).getOrThrow();
+        assertEquals(null, empty.ranks);
+
+        Spread.Clock k = Spread.Clock.CODEC.parse(ops, new net.minecraft.nbt.CompoundTag()).getOrThrow();
+        assertEquals(0, k.seconds);
+        k.seconds = 12345.5;
+        k.hard = true;
+        k.hardAt = 99.25;
+        Spread.Clock kb = Spread.Clock.CODEC.parse(ops, Spread.Clock.CODEC.encodeStart(ops, k).getOrThrow()).getOrThrow();
+        assertEquals(12345.5, kb.seconds);
+        assertTrue(kb.hard);
+        assertEquals(99.25, kb.hardAt);
+    }
+
     // ---- the clock -------------------------------------------------------------------------------------------------
 
     /** Coverage: cap * t / H up to the cap; in hard mode cap + (1 - cap) * the share of hardHours since; monotone. */
