@@ -9,6 +9,7 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   from the rifts over `spreadHours` of online time to `spreadCap` (80 %) of the land within `spreadRadius` of spawn.
   Hard mode (for now only `/stasis spread hardmode`) takes it on to 100 % over `hardSpreadHours`.
 - At 100 % the spread is **complete**: everything behaves as the stopped mode, spawn included (Baughn: on purpose).
+- First join: one stability compass and nothing else (`StarterKit`, persisted flag `stasisdelvers_starter_compass`).
 - Off in spreading mode: the spawn cottage (not marked done), the starter suit and flashlight, storms
   (`StasisConfig.storms` is false: storms come with hard mode, after the storm clock's origin moves, or tau jumps),
   and the stronghold portal room's gate rift (the room stays intact; hard mode will need it).
@@ -22,13 +23,23 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   normal freeze to a statue. Suited players drain at the deep rate (x2) as in stilled land.
 
 ## Classes
-- `SpreadMap.java`: the map, pure (no Minecraft state). `build(seed, spawnX, spawnZ, radius)`:
+- `SpreadMap.java`: the map, pure (no Minecraft state). `build(seed, spawnX, spawnZ, radius, connectedUntil)`,
+  algorithm 2, shape v2 "rising water" (Baughn 2026-10-19: v1's stilled regions were too scattered for bases):
   - 32-block cells (cell i covers blocks 32i..32i+31, global). Why 32: open corridors are at least 32 blocks wide
     (Argon), a quarter of the cells of a chunk grid, and every chunk lies in one bilinear patch per axis.
-  - A0 per cell: distance to the nearest static deep's rift (from a point warped by fbm: lobes), a slope up to spawn,
-    a little fbm, and a cone within 600 blocks of spawn so the last land is a round patch around spawn.
-  - Ranks by 4-connected region growing from the 2x2 cells round spawn, taking the frontier cell with the highest A0.
-    Step k gets rank N-1-k. Cells outside the radius are -1 (stilled from the start).
+  - S per cell (`stability`): a smooth stability terrain. 2-octave fbm hills on a 1400-block lattice over a warped
+    domain (features of 1-2 km), small detail for ragged shores, minus a dip round each static deep's rift (0.35 at its
+    edge, gone 200 blocks out: the stillness starts at the rifts), plus a Gaussian raise round spawn (0.25, 800 blocks).
+  - split = floor(`spreadConnectedUntil` x N) (config, default 0.5). The N - split cells of highest S take ranks
+    split..N-1 in S order: the water rises over the terrain, the islands shrink to their high points, which still last.
+  - The other cells take ranks 0..split-1 in the order of a 4-connected priority flood from spawn's cell over all
+    cells (the frontier cell of highest S first, v1's growth), keeping only the low cells' order (the later reached, the
+    lower). Every low cell was reached from a cell taken before it (high, or low of higher rank), so below the split
+    every running low cell is connected to spawn through running cells; high ground may be a running island.
+    Above the split nothing is promised (Baughn: EA teleporters, cheap suits). Spawn's cell runs until the split.
+  - Sort keys are S exactly (float bits made sortable), then the cell index: deterministic, no ties.
+  - Cells outside the radius are -1 (stilled from the start).
+  - `nearestAtLeast(map, x, z, minRank, rings)`: the nearest cell centre at or above a rank, ring by ring (the compass).
   - `rank1024(SpreadRanks, x, z)`: **the** lookup, bilinear between cell centres (32i+16) in integer arithmetic.
     A column is stilled iff it is below `P * SCALE` (`stilled`). `chunkMin1024`/`chunkMax1024` are exact.
   - `stilledSplit`: `stilled` in 32-bit integers (high and low 16 bits of r - P), the shader's arithmetic.
@@ -66,10 +77,19 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   sounds, frozen entities and flames go through `rateAt` and so follow the client's tiles. A field's shield still
   keeps rain out on running land (`underShield` is the dome's shape, not a time test).
 - `StasisCommands`: `/stasis spread status | set <coverage> | hardmode` (op).
+- `StabilityCompassItem.java` (`stasisdelvers:stability_compass`): points at the nearest place of temporal stability
+  (rank / N, the coverage at which it stills) >= 90 %; past 90 % (hard mode) at rank >= P, so never into stilled land.
+  The server searches (`nearestAtLeast`, cached per player until the player's cell or the threshold changes, asked
+  every 20 ticks from `inventoryTick`) and stores an untracked `LODESTONE_TRACKER` target: the vanilla needle draws it,
+  as the rift compass's. It spins outside spreading mode, off the overworld, when complete, or with no target. Use:
+  "Temporal stability here: NN %" on the action bar. Recipe: a compass with amethyst shards N, E, S, W. Model: the
+  vanilla compass models with a constant pale-amethyst tint (`items/stability_compass.json`).
 
 ## Persistent state
 - Overworld SavedData `stasisdelvers:spread_map` (`algorithm`, `spawn_x`, `spawn_z`, `radius`, `ranks` int array),
-  written once; `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`).
+  written once. A saved map is never rebuilt, whatever its algorithm: a world made with v1 keeps its v1 map (logged at
+  load). A missing `algorithm` reads as 1 (DFU drops fields equal to their default, so v1 saves lack it). Delete
+  `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`).
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -85,22 +105,30 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
 - Xaero's overlays use `rateAtLand`; the world map refreshes as P moves by 1/2000 of the map.
 
 ## Invariants and tests
-- `SpreadMapTest`: ranks are a permutation of 0..N-1; build is deterministic; every cell but the top one has a
-  higher 4-neighbour (so the running cells are one piece with spawn at every P); block-sampled bilinear running set
-  is one piece from the spawn column; chunk extremes are exact; coverage formula, monotone, capped tick.
-  `pinchReport` logs corridor widths (a few roomy regions hang behind 5-8 block pinches; 1-block ones are rare and
-  transient: every corridor narrows to nothing just before it stills).
+- `SpreadMapTest`: ranks are a permutation of 0..N-1 (any split); build is deterministic; the ranks from the split up
+  follow S and every low cell is at most as stable as the least high one; below the split, BFS from spawn's cell
+  reaches every running low cell, and block by block (the bilinear) every running low cell's centre column; the compass
+  search equals brute force; chunk extremes are exact; coverage formula, monotone, capped tick.
+  `coherenceReport` logs, at 20/50/80/90/95 %, the running cells' components, those of >= 100 cells (~320 x 320
+  blocks) and their share, the largest, and the shore share (running cells next to stilled land); it dumps the lab
+  seed's map to `build/spread-lab-v2.ranks` for `tools/spread-render.py` (renders: `notes/spread-renders/v2-*.png`).
+  Lab seed 3201319, 8 km: at 50 % 38 components, 11 big holding 99.6 %; at 80 % 38, 20 big holding 98.9 %, the
+  largest 29 %; at 95 % 32, 17 big holding 97 %.
 - `SpreadTilesTest`: tile lookup = map lookup on random maps (through the codec), uncovered cells run,
   `stilledSplit` = the exact sum at every offset and at P on each boundary. `NetCodecTest`: the three payloads.
-- GameTests (isolated): `spread_rates`; `spread_deep_stops_running_land` (rate 0 and no block tick in a drifting
+- GameTests (isolated): `spread_rates` (at P = N/3, below the split); `stability_compass_target` (the target is the
+  nearest cell >= 90 %, it spins in stopped mode); `stability_compass_first_join` (one compass, nothing else, not again); `spread_deep_stops_running_land` (rate 0 and no block tick in a drifting
   deep over running land, the land's rate 1, a field holds it off, an unsuited player is held, not a statue);
   `spread_tiles_follow_player` (the server's tile list follows the player).
 
 ## Gotchas
-- A running column's rift still stops (Baughn). A corridor could pass a rift's column; rifts still early (low A0),
-  and they are 3D, so there is usually a way round, but nothing guarantees it.
+- A running column's rift still stops (Baughn). Below the split a corridor could pass a rift's column; rifts still early
+  (S dips there), and they are 3D, so there is usually a way round, but nothing guarantees it.
+- Above the split (default 50 %) running regions can be cut off from spawn and from each other, on purpose.
+- Spawn's own region can still at the split: the spawn raise is mild (on the lab seed spawn sits in a low area).
 - Entering hard mode before the coverage reached the cap jumps it to the cap at once (the formula as designed).
-- Changing `spreadRadius` after the map is built changes nothing; delete `spread_map` to rebuild.
+- Changing `spreadRadius` or `spreadConnectedUntil` after the map is built changes nothing; delete `spread_map` to
+  rebuild.
 - `Deeps.at` is cached per tick by 256-block region (from `within`, a superset of `near`): it is asked per block in
   running land now. Off the server's main thread the deep test is skipped (it reads a heightmap); off-thread callers
   use `rateAtLand` anyway.

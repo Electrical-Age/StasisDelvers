@@ -12,7 +12,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 - `stasis-build.sh test`: unit and property tests of the mod only.
 - `stasis-build.sh :towergen:test`, and `./gradlew :towergen:slowTest [-Dtowergen.random=N -Dtowergen.seed=S]`.
 - `stasis-build.sh runGameTestServer`: every GameTest, headless. It exits non-zero if a required test fails.
-  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 101 at HEAD).
+  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 103 at HEAD).
 - One GameTest by hand: `./gradlew runServer` (or `runClient`), then `/test run stasisdelvers:<name>`.
   `neoforge.enabledGameTestNamespaces` is set for every run config.
 
@@ -29,7 +29,8 @@ There are three layers. All of them run through Gradle; the wrapper script below
   storm `tau` is monotone and continuous (also with overrides); `integral` is the integral of intensity; a
   storm stays in its block; the time-of-day wrap; the bed span.
 - `NetCodecTest.java`: round trip of every `StasisNet` payload; `sentFieldsAgreeOnBlocks` (networking.md).
-- `SpreadMapTest.java`: the spreading mode's map and clock (spreading-mode.md); `pinchReport` and `buildTimes` only log.
+- `SpreadMapTest.java`: the spreading mode's map and clock (spreading-mode.md); `coherenceReport` and `buildTimes` only log
+  (`coherenceReport` also writes the lab seed's ranks to `build/spread-lab-v2.ranks` for `tools/spread-render.py`).
 - `SpreadTilesTest.java`: the client's rank tiles answer like the server's map (through the wire codec), uncovered
   cells run, and `SpreadMap.stilledSplit` (the shader's 32-bit arithmetic) equals the exact sum at every offset.
 - `SuitsTest.java`: `drain` takes what `available` promised and respects its limits; `bugB_aCapacitorIsNotPower`.
@@ -44,7 +45,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 ## 3. GameTests (`src/main/java/org/erisia/stasis/gametest/StasisGameTests.java`)
 - Registration: a static `CASES` map (name → `Spec(ticks, body, field, isolated)`), registered through a
   `TEST_FUNCTION` `DeferredRegister` and `RegisterGameTestsEvent` in `register(modBus)`.
-  - 99 `CASES.put` calls, two of them in loops: 101 tests.
+  - 101 `CASES.put` calls, two of them in loops: 103 tests.
   - Each test gets the structure `stasisdelvers:floor_16x6x8` (`src/main/resources/data/stasisdelvers/structure/floor_16x6x8.nbt`,
     made by `script/gen_test_structures.py`) and `maxTicks = ticks + 40`.
   - `isolated` tests (towers, big fields) get their own environment `alone_<name>`, so they run in a batch

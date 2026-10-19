@@ -74,7 +74,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 - `Suits.available` never counts batteries that can't discharge (rift capacitors).
   Tests: `SuitsTest.bugB_aCapacitorIsNotPower`, `drainingTakesWhatAvailablePromised`, `drainRespectsLimits`.
 - Rifts are never protected (Baughn's rule). Capacitors don't help there.
-- The starter suit is given once per player, across deaths: `starter_suit_once`.
+- The starter suit is given once per player, across deaths: `starter_suit_once`. In spreading mode there is no suit:
+  one stability compass instead (`StarterKit.COMPASS_TAG`), `stability_compass_first_join`.
 - Crafting keeps the charge: `suit_craft_keeps_charge`. Capacitors: `capacitor_takes_mist`.
 - Slow-field player clocks: `suit_full_speed_in_slow_field`, `rate_player_eats_slowly`.
 
