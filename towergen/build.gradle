@@ -14,6 +14,7 @@ repositories {
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'net.jqwik:jqwik:1.9.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -27,6 +28,7 @@ test {
         excludeTags 'slow'
     }
     maxHeapSize = '2g'
+    systemProperty 'jqwik.database', layout.buildDirectory.file('jqwik-database').get().asFile.absolutePath
     if (System.getProperty('meshDebug') != null) systemProperty 'meshDebug', '1'
     testLogging { events 'failed'; exceptionFormat 'full'; showStandardStreams = true }
 }

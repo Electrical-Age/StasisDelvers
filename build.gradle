@@ -49,6 +49,13 @@ neoForge {
             sourceSet(sourceSets.main)
         }
     }
+
+    // Unit and property tests (src/test, JUnit 5 + jqwik) run with the game on the classpath and the mod loaded
+    // (codecs, BlockPos). The GameTests are not part of `test`: they run only in runGameTestServer.
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
 }
 
 // Electrical Age 26.x (github Electrical-Age/ElectricalAge, branch ports/26.3): built locally. Compiled against,
@@ -58,6 +65,20 @@ dependencies {
     compileOnly files(elnJar)
     compileOnly 'maven.modrinth:xaeros-minimap:j2Xo3Dhc'   // xaerominimap-neoforge-26.3-26.6.0
     compileOnly 'maven.modrinth:xaeros-world-map:p5t2Xn8F' // xaeroworldmap-neoforge-26.3-1.47.0
+
+    // the mod requires eln, so the unit-test game loads it too
+    testImplementation files(elnJar)
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'net.jqwik:jqwik:1.9.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    // (the unit-test game runs in its own directory: an absolute path keeps jqwik's failure database in build/)
+    systemProperty 'jqwik.database', layout.buildDirectory.file('jqwik-database').get().asFile.absolutePath
+    testLogging { events 'failed'; exceptionFormat 'full' }
 }
 def copyEln = tasks.register('copyElnToRun', Copy) {
     from elnJar
