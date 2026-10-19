@@ -27,7 +27,7 @@ public final class LibraryBin {
 
     // ------------------------------------------------------------------------------------------------ writer
 
-    private static final class Out {
+    static final class Out {
         final ByteArrayOutputStream b = new ByteArrayOutputStream(1 << 22);
 
         void uv(int v) {                                  // unsigned varint
@@ -86,7 +86,7 @@ public final class LibraryBin {
 
     // ------------------------------------------------------------------------------------------------ reader
 
-    private static final class In {
+    static final class In {
         final byte[] b;
         int p;
         In(byte[] b) { this.b = b; }
