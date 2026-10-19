@@ -33,7 +33,7 @@ Kept simple, all in the tower's materials:
   EA copper coil). It drops itself and its focus.
 - The focus (`RiftFocusItem`, not consumed): use it on the core; sneak-use with an empty hand takes it out; an empty hand
   shows the state. `rift_focus` (tier 1; `DSD/SGS/DSD`: rift dust, rift shards, glass) breaches rifts whose gate leads to
-  the Nether; `charged_rift_focus` (tier 2; `ARA/RFR/ARA`: riftstone, charged shards round a rift focus) the End too
+  the Nether; `charged_rift_focus` (tier 2; `ARA/RFR/ARA`: riftstone, charged shards round a rift focus; a hot violet lens with sparkles, so the two tell apart) the End too
   (`RiftFocusItem.needs(Lance.kind)`, so before hard mode in spreading mode a tier 1 does any rift: Argon).
 
 ## Power and numbers (L2; all `StasisConfig`)
@@ -55,9 +55,12 @@ Kept simple, all in the tower's materials:
 - Each tick of the core: `want` = bound, with a fitting focus; `powered` = the draw met. Powered: the grace resets; not
   yet latched, progress grows (not in a storm), a step every breach / 8; at step 8 the gate latches OPEN (L1's state:
   travel works). Latched: the hold draw.
-- Not powered (or no focus, or unbound) past step 0: the grace counts (a klaxon every 2 s and an action-bar warning
+- Not powered (or no focus, or unbound) past step 0: the grace counts (a klaxon every 2 s and an action-bar countdown
   within 48 blocks), then the gate unlatches and progress runs down, a step back every relax / 8: never a snap. Power back
   mid-relax breaches on from there. Sounds at the eye: each step, the latch, the unlatch.
+  - The klaxon is the grace's only (AdventurAgent: it and "slips in 0 s" went on for the whole relax). While relaxing
+    (`Lance.relaxing`: grace is then graceTicks + 1) the core gives a low groan and "The gate is closing" once as the
+    relax starts and once per step back (`Lance.closingCue`).
 - Orphans (`Lance.tick`): a gate whose lance was dismantled (or hasn't driven it for 10 s) is driven as unpowered, so it
   relaxes by itself. Gates that never had a lance (the test command's) stay as set.
 - The test command still opens (step 8, latched) and closes (step 0) at once; a bound lance then drives the gate.
@@ -69,7 +72,7 @@ Kept simple, all in the tower's materials:
   `Flames` follow. Worldgen's `shape` is untouched, and so are the strata (rock, pockets): venting is L4.
 - At a quarter a r 9 gate rift's black is under a block across.
 - Sync: `GateRifts` carries `steps` (`id << 4 | step`; protocol 15). Clients set the same strengths; `StasisPost` puts
-  them in slots 240 + i; the shader divides `staticShape` by them (black body, fringe, grey) and scales the mist's
+  them in slots 240 + i, eased over ~1.5 s after each step (`StasisPost.shownStrength`; AdventurAgent: each step popped); the shader divides `staticShape` by them (black body, fringe, grey) and scales the mist's
   envelope, the eye's half-width and the strain. `FrozenSprites.riftStrengths` re-meshes the rift's sections per step.
 
 ## The beam and the eye (L2; client)
@@ -190,7 +193,7 @@ Kept simple, all in the tower's materials:
   the End flag cleared); `lance_outer_end` (a wild End-bound rift: a pad >= 1024 out in the test End).
 - `NetCodecTest.gateRiftsRoundTrip` covers the payload's lists; `lanceStepsPack` the steps' packing.
 - L2 unit (`LanceTest`): costs and times by radius, the strength steps, breach -> latch -> hold, a storm stall, grace ->
-  a step at a time back, power back mid-relax, no focus = no power, the dormancy rule.
+  a step at a time back (the klaxon only in the grace, one closing cue per step back), power back mid-relax, no focus = no power, the dormancy rule.
 - L2 GameTests: `lance_multiblock_binds` (no mast; a boom away from the rift; the boom over the eye binds; the tip; the
   base beside the core; one lance per rift; two booms let go; the rift free for a second lance);
   `lance_breach_hold_relax` (no focus, then a too-weak one: nothing; the breach one step at a time with the zones

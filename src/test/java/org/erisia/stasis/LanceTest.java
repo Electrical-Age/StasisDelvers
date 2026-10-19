@@ -129,9 +129,25 @@ class LanceTest {
         g = run(g, off, 30);
         assertTrue(g.open(), "still latched in the grace");
         assertTrue(Lance.klaxon(g, 30));
+        assertFalse(Lance.relaxing(g, 30));
+        var lastGrace = g;
         g = run(g, off, 1);
         assertFalse(g.open(), "unlatched after the grace");
         assertEquals(Lance.STEPS - 1, g.step(), "first step back");
+        // the klaxon only in the grace; the relax has its own cue, once as it starts and once per step (AdventurAgent)
+        assertFalse(Lance.klaxon(g, 30), "no klaxon while relaxing");
+        assertTrue(Lance.relaxing(g, 30));
+        assertTrue(Lance.closingCue(lastGrace, g, 30), "the cue as the relax starts");
+        int cues = 0;
+        for (int i = 0; i < 20 * Lance.STEPS; i++) {
+            var n = run(g, off, 1);
+            assertFalse(Lance.klaxon(n, 30), "no klaxon in the relax, tick " + i);
+            if (Lance.closingCue(g, n, 30)) cues++;
+            if (n.step() == 0 && n.progress() == 0) break;
+            g = n;
+        }
+        assertEquals(Lance.STEPS - 1, cues, "one cue per step back");
+        g = run(run(gate(), on, 80), off, 31);
         g = run(g, off, 19);
         assertEquals(Lance.STEPS - 1, g.step(), "a step every relaxTicks, never a snap");
         g = run(g, off, 1);

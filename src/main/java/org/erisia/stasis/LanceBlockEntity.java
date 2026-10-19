@@ -264,8 +264,13 @@ public class LanceBlockEntity extends BlockEntity {
             } else brownout = true;
         }
         drawW = powered ? w : 0;
+        Lance.Gate was = g;
         if (g != null) g = Lance.drive(sl, g.id(), want, powered, storm, testSpeed);
-        if (g != null && Lance.klaxon(g, Lance.drive(g.r(), false, false, false, testSpeed).graceTicks()) && ticks % 40 == 0) klaxon(sl, g);
+        if (g != null) {
+            int graceTicks = Lance.drive(g.r(), false, false, false, testSpeed).graceTicks();
+            if (Lance.klaxon(g, graceTicks) && ticks % 40 == 0) klaxon(sl, g);
+            else if (was != null && Lance.closingCue(was, g, graceTicks)) closing(sl);
+        }
         boolean active = g != null && (powered || g.open() || g.step() > 0 || g.progress() > 0);
         tickets(sl, active ? g : null);
         heldField(sl, active);
@@ -297,6 +302,14 @@ public class LanceBlockEntity extends BlockEntity {
         sl.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_DIDGERIDOO.value(), SoundSource.BLOCKS, 4f, 0.5f);
         int left = (int) Math.ceil((Lance.drive(g.r(), false, false, false, testSpeed).graceTicks() - g.grace()) / 20.0);
         Component m = Component.literal("The lance has lost power: the gate slips in " + left + " s").withStyle(ChatFormatting.RED);
+        for (ServerPlayer p : sl.players())
+            if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition)) < 48 * 48) p.sendOverlayMessage(m);
+    }
+
+    /** The relax's cue (AdventurAgent: not the klaxon for minutes): a low groan and a word, as it starts and per step back. */
+    void closing(ServerLevel sl) {
+        sl.playSound(null, worldPosition, SoundEvents.CONDUIT_DEACTIVATE, SoundSource.BLOCKS, 3f, 0.5f);
+        Component m = Component.literal("The gate is closing").withStyle(ChatFormatting.GOLD);
         for (ServerPlayer p : sl.players())
             if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition)) < 48 * 48) p.sendOverlayMessage(m);
     }

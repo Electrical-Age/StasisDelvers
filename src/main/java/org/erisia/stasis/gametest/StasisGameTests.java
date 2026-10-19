@@ -3840,16 +3840,18 @@ public final class StasisGameTests {
             last = gs.get().step();
             ticks = 0;
             oneAtATime = true;
-            boolean unlatched = false;
+            boolean unlatched = false, klaxonInRelax = false;
             while ((gs.get().step() > 0 || gs.get().progress() > 0) && ticks++ < 200) {
                 t.testTick();
                 int st = gs.get().step();
                 if (st > last || st < last - 1) oneAtATime = false;
                 if (!gs.get().open()) unlatched = true;
+                if (!gs.get().open() && org.erisia.stasis.Lance.klaxon(gs.get(), 6)) klaxonInRelax = true;
                 last = st;
             }
             c.check("then unlatched, relaxing a step at a time to the whole rift", unlatched && oneAtATime && gs.get().step() == 0 && !gs.get().open()
                 && ticks >= 6 * org.erisia.stasis.Lance.STEPS, "after " + ticks + " ticks: " + gs.get());
+            c.check("the klaxon only in the grace, not in the relax (AdventurAgent)", !klaxonInRelax);
             c.check("the zones are whole again", org.erisia.stasis.StaticDeeps.strength(seed, d) == 1f
                 && (probe == null || org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 2));
             for (int i = 0; i < 3; i++) t.testTick();

@@ -260,7 +260,7 @@ public final class StasisPost {
                 d[o + 3] = sd.radius();
                 d[o + 4] = sd.id() & 0xFFFFFF;
                 // its strength (Lance: a breach steps the radius down; 1 unless lanced): the shader shrinks the body, mist and eye
-                d[240 + ns - 1] = org.erisia.stasis.StaticDeeps.strength(ClientFields.deepSeed(), sd);
+                d[240 + ns - 1] = shownStrength(sd.id(), org.erisia.stasis.StaticDeeps.strength(ClientFields.deepSeed(), sd));
                 // the inhale before a puff (0..1 over its last 4 s): the rift's mist draws in and darkens
                 double inh = org.erisia.stasis.Deeps.nextPuffIn(sd, wclock, ClientFields.deepSeed());
                 d[1597 + ns - 1] = inh < 4 ? (float) Math.pow(1 - inh / 4, 2) : 0;
@@ -449,6 +449,21 @@ public final class StasisPost {
         if (Math.abs(f.radius() - e[0]) < 0.01) e[0] = f.radius();
         if (SHOWN.size() > 64) SHOWN.keySet().removeIf(id -> ClientFields.fields().stream().noneMatch(x -> x.id() == id));
         return e[0];
+    }
+
+    /** A lanced rift's strength as drawn: eased towards the step it is at, after the step (AdventurAgent: each relax step
+     *  popped; the server steps it once per step of the breach or relax, and zones follow at once). Over ~1.5 s. */
+    static final java.util.Map<Integer, double[]> SHOWN_STRENGTH = new java.util.HashMap<>();
+
+    static float shownStrength(int id, float want) {
+        long now = System.nanoTime();
+        double[] e = SHOWN_STRENGTH.computeIfAbsent(id, k -> new double[]{want, now});
+        double dt = Math.min(0.25, (now - e[1]) / 1e9);
+        e[1] = now;
+        e[0] += (want - e[0]) * Math.min(1, dt / 0.5);
+        if (Math.abs(want - e[0]) < 0.002) e[0] = want;
+        if (SHOWN_STRENGTH.size() > 64) SHOWN_STRENGTH.clear();
+        return (float) e[0];
     }
 
     static void putStretch(float[] d, int i, Field.Stretch st) {

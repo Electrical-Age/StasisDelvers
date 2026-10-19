@@ -914,7 +914,8 @@ public final class Lance {
      * One tick of a gate (pure; LanceTest). Powered and wanted: the grace resets; a gate not yet latched breaches (no
      * progress in a storm), stepping down every stepTicks, and latches OPEN at the last step; a latched gate holds.
      * Otherwise a gate past step 0 counts its grace (the klaxon), then unlatches and relaxes back (progress runs down,
-     * a step every relaxTicks; never a snap: it would swallow the gantry). Power back mid-relax breaches on from there.
+     * a step every relaxTicks; never a snap: it would swallow the gantry); grace is then graceTicks + 1, so the klaxon
+     * stops. Power back mid-relax breaches on from there.
      */
     static final float EPS = 1e-4f;
 
@@ -935,6 +936,7 @@ public final class Lance {
         } else if (open || step > 0 || pr > 0) {
             if (grace < d.graceTicks()) grace++;
             else {
+                grace = d.graceTicks() + 1;   // (past the window: relaxing, the klaxon over; AdventurAgent)
                 open = false;
                 pr -= (float) (1 / d.relaxTicks());
                 if (pr < -EPS) {
@@ -950,9 +952,20 @@ public final class Lance {
         return g.withBreach(open, step, pr, grace);
     }
 
-    /** Is the gate's klaxon sounding (without power, in its grace window)? */
+    /** Is the gate's klaxon sounding (without power, in its grace window)? Only in the grace: not the whole relax
+     *  (AdventurAgent: the klaxon and "slips in 0 s" went on for minutes). */
     public static boolean klaxon(Gate g, int graceTicks) {
         return g.grace() > 0 && g.grace() <= graceTicks && (g.open() || g.step() > 0 || g.progress() > 0);
+    }
+
+    /** Is the gate relaxing (its grace over, stepping back towards whole)? */
+    public static boolean relaxing(Gate g, int graceTicks) {
+        return g.grace() > graceTicks && (g.step() > 0 || g.progress() > 0);
+    }
+
+    /** The relax's own cue (a low groan, "The gate is closing"): once as it starts and once per step back, not every 2 s. */
+    public static boolean closingCue(Gate before, Gate after, int graceTicks) {
+        return relaxing(after, graceTicks) && (!relaxing(before, graceTicks) || after.step() != before.step());
     }
 
     /** Game time a lance last drove each gate (memory; orphans are driven by {@link #tick}). */
