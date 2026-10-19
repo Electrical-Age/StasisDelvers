@@ -42,6 +42,7 @@ tasks.register('slowTest', Test) {
     maxHeapSize = '2g'
     systemProperty 'towergen.random', System.getProperty('towergen.random', '60')
     systemProperty 'towergen.seed', System.getProperty('towergen.seed', '20261012')
+    systemProperty 'jqwik.database', layout.buildDirectory.file('jqwik-database').get().asFile.absolutePath
     testLogging { events 'failed', 'passed'; exceptionFormat 'full'; showStandardStreams = true }
 }
 

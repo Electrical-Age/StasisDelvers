@@ -74,15 +74,16 @@ public final class Redactor {
     }
 
     // other absolute paths: file URLs, Windows drive and UNC paths, POSIX paths under the usual private roots
-    // The first two folders may have spaces ("C:\\Users\\Alice Smith\\", "C:\\Program Files\\", "/Volumes/Macintosh HD/",
-    // "/home/Alice Smith/"): a run of words is taken as one folder when a separator follows it. Further on a space ends
-    // the path (the log's own words follow).
-    static final String SPACED = "(?:[^\\\\/\\s\"'<>|]+(?: [^\\\\/\\s\"'<>|]+)*[\\\\/]){0,2}";
+    // The first folders may have spaces ("C:\\Users\\Alice Smith\\", "C:\\Program Files\\"; on POSIX the one after the
+    // root: "/Volumes/Macintosh HD/", "/home/Alice Smith/"): a run of words is taken as one folder when a separator
+    // follows it. Further on a space ends the path (the log's own words follow).
+    static final String FOLDER = "(?:[^\\\\/\\s\"'<>|]+(?: [^\\\\/\\s\"'<>|]+)*[\\\\/])";
+    static final String SPACED = FOLDER + "{0,2}";
     static final Pattern URL_PATH = Pattern.compile("(?i)(?:jar:)?file:/+(?:[A-Z]:/)?" + SPACED + "[^\\s\"'<>|]*");
     static final Pattern WIN_PATH = Pattern.compile("(?i)(?<![\\w])[A-Z]:[\\\\/]" + SPACED + "[^\\s\"'<>|]*");
     static final Pattern UNC_PATH = Pattern.compile("\\\\\\\\[^\\s\"'<>|]+");
     static final Pattern POSIX_PATH = Pattern.compile(
-        "(?<![\\w.<>/\\-])/(?:home|Users|root|var|tmp|opt|mnt|media|run|nix|srv|data|Volumes)(?:/" + SPACED + "[^\\s\"'<>|]*)?(?![\\w])");
+        "(?<![\\w.<>/\\-])/(?:home|Users|root|var|tmp|opt|mnt|media|run|nix|srv|data|Volumes)(?:/" + FOLDER + "?[^\\s\"'<>|]*)?(?![\\w])");
     static final Pattern JAR_NAME = Pattern.compile("([^\\\\/!]+\\.jar)(?![\\w])", Pattern.CASE_INSENSITIVE);
 
     // IPv4: four parts each <= 255, not part of a dotted version (neoforge-26.3.0.75-beta, v1.2.3.4, 1.2.3.4.5)
