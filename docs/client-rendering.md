@@ -94,6 +94,12 @@ through hooks set in `StasisClient`.
   band uses the deep's ground grid instead of the column's heightmap, so the band's ends can differ by a block or two.
   The deep, static-zone and strain greys multiply by `1 - run` as before, so they show over running land only where it
   is stopped (a drifting deep), matching `rateAt`. The edge is per block, as the server's rule (no soft border).
+- The End rift (step 5): no shader change. It is one more static deep (`StaticDeeps.endRift`, radius 40), which the
+  client registers itself while in the End with the spread's `hard` flag (`StasisClient`'s tick: `addEndRift` for the
+  End's deep seed, cleared on logout); `near` lists it first so the four-deep limit keeps it. It is drawn (mist, eye,
+  strain) only once the End stills at the flash, by the usual `Stasis.stops` gate. Its ground grid is the islands' and
+  the wall's surface heights, as any static deep's. The island's shards are vanilla block displays (interpolated
+  transformations), nothing of ours. Not seen by eye yet (lab).
 - Known gaps: a collapsing field on running land holds a deep off in `rateAt` (any field containing the block) but
   only its uncollapsed part does in the shader; a scene point whose deep is past `MAX_HITS` along the ray misses it.
 

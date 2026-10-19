@@ -57,8 +57,9 @@ import java.util.Set;
  * warning. Some surface blocks fly as block displays (an arc with a tumble) to their places in the islands forming
  * round the rift, where the real block appears when they land; then the sector's islands fill in.</li>
  * <li>The finale (HardMode.explodeEnd, the dragon's death): until the flash the core heaves (more shards fly out);
- * once nobody is left in the End (the flash sends them home), every part not yet gone is lifted and every island
- * placed, faster, force-loading the chunks it needs one at a time (released after).</li>
+ * after it (it sends everyone home) every part not yet gone is lifted and every island placed, at the faster pace
+ * while nobody is there (a creative visitor slows it to the stage pace), force-loading the chunks it needs one or two
+ * at a time under its own ticket controller (released after; dropped on load, the work forces again what it needs).</li>
  * <li>Saved per End level ({@link Data}): which pillars broke, which parts are lifted and placed, and per part the
  * chunks done, so a restart resumes and nothing is applied twice (both steps only remove the island's own blocks and
  * only fill air, so a chunk redone after a crash changes nothing). The shards are cosmetic: discarded on load.</li>
@@ -157,7 +158,7 @@ public final class EndRift {
     static final class Job {
         final int part;
         final boolean lift;
-        /** Only with nobody in the End (the finale's parts: players stand on them until the flash). */
+        /** Only after the flash (the finale's parts: players stand on them until it sends them home). */
         final boolean waitEmpty;
         long notBefore;
         int idx;
@@ -341,7 +342,7 @@ public final class EndRift {
         int[] budget = {testWrites > 0 ? testWrites : watched ? STAGE_WRITES : BUILD_WRITES};
         for (Iterator<Job> it = JOBS.iterator(); it.hasNext() && budget[0] > 0; ) {
             Job j = it.next();
-            if (now < j.notBefore || j.waitEmpty && watched) continue;
+            if (now < j.notBefore || j.waitEmpty && HardMode.holdsEndOpen()) continue;
             boolean finished = j.lift ? lift(end, pl, d, j, now, watched, budget) : place(end, pl, d, j, watched, budget);
             if (!finished) continue;
             it.remove();

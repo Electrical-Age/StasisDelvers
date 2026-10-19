@@ -18,6 +18,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
   - A jittered 3D grid (`CX`/`CY`/`CZ` = 512/192/512) with 25% occupancy, radius 24-64; the rift is the inner 35%.
   - `cell`, `near`, `core`, `shape`, `zone` (0 none, 1 outer, 2 rift), `inRift`.
   - Gate rifts: `setGates`, `isGate`, `gateCount`.
+  - The End rift (spreading mode, hard mode): `endRift(seed)` at (0.5, 64.5, 0.5), radius 40, added per deep seed by
+    `addEndRift` and listed first by `near`; `isGate` is true for it (no strata, no puffs). See spreading-mode.md.
   - `sectionMayHave`: a concurrent cache per deep seed, used by `Stasis.sectionState` from mesh threads.
 - `Storms.java`: storms, roughly one per `stormEveryHours`, lasting `stormMinutes`.
   - Time is cut into blocks of the mean gap, one storm per block at a hashed start (`scheduled`); lookup is O(1).

@@ -3,8 +3,8 @@
 Paths are relative to `src/main/java/org/erisia/stasis/`. Design: `notes/timestop/spread-DESIGN.md` (with Argon's
 review and Baughn's decisions of 2026-10-19). Step 1 is in: the server core (1a) and the client sync, shader and
 drifting deeps over running land (1b); step 2 (the stronghold library desk, portal rooms recorded) and step 3 (front
-warnings) too, step 4a (hard mode's entry: the dragon's death, the End before and after) and 4b (the stronghold
-rewrite). Still to come: 5 (the island's explosion and the end-stone rift).
+warnings) too, step 4a (hard mode's entry: the dragon's death, the End before and after), 4b (the stronghold
+rewrite) and 5 (the island's breaking up into the End rift, as the crystals fall and at the dragon's death).
 
 ## What it is
 - Config `mode = "spreading"` (default `"stopped"`, the base mod). The world starts running; the stillness spreads
@@ -162,9 +162,9 @@ rewrite). Still to come: 5 (the island's explosion and the end-stone rift).
     so P doesn't jump), `hard_game` (game s: the storms' origin).
   - `Storms.clearOverrides`: test storm overrides go (they were ignored while storms were off; counted at once past
     the origin they would jump tau).
-  - The End event begins (memory only): `HardMode.explodeEnd(end)` is called, **step 5's hook** (the explosion and the
-    end-stone rift; for now a stand-in: a growl, then explosions over the island growing denser and white flashes in
-    each player's view). `hardModeTeleportSeconds` (default 6) later comes the flash: everyone in the End but spectators
+  - The End event begins (memory only): `HardMode.explodeEnd(end)` is called: a growl, explosions over the island
+    growing denser, white flashes in each player's view, and `EndRift.finale` (step 5, below: the core heaves, shards
+    fly out). `hardModeTeleportSeconds` (default 6) later comes the flash: everyone in the End but spectators
     is sent to their respawn point (`findRespawnPositionAndUseSpawnBlock(false)`, then `Freezing.safeRespawn`, the
     respawn rule: a bed or anchor in stopped land sends an unprotected player to world spawn), gets the advancement
     `stasisdelvers:breaking_it` "Good job breaking it, hero" (hidden, a challenge under "Free the End", end crystal
@@ -184,8 +184,81 @@ rewrite). Still to come: 5 (the island's explosion and the end-stone rift).
   rewritten, `HardRifts`).
   The lance (later) will open the way. A player who logs in in the End after the flash (a restart mid-event, a long
   absence) is sent home the same way, with the advancement.
-- A restart during the event: hard mode stays, the event is gone, the End is stilled at once. Step 5 will need to
-  persist its build progress.
+- A restart during the event: hard mode stays, the event is gone, the End is stilled at once. The End rift's build
+  resumes from its saved progress (`end_rift`, below).
+
+## The End's island breaks up into the End rift (step 5)
+Baughn: the End island explodes into a gigantic rift of the "floating islands surrounding static" kind, with end stone
+instead of ores; "the core island stays until the dragon is dead, but destruction starts as the end crystals are
+broken: they're stabilizing the problem", end stone lifted off as entities and flown to its place in the rift's
+islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
+- The plan (a function of the End's deep seed and its pillars, `EndSpikeFeature.getSpikesForLevel`):
+  - The main island's columns within `ISLAND_RADIUS` (150) are cut into parts: one per pillar (the columns outside the
+    core nearest that pillar's direction, edges wobbled by noise), and the core (radius `CORE_RADIUS` 60 ± 6: the
+    pillars at 42, the fountain, the fight). Each part's columns are ordered chunk by chunk from the outside in.
+  - Floating islands: lumpy, flat-topped, tapering below, end stone, some with obsidian (35 %) or a dead chorus flower
+    on top (40 %), in a shell 62-160 blocks round the rift's centre (0, 64, 0), flattened (few straight above or below),
+    at most `BLOCK_BUDGET` 60 000 blocks (about 60-90 islands), none within any static deep's zone (the End rift's or
+    the End's own grid deeps). Each island belongs to the part of the sector it hangs over, or to the core's if any of
+    its blocks below `ISLAND_TOP` (110) lies over a column of another part (it would meet ground still standing).
+  - The End rift itself: `StaticDeeps.endRift(seed)`, a gate-like extra static deep (radius `END_RIFT_RADIUS` 40, core
+    ~14 blocks, at (0.5, 64.5, 0.5); `isGate`: no strata, no puffs, leads to the End). It is registered per deep seed
+    (`StaticDeeps.addEndRift`, add only) on the server from hard mode on (`EndRift.tick`, `finale`), and on the client
+    while in the End with the spread's `hard` flag (`StasisClient`'s tick): no payload, both sides know hard mode and the
+    End's seed. It only shows and acts once the End stills (the flash): `Stasis.stops` gates `inRift` and the post
+    shader. `StaticDeeps.near` lists it first (the shader keeps four).
+- Stages (before the dragon dies): a pillar's own crystal destroyed by any means (`EntityLeaveLevelEvent` with a
+  destroying removal reason, inside that pillar's `getTopBoundingBox`; vanilla's pillar crystals show their bottom,
+  a player's never do, so placed crystals are ignored) records that pillar once (`broken` bit) and queues its part:
+  - Lift: its columns lose their end stone (only end stone: players' blocks, the arrival platform's obsidian, chests
+    stay, floating; writes skip neighbour and shape updates so nothing pops). With players in the End, each chunk is
+    warned `WARN_TICKS` (30) ahead with end-stone dust and a crumbling sound (two chunks ahead are warned with it), and a
+    column within 2 blocks of a player's feet is put off with dust and "The ground crumbles under your feet!" until they
+    step away or 3 s pass (then it goes: falling into the void is the End's usual risk). The stage starts with a boom
+    and an action-bar line, "The island shudders: that crystal was holding part of it together."
+  - Shards: with players watching, about 260 of the part's top end-stone blocks (320 in the air at most) fly as block
+    displays from where they stood to an island block of the part, on an arc with a tumble: four segments of 12-22
+    ticks, each a transformation interpolated by the client (the display itself stays put), seen from 320 blocks. When
+    one lands its real block is set there (in air only) and the display goes.
+  - Place: once the shards have landed (`FLIGHT_MAX` after the lift), the part's islands fill in, bottom up, chunk by
+    chunk, into air only.
+  - Pace: `STAGE_WRITES` 512 block writes a tick (plus 2 per column scanned) and `STAGE_PLACES` 96 island blocks a tick
+    while players are in the End; `BUILD_WRITES` 4096 with nobody there.
+- The finale (`EndRift.finale` from `explodeEnd`, the dragon's death): every part not yet lifted is queued. Until the
+  flash the core heaves (4 shards a tick thrown from its surface to the core's islands, purely cosmetic, reverse-portal
+  particles round the rift's centre) and nothing under the players goes; at the flash the shards are dropped
+  (`EndRift.flash`) and from then on every remaining part is lifted (the core also loses the pillars' obsidian, the
+  fountain's bedrock and torches, iron bars, fire, any portal block and the egg) and every island placed, at 4096 writes
+  a tick (512 if a creative visitor is there). A stage running at the kill goes on at its pace.
+- Chunks: the work goes chunk by chunk; a chunk not loaded is force-loaded through the `stasisdelvers:end_rift` ticket
+  controller (non-ticking), with the next one prefetched, and released when done (all released when the queue empties).
+  Tickets saved with the level are dropped on load; the work forces again what it needs.
+- After hard mode a pillar's crystal no longer starts a stage (the finale has them all). `/stasis spread endstage` too.
+- Restart: the jobs come back from `end_rift` (pillars broken, parts lifted and placed, and per part the chunks done),
+  so a part resumes from its next chunk; a chunk redone after a crash changes nothing (only the island's own blocks go,
+  only air is filled). Shards are memory only: a saved one loading again is dropped (`EntityJoinLevelEvent`).
+- Cost: the plan is built once per seed (~0.1-0.5 s, cached); the island scan reads each column once; a vanilla island
+  is a few hundred thousand block writes in all, most of them at the finale with nobody there (about a minute with
+  chunk loads).
+- Lab procedure (AdventurAgent; a lab server in spreading mode, a copy of a world whose dragon is alive, not the live
+  world: none of this can be undone):
+  1. Go to the End by its portal (or `/execute in minecraft:the_end run tp @s 100 50 0`), survival, and look over the
+     island from the arrival platform. `/stasis spread endstatus`: no pillars broken, the plan's islands and blocks.
+  2. Break one pillar's crystal with a bow: the boom and the action-bar line; that pillar's outer sector crumbles from
+     its rim inwards (dust a moment ahead), shards arc up and out and land as end stone; then that sector's islands grow
+     in. `endstatus` shows the lift and place jobs moving. Stand on the crumbling edge: the warning under your feet,
+     about 3 s before it goes. Your own blocks there (place some) stay, floating.
+  3. Without a fight: `/stasis spread endstage <0-9>` lifts that pillar's part as if its crystal broke (the pillars are
+     numbered as `EndSpikeFeature` lists them). Do two or three; watch the frame rate and the server's tick time (F3,
+     `/tick query`) while one runs.
+  4. Restart the server mid-stage; `endstatus` afterwards: the job resumes from its next chunk; no hole is dug twice.
+  5. The finale: kill the dragon (or `/stasis spread hardmode`). For 6 s the core heaves (shards flying out over the
+     explosions), then the flash sends you home. As a spectator (`/gamemode spectator`, then
+     `/execute in minecraft:the_end run tp @s 0 140 120`) watch the rest go and the islands form; `endstatus` until
+     "(built)". Then the End is stilled: the rift's black eye hangs at the old island's middle, mist round it, the
+     islands circling it, the wall (`EndBarrier`) still there. The log: "End rift: built".
+  6. Check by eye: shards' arcs and tumble (smooth, not stepping), the dust warnings, the islands' look (lumpy, flat
+     tops, obsidian flecks, dead chorus), the eye and mist in the stilled End.
 
 ## The strongholds at hard mode (step 4b)
 Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardRifts.java`.
@@ -232,8 +305,8 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
 
 ## The End's wall (λ-Nero)
 - `EndBarrier`: a vertical cylinder of radius `endBarrierRadius` (default 140) round 0, 0, on while `endBarrier` (default
-  true) in spreading mode, before and after hard mode (`EndBarrier.active`: the hook for step 5). Creative and spectator
-  players pass.
+  true) in spreading mode, before and after hard mode (`EndBarrier.active`); it stays round the End rift as a wall.
+  Creative and spectator players pass.
 - Server (`PlayerTickEvent.Post`, `check`): a player past it (walking, flying, a pearl, a boat) is put back where they
   last stood on the ground at least a block inside, or, with none on record, on the surface 4 blocks inside the wall
   towards them, or on the obsidian arrival platform (100, 50, 0) if that column is void. "A wall of stilled time holds
@@ -253,8 +326,12 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
   moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
 - SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre, dir,
   shattered: [chunk], carved: [chunk]}` (packed ChunkPos; `dir` derived and both lists empty in older saves).
+- End SavedData `stasisdelvers:end_rift`: `broken`, `lifted`, `placed` (bits per pillar / part; the core is the last
+  part), `finale`, `lift_done` and `place_done` (per part and chunk: part << 48 | cx << 24 | cz, 24 bits each); all
+  default empty for older saves.
 - Memory only: the End event (`HardMode`), the wall's last ground positions (`EndBarrier`), the stronghold rewrite's
-  queue (`HardRifts`: rebuilt from the progress and chunk loads).
+  queue (`HardRifts`: rebuilt from the progress and chunk loads), the End rift's jobs (rebuilt from `end_rift`), its
+  shards and forced chunks.
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -310,7 +387,22 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
   before it is a teleport home with the advancement; at the flash the other is sent home with it and the End stills;
   then the End can't be entered. `spread_end_barrier`: past the wall with no ground on record, put just inside on the
   ground; after standing inside, put back there; creative passes; no wall in the stopped mode. The mixin's suppression
-  of the portal, gateway and egg needs a real dragon fight: not tested (by eye in the lab).
+  of the portal, gateway and egg needs a real dragon fight: not tested (by eye in the lab). Both switch the End rift
+  off (`EndRift.testOff`): its finale would rebuild the test End.
+- The End rift: `EndRiftPlanTest` (unit, jqwik): the plan is deterministic and within its budget; every island block
+  is in the shell, in one part only and outside every static deep; the parts partition the island's columns (the core
+  holds radius 50, nothing past 67 is core), each sector ordered from the outside in; an island of a pillar's part never
+  hangs below `ISLAND_TOP` over a column of another part; every shard has a target. GameTests:
+  `end_rift_lift_and_shards` (a sector's column loses only its end stone, a core column its obsidian too but not a
+  chest; a shard is in the air midway, lands its block in air only and goes; the codec with defaults);
+  `end_rift_crystal_stages` (paused: in the test End a pillar's crystal discarded or killed records its pillar once, a
+  player's crystal or one away from the pillars doesn't, the command's path records another, the lifts are queued);
+  `end_rift_stage_builds` (two stages carried out with nobody there, a restart after 25 slow ticks resuming from the
+  saved chunks: the sectors hold no end stone but the islands', the islands stand, the core is untouched, no chunk
+  stays forced); `end_rift_finale_builds` (the dragon's death: everything lifted and placed, a pillar stump and the
+  fountain's bedrock gone, a player's block floating, the rift's core registered). The test End is flat (bedrock and
+  three end stone, no pillars): the tests use `getSpikesForLevel`'s positions and lay the flat ground back after.
+  Not tested: the shards' look, the warnings with real players on the island, a real island's numbers (lab).
 - Eyes of Ender: nothing here changes where strongholds are placed or `#eye_of_ender_located`; the portal room's
   blocks are vanilla's. The GameTest world has no strongholds, so this is not tested in a real one.
 

@@ -67,7 +67,8 @@ Javadocs often cite them as `notes/...`.
   and `Field.collapseScore` against its shader `collapseScore`.
 - **Saved data** (per level, `SavedDataType`): `stasisdelvers:fields` (`FieldData`), `gutters` (`Flames`),
   `rift_crystals` (`Crystals`), `storm_crystals` (`StormCrystals`), `rift_gates` (`Gates`),
-  `storm_override` (`Storms.Forced`); overworld only: `spread_map`, `spread_clock` (`Spread`). Block-entity NBT: towers (`TowerBlockEntity`, `TowerStructure`).
+  `storm_override` (`Storms.Forced`); overworld only: `spread_map`, `spread_clock` (`Spread`); the End only:
+  `end_rift` (`EndRift`). Block-entity NBT: towers (`TowerBlockEntity`, `TowerStructure`).
   Entity NBT: statues (`Statue`). Player persisted NBT: `stasisdelvers_starter_suit`, `stasisdelvers_map_desk`.
 - **Memory only, lost on restart:**
   - `Freezing` states and login grace
@@ -78,6 +79,8 @@ Javadocs often cite them as `notes/...`.
   - `Tickets.FORCED`, which is rebuilt from NeoForge's saved tickets at level load
   - `HardMode`'s End event (a restart mid-event stills the End at once), `EndBarrier`'s last ground positions
   - `HardRifts`' chunk queue (rebuilt from `pending_gates`' saved progress and chunk loads)
+  - `EndRift`'s jobs (rebuilt from `end_rift`), its flying shards (block displays, dropped when they load again) and
+    forced chunks (its ticket controller drops saved ones at load); `StaticDeeps`' End rift seeds
 - **Config:** `StasisConfig` is SYNCED. Values are cached in static volatiles by `refresh()`.
   Some keys that look like worldgen-only keys are also read at runtime (see deeps-strata-worldgen.md).
   The client-only config is `client/report/ReportConfig` (`stasisdelvers-client.toml`).
