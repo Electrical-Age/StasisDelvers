@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "stasisdelvers:riftstone_copper_ore",
+    "stasisdelvers:riftstone_lapis_ore",
+    "stasisdelvers:riftstone_redstone_ore"
+  ]
+}

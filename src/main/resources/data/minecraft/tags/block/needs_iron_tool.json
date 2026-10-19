@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "stasisdelvers:riftstone_diamond_ore",
+    "stasisdelvers:riftstone_emerald_ore",
+    "stasisdelvers:riftstone_gold_ore",
+    "stasisdelvers:riftstone_redstone_ore",
+    "stasisdelvers:riftstone_silver_ore"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:alternatives",
+          "children": [
+            {
+              "type": "minecraft:item",
+              "condition": "minecraft:tool/can_silk_touch",
+              "name": "stasisdelvers:riftstone_diamond_ore"
+            },
+            {
+              "type": "minecraft:loot_table",
+              "value": "minecraft:blocks/diamond_ore"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "random_sequence": "stasisdelvers:blocks/riftstone_diamond_ore"
+}

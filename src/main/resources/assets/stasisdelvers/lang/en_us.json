@@ -52,5 +52,16 @@
   "item.stasisdelvers.rift_capacitor": "Rift Capacitor",
   "item.stasisdelvers.charged_rift_capacitor": "Charged Rift Capacitor",
   "advancements.stasisdelvers.breaking_it.title": "Good job breaking it, hero",
-  "advancements.stasisdelvers.breaking_it.description": "Be in the End when the dragon's death shatters it, and be thrown home by the flash"
+  "advancements.stasisdelvers.breaking_it.description": "Be in the End when the dragon's death shatters it, and be thrown home by the flash",
+  "block.stasisdelvers.riftstone_coal_ore": "Riftstone Coal Ore",
+  "block.stasisdelvers.riftstone_copper_ore": "Riftstone Copper Ore",
+  "block.stasisdelvers.riftstone_diamond_ore": "Riftstone Diamond Ore",
+  "block.stasisdelvers.riftstone_emerald_ore": "Riftstone Emerald Ore",
+  "block.stasisdelvers.riftstone_gold_ore": "Riftstone Gold Ore",
+  "block.stasisdelvers.riftstone_iron_ore": "Riftstone Iron Ore",
+  "block.stasisdelvers.riftstone_lapis_ore": "Riftstone Lapis Ore",
+  "block.stasisdelvers.riftstone_redstone_ore": "Riftstone Redstone Ore",
+  "block.stasisdelvers.riftstone_sal_ammoniac_ore": "Riftstone Sal Ammoniac Ore",
+  "block.stasisdelvers.riftstone_silver_ore": "Riftstone Silver Ore",
+  "block.stasisdelvers.riftstone_tin_ore": "Riftstone Tin Ore"
 }

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=false": {
+      "model": "stasisdelvers:block/riftstone_redstone_ore"
+    },
+    "lit=true": {
+      "model": "stasisdelvers:block/riftstone_redstone_ore"
+    }
+  }
+}
