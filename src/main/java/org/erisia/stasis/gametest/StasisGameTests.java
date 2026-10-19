@@ -1567,6 +1567,102 @@ public final class StasisGameTests {
                 stone += st.getCount();
             c.check("riftstone drops itself", stone == 1, String.valueOf(stone));
         }, false));
+        // riftstone ores (λ-Nero): each drops what its stone source drops (Fortune too), silk touch gives the riftstone
+        // ore itself, and it carries the source's tags (not the scatter's c:ores_in_ground/stone|deepslate)
+        CASES.put("riftstone_ore_drops", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            var pos = h.absolutePos(new net.minecraft.core.BlockPos(1, 2, 1));
+            var ench = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT);
+            var plain = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE);
+            var silk = plain.copy();
+            silk.enchant(ench.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.SILK_TOUCH), 1);
+            var fortune = plain.copy();
+            fortune.enchant(ench.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.FORTUNE), 3);
+            var inGround = java.util.List.of("ores_in_ground/stone", "ores_in_ground/deepslate").stream()
+                .map(t -> net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, net.minecraft.resources.Identifier.fromNamespaceAndPath("c", t))).toList();
+            var riftTag = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, net.minecraft.resources.Identifier.fromNamespaceAndPath("c", "ores_in_ground/riftstone"));
+            int tested = 0;
+            for (var b : org.erisia.stasis.RiftOres.BLOCKS) {
+                var variant = b.get();
+                var name = b.getId().getPath();
+                var srcId = net.minecraft.resources.Identifier.parse(org.erisia.stasis.RiftOres.stoneSource(variant));
+                var source = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(srcId).orElse(null);
+                c.check(name + ": riftstone ore tag, not the scatter's", variant.defaultBlockState().is(riftTag)
+                    && inGround.stream().noneMatch(t -> variant.defaultBlockState().is(t)));
+                if (source == null) continue;   // a pack mod's ore (tin, silver, sal ammoniac): not in the dev run
+                tested++;
+                var vs = variant.defaultBlockState();
+                var ss = source.defaultBlockState();
+                // drops: the same items, counts in the source's range (from many draws)
+                java.util.Map<net.minecraft.world.item.Item, int[]> want = new java.util.HashMap<>(), got = new java.util.HashMap<>();
+                for (int i = 0; i < 200; i++) {
+                    tally(want, net.minecraft.world.level.block.Block.getDrops(ss, level, pos, null, null, plain));
+                    tally(got, net.minecraft.world.level.block.Block.getDrops(vs, level, pos, null, null, plain));
+                }
+                boolean same = want.keySet().equals(got.keySet()) && got.entrySet().stream().allMatch(e -> e.getValue()[0] >= want.get(e.getKey())[0] && e.getValue()[1] <= want.get(e.getKey())[1]);
+                c.check(name + " drops what " + srcId + " drops", same && !got.isEmpty(), show(got) + " vs " + show(want));
+                var st = net.minecraft.world.level.block.Block.getDrops(vs, level, pos, null, null, silk);
+                c.check(name + ": silk touch gives itself", st.size() == 1 && st.get(0).is(variant.asItem()) && st.get(0).getCount() == 1, st.toString());
+                if (name.equals("riftstone_diamond_ore")) {
+                    int more = 0;
+                    for (int i = 0; i < 100; i++)
+                        for (var d : net.minecraft.world.level.block.Block.getDrops(vs, level, pos, null, null, fortune)) if (d.getCount() > 1) more++;
+                    c.check("fortune III: sometimes more than one diamond", more > 10, more + " of 100");
+                    c.check("no fortune: one diamond", got.get(net.minecraft.world.item.Items.DIAMOND) != null && got.get(net.minecraft.world.item.Items.DIAMOND)[1] == 1);
+                }
+                // the source's tags, block and item, except the scatter's own and other mods' world-shape tags
+                var missing = new java.util.ArrayList<String>();
+                source.builtInRegistryHolder().tags().filter(t -> !inGround.contains(t) && !t.location().getPath().equals("snaps_goat_horn") && !t.location().getNamespace().equals("terralith"))
+                    .filter(t -> !vs.is(t)).forEach(t -> missing.add(t.location().toString()));
+                source.asItem().builtInRegistryHolder().tags().filter(t -> !t.location().getPath().startsWith("ores_in_ground/"))
+                    .filter(t -> !variant.asItem().builtInRegistryHolder().is(t)).forEach(t -> missing.add("item " + t.location()));
+                c.check(name + " has " + srcId + "'s tags", missing.isEmpty(), missing.toString());
+                c.check(name + ": the source's hardness", vs.getDestroySpeed(level, pos) == ss.getDestroySpeed(level, pos)
+                    && variant.getExplosionResistance() == source.getExplosionResistance());
+            }
+            c.check("the vanilla ores' riftstone ores tested", tested == 8, String.valueOf(tested));
+        }, false));
+        // the rift scatter places riftstone ores, never the stone or deepslate ores (new chunks; λ-Nero): a test rift in
+        // a stone-filled chunk far from the test grid, carved through a recording writer
+        CASES.put("riftstone_ore_scatter", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            int n = 0, other = 0;
+            java.util.Set<net.minecraft.world.level.block.Block> riftOres = new java.util.HashSet<>();
+            org.erisia.stasis.RiftOres.BLOCKS.forEach(b -> riftOres.add(b.get()));
+            for (int i = 0; i < 200000; i++) {
+                var o = org.erisia.stasis.DeepFeature.oreForTest(i % 97, i / 97 % 61, i / 5917, 0x5A0);
+                if (o == null) continue;
+                n++;
+                if (!riftOres.contains(o.getBlock())) other++;
+            }
+            c.check("the draw gives riftstone ores only", n > 400 && other == 0, n + " ores, " + other + " not riftstone");
+            int cx = 40000, cz = 40000, cy = 100;
+            var d = new org.erisia.stasis.StaticDeeps.Deep(cx + 8.5f, cy + 0.5f, cz + 8.5f, 30, 0x2B0E5);
+            level.getChunk(cx >> 4, cz >> 4);
+            var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+            var filled = new java.util.ArrayList<net.minecraft.core.BlockPos>();
+            for (int x = cx; x < cx + 16; x++)
+                for (int z = cz; z < cz + 16; z++)
+                    for (int y = cy - 40; y <= cy + 40; y++) {
+                        float s = org.erisia.stasis.StaticDeeps.shape(d, x + 0.5f, y + 0.5f, z + 0.5f);
+                        if (s < 0.30f || s >= 0.42f) continue;
+                        var p = new net.minecraft.core.BlockPos(x, y, z);
+                        level.setBlock(p, stone, 2);
+                        filled.add(p);
+                    }
+            java.util.Map<net.minecraft.world.level.block.Block, Integer> placed = new java.util.HashMap<>();
+            try {
+                org.erisia.stasis.DeepFeature.apply(level, (p, st) -> {
+                    if (riftOres.contains(st.getBlock()) || st.is(net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK,
+                        net.minecraft.resources.Identifier.fromNamespaceAndPath("c", "ores")))) placed.merge(st.getBlock(), 1, Integer::sum);
+                }, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, d, cx, cz, false);
+            } finally {
+                for (var p : filled) level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+            }
+            int ore = placed.values().stream().mapToInt(Integer::intValue).sum();
+            boolean onlyRift = placed.keySet().stream().allMatch(riftOres::contains);
+            c.check("ores in the test rift's shell, all riftstone ores", ore > 0 && onlyRift, filled.size() + " shell blocks, " + placed);
+        }, false));
         // the drifting deeps' clock never wraps: a deep moves smoothly (< 0.2 blocks in 0.05 s, but it moves) across the
         // old 14.5 h wrap of Eddies.time and weeks or a year into a world
         CASES.put("deeps_clock_continuous", new Spec(1, (h, c) -> () -> {
@@ -3284,6 +3380,23 @@ public final class StasisGameTests {
             throw new RuntimeException(e);
         }
         return new java.io.DataInputStream(new java.io.ByteArrayInputStream(bos.toByteArray()));
+    }
+
+    /** Per item: [min, max] count in one drop list (0 when absent in a draw is not counted). */
+    static void tally(java.util.Map<net.minecraft.world.item.Item, int[]> m, java.util.List<ItemStack> drops) {
+        java.util.Map<net.minecraft.world.item.Item, Integer> one = new java.util.HashMap<>();
+        for (var d : drops) one.merge(d.getItem(), d.getCount(), Integer::sum);
+        one.forEach((i, n) -> {
+            int[] r = m.computeIfAbsent(i, k -> new int[]{Integer.MAX_VALUE, 0});
+            r[0] = Math.min(r[0], n);
+            r[1] = Math.max(r[1], n);
+        });
+    }
+
+    static String show(java.util.Map<net.minecraft.world.item.Item, int[]> m) {
+        var sb = new StringBuilder();
+        m.forEach((i, r) -> sb.append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(i)).append(' ').append(r[0]).append("..").append(r[1]).append(' '));
+        return sb.toString().trim();
     }
 
     interface EaWriter {
