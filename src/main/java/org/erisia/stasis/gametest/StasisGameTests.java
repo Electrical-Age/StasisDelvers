@@ -2107,7 +2107,8 @@ public final class StasisGameTests {
             BlockPos b = still;
             c.cleanup.add(org.erisia.stasis.Spread::testReset);
             int v0 = Stasis.version();
-            org.erisia.stasis.Spread.testInstall(m, m.count / 2);
+            // (below the split, where every running low cell, spawn's among them, is connected to spawn)
+            org.erisia.stasis.Spread.testInstall(m, m.count / 3);
             c.check("installing bumps the version", Stasis.version() != v0);
             c.check("spawn column runs (no field needed)", Stasis.rateAt(level, spawn) == 1.0 && Stasis.rateAt(level, spawn.above(40)) == 1.0);
             c.check("a stilled column is stopped", Stasis.rateAt(level, b) == 0.0 && !Stasis.isRunning(level, b.below(30)));
@@ -2117,7 +2118,7 @@ public final class StasisGameTests {
             Field f = FieldData.get(level).add(level, b.getX() + 0.5, b.getY() + 0.5, b.getZ() + 0.5, 3.0, false, 0.6);
             c.cleanup.add(0, () -> FieldData.get(level).remove(level, f.id()));
             c.check("a field in stilled land runs at its rate", Stasis.rateAt(level, b) == 0.6, "" + Stasis.rateAt(level, b));
-            c.check("just outside it: stopped", Stasis.rateAt(level, b.east(5)) == 0.0 || !org.erisia.stasis.SpreadMap.stilled(m, b.getX() + 5, b.getZ(), m.count / 2));
+            c.check("just outside it: stopped", Stasis.rateAt(level, b.east(5)) == 0.0 || !org.erisia.stasis.SpreadMap.stilled(m, b.getX() + 5, b.getZ(), m.count / 3));
             // sectionState never claims RUNNING or STOPPED for a section with a block that disagrees
             for (BlockPos at : new BlockPos[]{spawn, b}) {
                 int sx = at.getX() >> 4, sy = at.getY() >> 4, sz = at.getZ() >> 4;

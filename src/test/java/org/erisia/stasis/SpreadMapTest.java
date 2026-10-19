@@ -14,26 +14,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The spreading mode's map (SpreadMap) and clock (Spread): the running land is always one piece with spawn in it, at
- * cell level and block by block through the bilinear; the ranks are a permutation; the build is deterministic; the
- * clock never jumps and its coverage follows the formula.
+ * The spreading mode's map (SpreadMap) and clock (Spread): the ranks are a permutation; the high ranks follow S (rising
+ * water); until the split every running low cell is connected to spawn, at cell level and block by block through the
+ * bilinear; the build is deterministic; the compass search finds the nearest cell; the clock never jumps and its
+ * coverage follows the formula. coherenceReport prints how coherent the running land is (Baughn: regions for bases).
  */
 class SpreadMapTest {
     static SpreadMap map(int seed, int sx, int sz, int radius) {
         return SpreadMap.build(seed, sx, sz, radius);
     }
 
-    /** Ranks inside the disc are exactly 0..N-1, the spawn cell's is N-1, and cells outside are -1. */
+    static int split(SpreadMap m, double connectedUntil) {
+        return (int) Math.floor(connectedUntil * m.count);
+    }
+
+    /** The index into m.ranks of the cell holding block (x, z). */
+    static int cellOf(SpreadMap m, int x, int z) {
+        return (Math.floorDiv(x, SpreadMap.CELL) - m.cellX0) + (Math.floorDiv(z, SpreadMap.CELL) - m.cellZ0) * m.n;
+    }
+
+    /** Ranks inside the disc are exactly 0..N-1, cells outside are -1, and spawn's cell is at least split - 1. */
     @Property(tries = 40)
     void ranksArePermutation(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -200000, max = 200000) int sx,
-                             @ForAll @IntRange(min = -200000, max = 200000) int sz, @ForAll @IntRange(min = 64, max = 1500) int radius) {
-        SpreadMap m = map(seed, sx, sz, radius);
+                             @ForAll @IntRange(min = -200000, max = 200000) int sz, @ForAll @IntRange(min = 64, max = 1500) int radius,
+                             @ForAll @DoubleRange(min = 0, max = 1) double connectedUntil) {
+        SpreadMap m = SpreadMap.build(seed, sx, sz, radius, connectedUntil);
         int[] in = Arrays.stream(m.ranks).filter(r -> r >= 0).sorted().toArray();
         assertEquals(m.count, in.length);
         for (int i = 0; i < in.length; i++) assertEquals(i, in[i]);
         assertTrue(Arrays.stream(m.ranks).allMatch(r -> r >= -1));
-        // the spawn column's continuous rank is among the last four (its patch's cells went first)
-        assertTrue(m.rank1024(sx, sz) >= (long) (m.count - 4) * SpreadMap.SCALE);
+        // the flood starts at spawn's cell: the last low cell to still, or high
+        assertTrue(m.ranks[cellOf(m, sx, sz)] >= split(m, connectedUntil) - 1);
         // every disc cell is in (the cell centres within the radius), and none beyond
         long r2 = (long) radius * radius;
         for (int k = 0; k < m.n; k++)
@@ -45,31 +56,69 @@ class SpreadMapTest {
 
     @Property(tries = 20)
     void deterministic(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -5000, max = 5000) int sx,
-                       @ForAll @IntRange(min = -5000, max = 5000) int sz, @ForAll @IntRange(min = 64, max = 1200) int radius) {
-        assertArrayEquals(map(seed, sx, sz, radius).ranks, map(seed, sx, sz, radius).ranks);
+                       @ForAll @IntRange(min = -5000, max = 5000) int sz, @ForAll @IntRange(min = 64, max = 1200) int radius,
+                       @ForAll @DoubleRange(min = 0, max = 1) double connectedUntil) {
+        assertArrayEquals(SpreadMap.build(seed, sx, sz, radius, connectedUntil).ranks, SpreadMap.build(seed, sx, sz, radius, connectedUntil).ranks);
+    }
+
+    /** Rising water: the ranks from the split up are the cells in the order of S (ties: the lower index first). */
+    @Property(tries = 30)
+    void highRanksFollowS(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -100000, max = 100000) int sx,
+                          @ForAll @IntRange(min = -100000, max = 100000) int sz, @ForAll @IntRange(min = 64, max = 3000) int radius,
+                          @ForAll @DoubleRange(min = 0, max = 1) double connectedUntil) {
+        SpreadMap m = SpreadMap.build(seed, sx, sz, radius, connectedUntil);
+        float[] s = SpreadMap.stability(seed, sx, sz, radius, m.cellX0, m.cellZ0, m.n);
+        int split = split(m, connectedUntil);
+        int[] byRank = new int[m.count];
+        for (int c = 0; c < m.ranks.length; c++) if (m.ranks[c] >= 0) byRank[m.ranks[c]] = c;
+        float least = Float.POSITIVE_INFINITY;
+        for (int r = split; r < m.count; r++) {
+            if (r > split) {
+                int a = byRank[r - 1], b = byRank[r];
+                assertTrue(s[a] < s[b] || s[a] == s[b] && a > b, "ranks " + (r - 1) + ", " + r + " out of S order");
+            }
+            least = Math.min(least, s[byRank[r]]);
+        }
+        // and every low cell is at most as stable as the least high one
+        for (int r = 0; r < split; r++) assertTrue(s[byRank[r]] <= least);
+    }
+
+    /** The running cells reached from spawn's cell by 4-steps at progress p. */
+    static boolean[] reachCells(SpreadMap m, int start, int p) {
+        boolean[] seen = new boolean[m.ranks.length];
+        if (m.ranks[start] < p) return seen;
+        ArrayDeque<Integer> q = new ArrayDeque<>();
+        seen[start] = true;
+        q.add(start);
+        while (!q.isEmpty()) {
+            int c = q.poll(), i = c % m.n, k = c / m.n;
+            for (int nc : new int[]{i > 0 ? c - 1 : -1, i < m.n - 1 ? c + 1 : -1, k > 0 ? c - m.n : -1, k < m.n - 1 ? c + m.n : -1})
+                if (nc >= 0 && !seen[nc] && m.ranks[nc] >= p) {
+                    seen[nc] = true;
+                    q.add(nc);
+                }
+        }
+        return seen;
     }
 
     /**
-     * For every P the running cells {rank >= P} are 4-connected and hold spawn. Equivalent to: every cell but spawn has
-     * a 4-neighbour of higher rank (then a strictly rising walk from any running cell stays running and ends at the top,
-     * which is spawn), which checks all P at once.
+     * Until the split, every running low cell (rank in [P, split)) is 4-connected to spawn's cell through running cells
+     * (high ground may be a running island). Checked at P = 0, split - 1 and a few between.
      */
-    @Property(tries = 60)
-    void runningCellsAreOnePieceAtEveryP(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -100000, max = 100000) int sx,
-                                         @ForAll @IntRange(min = -100000, max = 100000) int sz, @ForAll @IntRange(min = 64, max = 3000) int radius) {
-        SpreadMap m = map(seed, sx, sz, radius);
-        int top = m.count - 1;
-        for (int k = 0; k < m.n; k++)
-            for (int i = 0; i < m.n; i++) {
-                int r = m.ranks[i + k * m.n];
-                if (r < 0 || r == top) continue;
-                int best = -1;
-                if (i > 0) best = Math.max(best, m.ranks[i - 1 + k * m.n]);
-                if (i < m.n - 1) best = Math.max(best, m.ranks[i + 1 + k * m.n]);
-                if (k > 0) best = Math.max(best, m.ranks[i + (k - 1) * m.n]);
-                if (k < m.n - 1) best = Math.max(best, m.ranks[i + (k + 1) * m.n]);
-                assertTrue(best > r, "cell " + i + "," + k + " rank " + r + " has no higher neighbour");
+    @Property(tries = 40)
+    void runningLowCellsReachSpawn(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -100000, max = 100000) int sx,
+                                   @ForAll @IntRange(min = -100000, max = 100000) int sz, @ForAll @IntRange(min = 64, max = 3000) int radius,
+                                   @ForAll @DoubleRange(min = 0.05, max = 1) double connectedUntil, @ForAll @DoubleRange(min = 0, max = 1) double share) {
+        SpreadMap m = SpreadMap.build(seed, sx, sz, radius, connectedUntil);
+        int split = split(m, connectedUntil), start = cellOf(m, sx, sz);
+        if (split == 0) return;
+        for (int p : new int[]{0, split - 1, (int) (share * (split - 1)), split / 2, split * 9 / 10}) {
+            boolean[] seen = reachCells(m, start, p);
+            for (int c = 0; c < m.ranks.length; c++) {
+                int r = m.ranks[c];
+                if (r >= p && r < split) assertTrue(seen[c], "P " + p + ": low cell " + c + " (rank " + r + ") cut off from spawn");
             }
+        }
     }
 
     /** The running columns of a map at progress p, over its bounding box: [w*h], spawn at index sp. */
@@ -108,28 +157,121 @@ class SpreadMapTest {
     }
 
     /**
-     * Block by block (the bilinear between cell centres, as rateAt asks): at sampled P every running column is
-     * 4-connected to the spawn column, and the spawn column runs until P = N.
+     * Block by block (the bilinear between cell centres, as rateAt asks), below the split: the centre column of every
+     * running low cell is 4-connected to the centre column of spawn's cell (between two running centres the bilinear is
+     * linear, so a cell path is a block path).
      */
     @Property(tries = 25)
-    void runningColumnsAreOnePiece(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -50000, max = 50000) int sx,
-                                   @ForAll @IntRange(min = -50000, max = 50000) int sz, @ForAll @IntRange(min = 64, max = 400) int radius,
-                                   @ForAll @DoubleRange(min = 0, max = 1) double share) {
+    void runningLowColumnsReachSpawn(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -50000, max = 50000) int sx,
+                                     @ForAll @IntRange(min = -50000, max = 50000) int sz, @ForAll @IntRange(min = 64, max = 400) int radius,
+                                     @ForAll @DoubleRange(min = 0, max = 1) double share) {
         SpreadMap m = map(seed, sx, sz, radius);
-        int p = Math.min(m.count - 4, (int) (share * m.count));
-        for (int pp : new int[]{p, m.count - 4, m.count / 2}) {
-            Blocks b = Blocks.of(m, pp);
-            // from the spawn column (it runs while P <= N-4)
-            boolean[] seen = b.reach(sx, sz);
-            int running = 0, reached = 0;
-            for (int i = 0; i < seen.length; i++) {
-                if (b.run[i]) running++;
-                if (seen[i]) reached++;
+        int split = split(m, SpreadMap.CONNECTED_UNTIL);
+        int start = cellOf(m, sx, sz);
+        int cx = (m.cellX0 + start % m.n) * SpreadMap.CELL + SpreadMap.HALF, cz = (m.cellZ0 + start / m.n) * SpreadMap.CELL + SpreadMap.HALF;
+        for (int p : new int[]{(int) (share * (split - 1)), split - 1}) {
+            Blocks b = Blocks.of(m, p);
+            boolean[] seen = b.reach(cx, cz);
+            for (int c = 0; c < m.ranks.length; c++) {
+                int r = m.ranks[c];
+                if (r < p || r >= split) continue;
+                int x = (m.cellX0 + c % m.n) * SpreadMap.CELL + SpreadMap.HALF - b.x0(), z = (m.cellZ0 + c / m.n) * SpreadMap.CELL + SpreadMap.HALF - b.z0();
+                assertTrue(seen[x + z * b.w()], "P " + p + ": low cell " + c + "'s centre column cut off from spawn");
             }
-            assertTrue(running > 0 && running == reached, "P " + pp + ": " + (running - reached) + " running columns cut off from spawn");
         }
-        // at P = N everything is stilled
-        assertTrue(SpreadMap.stilled(m, sx, sz, m.count));
+    }
+
+    /** The compass search = the brute-force nearest cell centre at or above minRank (ties: the same distance). */
+    @Property(tries = 200)
+    void nearestAtLeastIsNearest(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -900, max = 900) int x,
+                                 @ForAll @IntRange(min = -900, max = 900) int z, @ForAll @DoubleRange(min = 0, max = 1.05) double share) {
+        SpreadMap m = map(seed, 10, -20, 700);
+        int min = (int) Math.ceil(share * m.count);
+        int[] t = SpreadMap.nearestAtLeast(m, x, z, min, m.n);
+        long best = Long.MAX_VALUE;
+        for (int c = 0; c < m.ranks.length; c++) {
+            if (m.ranks[c] < min) continue;
+            long dx = (m.cellX0 + c % m.n) * (long) SpreadMap.CELL + SpreadMap.HALF - x, dz = (m.cellZ0 + c / m.n) * (long) SpreadMap.CELL + SpreadMap.HALF - z;
+            best = Math.min(best, dx * dx + dz * dz);
+        }
+        if (best == Long.MAX_VALUE) {
+            assertEquals(null, t);
+            return;
+        }
+        assertTrue(t != null, "found none");
+        assertTrue(m.rank1024(t[0], t[1]) >= (long) min * SpreadMap.SCALE);
+        long dx = t[0] - x, dz = t[1] - z;
+        assertEquals(best, dx * dx + dz * dz);
+    }
+
+    /**
+     * Not an assertion, a report (Baughn 2026-10-19: coherent running regions for bases): at a few coverages, the running
+     * cells' 4-connected components: how many, how many big (>= BIG cells, ~ 320 x 320 blocks), the share of running
+     * land in big ones, the largest. Also writes the lab world's map (deep seed 3201319, spawn 0 0, 8 km) as raw ranks
+     * for /var/lib/mclab/agent/tools/spread-render.py: build/spread-lab-v2.ranks (int n, then n * n ints, big-endian).
+     */
+    @Example
+    void coherenceReport() throws java.io.IOException {
+        StringBuilder out = new StringBuilder("spread coherence report (8 km; big = >= " + BIG + " cells):\n");
+        for (int seed : new int[]{3201319, 12345, 777777}) {
+            long t0 = System.nanoTime();
+            SpreadMap m = map(seed, 0, 0, 8000);
+            out.append(String.format("seed %d: %d cells, built in %d ms%n", seed, m.count, (System.nanoTime() - t0) / 1_000_000));
+            for (double c : new double[]{0.2, 0.5, 0.8, 0.9, 0.95}) out.append("  ").append(coherence(m.ranks, m.n, (int) (c * m.count), c)).append('\n');
+            if (seed == 3201319) {
+                // next to jqwik's database (build.gradle sets it absolute, in build/): the tests run in their own directory
+                String db = System.getProperty("jqwik.database");
+                java.nio.file.Path f = (db != null ? java.nio.file.Path.of(db).getParent() : java.nio.file.Path.of("build")).resolve("spread-lab-v2.ranks").toAbsolutePath();
+                java.nio.file.Files.createDirectories(f.getParent());
+                try (var o = new java.io.DataOutputStream(new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(f)))) {
+                    o.writeInt(m.n);
+                    for (int r : m.ranks) o.writeInt(r);
+                }
+                out.append("  (ranks written to ").append(f).append(")\n");
+            }
+        }
+        System.out.println(out);
+        StasisDelvers.LOG.info("{}", out);
+    }
+
+    static final int BIG = 100;
+
+    static String coherence(int[] ranks, int n, int p, double c) {
+        int[] comp = new int[ranks.length];
+        Arrays.fill(comp, -1);
+        int comps = 0, big = 0, running = 0, inBig = 0, largest = 0, shore = 0;
+        ArrayDeque<Integer> q = new ArrayDeque<>();
+        for (int s = 0; s < ranks.length; s++) {
+            if (ranks[s] < p || comp[s] >= 0) continue;
+            int size = 0;
+            comp[s] = comps;
+            q.add(s);
+            while (!q.isEmpty()) {
+                int x = q.poll(), i = x % n, k = x / n;
+                size++;
+                for (int nc : new int[]{i > 0 ? x - 1 : -1, i < n - 1 ? x + 1 : -1, k > 0 ? x - n : -1, k < n - 1 ? x + n : -1})
+                    if (nc >= 0 && comp[nc] < 0 && ranks[nc] >= p) {
+                        comp[nc] = comps;
+                        q.add(nc);
+                    }
+                for (int nc : new int[]{i > 0 ? x - 1 : -1, i < n - 1 ? x + 1 : -1, k > 0 ? x - n : -1, k < n - 1 ? x + n : -1})
+                    if (nc < 0 || ranks[nc] < p) {
+                        shore++;
+                        break;
+                    }
+            }
+            comps++;
+            running += size;
+            largest = Math.max(largest, size);
+            if (size >= BIG) {
+                big++;
+                inBig += size;
+            }
+        }
+        // shore: running cells next to stilled land (scattered land is mostly shore; v1's lab map at c 0.8: 9 %)
+        return String.format("c %.2f: %d running cells in %d components, %d big holding %.1f%%, largest %d cells (%.1f%%), shore %.1f%%",
+            c, running, comps, big, running == 0 ? 0 : 100.0 * inBig / running, largest, running == 0 ? 0 : 100.0 * largest / running,
+            running == 0 ? 0 : 100.0 * shore / running);
     }
 
     /** A chunk's least and greatest rank1024 are the extremes over its columns (sectionState relies on it). */
@@ -150,44 +292,6 @@ class SpreadMapTest {
         assertEquals(hi, SpreadMap.chunkMax1024(m, cx, cz));
     }
 
-    /**
-     * Not an assertion, a report (Argon asked about minimum corridor widths): for a realistic map, how much running land
-     * hangs behind a narrow pinch at a few coverages. Width at a column = 2 d - 1, d its Chebyshev distance to stilled
-     * land; a region's pinch is the widest path's narrowest point from spawn.
-     */
-    @Example
-    void pinchReport() {
-        int radius = 2000;
-        StringBuilder out = new StringBuilder("spread pinch report (radius " + radius + "):\n");
-        for (int seed : new int[]{12345, 777777, 4242424}) {
-            long t0 = System.nanoTime();
-            SpreadMap m = map(seed, 100, -200, radius);
-            out.append(String.format("seed %d: %d cells, built in %d ms%n", seed, m.count, (System.nanoTime() - t0) / 1_000_000));
-            for (double c : new double[]{0.2, 0.5, 0.8, 0.95, 0.99}) {
-                int p = (int) (c * m.count);
-                Blocks b = Blocks.of(m, p);
-                int[] d = chebyshev(b);
-                int[] widest = widest(b, d, 100, -200);
-                // count only columns with some room round them (d >= 4: 7+ wide), so the edge itself isn't a "pinch"
-                int room = 0, w1 = 0, w3 = 0, w8 = 0, w16 = 0, worst = Integer.MAX_VALUE;
-                for (int i = 0; i < d.length; i++) {
-                    if (!b.run[i] || d[i] < 4) continue;
-                    room++;
-                    int pinch = 2 * widest[i] - 1;
-                    worst = Math.min(worst, pinch);
-                    if (pinch <= 1) w1++;
-                    if (pinch <= 3) w3++;
-                    if (pinch <= 8) w8++;
-                    if (pinch <= 16) w16++;
-                }
-                out.append(String.format("  c %.2f: %d roomy running cols, spawn's own width %d; behind a pinch <=1: %.2f%%, <=3: %.2f%%, <=8: %.2f%%, <=16: %.2f%%; narrowest %d%n",
-                    c, room, 2 * d[(100 - b.x0()) + (-200 - b.z0()) * b.w()] - 1, 100.0 * w1 / room, 100.0 * w3 / room, 100.0 * w8 / room, 100.0 * w16 / room, worst));
-            }
-        }
-        System.out.println(out);
-        StasisDelvers.LOG.info("{}", out);
-    }
-
     /** Build times at the default radius and the largest allowed (logged, not asserted: machines differ). */
     @Example
     void buildTimes() {
@@ -198,74 +302,6 @@ class SpreadMapTest {
             System.out.println(l);
             StasisDelvers.LOG.info(l);
         }
-    }
-
-    /** Chebyshev distance of each running block to the nearest stilled one (two-pass chamfer). */
-    static int[] chebyshev(Blocks b) {
-        int w = b.w(), h = b.h();
-        int[] d = new int[w * h];
-        int big = 1 << 20;
-        for (int i = 0; i < d.length; i++) d[i] = b.run()[i] ? big : 0;
-        for (int z = 0; z < h; z++)
-            for (int x = 0; x < w; x++) {
-                int i = x + z * w;
-                if (d[i] == 0) continue;
-                int v = d[i];
-                if (x > 0) v = Math.min(v, d[i - 1] + 1);
-                if (z > 0) {
-                    v = Math.min(v, d[i - w] + 1);
-                    if (x > 0) v = Math.min(v, d[i - w - 1] + 1);
-                    if (x < w - 1) v = Math.min(v, d[i - w + 1] + 1);
-                }
-                if (x == 0 || z == 0) v = Math.min(v, 1);
-                d[i] = v;
-            }
-        for (int z = h - 1; z >= 0; z--)
-            for (int x = w - 1; x >= 0; x--) {
-                int i = x + z * w;
-                if (d[i] == 0) continue;
-                int v = d[i];
-                if (x < w - 1) v = Math.min(v, d[i + 1] + 1);
-                if (z < h - 1) {
-                    v = Math.min(v, d[i + w] + 1);
-                    if (x < w - 1) v = Math.min(v, d[i + w + 1] + 1);
-                    if (x > 0) v = Math.min(v, d[i + w - 1] + 1);
-                }
-                if (x == w - 1 || z == h - 1) v = Math.min(v, 1);
-                d[i] = v;
-            }
-        return d;
-    }
-
-    /** Max over 4-paths from (sx, sz) of the least d on the path (bucket queue, highest first). */
-    static int[] widest(Blocks b, int[] d, int sx, int sz) {
-        int w = b.w(), h = b.h();
-        int[] best = new int[d.length];
-        int s = (sx - b.x0()) + (sz - b.z0()) * w;
-        int maxD = 0;
-        for (int v : d) maxD = Math.max(maxD, v);
-        @SuppressWarnings("unchecked") ArrayDeque<Integer>[] buckets = new ArrayDeque[maxD + 1];
-        for (int i = 0; i <= maxD; i++) buckets[i] = new ArrayDeque<>();
-        best[s] = d[s];
-        buckets[d[s]].add(s);
-        for (int lvl = maxD; lvl >= 1; lvl--) {
-            while (!buckets[lvl].isEmpty()) {
-                int c = buckets[lvl].poll();
-                if (best[c] != lvl) continue;
-                int cx = c % w, cz = c / w;
-                for (int k = 0; k < 4; k++) {
-                    int nx = cx + (k == 0 ? 1 : k == 1 ? -1 : 0), nz = cz + (k == 2 ? 1 : k == 3 ? -1 : 0);
-                    if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
-                    int nc = nx + nz * w;
-                    int v = Math.min(lvl, d[nc]);
-                    if (v > best[nc]) {
-                        best[nc] = v;
-                        buckets[v].add(nc);
-                    }
-                }
-            }
-        }
-        return best;
     }
 
     // ---- saved data ----------------------------------------------------------------------------------------------
@@ -286,6 +322,9 @@ class SpreadMapTest {
         assertArrayEquals(m.ranks, new SpreadMap(back.spawnX, back.spawnZ, back.radius, back.ranks).ranks);
         Spread.MapData empty = Spread.MapData.CODEC.parse(ops, new net.minecraft.nbt.CompoundTag()).getOrThrow();
         assertEquals(null, empty.ranks);
+        // a save without the field is algorithm 1 (DFU drops a field equal to its default: every v1 save lacks it)
+        assertEquals(1, empty.algorithm);
+        assertEquals(SpreadMap.ALGORITHM, back.algorithm);
 
         Spread.Clock k = Spread.Clock.CODEC.parse(ops, new net.minecraft.nbt.CompoundTag()).getOrThrow();
         assertEquals(0, k.seconds);

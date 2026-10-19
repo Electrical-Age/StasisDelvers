@@ -8,29 +8,34 @@ import java.util.List;
 
 /**
  * The spreading mode's map (Baughn 2026-10-19; notes/timestop/spread-DESIGN.md): for each 32x32-block cell of the
- * overworld within a radius of world spawn, its RANK: the order in which the stillness reaches it (0 first, N-1 last:
- * the spawn cell). At progress P (Spread: floor(coverage * N)) a cell is stilled iff its rank is below P, and the cells
- * still running are always one 4-connected region containing spawn: nobody is ever shut into a running pocket.
+ * overworld within a radius of world spawn, its RANK: the order in which the stillness reaches it (0 first, N-1 last).
+ * At progress P (Spread: floor(coverage * N)) a cell is stilled iff its rank is below P; a cell's "temporal stability"
+ * is rank / N, the coverage at which it stills (the stability compass points at stability >= 0.9).
  * <p>
- * Built once per world (a pure function of the deep seed, the spawn pinned at build time and the radius), then saved:
+ * Shape v2, "rising water" (Baughn 2026-10-19: v1's stilled regions were too scattered; players need coherent running
+ * regions for bases; the guarantee of a way to spawn is dropped after 50 %, there being EA teleporters and cheap suits).
+ * Built once per world (a pure function of the deep seed, the spawn pinned at build time, the radius and the split),
+ * then saved:
  * <ol>
- * <li>A0 per cell: the distance to the nearest static deep's rift (where the stillness starts), measured from a point
- * displaced by fbm noise so the fronts come in lobes, not circles; plus a gentle slope up towards spawn and a little
- * noise of its own.</li>
- * <li>Ranks by region growing from the 2x2 cells round spawn (Argon's review: 4-connected, which makes the bilinear set
- * provably connected too): repeatedly take the frontier cell with the highest A0 (the one that should run longest).
- * Step k gets rank N-1-k, so the running set {rank >= P} is always the first N-P cells taken: connected, with spawn.
- * A basin that would be cut off stills from its far side towards its exit instead.</li>
+ * <li>S per cell, a smooth "stability terrain": broad fbm hills and plateaus (features of 1-2 km, so stilled and running
+ * land come in coherent regions), lowered round the static deeps' rifts (the stillness starts there) and raised a
+ * little round spawn ({@link #stability}).</li>
+ * <li>The top (1 - split) of the cells by S take ranks split*N..N-1 in S order: water rising over the terrain, the
+ * islands shrinking to their high points, which still last.</li>
+ * <li>The other cells take ranks 0..split*N-1 in the order of a 4-connected priority flood from the spawn cell over ALL
+ * cells (the frontier cell with the highest S first; v1's growth), keeping only the low cells' order, the later grown
+ * the lower. Each low cell was reached from a neighbour taken before it: a high cell (running until the split) or a
+ * low cell of higher rank. So until P reaches the split every running low cell is 4-connected to spawn through running
+ * cells (high ground is wholly running until then anyway); after it, nothing is promised.</li>
  * </ol>
- * Within a cell the continuous rank is bilinear between the cell centres' ranks ({@link #rank1024}); bilinear has no
- * interior maxima, so no new pockets (SpreadMapTest checks the block-sampled set is connected). Cells outside the
+ * Within a cell the continuous rank is bilinear between the cell centres' ranks ({@link #rank1024}). Cells outside the
  * radius are -1: stilled from the start (Baughn: decision 3).
  * <p>
  * Why 32-block cells, not chunk-sized 16 (Argon: keep a minimum corridor width): a corridor of running cells is at least
  * one cell wide while open, so 32 blocks rather than 16; a quarter of the cells (an 8 km radius is ~196k cells: an
- * 0.8 MB save, ~0.2 s to build, 4x smaller client tiles); and the lobes come from noise at hundreds of blocks anyway.
- * With the grid aligned to multiples of 32 and centres at 32i + 16, every chunk lies in one bilinear patch per axis, so
- * a chunk's least and greatest rank are exactly those at its four corner columns ({@link #chunkMin1024}).
+ * 0.8 MB save, ~0.2 s to build, 4x smaller client tiles). With the grid aligned to multiples of 32 and centres at
+ * 32i + 16, every chunk lies in one bilinear patch per axis, so a chunk's least and greatest rank are exactly those at
+ * its four corner columns ({@link #chunkMin1024}).
  * <p>
  * CLIENT MIRROR: the client answers through the same {@link #rank1024(SpreadRanks, int, int)} (integer arithmetic, so
  * both sides agree on every column: stopped-water collision) from a {@link SpreadTiles} (the rank tiles the server
@@ -44,19 +49,19 @@ public final class SpreadMap implements SpreadRanks {
     public static final long SCALE = (long) CELL * CELL;
 
     /** Bumped when the builder's output changes (a saved map of another version is kept: it's the world's map). */
-    public static final int ALGORITHM = 1;
+    public static final int ALGORITHM = 2;
 
-    // A0's shape (blocks): the distance to the nearest rift (capped), warped by fbm, plus a slope up towards spawn
-    static final float DIST_CAP = 1100;
-    static final float WARP = 160, WARP_SCALE = 700;
-    static final float SLOPE = 0.1f;
-    static final float WOBBLE = 60, WOBBLE_SCALE = 300;
-    /**
-     * A cone around spawn, steeper than the distance term (1 per block, a bit more with the warp): within it A0 falls
-     * away from spawn, so the last land to still is a round patch around spawn, not a 32-block corridor that happens
-     * to pass a spawn near a rift (seen in SpreadMapTest's pinch report before the cone).
-     */
-    static final float DOME_RADIUS = 600, DOME_SLOPE = 2.5f;
+    // S's shape (Baughn 2026-10-19, "rising water"): tuned by SpreadMapTest.coherenceReport. Units: S is about 0..1.
+    /** The hills: 2-octave fbm on a lattice of HILL_SCALE blocks (features of 1-2 km), its domain warped by WARP blocks. */
+    static final float HILL_SCALE = 1400, WARP = 450, WARP_SCALE = 2200;
+    /** Detail on the hills' slopes, so the shores are ragged rather than smooth curves. */
+    static final float DETAIL = 0.06f, DETAIL_SCALE = 260;
+    /** The dip round a rift: RIFT_DIP at its edge, falling off quadratically to nothing RIFT_REACH blocks out. */
+    static final float RIFT_DIP = 0.35f, RIFT_REACH = 200;
+    /** The raise round spawn: SPAWN_RAISE at spawn, a Gaussian of SPAWN_SIGMA blocks. */
+    static final float SPAWN_RAISE = 0.25f, SPAWN_SIGMA = 800;
+    /** The default share of the ranks ordered by the flood from spawn (config spreadConnectedUntil). */
+    public static final double CONNECTED_UNTIL = 0.5;
 
     /** Global cell index of the map's first cell, cells per side, the cell count N (inside the disc). */
     public final int cellX0, cellZ0, n, count;
@@ -138,11 +143,11 @@ public final class SpreadMap implements SpreadRanks {
         return Math.max(Math.max(rank1024(s, x0, z0), rank1024(s, x0 + 15, z0)), Math.max(rank1024(s, x0, z0 + 15), rank1024(s, x0 + 15, z0 + 15)));
     }
 
-    /** Raw A0 per cell of an n x n grid starting at global cell (cellX0, cellZ0); NaN outside the disc. */
-    static float[] rawMap(int seed, int spawnX, int spawnZ, int radius, int cellX0, int cellZ0, int n) {
+    /** S per cell of an n x n grid starting at global cell (cellX0, cellZ0); NaN outside the disc. */
+    static float[] stability(int seed, int spawnX, int spawnZ, int radius, int cellX0, int cellZ0, int n) {
         // the static deeps' rifts, projected to x/z and bucketed by their 512-block grid cell
-        int b0x = Math.floorDiv(cellX0 * CELL, StaticDeeps.CX) - 3, b1x = Math.floorDiv((cellX0 + n) * CELL, StaticDeeps.CX) + 3;
-        int b0z = Math.floorDiv(cellZ0 * CELL, StaticDeeps.CZ) - 3, b1z = Math.floorDiv((cellZ0 + n) * CELL, StaticDeeps.CZ) + 3;
+        int b0x = Math.floorDiv(cellX0 * CELL, StaticDeeps.CX) - 2, b1x = Math.floorDiv((cellX0 + n) * CELL, StaticDeeps.CX) + 2;
+        int b0z = Math.floorDiv(cellZ0 * CELL, StaticDeeps.CZ) - 2, b1z = Math.floorDiv((cellZ0 + n) * CELL, StaticDeeps.CZ) + 2;
         int bw = b1x - b0x + 1, bh = b1z - b0z + 1;
         @SuppressWarnings("unchecked") List<float[]>[] buckets = new List[bw * bh];
         for (int i = b0x; i <= b1x; i++)
@@ -156,6 +161,7 @@ public final class SpreadMap implements SpreadRanks {
             }
         float[] a = new float[n * n];
         long r2 = (long) radius * radius;
+        float sig2 = 2 * SPAWN_SIGMA * SPAWN_SIGMA;
         for (int k = 0; k < n; k++)
             for (int i = 0; i < n; i++) {
                 int px = (cellX0 + i) * CELL + HALF, pz = (cellZ0 + k) * CELL + HALF;
@@ -164,64 +170,76 @@ public final class SpreadMap implements SpreadRanks {
                     a[i + k * n] = Float.NaN;
                     continue;
                 }
-                // measured from a displaced point: the fronts bulge into lobes
-                float qx = px + WARP * 2 * (Noise.fbm32(px / WARP_SCALE, 0, pz / WARP_SCALE, seed ^ 0x5E1) - 0.5f);
-                float qz = pz + WARP * 2 * (Noise.fbm32(px / WARP_SCALE, 7.3f, pz / WARP_SCALE, seed ^ 0x5E2) - 0.5f);
-                int bx = Math.floorDiv((int) Math.floor(qx), StaticDeeps.CX) - b0x, bz = Math.floorDiv((int) Math.floor(qz), StaticDeeps.CZ) - b0z;
-                float best = DIST_CAP;
-                for (int u = Math.max(0, bx - 2); u <= Math.min(bw - 1, bx + 2); u++)
-                    for (int v = Math.max(0, bz - 2); v <= Math.min(bh - 1, bz + 2); v++)
+                // the hills, on a warped domain so they aren't lined up with the noise lattice
+                float wx = px + WARP * 2 * (Noise.fbm32(px / WARP_SCALE, 0, pz / WARP_SCALE, seed ^ 0x5E1) - 0.5f);
+                float wz = pz + WARP * 2 * (Noise.fbm32(px / WARP_SCALE, 7.3f, pz / WARP_SCALE, seed ^ 0x5E2) - 0.5f);
+                float hill = Noise.fbm32(wx / HILL_SCALE, 2.9f, wz / HILL_SCALE, seed ^ 0x5E4);
+                float detail = DETAIL * 2 * (Noise.value32(px / DETAIL_SCALE, 3.1f, pz / DETAIL_SCALE, seed ^ 0x5E3) - 0.5f);
+                // distance to the nearest rift's edge (within reach)
+                int bx = Math.floorDiv(px, StaticDeeps.CX) - b0x, bz = Math.floorDiv(pz, StaticDeeps.CZ) - b0z;
+                float near = RIFT_REACH;
+                for (int u = Math.max(0, bx - 1); u <= Math.min(bw - 1, bx + 1); u++)
+                    for (int v = Math.max(0, bz - 1); v <= Math.min(bh - 1, bz + 1); v++)
                         for (float[] d : buckets[u + v * bw]) {
-                            float ex = qx - d[0], ez = qz - d[1];
+                            float ex = px - d[0], ez = pz - d[1];
                             float dist = (float) Math.sqrt(ex * ex + ez * ez) - d[2];
-                            if (dist < best) best = dist;
+                            if (dist < near) near = dist;
                         }
-                float toSpawn = (float) Math.sqrt((double) (dx * dx + dz * dz));
-                float wobble = WOBBLE * 2 * (Noise.fbm32(px / WOBBLE_SCALE, 3.1f, pz / WOBBLE_SCALE, seed ^ 0x5E3) - 0.5f);
-                float dome = DOME_SLOPE * Math.max(0, DOME_RADIUS - toSpawn);
-                a[i + k * n] = Math.max(0, best) + SLOPE * (radius - toSpawn) + wobble + dome;
+                float f = 1 - Math.max(0, near) / RIFT_REACH;
+                float dip = RIFT_DIP * f * f;
+                float raise = SPAWN_RAISE * (float) Math.exp(-(dx * dx + dz * dz) / sig2);
+                a[i + k * n] = hill + detail - dip + raise;
             }
         return a;
     }
 
-    /** Builds the map (pure: the same seed, spawn and radius give the same ranks). */
+    /** Builds the map with the default split (pure: the same arguments give the same ranks). */
     public static SpreadMap build(int seed, int spawnX, int spawnZ, int radius) {
+        return build(seed, spawnX, spawnZ, radius, CONNECTED_UNTIL);
+    }
+
+    /**
+     * Builds the map: ranks below floor(connectedUntil * N) by the flood from spawn, the rest by S (the class javadoc).
+     * Pure: the same arguments give the same ranks.
+     */
+    public static SpreadMap build(int seed, int spawnX, int spawnZ, int radius, double connectedUntil) {
         int half = halfCells(radius), n = 2 * half + 1;
         int cellX0 = Math.floorDiv(spawnX, CELL) - half, cellZ0 = Math.floorDiv(spawnZ, CELL) - half;
-        float[] a = rawMap(seed, spawnX, spawnZ, radius, cellX0, cellZ0, n);
+        float[] a = stability(seed, spawnX, spawnZ, radius, cellX0, cellZ0, n);
         int total = 0;
         for (float v : a) if (!Float.isNaN(v)) total++;
+        int split = (int) Math.floor(Math.max(0, Math.min(1, connectedUntil)) * total);
         int[] ranks = new int[n * n];
         java.util.Arrays.fill(ranks, -1);
+        // the high cells: the total - split greatest keys (S, then the lower index), in ascending order
+        long[] keys = new long[total];
+        int t = 0;
+        for (int c = 0; c < a.length; c++) if (!Float.isNaN(a[c])) keys[t++] = key(a[c], c);
+        java.util.Arrays.sort(keys);
+        boolean[] high = new boolean[n * n];
+        for (int j = split; j < total; j++) {
+            int c = Integer.MAX_VALUE - (int) keys[j];
+            ranks[c] = j;
+            high[c] = true;
+        }
+        // the low cells: the flood from the spawn cell over all cells (max-heap of the same unique keys: deterministic)
         boolean[] queued = new boolean[n * n];
-        // max-heap of (A0, then the lower index on ties): unique keys, so the order is deterministic. A0 is shifted
-        // positive, where a float's bits sort as its value.
         LongHeapPriorityQueue heap = new LongHeapPriorityQueue(LongComparators.OPPOSITE_COMPARATOR);
-        // the four cell centres round the spawn block go first (N-1..N-4): the spawn column's bilinear rank is theirs,
-        // so it runs until the last few cells, wherever in its cell spawn lies. They are raised by BOOST, and only the
-        // highest is queued at first, so they still come in a 4-connected order (two diagonal ones first would leave
-        // a saddle).
-        int si = Math.floorDiv(spawnX - HALF, CELL) - cellX0, sk = Math.floorDiv(spawnZ - HALF, CELL) - cellZ0;
-        int start = -1;
-        for (int di = 0; di <= 1; di++)
-            for (int dk = 0; dk <= 1; dk++) {
-                int c = si + di + (sk + dk) * n;
-                a[c] += BOOST;
-                if (start < 0 || a[c] > a[start]) start = c;
-            }
+        int start = (Math.floorDiv(spawnX, CELL) - cellX0) + (Math.floorDiv(spawnZ, CELL) - cellZ0) * n;
         queued[start] = true;
         heap.enqueue(key(a[start], start));
-        int step = 0;
+        int step = 0, low = 0;
         while (!heap.isEmpty()) {
             int c = Integer.MAX_VALUE - (int) heap.dequeueLong();
-            ranks[c] = total - 1 - step++;
+            step++;
+            if (!high[c]) ranks[c] = split - 1 - low++;
             int i = c % n, k = c / n;
             if (i > 0) push(heap, a, queued, c - 1);
             if (i < n - 1) push(heap, a, queued, c + 1);
             if (k > 0) push(heap, a, queued, c - n);
             if (k < n - 1) push(heap, a, queued, c + n);
         }
-        if (step != total) throw new IllegalStateException("spread map: flooded " + step + " of " + total + " cells");
+        if (step != total || low != split) throw new IllegalStateException("spread map: flooded " + step + " of " + total + " cells, " + low + " of " + split + " low");
         return new SpreadMap(spawnX, spawnZ, radius, ranks);
     }
 
@@ -231,10 +249,50 @@ public final class SpreadMap implements SpreadRanks {
         heap.enqueue(key(a[c], c));
     }
 
-    /** Lifts the spawn patch above any A0 (A0 stays well under 10^4 blocks). */
-    private static final float BOOST = 50_000f;
+    /**
+     * A unique sort key: S exactly (its bits made to sort as signed ints: negative floats' magnitude bits flipped; + 0f
+     * turns -0 into 0), then the lower index.
+     */
+    private static long key(float s, int c) {
+        int b = Float.floatToIntBits(s + 0f);
+        return (long) (b >= 0 ? b : b ^ 0x7FFFFFFF) << 32 | (Integer.MAX_VALUE - c);
+    }
 
-    private static long key(float a0, int c) {
-        return (long) Float.floatToIntBits(a0 + 100_000f) << 32 | (Integer.MAX_VALUE - c);
+    /**
+     * The stability compass's target: the centre of the nearest cell (by distance from block (x, z) to its centre) whose
+     * rank is at least minRank, searched ring by ring out from (x, z)'s cell; null if there is none. A cell centre's
+     * rank1024 is exactly its rank, so the target's stability is at least minRank / N.
+     */
+    public static int[] nearestAtLeast(SpreadRanks s, int x, int z, int minRank, int maxRings) {
+        int ci = Math.floorDiv(x, CELL), ck = Math.floorDiv(z, CELL);
+        long best = Long.MAX_VALUE;
+        int[] out = null;
+        for (int ring = 0; ring <= maxRings; ring++) {
+            // a cell of this ring is at least ring * CELL - HALF blocks away along one axis (the block may be up to half a
+            // cell off its own cell's centre): stop once that is beyond the best found
+            long minD = Math.max(0, (long) ring * CELL - HALF);
+            if (out != null && minD * minD > best) break;
+            int side = Math.max(1, 8 * ring);
+            for (int j = 0; j < side; j++) {
+                // walk the ring's perimeter: four sides of 2 * ring cells each (ring 0: the cell itself)
+                int di, dk;
+                if (ring == 0) {
+                    di = 0;
+                    dk = 0;
+                } else {
+                    int sd = j / (2 * ring), o = j % (2 * ring) - ring;
+                    di = sd == 0 ? o : sd == 1 ? ring : sd == 2 ? -o : -ring;
+                    dk = sd == 0 ? -ring : sd == 1 ? o : sd == 2 ? ring : -o;
+                }
+                if (s.rank(ci + di, ck + dk) < minRank) continue;
+                long px = (long) (ci + di) * CELL + HALF - x, pz = (long) (ck + dk) * CELL + HALF - z;
+                long d = px * px + pz * pz;
+                if (d < best) {
+                    best = d;
+                    out = new int[]{(ci + di) * CELL + HALF, (ck + dk) * CELL + HALF};
+                }
+            }
+        }
+        return out;
     }
 }
