@@ -59,7 +59,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 ## Effects on gameplay
 - Rift (`StaticDeeps.inRift`, pocket `RIFT`, storm rift): `Stasis.rateAt` returns 0 even inside a field.
   An unprotected player becomes a statue in about 3 s; touching the eye is instant. Nothing protects. (Open lance
-  gates and return rifts are doors: lance.md.)
+  gates and return rifts are doors: lance.md. A lance's breach shrinks a rift and its outer zone round the eye to a
+  quarter: `StaticDeeps.strength`, applied in `zone`.)
 - Outer zone, mist pockets: suit drain x3 or x2, and the Delver freeze creeps (players-suits.md).
 - Drifting deeps and storm mist: drain x2, and the Delver hold instead of a statue.
 - Towers: `weatherFactor` (towers.md). Storm mist x2, storm rift x3, drifting deep up to x1.5, static outer

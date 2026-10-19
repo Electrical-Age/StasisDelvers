@@ -37,6 +37,9 @@ locally at `/var/lib/mclab/agent/eln/port26`.
   - `VoxelNode`s made only of `CablePart`
   - `SixNode`s made only of wiring: cables, switches, relays, fuses, diodes, ground
   - Machinery never counts as infrastructure, by design (not even a heat turbine).
+  - A rift lance's core (`LanceBlockEntity`, 1x1x1) has the same yard (lance.md): its exporter and cables run while it
+    breaches or holds a gate in stopped land. It is exempt from stopping too (`Stasis.exemptBlockEntity`) and takes FE
+    like a tower (energy capability registered in `StasisRegistry`).
 - A cable that crosses into stopped land is cut there, so a field's power must come from inside it.
 - `FROZEN` is memory only; `isFrozen(n)` is for bug reports and tests.
 

@@ -63,7 +63,9 @@ through hooks set in `StasisClient`.
   - 32 + 10i: field i (centre, radius, collapse, failing, column, seed, age, remnant time)
   - 168-219: static deeps' ground range, mist clocks, strata mask, pocket clocks, eyes (`ns` ≤ 4), render distance
   - 196-199: spreading mode: on (1 while `Spread.active`), P, the rank window's first cell x, z
-  - 220 + 5i: static deep i
+  - 220 + 5i: static deep i; 240 + i: its strength (a lance's breach: 0.25..1, `StaticDeeps.strength`; the shape, mist
+    envelope, eye width and strain follow)
+  - 244-250: the nearest lance beam (`LanceBlockEntity`): boom tip, eye (each - floor(camera)), on
   - 256-259 + 260 + 5i: bolts
   - 1024 + 12i: drifting deep i (`DEEP_BASE`, `DEEP_STRIDE`, `MAX_DEEPS` = 24)
   - 1312-1319: storm; 1320 + 16j + i: a 16x16 ground grid
@@ -102,6 +104,13 @@ through hooks set in `StasisClient`.
   transformations), nothing of ours. Not seen by eye yet (lab).
 - Known gaps: a collapsing field on running land holds a deep off in `rateAt` (any field containing the block) but
   only its uncollapsed part does in the shader; a scene point whose deep is past `MAX_HITS` along the ray misses it.
+
+## The rift lance (docs/lance.md)
+- A breach's step changes a rift's strength (`GateRifts`): `FrozenSprites.riftStrengths` bumps `Stasis.version` and
+  re-meshes the rift's sections (r x 1.4 + 28 round its centre) once per step, at most once a second (`FLUSH_TICKS`).
+- The beam: `stasis.fsh` after the storm glow; the closest approach of the view ray (clamped at the scene) and the
+  tip-eye segment, a thin core and a halo. `StasisPost` aims the eye's saccades at the tip while the beam is on.
+- Not seen by eye yet (lab).
 
 ## Invariants
 - Reversed-Z depth: the shaders reconstruct world positions accordingly (`stasis.fsh`, `flashlight.fsh`).

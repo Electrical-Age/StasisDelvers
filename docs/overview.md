@@ -47,7 +47,8 @@ Javadocs often cite them as `notes/...`.
 - [rifts-storms.md](rifts-storms.md): drifting and static deeps, rifts, storms, crystals.
 - [deeps-strata-worldgen.md](deeps-strata-worldgen.md): `DeepFeature`, strata, gates, ruins, end sites, the deep seed.
 - [spawn-cottage.md](spawn-cottage.md): the spawn site placed once per world.
-- [lance.md](lance.md): the rift lance (L1: gates opened by command, travel, arrival pads, return rifts).
+- [lance.md](lance.md): the rift lance (L1: gates, travel, arrival pads, return rifts; L2: the core, mast and boom, power,
+  breach, hold and relax, the effective radius, the beam).
 - [spreading-mode.md](spreading-mode.md): the `spreading` game mode: the world starts running and the stillness
   spreads from the rifts over online time (`SpreadMap`, `Spread`; client sync `SpreadSync`, `SpreadTiles`); hard mode
   at the dragon's death (`HardMode`), the strongholds torn into gate rifts (`HardRifts`), the End's wall (`EndBarrier`,

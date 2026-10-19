@@ -5,7 +5,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 (`RegisterPayloadHandlersEvent`).
 
 ## Protocol version
-- `e.registrar("14")` (14: `gate_rifts` carries the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+- `e.registrar("15")` (15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
   are then refused at login instead of failing mid-game.
   - 9 added `dig_stilled`.
   - 10 removed the unused `chunk_clocks`.
@@ -20,7 +20,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 | Payload | Id | Sent by | Client handler |
 |---|---|---|---|
 | `Fields(fields, deepSeed)` | `fields` | `sendFields(level)` from `FieldData.changed`; `sendFields(player)` on login, respawn and dimension change (`Freezing.grace`) | `ClientFields.deepSeed` + `ClientFields.set` |
-| `GateRifts(seed, centres, returns)` | `gate_rifts` | `sendGates` (with every per-player `sendFields`), `Gates` when a gate is added, `Lance` when a return rift is made | `StaticDeeps.setGates`, `StaticDeeps.setReturns` |
+| `GateRifts(seed, centres, returns, steps)` | `gate_rifts` | `sendGates` (with every per-player `sendFields`), `Gates` when a gate is added, `Lance.publishAndSend` when a return rift is made, wakes or sleeps, or a breach step changes (`steps`: `id << 4 \| step` for gates past step 0) | `StaticDeeps.setGates`, `setReturns`, `setStrengths`; `riftStrengths` (client: `FrozenSprites` re-meshes the changed rifts) |
 | `StormOverride(active, start, end, folded)` | `storm_override` | `sendStorm` (`Storms.start/stop`), `sendGates` | `Storms.clientOverride` |
 | `Freeze(progress)` | `freeze` | `Freezing.tick` on a change ≥ 0.01 | `StasisNet.clientFreeze` (shader slot 23) |
 | `FieldClocks(map id → double[])` | `field_clocks` | `LocalTime.tick` every 40 ticks | `LocalTime.Client.fieldClocks` |
