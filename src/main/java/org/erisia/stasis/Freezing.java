@@ -79,6 +79,8 @@ public final class Freezing {
     /** One tick of a player's freezing (public for tests, whose mock players get no tick events). */
     public static void tick(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level)) return;
+        // a lance gate's disc or a return rift first: stepping into one is a trip, not the eye's statue (Lance)
+        if (Lance.step(p)) return;
         State s = state(p);
         s.counted++;
         Suits.tick(p);
@@ -92,6 +94,9 @@ public final class Freezing {
         // in a deep (Deeps): suits drain twice as fast; a Delver suit only slows the freeze (a quarter rate), and a
         // full freeze there holds the player for a minute instead of making a statue (the deep is passing weather)
         int zone = stopped ? StaticDeeps.zone(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) : 0;
+        // an open lance gate holds its rift small and its disc is a door; a return rift is a door home (Lance): no statue
+        // there, nor the eye's touch (the outer zone's rules instead)
+        if (zone == 2 && Lance.spares(level, p)) zone = 1;
         // strata weather (Pockets): a rift pocket is a rift; mist and its violet warning count as the static outer zone
         // (x2 drain, and a Delver-only freeze ends as a statue: a mist spell lasts too long to hold someone). The worse
         // of the static zone and the pocket wins.
@@ -321,6 +326,19 @@ public final class Freezing {
 
     static void logout(PlayerEvent.PlayerLoggedOutEvent e) {
         STATES.remove(e.getEntity().getUUID());
+    }
+
+    /** A lance trip's arrival (Lance.send): the grace of a new place, also within one level (a dimension change gives it too). */
+    public static void giveGrace(ServerPlayer p) {
+        if (!(p.level() instanceof ServerLevel level)) return;
+        State s = state(p);
+        s.ticks = 0;
+        s.graceUntil = Math.max(s.graceUntil, level.getGameTime() + StasisConfig.graceTicks);
+    }
+
+    /** For tests: is the player in grace now? */
+    public static boolean inGrace(ServerPlayer p) {
+        return p.level().getGameTime() < state(p).graceUntil;
     }
 
     /** For tests: end the player's grace period now. */

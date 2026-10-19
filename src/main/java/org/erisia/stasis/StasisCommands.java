@@ -218,6 +218,15 @@ final class StasisCommands {
                     c.getSource().sendSuccess(() -> Component.literal("The test storm ramps out"), true);
                     return 1;
                 })))
+            // the lance's gates, until L2's multiblock opens them (docs/lance.md): the nearest rift, or one by id
+            .then(Commands.literal("lance")
+                .then(Commands.literal("list").executes(c -> Lance.list(c.getSource())))
+                .then(Commands.literal("open").executes(c -> Lance.command(c.getSource(), true, null))
+                    .then(Commands.argument("rift", IntegerArgumentType.integer(1)).executes(c ->
+                        Lance.command(c.getSource(), true, IntegerArgumentType.getInteger(c, "rift")))))
+                .then(Commands.literal("close").executes(c -> Lance.command(c.getSource(), false, null))
+                    .then(Commands.argument("rift", IntegerArgumentType.integer(1)).executes(c ->
+                        Lance.command(c.getSource(), false, IntegerArgumentType.getInteger(c, "rift"))))))
             .then(Commands.literal("rifts").executes(c -> {
                 var src = c.getSource();
                 var level = src.getLevel();

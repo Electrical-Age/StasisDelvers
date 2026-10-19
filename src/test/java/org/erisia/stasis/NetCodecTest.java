@@ -76,8 +76,8 @@ class NetCodecTest {
     }
 
     @Property(tries = 200)
-    void gateRiftsRoundTrip(@ForAll int seed, @ForAll @Size(max = 20) List<Long> centres) {
-        var p = new StasisNet.GateRifts(seed, centres);
+    void gateRiftsRoundTrip(@ForAll int seed, @ForAll @Size(max = 20) List<Long> centres, @ForAll @Size(max = 20) List<Long> returns) {
+        var p = new StasisNet.GateRifts(seed, centres, returns);
         assertEquals(p, trip(StasisNet.GateRifts.CODEC, p));
     }
 

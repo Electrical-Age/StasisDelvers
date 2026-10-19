@@ -55,11 +55,12 @@ public final class StasisNet {
         }
     }
 
-    /** The level's gate rifts (Gates): their deep seed and centres (packed block positions). */
-    public record GateRifts(int seed, List<Long> centres) implements CustomPacketPayload {
+    /** The level's gate rifts (Gates) and lance return rifts (Lance): their deep seed and centres (packed block positions). */
+    public record GateRifts(int seed, List<Long> centres, List<Long> returns) implements CustomPacketPayload {
         public static final Type<GateRifts> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "gate_rifts"));
         public static final StreamCodec<RegistryFriendlyByteBuf, GateRifts> CODEC = StreamCodec.composite(
-            ByteBufCodecs.INT, GateRifts::seed, ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::centres, GateRifts::new);
+            ByteBufCodecs.INT, GateRifts::seed, ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::centres,
+            ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::returns, GateRifts::new);
 
         @Override
         public Type<GateRifts> type() {
@@ -371,7 +372,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("13");   // 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar("14");   // 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -405,7 +406,10 @@ public final class StasisNet {
                 ClientFields.set(p.fields(), ctx.player().level());
             });
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
-            r.playToClient(GateRifts.TYPE, GateRifts.CODEC, (p, ctx) -> StaticDeeps.setGates(p.seed(), p.centres()));
+            r.playToClient(GateRifts.TYPE, GateRifts.CODEC, (p, ctx) -> {
+                StaticDeeps.setGates(p.seed(), p.centres());
+                StaticDeeps.setReturns(p.seed(), p.returns());
+            });
             r.playToClient(StormOverride.TYPE, StormOverride.CODEC, (p, ctx) ->
                 Storms.clientOverride = p.active() ? new double[]{p.start(), p.end(), p.folded()} : null);
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
@@ -450,7 +454,7 @@ public final class StasisNet {
 
     static void sendGates(ServerPlayer player) {
         send(player, stormPacket(player.level()));
-        send(player, new GateRifts(FieldData.get(player.level()).deepSeed(), Gates.list(player.level())));
+        send(player, new GateRifts(FieldData.get(player.level()).deepSeed(), Gates.list(player.level()), Lance.returns(player.level())));
     }
 
     public static void sendFields(ServerLevel level) {

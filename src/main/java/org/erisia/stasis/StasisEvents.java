@@ -108,6 +108,7 @@ public final class StasisEvents {
         if (e.getLevel() instanceof ServerLevel level) {
             FieldData.get(level).deepSeed();   // made now, on the main thread
             Gates.publish(level);
+            Lance.publish(level);
             Spread.levelLoad(level);   // a saved spread map is back before chunks ask rateAt
         }
     }

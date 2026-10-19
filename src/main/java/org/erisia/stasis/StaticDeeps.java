@@ -52,6 +52,44 @@ public final class StaticDeeps {
         SECTIONS.clear();
     }
 
+    // ---- return rifts (Lance: the small rift beside each lance arrival pad, leading home; docs/lance.md)
+
+    /** A return rift's radius: its core (0.35 r, about a block) hangs at body height over the pad's far end. */
+    public static final float RETURN_RADIUS = 3;
+
+    /** Return rifts per deep seed (the Nether's, the End's), as GATES: saved by Lance in the destination level, synced
+     *  with the gate rifts so clients draw them. */
+    private static final java.util.Map<Integer, List<Deep>> RETURNS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static volatile java.util.Set<Integer> returnIds = java.util.Set.of();
+
+    /** A return rift at this centre block (pure: both sides). */
+    public static Deep returnRift(net.minecraft.core.BlockPos p) {
+        int id = (int) (Noise.hash32(p.getX(), p.getY(), p.getZ(), 0x6E7B) * 0xFFFFFF) | 1;
+        return new Deep(p.getX() + 0.5f, p.getY() + 0.5f, p.getZ() + 0.5f, RETURN_RADIUS, id);
+    }
+
+    /** Set the return rifts for a deep seed (server: Lance.publish; client: the GateRifts packet). */
+    public static void setReturns(int seed, java.util.Collection<Long> centres) {
+        List<Deep> l = new ArrayList<>();
+        for (long c : centres) l.add(returnRift(net.minecraft.core.BlockPos.of(c)));
+        if (l.isEmpty()) RETURNS.remove(seed);
+        else RETURNS.put(seed, List.copyOf(l));
+        java.util.Set<Integer> ids = new java.util.HashSet<>();
+        RETURNS.values().forEach(g -> g.forEach(d -> ids.add(d.id())));
+        returnIds = java.util.Set.copyOf(ids);
+        SECTIONS.clear();
+    }
+
+    /** Is d a lance's return rift? */
+    public static boolean isReturn(Deep d) {
+        return d.radius() == RETURN_RADIUS && returnIds.contains(d.id());
+    }
+
+    /** Is d a stronghold's gate rift (not the End rift, not a return rift)? */
+    public static boolean isStrongholdGate(Deep d) {
+        return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id());
+    }
+
     // ---- the End's rift (spreading mode, hard mode: EndRift; spreading-mode.md)
 
     /** The End rift's radius: its core (0.35 r, ~14 blocks) is the black eye the floating end-stone islands circle. */
@@ -90,6 +128,8 @@ public final class StaticDeeps {
     public static void clearEndRifts() {
         endRiftSeeds = java.util.Set.of();
         endRiftIds = java.util.Set.of();
+        RETURNS.clear();
+        returnIds = java.util.Set.of();
         SECTIONS.clear();
     }
 
@@ -100,9 +140,10 @@ public final class StaticDeeps {
     }
 
     /** Is d a gate rift (no strata, no worldgen of its own)? The End rift is one too: no strata, no puffs; it leads to
-     *  the End (Gates.destination), where it stands. */
+     *  the End (Gates.destination), where it stands. So is a lance's return rift (Lance). */
     public static boolean isGate(Deep d) {
-        return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id()) || d.radius() == END_RIFT_RADIUS && endRiftIds.contains(d.id());
+        return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id()) || d.radius() == END_RIFT_RADIUS && endRiftIds.contains(d.id())
+            || isReturn(d);
     }
 
     /** The static deeps whose cells touch the box around (x, y, z) with this margin: at most 8, plus gate rifts. */
@@ -114,6 +155,9 @@ public final class StaticDeeps {
                 out.add(e);
         }
         for (Deep g : GATES.getOrDefault(seed, List.of()))
+            if (Math.abs(g.x() - x) <= margin + g.radius() && Math.abs(g.y() - y) <= margin + g.radius() && Math.abs(g.z() - z) <= margin + g.radius())
+                out.add(g);
+        for (Deep g : RETURNS.getOrDefault(seed, List.of()))
             if (Math.abs(g.x() - x) <= margin + g.radius() && Math.abs(g.y() - y) <= margin + g.radius() && Math.abs(g.z() - z) <= margin + g.radius())
                 out.add(g);
         int i0 = (int) Math.floor((x - margin) / CX), i1 = (int) Math.floor((x + margin) / CX);

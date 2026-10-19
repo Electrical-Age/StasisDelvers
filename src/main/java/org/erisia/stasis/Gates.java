@@ -65,8 +65,9 @@ public final class Gates {
         scatter = null;
     }
 
-    /** Where static deep d's rift leads (a dimension id). Gate rifts always lead to the End. */
+    /** Where static deep d's rift leads (a dimension id). Gate rifts always lead to the End; a lance's return rift home. */
     public static String destination(StaticDeeps.Deep d) {
+        if (StaticDeeps.isReturn(d)) return "minecraft:overworld";
         if (StaticDeeps.isGate(d)) return "minecraft:the_end";
         List<Dest> l = destinations;
         int total = l.stream().mapToInt(Dest::weight).sum();
@@ -153,6 +154,11 @@ public final class Gates {
         publish(level);
         for (var pl : level.players()) StasisNet.sendGates(pl);
         return true;
+    }
+
+    /** Tests: register a gate rift at centre (as a stronghold's portal room would). */
+    public static boolean testRegister(ServerLevel level, BlockPos p) {
+        return register(level, p);
     }
 
     /** Tests: forget the gate rift at centre (and tell StaticDeeps and the players). */
