@@ -161,6 +161,7 @@ Kept simple, all in the tower's materials:
 ## Test command (op)
 - `/stasis lance open [rift]`, `/stasis lance close [rift]`: the nearest rift (its core, within ~512 blocks) or one by
   id (`/stasis rifts` doesn't show ids; `list` does). Says where it leads.
+- `/stasis lance supply <watts>`: test power (W) into the nearest lance core within 32 blocks, no EA grid needed (lab checks); a negative value clears it.
 - `/stasis lance list`: every gate in every level (state, step, core, radius, where it leads, its lance) and every
   arrival (dormant ones marked).
 

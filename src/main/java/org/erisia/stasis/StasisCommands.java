@@ -226,7 +226,30 @@ final class StasisCommands {
                         Lance.command(c.getSource(), true, IntegerArgumentType.getInteger(c, "rift")))))
                 .then(Commands.literal("close").executes(c -> Lance.command(c.getSource(), false, null))
                     .then(Commands.argument("rift", IntegerArgumentType.integer(1)).executes(c ->
-                        Lance.command(c.getSource(), false, IntegerArgumentType.getInteger(c, "rift"))))))
+                        Lance.command(c.getSource(), false, IntegerArgumentType.getInteger(c, "rift")))))
+                // test power for the nearest lance core within 32 blocks (lab checks without an EA grid); < 0 clears
+                .then(Commands.literal("supply").then(Commands.argument("watts", DoubleArgumentType.doubleArg()).executes(c -> {
+                    CommandSourceStack src = c.getSource();
+                    double w = DoubleArgumentType.getDouble(c, "watts");
+                    BlockPos at = BlockPos.containing(src.getPosition());
+                    LanceBlockEntity best = null;
+                    double bd = 32 * 32;
+                    for (BlockPos q : BlockPos.betweenClosed(at.offset(-32, -32, -32), at.offset(32, 32, 32))) {
+                        if (src.getLevel().isLoaded(q) && src.getLevel().getBlockEntity(q) instanceof LanceBlockEntity l && q.distSqr(at) < bd) {
+                            best = l;
+                            bd = q.distSqr(at);
+                        }
+                    }
+                    if (best == null) {
+                        src.sendFailure(Component.literal("No lance core within 32 blocks"));
+                        return 0;
+                    }
+                    best.testSupplyW = w < 0 ? Double.NaN : w;
+                    BlockPos bp = best.getBlockPos();
+                    src.sendSuccess(() -> Component.literal(w < 0 ? "Test supply off at " + bp.toShortString()
+                        : "Test supply " + (int) w + " W into the lance core at " + bp.toShortString()), true);
+                    return 1;
+                }))))
             .then(Commands.literal("rifts").executes(c -> {
                 var src = c.getSource();
                 var level = src.getLevel();
