@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import org.spongepowered.asm.service.MixinService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,11 +60,33 @@ public class CosmeticPlugin implements IMixinConfigPlugin {
         "Lcom/llamalad7/mixinextras/injector/ModifyReceiver;",
         "Lcom/llamalad7/mixinextras/injector/wrapmethod/WrapMethod;");
 
+    /**
+     * Always applies: the config is required=false, so Mixin itself skips a target that isn't there. This only warns.
+     * The quick check is a resource lookup on our own loader; that may not see game classes on every launcher, so a
+     * miss is confirmed with Mixin's bytecode provider before warning, and any doubt (an exception) stays silent.
+     * Refusing on a false miss would turn the effect off for nothing.
+     */
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (getClass().getClassLoader().getResource(targetClassName.replace('.', '/') + ".class") != null) return true;
-        warn(mixinClassName, "its target class " + targetClassName + " isn't there");
-        return false;
+        if (!present(targetClassName)) warn(mixinClassName, "its target class " + targetClassName + " isn't there");
+        return true;
+    }
+
+    private boolean present(String className) {
+        try {
+            if (getClass().getClassLoader().getResource(className.replace('.', '/') + ".class") != null) return true;
+        } catch (RuntimeException e) {
+            LOG.debug("Stasis Delvers: resource lookup of {} failed", className, e);
+        }
+        try {
+            MixinService.getService().getBytecodeProvider().getClassNode(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        } catch (Exception e) {
+            LOG.debug("Stasis Delvers: couldn't look up {}", className, e);
+            return true;
+        }
     }
 
     @Override

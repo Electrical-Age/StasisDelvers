@@ -61,7 +61,9 @@ mods) has rewritten a target, only that effect is lost.
 
 - `mixin/client/CosmeticPlugin.java` (`IMixinConfigPlugin`) runs before any game class loads (ASM, Mixin and
   SLF4J only).
-  - `shouldApplyMixin` skips a mixin whose target class is missing, with a warning.
+  - `shouldApplyMixin` always applies (fail open: the config is `required: false`, so Mixin skips a missing
+    target itself). It warns when the target class is missing: a resource lookup, and on a miss Mixin's
+    bytecode provider to confirm it; an inconclusive lookup stays silent.
   - `postApply` checks that each injector found its spot. For Mixin's own injectors, the target must call the
     handler. For MixinExtras wrappers, which are woven later, the wrapped INVOKE must still be in the method.
   - It logs one warning per mixin, naming the lost effect (`EFFECT` map).
