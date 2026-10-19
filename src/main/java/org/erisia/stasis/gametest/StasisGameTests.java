@@ -3419,6 +3419,43 @@ public final class StasisGameTests {
             c.check("a closed gate spares nobody", !org.erisia.stasis.Lance.spares(level, p));
             return () -> { };
         }, false, true));
+        // stopped mode, a wild End-bound rift: to the outer End (>= 1024 out, beside an End site's placement), on a pad
+        CASES.put("lance_outer_end", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null || org.erisia.stasis.Spread.status(server, null).startsWith("mode spreading")) {
+                c.check("the test server has the End, in stopped mode", false);
+                return () -> { };
+            }
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.StaticDeeps.Deep wild = null;
+            for (var d : org.erisia.stasis.StaticDeeps.near(at.getX(), at.getY(), at.getZ(), 2048, FieldData.get(level).deepSeed()))
+                if (!org.erisia.stasis.StaticDeeps.isGate(d) && org.erisia.stasis.Gates.destination(d).equals("minecraft:the_end")) {
+                    wild = d;
+                    break;
+                }
+            if (wild == null) {
+                c.check("an End-bound wild rift within 2 km", false);
+                return () -> { };
+            }
+            var d = wild;
+            org.erisia.stasis.Lance.setOpen(level, d, true);
+            c.cleanup.add(() -> {
+                for (var a : org.erisia.stasis.Lance.ArrivalData.get(end).all())
+                    if (a.homeId() == d.id()) for (BlockPos q : org.erisia.stasis.Lance.testPad(a)) end.setBlock(q, Blocks.AIR.defaultBlockState(), 2);
+                org.erisia.stasis.Lance.testForget(level, d.id(), end);
+            });
+            ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 1.0, 1.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            boolean went = stepIntoCore(p, level, d);
+            var ea = org.erisia.stasis.Lance.ArrivalData.get(end).all().stream().filter(a -> a.homeId() == d.id()).toList();
+            c.check("through the gate into the End", went && p.level() == end, p.level().dimension().toString());
+            c.check("an outer-End pad >= 1024 out", ea.size() == 1 && Math.hypot(ea.get(0).footPos().getX(), ea.get(0).footPos().getZ()) >= 1024
+                && end.getBlockState(ea.get(0).footPos().below()).is(org.erisia.stasis.StasisRegistry.RIFTSTONE.get())
+                && p.blockPosition().equals(ea.get(0).footPos()), ea.toString());
+            return () -> { };
+        }, false, true));
         // spreading mode (Baughn's decisions 5-7): before hard mode a gate leads to the Nether, whatever the rift; after it a
         // stronghold gate leads onto the End rift's islands (the closed End lets the lance through, and only it), the
         // player isn't evicted at login, and the End's wall is down
@@ -3458,6 +3495,12 @@ public final class StasisGameTests {
             c.check("after hard mode: through the lance into the End", toEnd && p.level() == end, p.level().dimension().toString());
             c.check("onto one of the rift's islands", ea.size() == 1 && ea.get(0).central() && ea.get(0).key().startsWith("island:")
                 && end.getBlockState(ea.get(0).footPos().below()).is(org.erisia.stasis.StasisRegistry.RIFTSTONE.get()), ea.toString());
+            if (ea.size() == 1) {
+                var plan = org.erisia.stasis.EndRift.testPlan(end);
+                long buried = org.erisia.stasis.Lance.testPad(ea.get(0)).stream()
+                    .flatMap(b -> java.util.stream.Stream.of(b.above(), b.above(2), b.above(3))).filter(b -> plan.isIsland(b.asLong())).count();
+                c.check("nothing the rift's islands will place lands on the pad or in the return rift", buried == 0, String.valueOf(buried));
+            }
             c.check("arrived by lance: login leaves them in the End", org.erisia.stasis.Lance.arrivedByLance(p)
                 && !org.erisia.stasis.HardMode.evictsOnLogin(p));
             // the central return rift: back to the gate the player came out of (open)

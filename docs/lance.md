@@ -34,7 +34,7 @@ Code: `Lance.java` (everything), hooks in `Freezing`, `HardMode`, `EndBarrier`, 
 | stopped | stronghold gate rift | `STRONGHOLD_END` | 150-200 blocks from (0, 0), in view of the main island; ground if any, else a floating pad at y 64 |
 | any | Gates destination Nether (or another non-End dimension in `riftDestinations`) | `NETHER` | the rift's x/8, z/8; ground within 32 blocks: sturdy, not lava or magma, 3 air, above the lava sea, y <= 112; else a pad carved at y 70 |
 | spreading, before hard mode | any | `NETHER` | (Baughn's decision 5) |
-| spreading, after hard mode | stronghold gate rift | `CENTRAL_END` | one of the End rift's floating islands (`EndRiftPlan.islands`, a roomy one, hashed per rift), on its planned top, stamped even if `EndRift` hasn't built it yet |
+| spreading, after hard mode | stronghold gate rift | `CENTRAL_END` | one of the End rift's floating islands (`EndRiftPlan.islands`, a roomy one, hashed per rift), on its highest planned block under the pad's footprint (so `EndRift.place`, which fills air, never buries it), stamped even if `EndRift` hasn't built it yet |
 | spreading, after hard mode | End-bound / Nether-bound wild rift | `OUTER_END` / `NETHER` | as in stopped mode (decision 6) |
 
 ## Arrival pads and return rifts
@@ -54,6 +54,8 @@ Code: `Lance.java` (everything), hooks in `Freezing`, `HardMode`, `EndBarrier`, 
     `stasisdelvers_lance_from`) if it is open; else a random open gate leading to this dimension; else the player's own
     gate regardless (the island's first home if the player has none on record);
   - elsewhere: the return rift's own home gate, in the same order.
+  - "A random open one" is read as a random open gate leading to the return rift's dimension (the End or the Nether);
+    Baughn's decision 3 says only "a random powered one". Our reading, to confirm.
   - If no gate is known at all: the respawn point (`Freezing.safeRespawn`).
 - Home is `Lance.basePosition`, the hook for L2's lance base; in L1 the rift's rim (`Lance.rim`): rings every 2 blocks
   from just outside the rift zone to r + 12, 16 directions, the standable spot outside the rift nearest the core's
@@ -82,7 +84,7 @@ Code: `Lance.java` (everything), hooks in `Freezing`, `HardMode`, `EndBarrier`, 
 ## Lab procedure
 1. Stopped mode: `/stasis rifts` to find a rift (or a stronghold's gate rift); stand near it, `/stasis lance open`.
 2. Walk (suited) into the eye's centre: you land on a pad in the End or the Nether, with the grace countdown. The return
-   rift hangs 5 blocks along the pad. Step into it: back at the home rift's rim.
+   rift hangs 5 blocks along the pad. Check by eye that its eye renders (the client got `GateRifts` on the dimension change). Step into it: back at the home rift's rim.
 3. `/stasis lance close`, step into the eye: nothing (the rift's statue, as before).
 4. Spreading mode: before `/stasis spread hardmode` a gate goes to the Nether; after it a stronghold gate rift goes to an
    island round the End rift, and the End's wall is gone.
@@ -93,5 +95,6 @@ Code: `Lance.java` (everything), hooks in `Freezing`, `HardMode`, `EndBarrier`, 
   its return rift, grace, the cooldown, the second trip's pocket, home to the rim, home closed -> another open gate,
   none open -> home regardless, a closed gate takes nobody); `lance_spreading_rules` (before hard mode the Nether, the
   wall up; after it the wall down, a plain teleport into the End turned away, the lance through onto an island, not
-  evicted at login, the islands' return rift home to the gate came out of, the End flag cleared).
+  evicted at login, nothing the islands will place on the pad, the islands' return rift home to the gate came out of,
+  the End flag cleared); `lance_outer_end` (a wild End-bound rift: a pad >= 1024 out in the test End).
 - `NetCodecTest.gateRiftsRoundTrip` covers the payload's new list.

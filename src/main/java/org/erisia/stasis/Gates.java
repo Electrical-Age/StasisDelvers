@@ -23,8 +23,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * has some of that place's plain blocks scattered in its shell and strata (config riftScatter; the Nether:
  * netherrack, soul sand). Vanilla End portals are gone: a stronghold's portal room gets no frame, and a gate rift
  * (always to the End) stands where the portal would have been. Gate rifts are extra static deeps, kept per level
- * (saved; sent to clients) since they're only known once the room generates. The gate itself (going through) comes
- * later, with the lance.
+ * (saved; sent to clients) since they're only known once the room generates. Going through is the lance's (Lance:
+ * an open gate's disc).
  */
 public final class Gates {
     private Gates() {

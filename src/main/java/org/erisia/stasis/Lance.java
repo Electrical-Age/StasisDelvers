@@ -346,12 +346,16 @@ public final class Lance {
                 int idx = island(dest, g);
                 if (idx >= 0) {
                     EndRiftPlan.Island is = EndRift.plan(dest).islands.get(idx);
-                    int top = is.y();
-                    for (long[] b : EndRiftPlan.shape(is))
-                        if (b[0] == is.x() && b[2] == is.z() && b[3] != EndRiftPlan.Kind.CHORUS.ordinal()) top = Math.max(top, (int) b[1]);
                     // the pad points away from the rift's core (the return rift never near it)
                     Direction away = Math.abs(is.x()) >= Math.abs(is.z()) ? (is.x() >= 0 ? Direction.EAST : Direction.WEST)
                         : (is.z() >= 0 ? Direction.SOUTH : Direction.NORTH);
+                    // on the island's highest planned block under the pad's whole footprint: EndRift places island blocks
+                    // into air later, and would bury a pad stamped lower (or fill the return rift's core)
+                    Set<Long> foot = new java.util.HashSet<>();
+                    for (BlockPos q : padColumns(new BlockPos(is.x(), 0, is.z()), away)) foot.add(BlockPos.asLong(q.getX(), 0, q.getZ()));
+                    int top = is.y();
+                    for (long[] b : EndRiftPlan.shape(is))
+                        if (foot.contains(BlockPos.asLong((int) b[0], 0, (int) b[2]))) top = Math.max(top, (int) b[1]);
                     return new Spot(key, new BlockPos(is.x(), top + 1, is.z()), away, true);
                 }
                 return spot(dest, Kind.STRONGHOLD_END, g, key);
@@ -447,20 +451,30 @@ public final class Lance {
      */
     static Arrival build(ServerLevel dest, Spot s, String homeDim, int homeId) {
         BlockPos f = s.foot();
-        Direction d = s.along(), side = d.getClockWise();
+        Direction d = s.along();
         BlockState rift = StasisRegistry.RIFTSTONE.get().defaultBlockState(), obs = Blocks.OBSIDIAN.defaultBlockState();
-        for (int a = -1; a <= RETURN_ALONG + 1; a++)
-            for (int b = -1; b <= 1; b++) {
-                BlockPos base = f.below().relative(d, a).relative(side, b);
-                boolean corner = (a == -1 || a == RETURN_ALONG + 1) && b != 0;
-                dest.setBlock(base, corner && !s.central() ? obs : rift, 3);
-                for (int h = 1; h <= 3; h++) {
-                    BlockPos up = base.above(h);
-                    if (!dest.getBlockState(up).isAir()) dest.setBlock(up, Blocks.AIR.defaultBlockState(), 3);
-                }
+        List<BlockPos> pad = padColumns(f.below(), d);
+        for (int i = 0; i < pad.size(); i++) {
+            BlockPos base = pad.get(i);
+            int a = i / 3 - 1, b = i % 3 - 1;
+            boolean corner = (a == -1 || a == RETURN_ALONG + 1) && b != 0;
+            dest.setBlock(base, corner && !s.central() ? obs : rift, 3);
+            for (int h = 1; h <= 3; h++) {
+                BlockPos up = base.above(h);
+                if (!dest.getBlockState(up).isAir()) dest.setBlock(up, Blocks.AIR.defaultBlockState(), 3);
             }
+        }
         BlockPos ret = f.relative(d, RETURN_ALONG).above();
         return new Arrival(s.key(), f.asLong(), ret.asLong(), homeDim, homeId, s.central());
+    }
+
+    /** The pad's blocks at base's height: along d from one behind to one past the return rift, 3 wide (row by row). */
+    static List<BlockPos> padColumns(BlockPos base, Direction d) {
+        Direction side = d.getClockWise();
+        List<BlockPos> l = new ArrayList<>();
+        for (int a = -1; a <= RETURN_ALONG + 1; a++)
+            for (int b = -1; b <= 1; b++) l.add(base.relative(d, a).relative(side, b));
+        return l;
     }
 
     // ---- going home
@@ -728,11 +742,7 @@ public final class Lance {
     /** Tests: the pad's blocks of an arrival (to take them away again). */
     public static List<BlockPos> testPad(Arrival a) {
         BlockPos f = a.footPos(), r = a.retPos();
-        Direction d = Direction.getApproximateNearest(r.getX() - f.getX(), 0, r.getZ() - f.getZ()), side = d.getClockWise();
-        List<BlockPos> l = new ArrayList<>();
-        for (int i = -1; i <= RETURN_ALONG + 1; i++)
-            for (int b = -1; b <= 1; b++) l.add(f.below().relative(d, i).relative(side, b));
-        return l;
+        return padColumns(f.below(), Direction.getApproximateNearest(r.getX() - f.getX(), 0, r.getZ() - f.getZ()));
     }
 
     /** Tests: forget the player's cooldown. */
