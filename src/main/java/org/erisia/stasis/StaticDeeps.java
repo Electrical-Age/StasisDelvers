@@ -52,20 +52,67 @@ public final class StaticDeeps {
         SECTIONS.clear();
     }
 
+    // ---- the End's rift (spreading mode, hard mode: EndRift; spreading-mode.md)
+
+    /** The End rift's radius: its core (0.35 r, ~14 blocks) is the black eye the floating end-stone islands circle. */
+    public static final float END_RIFT_RADIUS = 40;
+    /** The End rift's centre: over the old main island's middle (0, 0), at its old surface's height. */
+    public static final int END_RIFT_Y = 64;
+
+    /** Deep seeds of End levels whose island has exploded into the rift (both sides; seed-keyed as GATES). */
+    private static volatile java.util.Set<Integer> endRiftSeeds = java.util.Set.of(), endRiftIds = java.util.Set.of();
+
+    /** The End rift of the End level with this deep seed (pure: both sides compute it). */
+    public static Deep endRift(int seed) {
+        return new Deep(0.5f, END_RIFT_Y + 0.5f, 0.5f, END_RIFT_RADIUS, (Noise.hashInt(seed, 0xE4D, 7, 0x3E1F) & 0xFFFFFF) | 1);
+    }
+
+    /**
+     * From now on the level with this deep seed has the End rift (server: hard mode in spreading mode, EndRift; client:
+     * in the End with the spread's hard flag). Add only: a seed never loses it (hard mode is once only).
+     */
+    public static void addEndRift(int seed) {
+        if (seed == 0 || endRiftSeeds.contains(seed)) return;
+        java.util.Set<Integer> s = new java.util.HashSet<>(endRiftSeeds), ids = new java.util.HashSet<>(endRiftIds);
+        s.add(seed);
+        ids.add(endRift(seed).id());
+        endRiftSeeds = java.util.Set.copyOf(s);
+        endRiftIds = java.util.Set.copyOf(ids);
+        SECTIONS.clear();
+    }
+
+    /** Does the level with this deep seed have the End rift? */
+    public static boolean hasEndRift(int seed) {
+        return endRiftSeeds.contains(seed);
+    }
+
+    /** Server stopped / client left: the next world starts without. */
+    public static void clearEndRifts() {
+        endRiftSeeds = java.util.Set.of();
+        endRiftIds = java.util.Set.of();
+        SECTIONS.clear();
+    }
+
     /** Bug reports: the gate rifts known for this deep seed. */
     public static int gateCount(int seed) {
         List<Deep> g = GATES.get(seed);
         return g == null ? 0 : g.size();
     }
 
-    /** Is d a gate rift (no strata, no worldgen of its own)? */
+    /** Is d a gate rift (no strata, no worldgen of its own)? The End rift is one too: no strata, no puffs; it leads to
+     *  the End (Gates.destination), where it stands. */
     public static boolean isGate(Deep d) {
-        return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id());
+        return d.radius() == Gates.GATE_RADIUS && gateIds.contains(d.id()) || d.radius() == END_RIFT_RADIUS && endRiftIds.contains(d.id());
     }
 
     /** The static deeps whose cells touch the box around (x, y, z) with this margin: at most 8, plus gate rifts. */
     public static List<Deep> near(float x, float y, float z, float margin, int seed) {
         List<Deep> out = new ArrayList<>(2);
+        if (endRiftSeeds.contains(seed)) {   // first: the shader keeps the first 4
+            Deep e = endRift(seed);
+            if (Math.abs(e.x() - x) <= margin + e.radius() && Math.abs(e.y() - y) <= margin + e.radius() && Math.abs(e.z() - z) <= margin + e.radius())
+                out.add(e);
+        }
         for (Deep g : GATES.getOrDefault(seed, List.of()))
             if (Math.abs(g.x() - x) <= margin + g.radius() && Math.abs(g.y() - y) <= margin + g.radius() && Math.abs(g.z() - z) <= margin + g.radius())
                 out.add(g);
