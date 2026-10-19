@@ -268,8 +268,9 @@ public final class Stasis {
     }
 
     /**
-     * Block entities that tick even in stopped land: tower bases (or no tower could ever start), and EA's energy
-     * exporters near a tower (they feed it).
+     * Block entities that tick even in stopped land: tower bases (or no tower could ever start). EA's energy exporters
+     * near a tower used to be here too, as their FE push into the tower ran in their block-entity tick; it runs in EA's
+     * simulation now, which NodeFreezer keeps going near towers (NodeFreezer.infrastructure).
      */
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
         var be = level.getBlockEntity(pos);
@@ -278,8 +279,7 @@ public final class Stasis {
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
         // EA's light blocks (lamps, flashlights) time out in their tick: frozen, a flashlight sweep would leave its
         // light behind for good. Their sources refresh them only while they run, so stopped lamps go dark.
-        if (be instanceof mods.eln.sixnode.lampsocket.LightBlockEntity) return true;
-        return be instanceof mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherEntity && nearTower(level, pos);
+        return be instanceof mods.eln.sixnode.lampsocket.LightBlockEntity;
     }
 
     /** How far from a tower core (its 3x3x2 blocks) EA infrastructure keeps running in stopped land (Baughn: 6). */

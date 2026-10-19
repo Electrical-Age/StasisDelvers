@@ -1906,6 +1906,37 @@ public final class StasisGameTests {
                 c.check("8 blocks away a cable is stopped", org.erisia.stasis.NodeFreezer.isFrozen(far.sixNode));
             };
         }, false, true));
+        // an EA-to-FE exporter beside the core feeds the tower in stopped land (its push runs in EA's simulation, which
+        // NodeFreezer keeps going in the tower yard; it used to be a block-entity tick, exempted in Stasis)
+        CASES.put("ea_tower_yard_exporter_feeds_the_tower", new Spec(30, (h, c) -> {
+            var tower = tower(h, new BlockPos(12, 1, 6), 0);                     // unpowered: no field
+            var d = mods.eln.registry.batch.Wp11Content.elnToOtherLvu;
+            ServerLevel level = h.getLevel();
+            BlockPos p = h.absolutePos(new BlockPos(12, 1, 5)), core = h.absolutePos(new BlockPos(12, 1, 6));
+            var towards = net.minecraft.core.Direction.getApproximateNearest(core.getX() - p.getX(), 0, core.getZ() - p.getZ());
+            var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+            float yaw = player.getYRot(), pitch = player.getXRot();
+            player.setYRot(towards.toYRot());                                     // looking at the core: back to it
+            player.setXRot(0f);
+            mods.eln.node.transparent.TransparentNode n;
+            try {
+                n = ((mods.eln.node.transparent.TransparentNodeItem) d.parentItem).placeAt(d.newItemStack(), player, level, p, mods.eln.misc.Direction.YN);
+            } finally {
+                player.setYRot(yaw);
+                player.setXRot(pitch);
+            }
+            if (n == null) throw new IllegalStateException("placing the exporter failed");
+            var exporter = (mods.eln.transparentnode.energyconverter.EnergyConverterElnToOtherElement) n.element;
+            exporter.energyBuffer = 300;                                          // J: 400 FE
+            return () -> {
+                org.erisia.stasis.NodeFreezer.pass();
+                c.check("time is stopped at the exporter", !Stasis.isRunning(level, p));
+                c.check("the exporter beside the core runs", !org.erisia.stasis.NodeFreezer.isFrozen(n));
+                c.check("its buffer went into the tower", exporter.energyBuffer < 1, exporter.energyBuffer + " J left; front " + exporter.getFront()
+                    + ", FE behind " + level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, core, towards.getOpposite()));
+                c.check("the tower got it", tower.storedJ() > 290, tower.storedJ() + " J stored");
+            };
+        }, false, true));
         // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
         // so it moves) dropped onto each; outside the field both fluids are stopped
         CASES.put("stopped_fluids_are_solid", new Spec(5, (h, c) -> {

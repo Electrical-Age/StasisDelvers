@@ -5,7 +5,7 @@ import mods.eln.node.NodeManager;
 import mods.eln.node.six.SixNode;
 import mods.eln.node.six.SixNodeElement;
 import mods.eln.node.transparent.TransparentNode;
-import mods.eln.simplenode.energyconverter.EnergyConverterElnToOtherNode;
+import mods.eln.transparentnode.energyconverter.EnergyConverterElnToOtherElement;
 import mods.eln.sixnode.electricalcable.ElectricalCableElement;
 import mods.eln.transparentnode.battery.BatteryElement;
 import net.minecraft.core.BlockPos;
@@ -75,8 +75,10 @@ public final class NodeFreezer {
 
     /** Is the node only cables, a battery or an EA-to-FE exporter? */
     static boolean infrastructure(NodeBase n) {
-        if (n instanceof EnergyConverterElnToOtherNode || n instanceof TowerSignalNode) return true;
-        if (n instanceof TransparentNode t) return t.element instanceof BatteryElement;
+        if (n instanceof TowerSignalNode) return true;
+        // the exporter's FE push into its neighbour runs in EA's simulation (a slow process), so this also lets an
+        // exporter near a tower keep feeding it in stopped land
+        if (n instanceof TransparentNode t) return t.element instanceof BatteryElement || t.element instanceof EnergyConverterElnToOtherElement;
         // EA voxel blocks: their cables are wiring; anything else in them (pipes) isn't (yet)
         boolean anyPart = false;
         if (n instanceof mods.eln.node.voxel.VoxelNode v) {
