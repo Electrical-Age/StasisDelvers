@@ -1,0 +1,66 @@
+# Networking (StasisNet)
+
+All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records with a `TYPE`
+(`stasisdelvers:<name>`) and a `StreamCodec`. They are registered in `StasisNet.register`
+(`RegisterPayloadHandlersEvent`).
+
+## Protocol version
+- `e.registrar("10")`. Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+  are then refused at login instead of failing mid-game.
+  - 9 added `dig_stilled`.
+  - 10 removed the unused `chunk_clocks`.
+- The report channels sit under `r.optional()`, so a peer without them still connects; the bug report then
+  says `no_channel`.
+- `send(player, payload)` checks `connection.hasChannel(payload)`. Vanilla clients and GameTest mock players
+  (EmbeddedChannel) simply get nothing.
+
+## Server → client
+| Payload | Id | Sent by | Client handler |
+|---|---|---|---|
+| `Fields(fields, deepSeed)` | `fields` | `sendFields(level)` from `FieldData.changed`; `sendFields(player)` on login, respawn and dimension change (`Freezing.grace`) | `ClientFields.deepSeed` + `ClientFields.set` |
+| `GateRifts(seed, centres)` | `gate_rifts` | `sendGates` (with every per-player `sendFields`), `Gates` when a gate is added | `StaticDeeps.setGates` |
+| `StormOverride(active, start, end, folded)` | `storm_override` | `sendStorm` (`Storms.start/stop`), `sendGates` | `Storms.clientOverride` |
+| `Freeze(progress)` | `freeze` | `Freezing.tick` on a change ≥ 0.01 | `StasisNet.clientFreeze` (shader slot 23) |
+| `FieldClocks(map id → double[])` | `field_clocks` | `LocalTime.tick` every 40 ticks | `LocalTime.Client.fieldClocks` |
+| `Gutters(map pos → light)` | `gutters` | `Flames` (on watch and on change) | `Flames.clientGutters` |
+| `Bolt(from, to, seed)` | `bolt` | `TowerBlockEntity.bolt/boltOut/freeze` | `boltSink` → `client/BoltRenderer` + `client/AntiSound` |
+| `ConsoleState(pos, v, text)` | `console_state` | the console handlers below | `consoleSink` → `client/ConsoleScreen` |
+| `ReportState(nonce, json)` | `report_state` (optional) | the `ReportQuery` handler | `reportSink` → `client/report/BugReport.reply` |
+
+## Client → server
+| Payload | Id | Handler | Guard |
+|---|---|---|---|
+| `DigStilled()` | `dig_stilled` | `StilledLiquids.dig` | the server raycasts from the player's own view and needs a digging tool in hand; the client repeats every 5 ticks while the button is held |
+| `ConsoleQuery(pos)` | `console_query` | replies `consoleState` | `consoleTower`: within 8 blocks, master, inside the world border |
+| `ConsoleFeed(pos)` | `console_feed` | `TowerBlockEntity.toggleFeed` | `consoleTower` |
+| `ConsoleSet(pos, target, override)` | `console_set` | `TowerBlockEntity.setControls` (ignored when `locked`); logs OVERRIDE changes | `consoleTower` |
+| `ReportQuery(nonce, look?, face)` | `report_query` (optional) | `ReportResponder.answer` | 1 per 10 s per player (`MIN_INTERVAL_MS`); look honoured within 8 blocks |
+
+## Other synced state (not StasisNet)
+- Tower block entities: the update tag is the full NBT (layout JSON, status, remnant), sent with
+  `sendBlockUpdated`.
+- The attachment `stasisdelvers:frozen` (`StasisRegistry.FROZEN`) is synced through NeoForge's attachment sync.
+- Player tick rate: vanilla's ticking-state packet (`PlayerRates`).
+- Config: `StasisConfig` is a SYNCED config.
+
+## Size limits
+- `ReportState.REPORT_MAX` = 64 KiB (`stringUtf8(REPORT_MAX)`); encoding more throws.
+  `ReportResponder` drops sections until its JSON fits under `REPORT_MAX - 256`.
+- `ConsoleState.text` uses the default string limit.
+- `Fields` sends every field of the level each time. That is fine for tens of fields; the shader only draws
+  13 (client-rendering.md).
+
+## Tests
+- `src/test/java/org/erisia/stasis/NetCodecTest.java`: a round trip for every payload codec
+  (`fieldsRoundTrip`, `gateRiftsRoundTrip`, `stormOverrideRoundTrips`, `consolePayloadsRoundTrip`,
+  `digStilledRoundTrips`, `reportPayloadsRoundTrip`, `reportStateOverTheCapThrows`, `freezeRoundTrips`,
+  `clockMapsRoundTrip`, `boltRoundTrips`).
+  - `sentFieldsAgreeOnBlocks`: a field after the wire codec gives the same `containsBlock` answers.
+- GameTest `tower_console_access` calls `StasisNet.consoleTower` directly. The serverbound handlers
+  themselves have no test.
+
+## Gotchas
+- `FIELD` (the wire codec for `Field`) is separate from `Field.CODEC` (the save codec). A new `Field`
+  component needs both, plus a protocol bump. `NetCodecTest` catches a missing wire field only if its
+  generator varies it.
+- `ReportResponder.LAST` (rate limit per UUID) is never pruned: one entry per player who ever reported.
