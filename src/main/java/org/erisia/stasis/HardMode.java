@@ -76,13 +76,15 @@ public final class HardMode {
     }
 
     /**
-     * STEP 5 HOOK: the End's main island explodes into shards and an end-stone rift is built in its place. Called at the
-     * hard-mode instant, before the teleport; the flash (the teleport) comes hardModeTeleportSeconds later (Argon: shake,
-     * shockwave, shards and flash over ~5-8 s, teleport at the flash's peak, then build the rift paced while nobody is
-     * there). For now it only starts the stand-in effect, which {@link #tick} plays (explosions and flashes).
+     * The End's main island explodes into the End rift (step 5, EndRift). Called at the hard-mode instant, before the
+     * teleport; the flash (the teleport) comes hardModeTeleportSeconds later (Argon: shake, shockwave, shards and flash
+     * over ~5-8 s, teleport at the flash's peak, then build the rift paced while nobody is there). Until the flash the
+     * core heaves (EndRift's shards) under {@link #tick}'s explosions and flashes; after it EndRift lifts what is left of
+     * the island and places the rift's islands.
      */
     public static void explodeEnd(ServerLevel end) {
         end.playSound(null, 0, 70, 0, SoundEvents.ENDER_DRAGON_GROWL, SoundSource.HOSTILE, 16f, 0.5f);
+        EndRift.finale(end);
     }
 
     /** Ticks from the kill to the flash (the teleport). */
@@ -125,6 +127,7 @@ public final class HardMode {
                     n++;
                 }
                 StasisDelvers.LOG.info("Hard mode's flash: {} player(s) sent out of the End", n);
+                if (end != null) EndRift.flash(end);
                 Spread.refresh(srv);   // the End stills now
             }
         } else if (t >= END_WINDOW) event = null;

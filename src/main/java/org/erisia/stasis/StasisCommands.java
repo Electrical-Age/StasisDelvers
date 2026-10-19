@@ -155,6 +155,29 @@ final class StasisCommands {
                     c.getSource().sendSuccess(() -> Component.literal(now ? "Hard mode: the stillness spreads on towards all of the land"
                         : "Already in hard mode"), true);
                     return now ? 1 : 0;
+                }))
+                // the End's island breaking up (EndRift): a pillar's crystal broken by hand, for the lab; and its state
+                .then(Commands.literal("endstage").then(Commands.argument("pillar", com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 31)).executes(c -> {
+                    var end = c.getSource().getServer().getLevel(net.minecraft.world.level.Level.END);
+                    if (!StasisConfig.spreading || end == null) {
+                        c.getSource().sendFailure(Component.literal("Not in spreading mode (config mode), or no End"));
+                        return 0;
+                    }
+                    int k = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c, "pillar");
+                    boolean now = EndRift.crystalBroken(end, k);
+                    c.getSource().sendSuccess(() -> Component.literal(now ? "Pillar " + k + "'s part of the island lifts"
+                        : "Nothing: that pillar's part went already, there is no such pillar, or hard mode has begun"), true);
+                    return now ? 1 : 0;
+                })))
+                .then(Commands.literal("endstatus").executes(c -> {
+                    var end = c.getSource().getServer().getLevel(net.minecraft.world.level.Level.END);
+                    if (end == null) {
+                        c.getSource().sendFailure(Component.literal("No End"));
+                        return 0;
+                    }
+                    String msg = EndRift.status(end);
+                    c.getSource().sendSuccess(() -> Component.literal(msg), false);
+                    return 1;
                 })))
             .then(Commands.literal("storm").executes(c -> {
                     // the storm schedule: now, the next one, and the warped clock

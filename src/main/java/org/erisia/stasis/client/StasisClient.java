@@ -32,6 +32,13 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Pre.class, FrozenEntities::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, RiftHum::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, EndBarrierFx::tick);   // spreading mode's End wall
+        // the End rift (EndRift): in the End after hard mode its static core stands where the island was
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> {
+            var lvl = net.minecraft.client.Minecraft.getInstance().level;
+            if (lvl != null && lvl.dimension() == net.minecraft.world.level.Level.END && org.erisia.stasis.Spread.client.hard()
+                && org.erisia.stasis.ClientFields.deepSeed() != 0)
+                org.erisia.stasis.StaticDeeps.addEndRift(org.erisia.stasis.ClientFields.deepSeed());
+        });
         // flames: recheck gutters once their chunk (and its light) is in
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> org.erisia.stasis.Flames.clientTick(net.minecraft.client.Minecraft.getInstance().level));
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.level.ChunkEvent.Load.class, e -> {
@@ -110,7 +117,10 @@ public final class StasisClient {
         // spreading mode: re-mesh and relight only where P or a new rank tile changed the answer; forget it all on leaving
         org.erisia.stasis.Spread.clientListener = FrozenSprites.SPREAD;
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class,
-            e -> org.erisia.stasis.Spread.clientClear());
+            e -> {
+                org.erisia.stasis.Spread.clientClear();
+                org.erisia.stasis.StaticDeeps.clearEndRifts();
+            });
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> FrozenSprites.tick(net.minecraft.client.Minecraft.getInstance()));
         org.erisia.stasis.TowerClientHooks.onUpdate = be -> {
             TowerRenderer.updated(be);

@@ -2292,6 +2292,9 @@ public final class StasisGameTests {
                     net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
             c.check("both players are in the End", ps.stream().allMatch(p -> p.level() == end));
             double now = ow.getGameTime() / 20.0;
+            // (the End rift's work would rebuild the test End for minutes: off here, EndRift has its own tests)
+            org.erisia.stasis.EndRift.testOff = true;
+            c.cleanup.add(() -> org.erisia.stasis.EndRift.testOff = false);
             boolean first = org.erisia.stasis.HardMode.enter(server, "test"), again = org.erisia.stasis.HardMode.enter(server, "test again");
             c.check("the entry point enters once", first && !again && org.erisia.stasis.Spread.hard(server), first + " " + again);
             var after = org.erisia.stasis.Spread.testServerState();
@@ -2329,6 +2332,107 @@ public final class StasisGameTests {
                     && hasBreakingIt(stays), "in " + stays.level().dimension().identifier() + ", advancement " + hasBreakingIt(stays));
                 c.check("the flash came, then the End stilled", flashed[0] && endStopped[0], flashed[0] + " " + endStopped[0]);
                 c.check("after hard mode the End can't be entered", blocked[0]);
+            };
+        }, false, true));
+        // the End rift's pieces (EndRift, step 5), in the test area: a pillar sector's column loses only its end stone and a
+        // core column also the pillars' obsidian (a player's chest stays, floating); a shard flies and lands its block in air
+        // only, then goes; the saved state round-trips with defaults for an older save
+        CASES.put("end_rift_lift_and_shards", new Spec(org.erisia.stasis.EndRift.FLIGHT_MAX + 10, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            c.check("the saved state's codec round-trips, with defaults for an empty tag", org.erisia.stasis.EndRift.testCodecRoundTrip());
+            BlockPos a = h.absolutePos(new BlockPos(2, 1, 2));
+            net.minecraft.world.level.block.Block[] col = {Blocks.END_STONE, Blocks.COBBLESTONE, Blocks.END_STONE, Blocks.OBSIDIAN, Blocks.END_STONE};
+            for (int i = 0; i < col.length; i++) level.setBlock(a.above(i), col[i].defaultBlockState(), 2);
+            int n = org.erisia.stasis.EndRift.testLiftColumn(level, a.getX(), a.getZ(), false, a.getY());
+            c.check("a sector's column: only the end stone goes, the rest floats", n == 3 && level.getBlockState(a).isAir() && level.getBlockState(a.above(1)).is(Blocks.COBBLESTONE)
+                && level.getBlockState(a.above(2)).isAir() && level.getBlockState(a.above(3)).is(Blocks.OBSIDIAN) && level.getBlockState(a.above(4)).isAir(), "removed " + n);
+            BlockPos b = h.absolutePos(new BlockPos(4, 1, 2));
+            net.minecraft.world.level.block.Block[] core = {Blocks.END_STONE, Blocks.OBSIDIAN, Blocks.CHEST, Blocks.END_STONE};
+            for (int i = 0; i < core.length; i++) level.setBlock(b.above(i), core[i].defaultBlockState(), 2);
+            n = org.erisia.stasis.EndRift.testLiftColumn(level, b.getX(), b.getZ(), true, b.getY());
+            c.check("a core column: the obsidian goes too, a chest stays", n == 3 && level.getBlockState(b.above(1)).isAir() && level.getBlockState(b.above(2)).is(Blocks.CHEST),
+                "removed " + n);
+            BlockPos from = h.absolutePos(new BlockPos(2, 3, 6)), to = h.absolutePos(new BlockPos(10, 4, 6)), busy = h.absolutePos(new BlockPos(12, 2, 6));
+            level.setBlock(busy, Blocks.COBBLESTONE.defaultBlockState(), 2);
+            int before = org.erisia.stasis.EndRift.testShards();
+            org.erisia.stasis.EndRift.testShard(level, from, to, Blocks.END_STONE.defaultBlockState());
+            org.erisia.stasis.EndRift.testShard(level, from.east(), busy, Blocks.END_STONE.defaultBlockState());
+            net.minecraft.world.phys.AABB area = new net.minecraft.world.phys.AABB(h.absolutePos(BlockPos.ZERO)).inflate(24);
+            java.util.function.IntSupplier displays = () -> level.getEntitiesOfClass(net.minecraft.world.entity.Display.BlockDisplay.class, area,
+                x -> x.entityTags().contains("stasisdelvers_end_shard")).size();
+            c.check("two shards in the air", org.erisia.stasis.EndRift.testShards() == before + 2 && displays.getAsInt() == 2,
+                org.erisia.stasis.EndRift.testShards() + " shards, " + displays.getAsInt() + " displays");
+            boolean[] midway = new boolean[1];
+            h.runAfterDelay(30, () -> midway[0] = level.getBlockState(to).isAir() && displays.getAsInt() == 2);
+            return () -> {
+                c.check("midway: still flying, nothing placed", midway[0]);
+                c.check("landed: its block is there", level.getBlockState(to).is(Blocks.END_STONE), level.getBlockState(to).toString());
+                c.check("into air only: the block in the way stays", level.getBlockState(busy).is(Blocks.COBBLESTONE));
+                c.check("the shards are gone", displays.getAsInt() == 0 && org.erisia.stasis.EndRift.testShards() == before,
+                    displays.getAsInt() + " displays, " + org.erisia.stasis.EndRift.testShards() + " shards");
+            };
+        }));
+        // the End's stages (EndRift; Baughn: each pillar crystal broken lifts part of the island): in the test End, a pillar's
+        // own crystal destroyed records its pillar once; a player's crystal (no bottom) on a pillar and a crystal away from
+        // the pillars don't count; the command's path records another; the lifts are queued (no block is written: paused)
+        CASES.put("end_rift_crystal_stages", new Spec(12, (h, c) -> {
+            var server = h.getLevel().getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return () -> { };
+            }
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, 0, 0, 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.EndRift.testPaused = true;
+            org.erisia.stasis.EndRift.testReset(end);
+            c.cleanup.add(() -> {
+                org.erisia.stasis.EndRift.testReset(end);
+                org.erisia.stasis.EndRift.testPaused = false;
+            });
+            var spikes = net.minecraft.world.level.levelgen.feature.EndSpikeFeature.getSpikesForLevel(end);
+            c.check("the End has its ten pillars", spikes.size() == 10, String.valueOf(spikes.size()));
+            if (spikes.size() < 3) return () -> { };
+            var s0 = spikes.get(0);
+            var s1 = spikes.get(1);
+            List<long[]> forced = new ArrayList<>();
+            for (int[] k : new int[][]{{s0.getCenterX() >> 4, s0.getCenterZ() >> 4}, {s1.getCenterX() >> 4, s1.getCenterZ() >> 4}, {0, 0}}) {
+                end.getChunk(k[0], k[1]);
+                if (end.setChunkForced(k[0], k[1], true)) forced.add(new long[]{k[0], k[1]});
+            }
+            c.cleanup.add(() -> forced.forEach(k -> end.setChunkForced((int) k[0], (int) k[1], false)));
+            int[] after = new int[5];
+            boolean[] cmd = new boolean[2];
+            String[] jobs = {""};
+            h.runAfterDelay(5, () -> {
+                java.util.function.Function<double[], net.minecraft.world.entity.boss.enderdragon.EndCrystal> crystal = at -> {
+                    var k = new net.minecraft.world.entity.boss.enderdragon.EndCrystal(end, at[0], at[1], at[2]);
+                    end.addFreshEntity(k);
+                    return k;
+                };
+                crystal.apply(new double[]{s0.getCenterX() + 0.5, s0.getHeight() + 1, s0.getCenterZ() + 0.5}).discard();
+                after[0] = org.erisia.stasis.EndRift.testBroken(end);
+                crystal.apply(new double[]{s0.getCenterX() + 0.5, s0.getHeight() + 1, s0.getCenterZ() + 0.5}).kill(end);
+                after[1] = org.erisia.stasis.EndRift.testBroken(end);
+                var mine = crystal.apply(new double[]{s1.getCenterX() + 0.5, s1.getHeight() + 1, s1.getCenterZ() + 0.5});
+                mine.setShowBottom(false);
+                mine.discard();
+                after[2] = org.erisia.stasis.EndRift.testBroken(end);
+                crystal.apply(new double[]{0.5, 90, 0.5}).discard();
+                after[3] = org.erisia.stasis.EndRift.testBroken(end);
+                cmd[0] = org.erisia.stasis.EndRift.crystalBroken(end, 2);
+                cmd[1] = org.erisia.stasis.EndRift.crystalBroken(end, 2);
+                after[4] = org.erisia.stasis.EndRift.testBroken(end);
+                jobs[0] = org.erisia.stasis.EndRift.testJobs(end);
+            });
+            return () -> {
+                c.check("a pillar's crystal destroyed: its pillar is recorded", after[0] == 1, Integer.toBinaryString(after[0]));
+                c.check("again on the same pillar: once only", after[1] == 1, Integer.toBinaryString(after[1]));
+                c.check("a player's crystal on a pillar doesn't count", after[2] == 1, Integer.toBinaryString(after[2]));
+                c.check("a crystal away from the pillars doesn't count", after[3] == 1, Integer.toBinaryString(after[3]));
+                c.check("the command's path records another, once", cmd[0] && !cmd[1] && after[4] == 0b101, cmd[0] + " " + cmd[1] + " " + Integer.toBinaryString(after[4]));
+                c.check("their lifts are queued", jobs[0].contains("part 0 lift") && jobs[0].contains("part 2 lift"), jobs[0]);
             };
         }, false, true));
         // spreading mode's End wall (EndBarrier; λ-Nero): a survival player past endBarrierRadius is put back where they
@@ -2618,6 +2722,8 @@ public final class StasisGameTests {
             // static deeps on from here (GameTests run without; before, a drifting deep could stop the player's spot)
             org.erisia.stasis.Deeps.testDeeps = true;
             c.cleanup.add(() -> org.erisia.stasis.Deeps.testDeeps = false);
+            org.erisia.stasis.EndRift.testOff = true;   // (the End rift's work: not in this test)
+            c.cleanup.add(() -> org.erisia.stasis.EndRift.testOff = false);
             boolean entered = org.erisia.stasis.HardMode.enter(server, "test");
             c.check("hard mode begins", entered);
             c.check("the gate rift is registered at once", org.erisia.stasis.Gates.list(level).contains(centre.asLong())
