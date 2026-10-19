@@ -14,18 +14,15 @@ import org.spongepowered.asm.mixin.injection.At;
 @Mixin(ParticleGroup.class)
 public abstract class ParticleGroupMixin {
     @WrapWithCondition(method = "tickParticle", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/particle/Particle;tick()V"))
-    private boolean stasis$particleTick(Particle particle) {
-        ParticleAccessor p = (ParticleAccessor) particle;
-        var level = p.stasis$level();
+    private boolean stasis$particleTick(Particle p) {
+        var level = p.level;
         if (level == null || !Stasis.stops(level)) return true;
-        int x = (int) Math.floor(p.stasis$x()), y = (int) Math.floor(p.stasis$y()), z = (int) Math.floor(p.stasis$z());
+        int x = (int) Math.floor(p.x), y = (int) Math.floor(p.y), z = (int) Math.floor(p.z);
         if (Stasis.isRunning(level, x, y, z)) return true;
-        p.stasis$setXo(p.stasis$x());
-        p.stasis$setYo(p.stasis$y());
-        p.stasis$setZo(p.stasis$z());
-        int age = p.stasis$age() + 1;
-        p.stasis$setAge(age);
-        if (age >= p.stasis$lifetime()) particle.remove();
+        p.xo = p.x;
+        p.yo = p.y;
+        p.zo = p.z;
+        if (++p.age >= p.lifetime) p.remove();
         return false;
     }
 }

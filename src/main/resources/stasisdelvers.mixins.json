@@ -22,7 +22,6 @@
     "client.ClientLevelMixin",
     "client.ClientClockManagerMixin",
     "client.ClientClockInstanceMixin",
-    "client.ParticleAccessor",
     "client.ParticleGroupMixin",
     "client.SectionCompilerMixin",
     "client.FluidRendererMixin",
