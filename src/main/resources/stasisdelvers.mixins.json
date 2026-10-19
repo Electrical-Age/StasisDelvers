@@ -11,6 +11,7 @@
     "LivingEntityMixin",
     "StrongholdPortalRoomMixin",
     "StrongholdLibraryMixin",
+    "EnderDragonFightMixin",
     "StructureTemplateMixin",
     "SpawnUseMixin",
     "BucketItemMixin",

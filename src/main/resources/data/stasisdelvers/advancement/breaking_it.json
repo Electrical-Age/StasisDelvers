@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:end/kill_dragon",
+  "criteria": {
+    "broke_it": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.stasisdelvers.breaking_it.description"
+    },
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "id": "minecraft:end_crystal"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.breaking_it.title"
+    }
+  },
+  "requirements": [
+    [
+      "broke_it"
+    ]
+  ]
+}

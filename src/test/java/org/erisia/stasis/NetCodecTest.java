@@ -144,9 +144,13 @@ class NetCodecTest {
 
     @Property(tries = 200)
     void spreadStateRoundTrips(@ForAll boolean reset, @ForAll boolean map, @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int count,
-                               @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int p, @ForAll boolean hard, @ForAll boolean complete) {
-        var s = new StasisNet.SpreadState(reset, map, count, p, hard, complete);
+                               @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int p, @ForAll boolean hard, @ForAll boolean complete,
+                               @ForAll boolean endStill, @ForAll double stormOrigin) {
+        var s = new StasisNet.SpreadState(reset, map, count, p, hard, complete, endStill, stormOrigin);
         assertEquals(s, trip(StasisNet.SpreadState.CODEC, s));
+        // before hard mode: no origin (NaN) comes back as NaN
+        var none = new StasisNet.SpreadState(reset, map, count, p, false, complete, false, Double.NaN);
+        assertTrue(Double.isNaN(trip(StasisNet.SpreadState.CODEC, none).stormOrigin()));
     }
 
     /** Any tile of ranks (-1..N-1 as sent, and MISSING or other extremes all the same) comes back cell for cell. */

@@ -44,5 +44,7 @@
   "key.stasisdelvers.bug_report": "Send bug report",
   "key.category.stasisdelvers.keys": "Stasis Delvers",
   "item.stasisdelvers.rift_capacitor": "Rift Capacitor",
-  "item.stasisdelvers.charged_rift_capacitor": "Charged Rift Capacitor"
+  "item.stasisdelvers.charged_rift_capacitor": "Charged Rift Capacitor",
+  "advancements.stasisdelvers.breaking_it.title": "Good job breaking it, hero",
+  "advancements.stasisdelvers.breaking_it.description": "Be in the End when the dragon's death shatters it, and be thrown home by the flash"
 }

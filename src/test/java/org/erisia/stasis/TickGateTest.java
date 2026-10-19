@@ -8,6 +8,7 @@ import net.jqwik.api.constraints.IntRange;
 import net.jqwik.api.constraints.LongRange;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,6 +88,40 @@ class TickGateTest {
         double a = Storms.tau(seed, o, t), b = Storms.tau(seed, o, t + dt);
         // two storms can overlap (scheduled and override): up to 1 + 9 + 9
         assertTrue(b - a >= dt - 1e-6 && b - a <= 19 * dt + 1e-6, () -> (b - a) + " over " + dt);
+    }
+
+    /**
+     * Hard mode's storm origin (spreading mode, step 4a): before it tau is the real clock exactly and no storm blows
+     * (identical to before hard mode); across it tau is continuous and monotone; after it the schedule is the base
+     * schedule moved to start at the origin; with no origin (NaN) there are no storms at all.
+     */
+    @Property(tries = 2000)
+    void tauIsContinuousAcrossTheHardModeOrigin(@ForAll @IntRange(min = 1, max = Integer.MAX_VALUE) int seed,
+                                                @ForAll @DoubleRange(min = 0, max = 4e9) double origin, @ForAll @DoubleRange(min = -1e6, max = 1e6) double u,
+                                                @ForAll @DoubleRange(min = 0, max = 600) double dt) {
+        double t = Math.max(0, origin + u);
+        if (t < origin) {
+            assertEquals(t, Storms.tau(seed, null, origin, t));
+            assertEquals(0, Storms.intensity(seed, null, origin, t));
+            assertEquals(0, Storms.warning(seed, null, origin, t));
+        } else {
+            // the base schedule, shifted (the same storms, counted from the origin)
+            double base = Storms.tau(seed, null, 0, t - origin);
+            assertEquals(origin + base, Storms.tau(seed, null, origin, t), 1e-6 * (1 + Math.abs(origin + base)));
+        }
+        // monotone, 1x..10x, with no jump anywhere (across the origin too)
+        double a = Storms.tau(seed, null, origin, t), b = Storms.tau(seed, null, origin, t + dt);
+        double slack = 1e-4;
+        assertTrue(b - a >= dt - slack && b - a <= 10 * dt + slack, () -> "tau jumps at " + t + " (origin " + origin + "): " + (b - a) + " over " + dt);
+        // just either side of the origin
+        double e = 1e-3, before = Storms.tau(seed, null, origin, origin - e), after = Storms.tau(seed, null, origin, origin + e);
+        assertTrue(after - before >= 2 * e - slack && after - before <= 20 * e + slack, () -> "at the origin: " + (after - before));
+        // no origin: no storms
+        assertEquals(t, Storms.tau(seed, null, Double.NaN, t));
+        assertEquals(0, Storms.intensity(seed, null, Double.NaN, t));
+        assertNull(Storms.next(seed, Double.NaN, t));
+        // the next storm, on the real clock, starts at or after the origin
+        assertTrue(Storms.next(seed, origin, t).start() >= origin);
     }
 
     @Property(tries = 500)

@@ -3,20 +3,23 @@
 Paths are relative to `src/main/java/org/erisia/stasis/`. Design: `notes/timestop/spread-DESIGN.md` (with Argon's
 review and Baughn's decisions of 2026-10-19). Step 1 is in: the server core (1a) and the client sync, shader and
 drifting deeps over running land (1b); step 2 (the stronghold library desk, portal rooms recorded) and step 3 (front
-warnings) too. Hard mode's effects come later.
+warnings) too, and step 4a (hard mode's entry: the dragon's death, the End before and after). Still to come: 4b (the
+stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
 
 ## What it is
 - Config `mode = "spreading"` (default `"stopped"`, the base mod). The world starts running; the stillness spreads
   from the rifts over `spreadHours` of online time to `spreadCap` (80 %) of the land within `spreadRadius` of spawn.
-  Hard mode (for now only `/stasis spread hardmode`) takes it on to 100 % over `hardSpreadHours`.
+  Hard mode (the ender dragon's death, or `/stasis spread hardmode`) takes it on from where it stood to 100 % over
+  `hardSpreadHours`.
 - At 100 % the spread is **complete**: everything behaves as the stopped mode, spawn included (Baughn: on purpose).
 - First join: one stability compass and nothing else (`StarterKit`, persisted flag `stasisdelvers_starter_compass`).
-- Off in spreading mode: the spawn cottage (not marked done), the starter suit and flashlight, storms
-  (`StasisConfig.storms` is false: storms come with hard mode, after the storm clock's origin moves, or tau jumps),
-  and the stronghold portal room's gate rift (the room stays intact; hard mode will need it).
+- Off in spreading mode: the spawn cottage (not marked done), the starter suit and flashlight, storms until hard mode
+  (`Storms.origin` is NaN; from hard mode on the schedule counts from its instant, so tau doesn't jump), and the
+  stronghold portal room's gate rift (the room stays intact; hard mode will need it).
 - Strongholds (step 2): each library has a surveyor's desk (`MapDeskBlock`, maps to ruined cottages; the spawn
   cottage's desk is off with the cottage), and each portal room is a working End portal room, recorded for hard mode.
-- The Nether and the End run until the spread is complete (`Stasis.stops` is false there), then follow the base rules.
+- The Nether runs until the spread is complete (`Stasis.stops` is false there), then follows the base rules. The End
+  runs until hard mode's flash (below), then follows the base rules (stopped: the rift world of step 5).
 - Drifting deeps (Baughn, 2026-10-19): a drifting deep stops time on running land it passes over wherever no field
   (or the spawn area) holds it, on both sides: `rateAt` and `rateAtSteady` are 0 there (block ticks, entities, EA
   nodes stop), at the threshold Freezing uses (`Deeps.at > Deeps.THRESHOLD` = 0.5). `rateAtLand` (flame light,
@@ -151,6 +154,37 @@ warnings) too. Hard mode's effects come later.
   Nothing reads the list yet (`PendingGates.list`). `endPortalRifts = false` turns recording off too (no gate rooms
   ever).
 
+## Hard mode (step 4a)
+- `HardMode.enter(server, cause)`: the one entry point, for the dragon's death and `/stasis spread hardmode`. Once only
+  (the clock's `hard`); not outside spreading mode. At the instant:
+  - `Spread.startHardClock`: `hard`, `hard_at` (online s), `hard_c` (the coverage then: the course goes on from it,
+    so P doesn't jump), `hard_game` (game s: the storms' origin).
+  - `Storms.clearOverrides`: test storm overrides go (they were ignored while storms were off; counted at once past
+    the origin they would jump tau).
+  - The End event begins (memory only): `HardMode.explodeEnd(end)` is called, **step 5's hook** (the explosion and the
+    end-stone rift; for now a stand-in: a growl, then explosions over the island growing denser and white flashes in
+    each player's view). `hardModeTeleportSeconds` (default 6) later comes the flash: everyone in the End but spectators
+    is sent to their respawn point (`findRespawnPositionAndUseSpawnBlock(false)`, then `Freezing.safeRespawn`, the
+    respawn rule: a bed or anchor in stopped land sends an unprotected player to world spawn), gets the advancement
+    `stasisdelvers:breaking_it` "Good job breaking it, hero" (hidden, a challenge under "Free the End", end crystal
+    icon, impossible trigger granted in code), and the short grace of a dimension change (`Freezing.grace`).
+  - Only at the flash does the End still (`State.endStill`, synced): stopped at the kill, its players would be statues
+    (5 s) before the flash. `Spread.update` then invalidates and relights the End.
+  - For 30 s after the kill (`END_WINDOW`) a player dying in the End is sent home the same way instead
+    (`LivingDeathEvent`, highest priority, cancelled, health restored).
+  - A broadcast: "Something broke in the End. The stillness stirs again, and storms will rise from the rifts."
+- `mixin/EnderDragonFightMixin` (spreading mode only): `setDragonKilled` keeps vanilla's bookkeeping (boss bar off,
+  `dragonKilled`, `hasPreviouslyKilledDragon`) and calls `HardMode.enter`, but opens no exit portal, spawns no End
+  gateway and places **no dragon egg** (the island is about to explode and nobody is left to take it; the vanilla
+  "The Next Generation" advancement can't be had in this mode). `tryRespawn` is cancelled: no second dragon (it would
+  build an exit portal). `LivingDeathEvent` isn't used: it comes 10 s before, at the start of the death animation.
+- After hard mode no way leads into the End (`HardMode.endClosed`: `EntityTravelToDimensionEvent` to the End is
+  cancelled for everything but creative and spectator players; the stronghold portals still stand until step 4b).
+  The lance (later) will open the way. A player who logs in in the End after the flash (a restart mid-event, a long
+  absence) is sent home the same way, with the advancement.
+- A restart during the event: hard mode stays, the event is gone, the End is stilled at once. Step 5 will need to
+  persist its build progress.
+
 ## Persistent state
 - Overworld SavedData `stasisdelvers:spread_map` (`algorithm`, `spawn_x`, `spawn_z`, `radius`, `ranks` int array),
   written once. A saved map is never rebuilt, whatever its algorithm: a world made with v1 keeps its v1 map (logged at
@@ -159,6 +193,7 @@ warnings) too. Hard mode's effects come later.
   the cap), `hard_game` (game seconds at the instant: the storms' origin, -1 unknown), and the spawn move: `spawn_move` 0 not moved / 1
   moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
 - SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre}`.
+- Memory only: the End event (`HardMode`).
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -166,6 +201,8 @@ warnings) too. Hard mode's effects come later.
   has no map, and for cells no tile covers, the client says "running".
 - Drifting deeps are computed on both sides from the deep seed and game time (as in stopped mode); the client's game
   time can be a tick or so off, so at a moving deep's edge the two may disagree for a moment.
+- `SpreadState` carries `endStill` and `stormOrigin` (protocol 12), so the client's End stops with the server's and its
+  tau and storms (`Storms.clientOrigin`) match.
 - Re-meshing: `FrozenSprites.spreadMoved` (at most once a second) re-meshes and relights the loaded chunks whose
   [`chunkMin1024`, `chunkMax1024`] the new P crossed, and those a new tile covers that aren't wholly running. Near a
   player that is a handful of chunks a minute.
@@ -200,6 +237,12 @@ warnings) too. Hard mode's effects come later.
   library and portal room pieces built chunk by chunk, each straddling four chunks: no desk in stopped mode, one desk
   per library in spreading mode, in rock and in a cave; the portal room keeps its 12 frames, and its portal when all
   12 eyes rolled, gets no shards, and is recorded once with its whole box although generated twice over).
+- `spread_hard_mode_entry` (two players in the test End beyond 192 blocks of the centre, so its dragon fight stays
+  asleep): the entry point enters once; P doesn't jump and status names the instant's coverage; the storms' origin is
+  the instant, tau = t before it and storms are scheduled after it; the End runs until the flash; a death in the End
+  before it is a teleport home with the advancement; at the flash the other is sent home with it and the End stills;
+  then the End can't be entered. The mixin's suppression
+  of the portal, gateway and egg needs a real dragon fight: not tested (by eye in the lab).
 - Eyes of Ender: nothing here changes where strongholds are placed or `#eye_of_ender_located`; the portal room's
   blocks are vanilla's. The GameTest world has no strongholds, so this is not tested in a real one.
 

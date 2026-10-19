@@ -115,7 +115,8 @@ public final class StasisPost {
         // packet steps its game time every second (AdventurAgent: the whole screen stepped once a second)
         double clock = weatherClock(mc);
         // the drifting weather's clock, warped by storms (Storms.tau: up to 10x); pockets and the eye keep real time
-        double wclock = org.erisia.stasis.Storms.tau(ClientFields.deepSeed(), org.erisia.stasis.Storms.clientOverrideForClient(), clock);
+        double wclock = org.erisia.stasis.Storms.tau(ClientFields.deepSeed(), org.erisia.stasis.Storms.clientOverrideForClient(),
+            org.erisia.stasis.Storms.clientOrigin(), clock);
         debugFrame++;
         d[29] = (float) ((clock % 1200.0));
         // eddy time (Eddies.time), with the partial tick so the mist drifts smoothly
@@ -309,9 +310,10 @@ public final class StasisPost {
         if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {
             int seed = ClientFields.deepSeed();
             double[] ov = org.erisia.stasis.Storms.clientOverrideForClient();
-            double si = org.erisia.stasis.Storms.intensity(seed, ov, clock);
+            double so = org.erisia.stasis.Storms.clientOrigin();
+            double si = org.erisia.stasis.Storms.intensity(seed, ov, so, clock);
             d[1312] = (float) si;
-            d[1313] = (float) org.erisia.stasis.Storms.warning(seed, ov, clock);
+            d[1313] = (float) org.erisia.stasis.Storms.warning(seed, ov, so, clock);
             d[1314] = org.erisia.stasis.Deeps.windAngle(seed);
             if (si > 0) {
                 double[] dr = org.erisia.stasis.Deeps.drift(wclock, seed);

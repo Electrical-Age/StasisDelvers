@@ -23,6 +23,11 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
   - Time is cut into blocks of the mean gap, one storm per block at a hashed start (`scheduled`); lookup is O(1).
   - The intensity I ramps in and out over 2 min (`RAMP`). `integral` has a closed form.
   - **Warped time** `tau(t) = t + 9·∫I + override offset`: deeps and puffs move up to 10x faster in a storm.
+  - **The origin** (`origin(level)`, `clientOrigin()`; every function takes it): the schedule's blocks count from it,
+    and before it `tau(t) = t` with no storms. 0 in the base mode (the schedule as always). In spreading mode NaN (no
+    storms) until hard mode, then the game time of the hard-mode instant (`Spread.Clock.hard_game`, synced in
+    `SpreadState`): storms switch on there and tau goes on from t without a jump (Baughn: storms come with hard mode).
+    The 3-argument `tau`/`intensity`/`warning` are origin 0, for tests.
   - `warning` drives the violet horizon glow. `field`/`kind`/`at`: storm mist (1) and storm rift (2) by noise.
   - `overlap`/`side`: for towers (draw, collapse side).
   - `Forced` is the `/stasis storm start|stop` override (SavedData `storm_override`: active, start, end, folded).
@@ -59,10 +64,11 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 - `FieldData.deep_seed` (time-stop.md).
 - SavedData: `storm_override`, `rift_crystals`, `storm_crystals`, `rift_gates` (`Gates`, see
   deeps-strata-worldgen.md).
-- Config: `storms` (forced off in spreading mode, spreading-mode.md), `stormEveryHours`, `stormMinutes`, `stormWarnMinutes`, `crystalStageSeconds`.
+- Config: `storms` (in spreading mode only from hard mode's origin, spreading-mode.md), `stormEveryHours`, `stormMinutes`, `stormWarnMinutes`, `crystalStageSeconds`.
 
 ## Client / server split
-- Synced: the deep seed (in `StasisNet.Fields`), gate rifts (`GateRifts`), the storm override (`StormOverride`).
+- Synced: the deep seed (in `StasisNet.Fields`), gate rifts (`GateRifts`), the storm override (`StormOverride`), and in
+  spreading mode the storms' origin (`SpreadState.stormOrigin`).
 - Everything else is recomputed on the client from the seed, the synced config and game time. The GLSL
   mirrors `Noise`, `Pockets` periods (600/900/1200/1800 s in data slots 188-195) and the deep constants
   (`DEEP_BASE`, `MAX_DEEPS`).
@@ -71,7 +77,11 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 - **tau never jumps.** Deeps' positions are a function of tau, so a jump teleports every deep.
   - `Storms.start` folds a finished override into `folded` (9·its integral); `stop` ends at the start of a ramp-out.
   - Tests: `TickGateTest.tauIsMonotoneAndWithoutJumps`, `tauIsContinuousAcrossBlockEdges`,
-    `tauWithAnOverrideIsMonotoneToo`, `integralIsTheIntegralOfIntensity`, GameTest `deeps_clock_continuous`.
+    `tauWithAnOverrideIsMonotoneToo`, `integralIsTheIntegralOfIntensity`, `tauIsContinuousAcrossTheHardModeOrigin` (t
+    before the origin, the shifted schedule after, monotone and jump-free across it, nothing with no origin), GameTests
+    `deeps_clock_continuous`, `spread_hard_mode_entry`.
+  - Hard mode drops the test overrides (`Storms.clearOverrides`): they were ignored while storms were off, and counted
+    at once past the origin they would jump tau. `/stasis storm start` is refused before hard mode in spreading mode.
 - Each storm stays inside its block: `TickGateTest.scheduledStormStaysInItsBlock`, GameTest `storm_schedule`.
 - Storm coverage and rules: `storm_coverage`, `storm_draw_and_rules`.
 - Crystals: `rift_crystals_grow`, `rift_crystals_no_growth_in_field`, `rift_crystal_grades`, `rift_crystal_drops`.

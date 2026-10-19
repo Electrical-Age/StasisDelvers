@@ -2255,6 +2255,82 @@ public final class StasisGameTests {
             c.check("once stilled: nothing (Freezing's turn)", before.apply(-5).equals("none") && !Stasis.spreadRuns(level, p.getBlockX(), p.getBlockZ()),
                 org.erisia.stasis.FrontWarnings.describe(p));
         }, false, true));
+        // spreading mode's hard mode (step 4a; Baughn's brief: the dragon's death starts it): the one entry point (the
+        // dragon's death through EnderDragonFightMixin, and the command) sets it once; the coverage goes on from where it
+        // stood, P doesn't jump; storms are off before and scheduled from the instant after (tau = t up to it); the End
+        // keeps running until the flash, when its players are sent home with the advancement; a death in the End meanwhile
+        // is a teleport instead; then the End is stilled and the way in is closed. Players stay beyond 192 blocks of the
+        // island's centre so the test End's dragon fight doesn't wake.
+        CASES.put("spread_hard_mode_entry", new Spec((int) org.erisia.stasis.HardMode.flashTicks() + 30, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            ServerLevel ow = server.overworld(), end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return () -> { };
+            }
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, at.getX(), at.getZ(), 400);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            // a fifth of spreadHours online: coverage a fifth of the cap, well short of it
+            double secs = 0.2 * org.erisia.stasis.StasisConfig.spreadHoursForTests() * 3600;
+            double[] was = org.erisia.stasis.Spread.testClock(server, secs, false, 0);
+            var before = org.erisia.stasis.Spread.testServerState();
+            List<ServerPlayer> ps = new ArrayList<>();
+            c.cleanup.add(() -> ps.forEach(p -> remove(h, p)));
+            c.cleanup.add(org.erisia.stasis.HardMode::testReset);
+            c.cleanup.add(() -> org.erisia.stasis.Spread.testClockRestore(server, was));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            c.check("before: not hard, storms off (no origin)", !org.erisia.stasis.Spread.hard(server) && Double.isNaN(org.erisia.stasis.Storms.origin(ow))
+                && org.erisia.stasis.Storms.intensity(12345, null, org.erisia.stasis.Storms.origin(ow), 1e6) == 0);
+            c.check("before: the End runs", !Stasis.stops(end));
+            ServerPlayer stays = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true), dies = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            ps.add(stays);
+            ps.add(dies);
+            for (ServerPlayer p : ps)
+                p.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(300.5, 4, 0.5 + 10 * ps.indexOf(p)), Vec3.ZERO, 0, 0,
+                    net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+            c.check("both players are in the End", ps.stream().allMatch(p -> p.level() == end));
+            double now = ow.getGameTime() / 20.0;
+            boolean first = org.erisia.stasis.HardMode.enter(server, "test"), again = org.erisia.stasis.HardMode.enter(server, "test again");
+            c.check("the entry point enters once", first && !again && org.erisia.stasis.Spread.hard(server), first + " " + again);
+            var after = org.erisia.stasis.Spread.testServerState();
+            c.check("P doesn't jump at the instant", after.p() == before.p() && after.hard(), before.p() + " -> " + after.p());
+            c.check("status: from the coverage of the instant", org.erisia.stasis.Spread.status(server, null).contains("from coverage 0.") 
+                && !org.erisia.stasis.Spread.status(server, null).contains("from coverage 0.8"), org.erisia.stasis.Spread.status(server, null));
+            double o = org.erisia.stasis.Storms.origin(ow);
+            c.check("storms: the origin is the instant", Math.abs(o - now) < 0.051, o + " vs " + now);
+            c.check("tau is the real clock up to the origin and on from it", org.erisia.stasis.Storms.tau(ow, o - 100) == o - 100
+                && Math.abs(org.erisia.stasis.Storms.tau(ow, o) - o) < 1e-9);
+            var next = org.erisia.stasis.Storms.next(12345, o, o);
+            c.check("after: storms are scheduled from the origin", next != null && next.start() >= o
+                && org.erisia.stasis.Storms.intensity(12345, null, o, next.start() + next.length() / 2) > 0.99, String.valueOf(next));
+            c.check("the End keeps running until the flash", !Stasis.stops(end) && Boolean.FALSE.equals(org.erisia.stasis.HardMode.testFlashed()));
+            // a death in the End before the flash: sent home instead
+            // (die directly: a mock player has no loaded client, so ServerPlayer.isInvulnerableTo turns all damage away)
+            dies.setHealth(0);
+            dies.die(end.damageSources().fellOutOfWorld());
+            boolean[] diedOk = {dies.isAlive() && dies.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && hasBreakingIt(dies)};
+            boolean[] stillThere = {stays.level() == end};
+            boolean[] flashed = new boolean[1], endStopped = new boolean[1], blocked = new boolean[1];
+            h.runAfterDelay(org.erisia.stasis.HardMode.flashTicks() + 5, () -> {
+                flashed[0] = Boolean.TRUE.equals(org.erisia.stasis.HardMode.testFlashed());
+                endStopped[0] = Stasis.stops(end) && org.erisia.stasis.Spread.testServerState().endStill();
+                // the way back is closed for survival players
+                var into = new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(300.5, 4, 0.5), Vec3.ZERO, 0, 0,
+                    net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING);
+                blocked[0] = stays.teleport(into) == null && stays.level() != end;
+            });
+            return () -> {
+                c.check("a death in the End meanwhile: alive, at home, with the advancement", diedOk[0],
+                    "alive " + dies.isAlive() + " in " + dies.level().dimension().identifier());
+                c.check("the other stayed until the flash", stillThere[0]);
+                c.check("the flash: sent home with the advancement", stays.isAlive() && stays.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+                    && hasBreakingIt(stays), "in " + stays.level().dimension().identifier() + ", advancement " + hasBreakingIt(stays));
+                c.check("the flash came, then the End stilled", flashed[0] && endStopped[0], flashed[0] + " " + endStopped[0]);
+                c.check("after hard mode the End can't be entered", blocked[0]);
+            };
+        }, false, true));
         // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
         // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
         // the server's list of what it sent is what a client would hold)
@@ -2703,6 +2779,12 @@ public final class StasisGameTests {
             b.setEnergy(st, charged ? b.getEnergyMax(st) : 0);
             p.setItemSlot(slots[i], st);
         }
+    }
+
+    /** Has the player "Good job breaking it, hero" (HardMode)? */
+    static boolean hasBreakingIt(ServerPlayer p) {
+        var a = p.level().getServer().getAdvancements().get(org.erisia.stasis.HardMode.ADVANCEMENT);
+        return a != null && p.getAdvancements().getOrStartProgress(a).isDone();
     }
 
     static void remove(GameTestHelper h, ServerPlayer p) {

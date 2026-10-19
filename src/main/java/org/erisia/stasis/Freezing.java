@@ -239,15 +239,23 @@ public final class Freezing {
      * spawn instead (the spawn area runs), else they would freeze again and again at the bed.
      */
     static void respawnPosition(net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent e) {
-        if (!(e.getEntity() instanceof ServerPlayer p) || p.isCreative() || p.isSpectator()) return;
-        var t = e.getTeleportTransition();
-        if (Stasis.isRunning(t.newLevel(), net.minecraft.core.BlockPos.containing(t.position())) || Suits.protect(p)) return;
+        if (!(e.getEntity() instanceof ServerPlayer p)) return;
+        e.setTeleportTransition(safeRespawn(p, e.getTeleportTransition()));
+    }
+
+    /**
+     * The respawn rule as a function (respawnPosition, and HardMode's teleport out of the End): t, unless it lies in
+     * stopped land and the player is unprotected, in which case world spawn if that runs.
+     */
+    static net.minecraft.world.level.portal.TeleportTransition safeRespawn(ServerPlayer p, net.minecraft.world.level.portal.TeleportTransition t) {
+        if (p.isCreative() || p.isSpectator()) return t;
+        if (Stasis.isRunning(t.newLevel(), net.minecraft.core.BlockPos.containing(t.position())) || Suits.protect(p)) return t;
         var spawn = net.minecraft.world.level.portal.TeleportTransition.createDefault(p, t.postTeleportTransition());
-        if (!Stasis.isRunning(spawn.newLevel(), net.minecraft.core.BlockPos.containing(spawn.position()))) return;   // no safe place either
-        e.setTeleportTransition(spawn);
+        if (!Stasis.isRunning(spawn.newLevel(), net.minecraft.core.BlockPos.containing(spawn.position()))) return t;   // no safe place either
         REDIRECTED.add(p.getUUID());
         StasisDelvers.LOG.info("{}'s respawn point {} is in stopped land: respawning at world spawn", p.getName().getString(),
             net.minecraft.core.BlockPos.containing(t.position()).toShortString());
+        return spawn;
     }
 
     /** The players of a level who stand where time runs (before a field shrinks or goes: see graceIfStopped). */

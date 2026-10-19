@@ -35,8 +35,9 @@ public final class RiftHum {
         if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {
             double t = Double.isNaN(StasisPost.smoothClock) ? Deeps.realTime(mc.level) : StasisPost.smoothClock;
             double[] ov = org.erisia.stasis.Storms.clientOverrideForClient();
-            w = (float) Math.max(0.85 * org.erisia.stasis.Storms.intensity(ClientFields.deepSeed(), ov, t),
-                0.12 * org.erisia.stasis.Storms.warning(ClientFields.deepSeed(), ov, t));
+            double so = org.erisia.stasis.Storms.clientOrigin();
+            w = (float) Math.max(0.85 * org.erisia.stasis.Storms.intensity(ClientFields.deepSeed(), ov, so, t),
+                0.12 * org.erisia.stasis.Storms.warning(ClientFields.deepSeed(), ov, so, t));
         }
         windTarget = w;
         if (w > 0.01f && (wind == null || wind.isStopped())) {

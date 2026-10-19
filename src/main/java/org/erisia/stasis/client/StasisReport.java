@@ -268,10 +268,12 @@ public final class StasisReport {
             for (double v : ov) a.add(v);
             st.add("override", a);
         }
-        st.addProperty("intensity", Storms.intensity(seed, ov, t));
-        st.addProperty("warning", Storms.warning(seed, ov, t));
-        st.addProperty("tau", Storms.tau(seed, ov, t));
-        Storms.Storm next = Storms.next(seed, t);
+        double so = Storms.clientOrigin();
+        st.addProperty("origin", so);
+        st.addProperty("intensity", Storms.intensity(seed, ov, so, t));
+        st.addProperty("warning", Storms.warning(seed, ov, so, t));
+        st.addProperty("tau", Storms.tau(seed, ov, so, t));
+        Storms.Storm next = Storms.next(seed, so, t);
         if (next != null) {
             st.addProperty("next_in_s", next.start() - t);
             st.addProperty("next_length_s", next.length());

@@ -61,6 +61,12 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Spread::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, SpawnMove::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, FrontWarnings::tick);
+        // spreading mode's hard mode (the dragon's death)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, HardMode::tick);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, HardMode::death);
+        NeoForge.EVENT_BUS.addListener(HardMode::travel);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, HardMode::login);
+        NeoForge.EVENT_BUS.addListener(HardMode::serverStopped);
         // (after Spread::tick: the clients hear this tick's P)
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, SpreadSync::tick);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, SpreadSync::join);

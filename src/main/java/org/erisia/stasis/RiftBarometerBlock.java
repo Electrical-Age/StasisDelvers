@@ -35,7 +35,8 @@ public class RiftBarometerBlock extends Block {
         if (seed == 0) return 0;
         double t = Deeps.realTime(level);
         double[] ov = Storms.override(level);
-        double i = Storms.intensity(seed, ov, t), w = Storms.warning(seed, ov, t);
+        double o = Storms.origin(level);
+        double i = Storms.intensity(seed, ov, o, t), w = Storms.warning(seed, ov, o, t);
         return i > 0 ? (int) Math.round(4 + 11 * i) : (int) Math.round(4 * w);
     }
 

@@ -1,6 +1,6 @@
 # Mixins
 
-There are 26 mixin classes in three configs, plus an access transformer. Mixin sources are in
+There are 27 mixin classes in three configs, plus an access transformer. Mixin sources are in
 `src/main/java/org/erisia/stasis/mixin/`; the configs are in `src/main/resources/`. All three configs are listed
 in `src/main/templates/META-INF/neoforge.mods.toml` (`[[mixins]]`), along with the AT (`[[accessTransformers]]`).
 The background audit (written before the cleanup, with 36 mixins) is
@@ -36,6 +36,7 @@ If one of these can't apply, the game stops at startup, on purpose: without them
 | `LivingEntityMixin` | `LivingEntity.tick` (`updatingUsingItem`), `hurtServer` (`playHurtSound`), both `@WrapWithCondition` | Item use counts only on the player's running ticks; frozen mobs make no hurt sound | `LivingEntityUseItemEvent.Tick` would still fire `onUseTick` effects; no entity-specific sound event |
 | `StrongholdPortalRoomMixin` | `StrongholdPieces$PortalRoom.postProcess` (TAIL) | The End portal becomes a gate rift in a shattered room (`GateRoom`, `Gates`); in spreading mode the room stays intact and is recorded for hard mode (`PendingGates`) | Strongholds are code-built pieces; there is no data route |
 | `StrongholdLibraryMixin` | `StrongholdPieces$Library.postProcess` (TAIL) | Spreading mode: a surveyor's desk on each library's floor | No template, so no structure processor; NeoForge has no per-piece event |
+| `EnderDragonFightMixin` | `EnderDragonFight.setDragonKilled`, `tryRespawn` (HEAD cancel) | Spreading mode only: the dragon's death keeps vanilla's bookkeeping (boss bar, killed flags) and enters hard mode (`HardMode.enter`) instead of opening the exit portal, spawning an End gateway and placing the egg; the dragon can't be summoned again | `LivingDeathEvent` fires 10 s earlier (the death animation) and can't stop the portal, gateway or egg, which `setDragonKilled` places directly |
 | `StructureTemplateMixin` | `StructureTemplate.processBlockInfos` (RETURN) | Random crop ages in structures (`TimeScars.cropAge`) | A processor_list route covers only listed pools and conflicts with datapacks |
 | `SpawnUseMixin` | `ServerGamePacketListenerImpl.handleUseItemOn` (`isUnderSpawnProtection`, `mayInteract`; `@WrapOperation`) | Lets EA and Stasis blocks be used under spawn protection | No spawn-protection event |
 | `BucketItemMixin` | `BucketItem.emptyContents` (`Level.setBlock`) | Water poured in stopped land becomes stilled water | Events would mean reimplementing bucket placement |
@@ -92,5 +93,6 @@ mods) has rewritten a target, only that effect is lost.
 - The behaviour behind the required mixins is covered by GameTests (time-stop.md, players-suits.md):
   `rate_scheduled_button`, `rate_random_ticks`, `furnace_burns_only_inside`, `stopped_fluids_are_solid`,
   `flames_*`, `poured_water_freezes`, `furnace_cart_pushes_frozen_cart`, `mobs_avoid_stopped_land`,
-  `rate_player_eats_slowly`, `rift_gates`, `spread_stronghold_rooms`.
+  `rate_player_eats_slowly`, `rift_gates`, `spread_stronghold_rooms`, `spread_hard_mode_entry` (the entry point
+  `EnderDragonFightMixin` calls; the mixin itself needs a real dragon fight and is untested).
 - Cosmetic mixins have no automated test; a missing hook shows as a startup warning.

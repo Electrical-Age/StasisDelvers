@@ -18,7 +18,7 @@ import net.minecraft.world.level.saveddata.SavedDataType;
  * During a storm the drifting weather (deeps, puffs) runs on warped time tau(t) = t + 9 x the integral of I, which
  * has a closed form, so it moves up to 10x faster with no jumps. Strata pockets and crystal growth keep real time.
  * Both sides compute it from the deep seed and synced config; a test override (/stasis storm start|stop) is saved and
- * sent to clients.
+ * sent to clients. In spreading mode storms begin at the hard-mode instant: the schedule's origin (origin()).
  */
 public final class Storms {
     private Storms() {
@@ -54,6 +54,27 @@ public final class Storms {
 
     public static double[] clientOverrideForClient() {
         return clientOverride;
+    }
+
+    /**
+     * The storm schedule's origin (s, Deeps' real clock) on this side: storms run from it on, and tau(t) = t before it.
+     * 0 in the base mode (the schedule as it always was); in spreading mode the hard-mode instant (Spread.State
+     * stormOrigin, synced in SpreadState), NaN before hard mode: no storms (Baughn: storms come with hard mode). Putting
+     * the origin there, not at 0, keeps tau from jumping when they switch on: tau(t) for t before it stays t, so no
+     * drifting deep moves (step 4a).
+     */
+    public static double origin(Level level) {
+        return StasisConfig.spreading ? Spread.state(level).stormOrigin() : 0;
+    }
+
+    /** origin() for the client's own level (client code: StasisPost, RiftHum, StasisReport). */
+    public static double clientOrigin() {
+        return StasisConfig.spreading ? Spread.client.stormOrigin() : 0;
+    }
+
+    /** Storms on at time t: the config, a deep seed, and t at or after the origin (NaN: never). */
+    static boolean on(int seed, double origin, double t) {
+        return StasisConfig.storms && seed != 0 && t >= origin;
     }
 
     static double[] override(Level level) {
@@ -94,22 +115,26 @@ public final class Storms {
     }
 
     /** The storm intensity 0..1 at time t (real clock, s): the scheduled storm's or the override's, the stronger. */
-    public static double intensity(int seed, double[] override, double t) {
-        if (!StasisConfig.storms || seed == 0) return 0;
-        long n = (long) Math.floor(t / block());
-        double i = intensity(scheduled(seed, n), t);
+    public static double intensity(int seed, double[] override, double origin, double t) {
+        if (!on(seed, origin, t)) return 0;
+        double u = t - origin;
+        long n = (long) Math.floor(u / block());
+        double i = intensity(scheduled(seed, n), u);
         if (override != null) i = Math.max(i, intensity(new Storm(override[0], override[1] - override[0]), t));
         return i;
     }
 
-    /** Warped time: t + 9 x the storms' integral so far. */
-    public static double tau(int seed, double[] override, double t) {
-        if (!StasisConfig.storms || seed == 0) return t;
-        double B = block();
-        long n = (long) Math.floor(t / B);
+    /**
+     * Warped time: t + 9 x the storms' integral so far. The schedule counts from the origin (block n covers
+     * origin + nB ..), so before the origin tau(t) = t and at it the integral is 0: no jump when storms switch on.
+     */
+    public static double tau(int seed, double[] override, double origin, double t) {
+        if (!on(seed, origin, t)) return t;
+        double B = block(), u = t - origin;
+        long n = (long) Math.floor(u / B);
         Storm s = scheduled(seed, n);
         double full = integral(s, s.end());
-        double sum = Math.max(0, n) * full + integral(s, t);
+        double sum = Math.max(0, n) * full + integral(s, u);
         double extra = 0;
         if (override != null) {
             Storm o = new Storm(override[0], override[1] - override[0]);
@@ -120,25 +145,42 @@ public final class Storms {
     }
 
     /** How near the next storm is, 0..1 over the warning (1 at its start, and through it); for the horizon glow. */
-    public static double warning(int seed, double[] override, double t) {
-        if (!StasisConfig.storms || seed == 0) return 0;
-        double W = StasisConfig.stormWarnMinutes * 60.0;
-        long n = (long) Math.floor(t / block());
+    public static double warning(int seed, double[] override, double origin, double t) {
+        if (!on(seed, origin, t)) return 0;
+        double W = StasisConfig.stormWarnMinutes * 60.0, u = t - origin;
+        long n = (long) Math.floor(u / block());
         double best = 0;
         for (long k = n; k <= n + 1; k++) {
             Storm s = scheduled(seed, k);
-            if (t >= s.start() && t <= s.end()) return 1;
-            if (t < s.start() && s.start() - t < W) best = Math.max(best, 1 - (s.start() - t) / W);
+            if (u >= s.start() && u <= s.end()) return 1;
+            if (u < s.start() && s.start() - u < W) best = Math.max(best, 1 - (s.start() - u) / W);
         }
         if (override != null && t >= override[0] - W && t <= override[1]) best = Math.max(best, t >= override[0] ? 1 : 1 - (override[0] - t) / W);
         return best;
     }
 
-    /** The next scheduled storm starting after t (or the current one). */
-    public static Storm next(int seed, double t) {
-        long n = (long) Math.floor(t / block());
+    /** The next scheduled storm starting after t (or the current one), on the real clock; null if storms never come. */
+    public static Storm next(int seed, double origin, double t) {
+        if (Double.isNaN(origin)) return null;
+        double u = Math.max(0, t - origin);
+        long n = (long) Math.floor(u / block());
         Storm s = scheduled(seed, n);
-        return t <= s.end() ? s : scheduled(seed, n + 1);
+        if (u > s.end()) s = scheduled(seed, n + 1);
+        return new Storm(s.start() + origin, s.length());
+    }
+
+    // the base mode's schedule (origin 0), for tests
+
+    public static double intensity(int seed, double[] override, double t) {
+        return intensity(seed, override, 0, t);
+    }
+
+    public static double tau(int seed, double[] override, double t) {
+        return tau(seed, override, 0, t);
+    }
+
+    public static double warning(int seed, double[] override, double t) {
+        return warning(seed, override, 0, t);
     }
 
     // ---- the storm field: coverage over the surface band, carried on the warped wind
@@ -237,12 +279,25 @@ public final class Storms {
     // ---- level-side helpers
 
     public static double intensity(Level level) {
-        return intensity(Deeps.seed(level), override(level), level.getGameTime() / 20.0);
+        return intensity(Deeps.seed(level), override(level), origin(level), level.getGameTime() / 20.0);
     }
 
     /** The real clock (Deeps.realTime) warped. */
     public static double tau(Level level, double t) {
-        return tau(Deeps.seed(level), override(level), t);
+        return tau(Deeps.seed(level), override(level), origin(level), t);
+    }
+
+    /** Hard mode began (HardMode.enter): earlier test overrides were ignored while storms were off (tau = t before the
+     *  origin); dropped now, or the first moment past the origin would count them all at once and tau would jump. */
+    static void clearOverrides(net.minecraft.server.MinecraftServer srv) {
+        for (ServerLevel l : srv.getAllLevels()) {
+            Forced o = Forced.get(l);
+            if (!o.active && o.folded == 0) continue;
+            o.active = false;
+            o.folded = 0;
+            o.setDirty();
+            StasisNet.sendStorm(l);
+        }
     }
 
     // ---- the test override

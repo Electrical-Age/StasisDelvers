@@ -55,6 +55,7 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue SPREAD_CAP;
     static final ModConfigSpec.IntValue SPREAD_RADIUS;
     static final ModConfigSpec.DoubleValue SPREAD_CONNECTED_UNTIL;
+    static final ModConfigSpec.DoubleValue HARD_MODE_TELEPORT_SECONDS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -127,8 +128,8 @@ public final class StasisConfig {
         STARTER_SUIT = b.comment("Give each player a full, charged Delver suit on their first join.").define("starterSuit", true);
         MODE = b.comment("Game mode (Baughn 2026-10-19; docs/spreading-mode.md). \"stopped\": time stands still outside fields from the",
                 "start (the base mod). \"spreading\": the world starts running and the stillness spreads from the rifts over",
-                "spreadHours of online time; no spawn cottage, no starter suit, no storms; the Nether and the End run until the",
-                "spread is complete, after which everything behaves as \"stopped\".")
+                "spreadHours of online time; no spawn cottage, no starter suit, no storms until hard mode (the dragon's death);",
+                "the Nether runs until the spread is complete, the End until hard mode; then everything behaves as \"stopped\".")
             .define("mode", "stopped", o -> "stopped".equals(o) || "spreading".equals(o));
         SPREAD_HOURS = b.comment("Spreading mode: hours of online time (at least one player on) for the stillness to cover spreadCap",
                 "of the land within spreadRadius.").defineInRange("spreadHours", 48.0, 0.01, 10000.0);
@@ -143,6 +144,8 @@ public final class StasisConfig {
                 "high ground may stand as running islands); above it the stillness rises like water over the map's stability",
                 "terrain and leaves high regions running on their own (Baughn 2026-10-19). Only read when a world's map is built.")
             .defineInRange("spreadConnectedUntil", SpreadMap.CONNECTED_UNTIL, 0.0, 1.0);
+        HARD_MODE_TELEPORT_SECONDS = b.comment("Spreading mode: seconds from the dragon's death (hard mode) to the flash that sends everyone in",
+                "the End to their respawn point; the island's explosion plays meanwhile.").defineInRange("hardModeTeleportSeconds", 6.0, 0.0, 30.0);
         SPEC = b.build();
     }
 
@@ -180,6 +183,7 @@ public final class StasisConfig {
     static volatile double spreadHours = 48, hardSpreadHours = 48, spreadCap = 0.8;
     static volatile int spreadRadius = 8000;
     static volatile double spreadConnectedUntil = SpreadMap.CONNECTED_UNTIL;
+    static volatile double hardModeTeleportSeconds = 6;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -191,6 +195,11 @@ public final class StasisConfig {
     /** Is the game mode "spreading" (Spread; docs/spreading-mode.md)? */
     public static boolean spreading() {
         return spreading;
+    }
+
+    /** spreadHours (GameTests). */
+    public static double spreadHoursForTests() {
+        return spreadHours;
     }
 
     public static int freezeTicks() {
@@ -234,6 +243,7 @@ public final class StasisConfig {
         m.put("spreadCap", spreadCap);
         m.put("spreadRadius", spreadRadius);
         m.put("spreadConnectedUntil", spreadConnectedUntil);
+        m.put("hardModeTeleportSeconds", hardModeTeleportSeconds);
         return m;
     }
 
@@ -266,9 +276,8 @@ public final class StasisConfig {
         riftScatterRate = RIFT_SCATTER_RATE.get();
         endPortalRifts = END_PORTAL_RIFTS.get();
         spreading = "spreading".equals(MODE.get());
-        // spreading mode: no storms (Baughn: storms only come with hard mode, which needs the storm clock's origin
-        // moved to its start first, else tau jumps for all past time). Both sides read the synced config: they agree.
-        storms = STORMS.get() && !spreading;
+        // (spreading mode: no storms until hard mode, whose instant is the storm schedule's origin: Storms.origin)
+        storms = STORMS.get();
         timeScars = TIME_SCARS.get();
         ruins = RUINS.get();
         skyIslands = SKY_ISLANDS.get();
@@ -283,5 +292,6 @@ public final class StasisConfig {
         spreadCap = SPREAD_CAP.get();
         spreadRadius = SPREAD_RADIUS.get();
         spreadConnectedUntil = SPREAD_CONNECTED_UNTIL.get();
+        hardModeTeleportSeconds = HARD_MODE_TELEPORT_SECONDS.get();
     }
 }

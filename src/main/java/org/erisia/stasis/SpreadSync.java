@@ -75,7 +75,7 @@ public final class SpreadSync {
 
     static StasisNet.SpreadState state(boolean reset) {
         Spread.State s = Spread.server;
-        return new StasisNet.SpreadState(reset, s.map() != null, s.count(), s.p(), s.hard(), s.complete());
+        return new StasisNet.SpreadState(reset, s.map() != null, s.count(), s.p(), s.hard(), s.complete(), s.endStill(), s.stormOrigin());
     }
 
     /** ServerTickEvent.Post (after Spread.tick): the state where it changed, then each overworld player's tiles. */

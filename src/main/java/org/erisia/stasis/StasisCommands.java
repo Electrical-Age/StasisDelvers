@@ -151,7 +151,7 @@ final class StasisCommands {
                         c.getSource().sendFailure(Component.literal("Not in spreading mode (config mode)"));
                         return 0;
                     }
-                    boolean now = Spread.enterHardMode(c.getSource().getServer());
+                    boolean now = HardMode.enter(c.getSource().getServer(), "/stasis spread hardmode by " + c.getSource().getTextName());
                     c.getSource().sendSuccess(() -> Component.literal(now ? "Hard mode: the stillness spreads on towards all of the land"
                         : "Already in hard mode"), true);
                     return now ? 1 : 0;
@@ -161,22 +161,31 @@ final class StasisCommands {
                     var level = c.getSource().getLevel();
                     int seed = Deeps.seed(level);
                     double t = Deeps.realTime(level);
-                    double i = Storms.intensity(level);
-                    var next = Storms.next(seed, t);
+                    double i = Storms.intensity(level), o = Storms.origin(level);
+                    var next = Storms.next(seed, o, t);
                     String msg = String.format("storm intensity %.2f, warning %.2f; %s; weather clock %.0f s ahead of real time",
-                        i, Storms.warning(seed, Storms.override(level), t),
-                        t >= next.start() ? String.format("this storm ends in %.0f min", (next.end() - t) / 60)
+                        i, Storms.warning(seed, Storms.override(level), o, t),
+                        next == null ? "no storms until hard mode (spreading mode)"
+                            : t >= next.start() ? String.format("this storm ends in %.0f min", (next.end() - t) / 60)
                             : String.format("next storm in %.1f h (%.0f min long)", (next.start() - t) / 3600, next.length() / 60),
                         Deeps.time(level) - t);
                     c.getSource().sendSuccess(() -> Component.literal(msg), false);
                     return 1;
                 })
                 .then(Commands.literal("start").executes(c -> {
+                    if (Double.isNaN(Storms.origin(c.getSource().getLevel()))) {
+                        c.getSource().sendFailure(Component.literal("No storms before hard mode in spreading mode"));
+                        return 0;
+                    }
                     Storms.start(c.getSource().getLevel(), 0);
                     c.getSource().sendSuccess(() -> Component.literal("A storm starts now (test override)"), true);
                     return 1;
                 }).then(Commands.argument("minutes", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0, 600)).executes(c -> {
                     double m = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(c, "minutes");
+                    if (Double.isNaN(Storms.origin(c.getSource().getLevel()))) {
+                        c.getSource().sendFailure(Component.literal("No storms before hard mode in spreading mode"));
+                        return 0;
+                    }
                     Storms.start(c.getSource().getLevel(), m);
                     c.getSource().sendSuccess(() -> Component.literal("A storm starts in " + m + " min (test override; its glow shows now)"), true);
                     return 1;
