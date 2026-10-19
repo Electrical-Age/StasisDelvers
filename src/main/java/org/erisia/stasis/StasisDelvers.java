@@ -65,6 +65,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, HardMode::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, HardMode::death);
         NeoForge.EVENT_BUS.addListener(HardMode::travel);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post.class, HardMode::playerTick);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, HardMode::login);
         NeoForge.EVENT_BUS.addListener(HardMode::serverStopped);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, EndRift::tick);

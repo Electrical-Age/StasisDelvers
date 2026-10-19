@@ -216,7 +216,7 @@ islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
     island stood stays put. With players in the End, each chunk is warned `WARN_TICKS` (30) before it goes with
     end-stone dust and a crumbling sound (as a chunk begins, the next two are warned), and a
     column within 2 blocks of a player's feet is put off with dust and "The ground crumbles under your feet!" until they
-    step away or 3 s pass (then it goes: falling into the void is the End's usual risk). The stage starts with a boom
+    step away or 3 s pass (then it goes). The stage starts with a boom
     and an action-bar line, "The island shudders: that crystal was holding part of it together."
   - Shards: with players watching, about 260 of the part's top end-stone blocks (320 in the air at most) fly as block
     displays from where they stood to an island block of the part, on an arc with a tumble: four segments of 12-22
@@ -236,6 +236,11 @@ islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
 - Chunks: the work goes chunk by chunk; a chunk not loaded is force-loaded through the `stasisdelvers:end_rift` ticket
   controller (non-ticking), with the next one prefetched, and released when done (all released when the queue empties).
   Tickets saved with the level are dropped on load; the work forces again what it needs.
+- The End event as players see it (`HardMode.endEventOn`): from the first stage (`EndRift.begun`: a pillar broken or
+  the finale) until the flash. Meanwhile a survival or adventure player below the End's floor (y < 0, long before
+  void damage) is rescued (`HardMode.voidRescue`, `PlayerTickEvent.Post`): put on the core island's top by the fountain
+  (`heart`: the first solid column 6-30 blocks out, or the arrival platform), slow falling for 5 s, "The island gives
+  way; you're thrown back to its heart." (AdventurAgent: a player in a crumbling sector fell and died.)
 - After hard mode a pillar's crystal no longer starts a stage (the finale has them all). `/stasis spread endstage` too.
 - Restart: the jobs come back from `end_rift` (pillars broken, parts lifted and placed, and per part the chunks done),
   so a part resumes from its next chunk; a chunk redone after a crash changes nothing (only the island's own blocks go,

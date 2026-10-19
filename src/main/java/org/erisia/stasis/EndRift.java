@@ -231,6 +231,13 @@ public final class EndRift {
         return StasisConfig.spreading && !testOff;
     }
 
+    /** Has the island begun to break (a pillar's stage, or the finale)? The End event's start (HardMode.endEventOn). */
+    static boolean begun(ServerLevel end) {
+        if (!active()) return false;
+        Data d = Data.get(end);
+        return d.broken != 0 || d.finale;
+    }
+
     // ---- stages
 
     /**

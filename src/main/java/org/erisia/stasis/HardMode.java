@@ -98,6 +98,58 @@ public final class HardMode {
         return e != null && !e.flashed;
     }
 
+    /**
+     * The End event as players see it: from the first pillar's stage (EndRift) until the flash. Then a fall into the
+     * void is a rescue ({@link #voidRescue}) and the client pushes the fog out (Spread's endEvent).
+     */
+    public static boolean endEventOn(MinecraftServer srv) {
+        if (!StasisConfig.spreading) return false;
+        if (Spread.server.hard()) return holdsEndOpen();
+        ServerLevel end = srv.getLevel(Level.END);
+        return end != null && EndRift.begun(end);
+    }
+
+    /** PlayerTickEvent.Post: a player falling out of the island during the End event is rescued. */
+    static void playerTick(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post e) {
+        if (e.getEntity() instanceof ServerPlayer p && p.getY() < p.level().getMinY()) voidRescue(p);
+    }
+
+    /**
+     * A survival or adventure player below the End's floor during the End event (before the flash: after it everyone is
+     * sent home anyway) is thrown back to the core island's top by the fountain, with a moment of slow falling
+     * (AdventurAgent: standing in a crumbling sector they fell into the void and died). True if rescued (public for tests).
+     */
+    public static boolean voidRescue(ServerPlayer p) {
+        if (!(p.level() instanceof ServerLevel end) || end.dimension() != Level.END || p.isCreative() || p.isSpectator()
+            || p.getY() >= end.getMinY() || !endEventOn(end.getServer())) return false;
+        Vec3 to = heart(end);
+        if (p.isPassenger()) p.stopRiding();
+        p.teleportTo(to.x, to.y, to.z);
+        p.setDeltaMovement(Vec3.ZERO);
+        p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
+        p.resetFallDistance();
+        p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SLOW_FALLING, 100, 0, false, false, true));
+        p.sendSystemMessage(Component.literal("The island gives way; you're thrown back to its heart.").withStyle(ChatFormatting.LIGHT_PURPLE));
+        return true;
+    }
+
+    /** The core island's top near the fountain (the core goes only after the flash), or the arrival platform. */
+    static Vec3 heart(ServerLevel end) {
+        for (int r = 6; r <= 30; r += 4)
+            for (int k = 0; k < 12; k++) {
+                double a = k * Math.PI / 6;
+                int x = (int) Math.floor(Math.cos(a) * r), z = (int) Math.floor(Math.sin(a) * r);
+                end.getChunk(x >> 4, z >> 4);
+                int y = end.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z);
+                if (y > end.getMinY() + 1 && end.getBlockState(new net.minecraft.core.BlockPos(x, y - 1, z)).isSolid())
+                    return new Vec3(x + 0.5, y, z + 0.5);
+            }
+        net.minecraft.core.BlockPos spawn = ServerLevel.END_SPAWN_POINT;
+        if (!end.getBlockState(spawn.below()).isSolid())
+            net.minecraft.world.level.levelgen.feature.EndPlatformFeature.createEndPlatform(end, spawn.below(), true);
+        return new Vec3(spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5);
+    }
+
     /** Within END_WINDOW of the kill (deaths in the End become teleports)? */
     static boolean inWindow() {
         return event != null;

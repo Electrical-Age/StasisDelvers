@@ -2669,6 +2669,41 @@ public final class StasisGameTests {
             c.check("creative players pass", d.getAsDouble() > r + 2, String.valueOf(d.getAsDouble()));
             p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
         }, false, true));
+        // a fall into the void during the End event (HardMode.voidRescue; AdventurAgent fell through a crumbling sector and
+        // died): not before the first stage; after it a survival player below the floor is put on the core's top by the
+        // fountain with slow falling; creative players aren't. In the test End, within one tick (the dragon fight).
+        CASES.put("end_event_void_rescue", new Spec(1, (h, c) -> () -> {
+            var server = h.getLevel().getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return;
+            }
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, 0, 0, 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            org.erisia.stasis.EndRift.testPaused = true;
+            org.erisia.stasis.EndRift.testReset(end);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            c.cleanup.add(() -> {
+                org.erisia.stasis.EndRift.testReset(end);
+                org.erisia.stasis.EndRift.testPaused = false;
+            });
+            p.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(40.5, -5, 30.5), Vec3.ZERO, 0, 0,
+                net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+            c.check("before any stage: no rescue", !org.erisia.stasis.HardMode.voidRescue(p) && p.getY() < 0, String.valueOf(p.getY()));
+            c.check("a stage begins the End event", org.erisia.stasis.EndRift.crystalBroken(end, 1) && org.erisia.stasis.HardMode.endEventOn(server));
+            p.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
+            c.check("creative: no rescue", !org.erisia.stasis.HardMode.voidRescue(p));
+            p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+            p.fallDistance = 40;
+            boolean saved = org.erisia.stasis.HardMode.voidRescue(p);
+            double d = Math.hypot(p.getX(), p.getZ());
+            c.check("rescued onto the core's top by the fountain", saved && p.getY() >= end.getMinY() + 1 && d < 32
+                && end.getBlockState(BlockPos.containing(p.getX(), p.getY() - 1, p.getZ())).isSolid(), p.position() + " " + saved);
+            c.check("with slow falling, the fall forgotten", p.hasEffect(net.minecraft.world.effect.MobEffects.SLOW_FALLING) && p.fallDistance == 0);
+        }, false, true));
         // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
         // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
         // the server's list of what it sent is what a client would hold)
