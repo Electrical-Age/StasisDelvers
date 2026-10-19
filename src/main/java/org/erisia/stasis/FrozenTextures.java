@@ -17,26 +17,6 @@ public final class FrozenTextures {
         return Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "frozen/" + sprite.getNamespace() + "/" + sprite.getPath());
     }
 
-    /**
-     * The fields whose running land changed shape from old to now (both versions of a changed one; added and removed
-     * ones): what must be re-meshed. Failing and rate changes don't count (a rate is always above 0).
-     */
-    public static java.util.List<Field> changed(java.util.List<Field> old, java.util.List<Field> now) {
-        java.util.Map<Integer, Field> before = new java.util.HashMap<>();
-        for (Field f : old) before.put(f.id(), f);
-        java.util.List<Field> out = new java.util.ArrayList<>();
-        for (Field f : now) {
-            Field b = before.remove(f.id());
-            if (b == null) out.add(f);
-            else if (!Flames.shape(b).equals(Flames.shape(f))) {
-                out.add(b);
-                out.add(f);
-            }
-        }
-        out.addAll(before.values());
-        return out;
-    }
-
     /** A texture coordinate in the span [from0, from1] moved to the same place in [to0, to1]. */
     public static float remap(float t, float from0, float from1, float to0, float to1) {
         float span = from1 - from0;

@@ -288,7 +288,7 @@ public final class FrozenSprites {
 
     /** ClientFields.onChange (main thread: the payload handler). */
     static void fieldsChanged(List<Field> old, List<Field> now) {
-        PENDING.addAll(FrozenTextures.changed(old, now));
+        PENDING.addAll(Field.changedShapes(old, now));
     }
 
     static void tick(Minecraft mc) {

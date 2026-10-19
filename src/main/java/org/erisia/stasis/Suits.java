@@ -70,7 +70,6 @@ final class Suits {
      */
     static void tick(ServerPlayer p) {
         if (p.tickCount % 20 != 0 || p.isSpectator()) return;
-        var inv = p.getInventory();
         // what the pieces want this second, and what the inventory's batteries can give
         java.util.List<ItemStack> pieces = new java.util.ArrayList<>();
         double[] want = new double[4];
@@ -80,12 +79,9 @@ final class Suits {
             want[pieces.size()] = Math.max(0, Math.min(b.getEnergyMax(s) - b.getEnergy(s), b.getChargePower(s)));
             pieces.add(s);
         }
+        java.util.List<Cell> carried = carried(p);
         double supply = 0;
-        for (int i = 0; i < 36; i++) {
-            ItemStack src = inv.getItem(i);
-            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && src.getItem() instanceof IItemEnergyBattery sb)
-                supply += Math.max(0, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
-        }
+        for (Cell c : carried) supply += Math.max(0, Math.min(c.discharge(), c.energy()));
         // share it evenly (water-filling), so every piece gets charge at once: a suit protects only when all have some
         double[] give = new double[pieces.size()];
         double left = supply;
@@ -99,15 +95,7 @@ final class Suits {
                 if (g > 0) { give[k] += g; left -= g; }
             }
         }
-        double draw = supply - left;
-        for (int i = 0; i < 36 && draw > 1e-6; i++) {
-            ItemStack src = inv.getItem(i);
-            if (src.isEmpty() || src.getItem() instanceof TimeSuit || !(src.getItem() instanceof IItemEnergyBattery sb)) continue;
-            double take = Math.min(draw, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
-            if (take <= 0) continue;
-            sb.setEnergy(src, sb.getEnergy(src) - take);
-            draw -= take;
-        }
+        takeCarried(carried, supply - left);
         for (int k = 0; k < pieces.size(); k++) {
             ItemStack s = pieces.get(k);
             IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
@@ -190,14 +178,7 @@ final class Suits {
     }
 
     static double drain(java.util.List<Cell> carried, java.util.List<Cell> worn, double maxJ, double reserve) {
-        double left = maxJ;
-        for (int i = 0; i < carried.size() && left > 1e-6; i++) {
-            Cell c = carried.get(i);
-            double take = Math.min(left, Math.min(c.discharge(), c.energy()));
-            if (take <= 0) continue;
-            c.set(c.energy() - take);
-            left -= take;
-        }
+        double left = takeCarried(carried, maxJ);
         java.util.List<Cell> pieces = new java.util.ArrayList<>();
         for (Cell c : worn) if (c.energy() > reserve * c.max() + 1e-6) pieces.add(c);
         // in equal shares, so the pieces run down together
@@ -213,6 +194,19 @@ final class Suits {
             }
         }
         return maxJ - left;
+    }
+
+    /** Take up to maxJ from carried batteries in order, each at most its discharge power. Returns what is left of maxJ. */
+    static double takeCarried(java.util.List<Cell> carried, double maxJ) {
+        double left = maxJ;
+        for (int i = 0; i < carried.size() && left > 1e-6; i++) {
+            Cell c = carried.get(i);
+            double take = Math.min(left, Math.min(c.discharge(), c.energy()));
+            if (take <= 0) continue;
+            c.set(c.energy() - take);
+            left -= take;
+        }
+        return left;
     }
 
     /** Would the suit protect (a chest piece, every worn piece charged), without drawing power? */

@@ -111,7 +111,7 @@ public final class FieldData extends SavedData {
     }
 
     public Field add(ServerLevel level, double x, double y, double z, double radius, boolean column, double rate) {
-        Field f = new Field(nextId++, x, y, z, radius, 0, 0, column, Field.clampRate(rate), level.getRandom().nextInt() & 0xFFFFFF, 0, 0, 0, 0, Field.Stretch.ONE);
+        Field f = new Field(nextId++, x, y, z, radius, column).withRate(rate).withSeed(level.getRandom().nextInt());
         fields.add(f);
         changed(level);
         return f;

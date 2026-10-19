@@ -1016,7 +1016,7 @@ public final class StasisGameTests {
             long corner = org.erisia.stasis.FrozenTextures.remapUV(org.erisia.stasis.FrozenTextures.packUV(0.5625f, 0.25f), 0.5f, 0.25f, 0.5625f, 0.3125f, 0.125f, 0f, 0.1875f, 0.0625f);
             c.check("corners map to corners", org.erisia.stasis.FrozenTextures.unpackU(corner) == 0.1875f && org.erisia.stasis.FrozenTextures.unpackV(corner) == 0f);
             Field a = new Field(1, 0, 0, 0, 10), b = new Field(2, 50, 0, 0, 10);
-            var changed = org.erisia.stasis.FrozenTextures.changed(List.of(a, b), List.of(a.withFailing(0.5), b.withRadius(12), new Field(3, 0, 50, 0, 5)));
+            var changed = Field.changedShapes(List.of(a, b), List.of(a.withFailing(0.5), b.withRadius(12), new Field(3, 0, 50, 0, 5)));
             c.check("re-mesh: shape changes and new fields count, failing doesn't", changed.size() == 3
                 && changed.stream().noneMatch(f -> f.id() == 1), changed.toString());
         }, false));

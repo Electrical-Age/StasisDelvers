@@ -262,24 +262,7 @@ public final class Flames {
      */
     static void fieldsChanged(Level level, List<Field> old, List<Field> now) {
         if (!Stasis.stops(level)) return;
-        Map<Integer, Field> before = new HashMap<>();
-        for (Field f : old) before.put(f.id(), f);
-        List<Field> regions = new ArrayList<>();
-        for (Field f : now) {
-            Field b = before.remove(f.id());
-            if (b == null) regions.add(f);
-            else if (!shape(b).equals(shape(f))) {
-                regions.add(b);
-                regions.add(f);
-            }
-        }
-        regions.addAll(before.values());
-        for (Field f : regions) relight(level, f);
-    }
-
-    /** What decides which blocks run (failing is visual; a rate is always above 0). */
-    static Field shape(Field f) {
-        return f.withFailing(0).withRate(1.0).withShield(0, 0, f.side());
+        for (Field f : Field.changedShapes(old, now)) relight(level, f);
     }
 
     private static void relight(Level level, Field f) {

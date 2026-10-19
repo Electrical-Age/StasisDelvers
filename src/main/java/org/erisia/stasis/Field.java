@@ -70,6 +70,31 @@ public record Field(int id, double x, double y, double z, double radius, double 
         this(id, x, y, z, radius, 0, 0, column, 1.0, 0, 0, 0, 0, 0, Stretch.ONE);
     }
 
+    /**
+     * The fields whose running land changed shape from old to now (both versions of a changed one; added and removed
+     * ones): what must be re-meshed. Failing and rate changes don't count (a rate is always above 0).
+     */
+    public static java.util.List<Field> changedShapes(java.util.List<Field> old, java.util.List<Field> now) {
+        java.util.Map<Integer, Field> before = new java.util.HashMap<>();
+        for (Field f : old) before.put(f.id(), f);
+        java.util.List<Field> out = new java.util.ArrayList<>();
+        for (Field f : now) {
+            Field b = before.remove(f.id());
+            if (b == null) out.add(f);
+            else if (!b.runShape().equals(f.runShape())) {
+                out.add(b);
+                out.add(f);
+            }
+        }
+        out.addAll(before.values());
+        return out;
+    }
+
+    /** What decides which blocks run (failing and the shield's look are visual; a rate is always above 0). */
+    Field runShape() {
+        return withFailing(0).withRate(1.0).withShield(0, 0, side);
+    }
+
     public Field withRadius(double r) {
         return new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formedAt, amber, dropout, side, stretch);
     }

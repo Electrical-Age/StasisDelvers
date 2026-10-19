@@ -108,11 +108,7 @@ public class TowerBlockEntity extends BlockEntity {
         /** Size the store before taking energy (the first insert can come before onLoad or the first tick). */
         @Override
         public int insert(int amount, net.neoforged.neoforge.transfer.transaction.TransactionContext transaction) {
-            if (!sized && level != null && !level.isClientSide()) {
-                sized = true;
-                segments = countSegments();
-                setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
-            }
+            if (level != null && !level.isClientSide()) ensureSized();
             return super.insert(amount, transaction);
         }
 
@@ -150,10 +146,25 @@ public class TowerBlockEntity extends BlockEntity {
     public void onLoad() {
         super.onLoad();
         if (level != null && level.isClientSide()) TowerClientHooks.updated(this);
-        if (level != null && !level.isClientSide()) {
-            segments = countSegments();
-            store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
-        }
+        if (level != null && !level.isClientSide()) resize();
+    }
+
+    /** Count the segments and size the store for the design radius. */
+    private void resize() {
+        segments = countSegments();
+        store.setCapacity(storeCapacity());
+    }
+
+    /** Size the store once, before the first energy moves (an insert or a feed can come before onLoad or the first tick). */
+    private void ensureSized() {
+        if (sized) return;
+        sized = true;
+        resize();
+    }
+
+    /** The store's capacity in FE, for the design radius. */
+    private int storeCapacity() {
+        return (int) (storeFor(designRadius()) * FE_PER_J);
     }
 
     public State state() {
@@ -229,11 +240,7 @@ public class TowerBlockEntity extends BlockEntity {
         else {
             // a dead tower you can't start would only take your suit (AdventurAgent: 42 kJ into a spawn tower needing 353)
             if (state == State.OFF) {
-                if (!sized) {
-                    sized = true;
-                    segments = countSegments();
-                    store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
-                }
+                ensureSized();
                 double need = 0.5 * storeMaxJ() - storedJ(), have = Suits.available(p);
                 if (have < need) {
                     p.sendSystemMessage(net.minecraft.network.chat.Component.literal(String.format(
@@ -257,11 +264,7 @@ public class TowerBlockEntity extends BlockEntity {
             feeder = null;
             return;
         }
-        if (!sized) {
-            sized = true;
-            segments = countSegments();
-            store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
-        }
+        ensureSized();
         if (feedingDead && state != State.OFF) {
             p.sendSystemMessage(net.minecraft.network.chat.Component.literal(String.format(
                 "The tower is up. You fed it %.1f kJ and kept the rest.", fed / 1000)));
@@ -454,7 +457,7 @@ public class TowerBlockEntity extends BlockEntity {
             }
         }
         double r = radius();
-        store.setCapacity((int) (storeFor(designRadius()) * FE_PER_J));
+        store.setCapacity(storeCapacity());
         if (level.getGameTime() % 10 == 3) signals(sl);
         double in = received / FE_PER_J;
         received = 0;
@@ -937,9 +940,8 @@ public class TowerBlockEntity extends BlockEntity {
 
     /** Fill the store (the spawn cottage's tower starts running at once). */
     public void fillStore() {
-        segments = countSegments();
-        store.setCapacity((int) (storeFor(radiusFor(segments)) * FE_PER_J));
-        store.set((int) (storeFor(radiusFor(segments)) * FE_PER_J));
+        resize();
+        store.set(storeCapacity());
         sized = true;
         setChanged();
     }
