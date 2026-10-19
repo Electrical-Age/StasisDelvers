@@ -12,7 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 
 /**
  * Op commands for testing without towers: /stasis field add &lt;pos&gt; &lt;radius&gt; [column] [rate] | rate &lt;id&gt; &lt;rate&gt;
- * | remove | clear | list, /stasis at &lt;pos&gt;. Rates are shares of 20 TPS in (0, 1]; added fields default to 1.
+ * | remove | clear | list, /stasis at &lt;pos&gt;, /stasis spread status | set &lt;coverage&gt; | hardmode. Rates are shares of 20 TPS in (0, 1]; added fields default to 1.
  */
 final class StasisCommands {
     private StasisCommands() {
@@ -125,6 +125,37 @@ final class StasisCommands {
                 c.getSource().sendSuccess(() -> Component.literal(msg), false);
                 return 1;
             })))
+            // spreading mode (Spread): where the stillness has got to, and test hooks to move it
+            .then(Commands.literal("spread")
+                .then(Commands.literal("status").executes(c -> {
+                    String msg = Spread.status(c.getSource().getServer(), c.getSource().getPlayer());
+                    c.getSource().sendSuccess(() -> Component.literal(msg), false);
+                    return 1;
+                }))
+                .then(Commands.literal("set").then(Commands.argument("coverage", DoubleArgumentType.doubleArg(0, 1)).executes(c -> {
+                    if (!StasisConfig.spreading) {
+                        c.getSource().sendFailure(Component.literal("Not in spreading mode (config mode)"));
+                        return 0;
+                    }
+                    String err = Spread.setCoverage(c.getSource().getServer(), DoubleArgumentType.getDouble(c, "coverage"));
+                    if (err != null) {
+                        c.getSource().sendFailure(Component.literal(err));
+                        return 0;
+                    }
+                    String msg = Spread.status(c.getSource().getServer(), c.getSource().getPlayer());
+                    c.getSource().sendSuccess(() -> Component.literal("Spread clock moved; " + msg), true);
+                    return 1;
+                })))
+                .then(Commands.literal("hardmode").executes(c -> {
+                    if (!StasisConfig.spreading) {
+                        c.getSource().sendFailure(Component.literal("Not in spreading mode (config mode)"));
+                        return 0;
+                    }
+                    boolean now = Spread.enterHardMode(c.getSource().getServer());
+                    c.getSource().sendSuccess(() -> Component.literal(now ? "Hard mode: the stillness spreads on towards all of the land"
+                        : "Already in hard mode"), true);
+                    return now ? 1 : 0;
+                })))
             .then(Commands.literal("storm").executes(c -> {
                     // the storm schedule: now, the next one, and the warped clock
                     var level = c.getSource().getLevel();
