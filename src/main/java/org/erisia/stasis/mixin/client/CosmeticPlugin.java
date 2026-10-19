@@ -63,8 +63,8 @@ public class CosmeticPlugin implements IMixinConfigPlugin {
     /**
      * Always applies: the config is required=false, so Mixin itself skips a target that isn't there. This only warns.
      * The quick check is a resource lookup on our own loader; that may not see game classes on every launcher, so a
-     * miss is confirmed with Mixin's bytecode provider before warning, and any doubt (an exception) stays silent.
-     * Refusing on a false miss would turn the effect off for nothing.
+     * miss is confirmed with Mixin's bytecode provider before warning. Refusing on a false miss would turn the effect
+     * off for nothing.
      */
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
@@ -81,11 +81,11 @@ public class CosmeticPlugin implements IMixinConfigPlugin {
         try {
             MixinService.getService().getBytecodeProvider().getClassNode(className);
             return true;
-        } catch (ClassNotFoundException e) {
-            return false;
         } catch (Exception e) {
+            // ClassNotFoundException, or however this launcher's provider reports a missing class: both lookups
+            // missed, so warn (a spurious warning costs nothing; silence on a real miss would hide the lost effect)
             LOG.debug("Stasis Delvers: couldn't look up {}", className, e);
-            return true;
+            return false;
         }
     }
 
