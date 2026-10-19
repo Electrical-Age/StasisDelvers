@@ -42,7 +42,7 @@ Kept simple, all in the tower's materials:
   batteries and exporter running in stopped land. Its power plant still needs a field (or the spread's running land).
 - Hold: `lanceHoldW` 10 kW (Baughn: "to break even"), any rift.
 - Breach: the hold draw x `lanceBreachMinFactor` 3 at r 9 (stronghold gates), rising linearly to
-  `lanceBreachMaxFactor` 5 at r 60: 30 kW (r 9), 34 kW (r 24), 50 kW (r 60). A storm over the rift (`Storms.at` at the
+  `lanceBreachMaxFactor` 5 at r 60: 30 kW (r 9), 36 kW (r 24), 50 kW (r 60). A storm over the rift (`Storms.at` at the
   boom's tip, or on the ground over the eye): x `lanceStormDrawFactor` 2 and no progress.
 - Breach time: `lanceBreachSeconds` 120 x sqrt(r / 9): 2 min (r 9), 3.3 min (r 24), 5.2 min (r 60); 3.6 MJ (r 9) to
   15.5 MJ (r 60). Relax: `lanceRelaxSeconds` 240 x sqrt(r / 9). Grace: `lanceGraceSeconds` 30.

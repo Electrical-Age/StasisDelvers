@@ -93,7 +93,7 @@ public final class StaticDeeps {
      * Set the strengths of the lanced rifts of a deep seed (server: Lance.publish; client: the GateRifts packet): id ->
      * share of the radius (absent or 1: whole). Returns the ids whose strength changed (to re-mesh them on the client).
      */
-    public static java.util.Set<Integer> setStrengths(int seed, java.util.Map<Integer, Float> byId) {
+    public static synchronized java.util.Set<Integer> setStrengths(int seed, java.util.Map<Integer, Float> byId) {
         java.util.Map<Long, Float> now = new java.util.HashMap<>();
         java.util.Set<Integer> changed = new java.util.HashSet<>();
         for (var e : strengths.entrySet()) {
