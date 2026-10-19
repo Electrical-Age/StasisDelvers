@@ -54,11 +54,14 @@ void main() {
     }
     // the surface normal from the neighbouring pixels' positions, each axis from the side whose depth is closer (Baughn:
     // dFdx/dFdy mixed two planes at every corner, a bright or dark line along each, plain in a 1-wide corridor)
+    // (the side that continues in a straight line: two pixels out, the smaller bend)
     vec2 px = 1.0 / InSize;
     vec3 pr = worldAt(inv, texCoord + vec2(px.x, 0.0)), pl = worldAt(inv, texCoord - vec2(px.x, 0.0));
+    vec3 pr2 = worldAt(inv, texCoord + vec2(2.0 * px.x, 0.0)), pl2 = worldAt(inv, texCoord - vec2(2.0 * px.x, 0.0));
     vec3 pu = worldAt(inv, texCoord + vec2(0.0, px.y)), pd = worldAt(inv, texCoord - vec2(0.0, px.y));
-    vec3 dx = length(pr - p) < length(p - pl) ? pr - p : p - pl;
-    vec3 dy = length(pu - p) < length(p - pd) ? pu - p : p - pd;
+    vec3 pu2 = worldAt(inv, texCoord + vec2(0.0, 2.0 * px.y)), pd2 = worldAt(inv, texCoord - vec2(0.0, 2.0 * px.y));
+    vec3 dx = length(pr2 - 2.0 * pr + p) < length(p - 2.0 * pl + pl2) ? pr - p : p - pl;
+    vec3 dy = length(pu2 - 2.0 * pu + p) < length(p - 2.0 * pd + pd2) ? pu - p : p - pd;
     vec3 nrm = cross(dx, dy);
     float nl = length(nrm);
     nrm = nl > 1e-6 ? nrm / nl : -normalize(p);
