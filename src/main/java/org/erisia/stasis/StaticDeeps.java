@@ -144,18 +144,16 @@ public final class StaticDeeps {
         return zone(seed, x + 0.5f, y + 0.5f, z + 0.5f) == 2;
     }
 
-    private static final java.util.Map<Long, Boolean> SECTIONS = new java.util.concurrent.ConcurrentHashMap<>();
-    private static volatile int sectionsSeed;
+    /** Per deep seed (each level has its own; worldgen, light and client threads ask at once): section -> may have. */
+    private static final java.util.Map<Integer, java.util.Map<Long, Boolean>> SECTIONS = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Can a static deep reach into this 16-block section at all? Cached; rejects almost everywhere at once. */
     static boolean sectionMayHave(int seed, int sx, int sy, int sz) {
-        if (sectionsSeed != seed) {
-            SECTIONS.clear();
-            sectionsSeed = seed;
-        }
-        if (SECTIONS.size() > 200_000) SECTIONS.clear();
+        if (SECTIONS.size() > 8) SECTIONS.clear();         // (tests try many seeds)
+        java.util.Map<Long, Boolean> sections = SECTIONS.computeIfAbsent(seed, k -> new java.util.concurrent.ConcurrentHashMap<>());
+        if (sections.size() > 200_000) sections.clear();
         long key = ((long) sx & 0x3FFFFF) << 42 | ((long) sy & 0xFFFFF) << 22 | ((long) sz & 0x3FFFFF);
-        return SECTIONS.computeIfAbsent(key, k -> {
+        return sections.computeIfAbsent(key, k -> {
             float cx = sx * 16 + 8, cy = sy * 16 + 8, cz = sz * 16 + 8;
             for (Deep d : near(cx, cy, cz, 120, seed)) {
                 float dx = cx - d.x(), dy = cy - d.y(), dz = cz - d.z();
