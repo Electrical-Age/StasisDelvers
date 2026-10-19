@@ -7,7 +7,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   - `rateAt(level, x, y, z)` with eddies; `rateAtSteady` without them (for flame light, EA nodes and towers).
     `spawnsHere` ignores the new-chunk grace.
   - Order inside `rateAt(level,x,y,z,eddies,grace)`:
-    1. Not a stopped dimension (`stops`): 1.
+    1. Not a stopped dimension (`stops`; in spreading mode the Nether and the End until complete): 1.
+       Spreading mode, overworld: a column the stillness hasn't reached: 1 (0 in a rift). See spreading-mode.md.
     2. Spawn area or new-chunk grace: 1.
     3. No field in the chunk column: 0.
     4. Otherwise the fastest field with `containsBlock`, skipping eddy pockets.

@@ -39,7 +39,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   `SuitUpgradeRecipe.java`: Delver to stasis piece, keeping the charge (recipe type `stasisdelvers:suit_upgrade`).
 - `Capacitors.java` / `CapacitorItem.java`: rift capacitors absorb the mist surcharge and the Delver creep
   (`absorb`, `drawFactor`). A raw shard takes half and crumbles after `SHARD_SECONDS`. EA chargers vent them.
-- `StarterKit.java`: a full charged Delver suit + EA flashlight on first join (player NBT `stasisdelvers_starter_suit`).
+- `StarterKit.java`: a full charged Delver suit + EA flashlight on first join (player NBT `stasisdelvers_starter_suit`). None in spreading mode.
 - `PlayerRates.java`: per-player tick rate in a slow field.
   - Sends vanilla's ticking-state packet at 20·rate.
   - `miningClock` (EntityTickEvent.Pre, LOWEST) and `attackClock` (PlayerTickEvent.Pre) hold back

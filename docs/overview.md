@@ -36,7 +36,7 @@ Javadocs often cite them as `notes/...`.
   - `StasisNet` sinks, `ClientFields.onChange`, `TowerClientHooks.onUpdate/onRemove`, `Flames.clientResolver`
   - post effects, renderers, `FrozenSprites`, the console and the bug-report key
   - No common class imports client code.
-- `StasisCommands`: `/stasis field|at|tower|deeps|rifts|storm|strata|status|savetemplate ...` (op, for testing).
+- `StasisCommands`: `/stasis field|at|tower|deeps|rifts|storm|strata|status|spread|savetemplate ...` (op, for testing).
 
 ## Subsystems (one page each)
 - [time-stop.md](time-stop.md): fields, `rateAt`, the tick gate, scheduled ticks. Everything else builds on it.
@@ -47,6 +47,8 @@ Javadocs often cite them as `notes/...`.
 - [rifts-storms.md](rifts-storms.md): drifting and static deeps, rifts, storms, crystals.
 - [deeps-strata-worldgen.md](deeps-strata-worldgen.md): `DeepFeature`, strata, gates, ruins, end sites, the deep seed.
 - [spawn-cottage.md](spawn-cottage.md): the spawn site placed once per world.
+- [spreading-mode.md](spreading-mode.md): the `spreading` game mode: the world starts running and the stillness
+  spreads from the rifts over online time (`SpreadMap`, `Spread`).
 - [client-rendering.md](client-rendering.md): post chain, data-texture slots, frozen textures, tower meshes.
 - [networking.md](networking.md): `StasisNet` payloads, protocol version.
 - [mixins.md](mixins.md): the 25 mixins, the required and cosmetic configs, `CosmeticPlugin`.
@@ -62,7 +64,7 @@ Javadocs often cite them as `notes/...`.
   and `Field.collapseScore` against its shader `collapseScore`.
 - **Saved data** (per level, `SavedDataType`): `stasisdelvers:fields` (`FieldData`), `gutters` (`Flames`),
   `rift_crystals` (`Crystals`), `storm_crystals` (`StormCrystals`), `rift_gates` (`Gates`),
-  `storm_override` (`Storms.Forced`). Block-entity NBT: towers (`TowerBlockEntity`, `TowerStructure`).
+  `storm_override` (`Storms.Forced`); overworld only: `spread_map`, `spread_clock` (`Spread`). Block-entity NBT: towers (`TowerBlockEntity`, `TowerStructure`).
   Entity NBT: statues (`Statue`). Player persisted NBT: `stasisdelvers_starter_suit`, `stasisdelvers_map_desk`.
 - **Memory only, lost on restart:**
   - `Freezing` states and login grace

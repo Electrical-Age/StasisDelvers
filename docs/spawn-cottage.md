@@ -9,7 +9,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`; data paths to `src/mai
   The fallback spawn area (`spawnArea`) is off by default.
 
 ## Classes and files
-- `SpawnCottage.java`:
+- `SpawnCottage.java` (not in spreading mode, see spreading-mode.md):
   - `serverStarted(ServerStartedEvent)`: overworld only. It returns if `FieldData.cottageDone()` or if the
     template is missing. It **marks the cottage before placing**, then calls `place`.
   - `place(level, template, around, eln)`:
