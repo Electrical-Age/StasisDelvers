@@ -119,18 +119,60 @@ final class Suits {
         }
     }
 
-    /** What a player could feed a tower: carried batteries and the worn suit pieces, J. */
-    static double available(ServerPlayer p) {
-        double sum = 0;
+    /** A battery as available and drain see it (pure, so SuitsTest can check them without a player). */
+    interface Cell {
+        double energy();
+
+        double max();
+
+        /** J it gives up per drain (a second): a carried battery's discharge power. */
+        double discharge();
+
+        void set(double energy);
+    }
+
+    static Cell cell(ItemStack s) {
+        IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
+        return new Cell() {
+            public double energy() { return b.getEnergy(s); }
+            public double max() { return b.getEnergyMax(s); }
+            public double discharge() { return b.getDischagePower(s); }
+            public void set(double e) { b.setEnergy(s, e); }
+        };
+    }
+
+    /** Batteries carried in the main inventory (not suit pieces). */
+    static java.util.List<Cell> carried(ServerPlayer p) {
+        java.util.List<Cell> out = new java.util.ArrayList<>();
         var inv = p.getInventory();
         for (int i = 0; i < 36; i++) {
             ItemStack src = inv.getItem(i);
-            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && src.getItem() instanceof IItemEnergyBattery sb) sum += sb.getEnergy(src);
+            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && src.getItem() instanceof IItemEnergyBattery) out.add(cell(src));
         }
+        return out;
+    }
+
+    /** The worn suit pieces. */
+    static java.util.List<Cell> worn(ServerPlayer p) {
+        java.util.List<Cell> out = new java.util.ArrayList<>();
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
-            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b) sum += b.getEnergy(s);
+            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery) out.add(cell(s));
         }
+        return out;
+    }
+
+    /** What a player could feed a tower: carried batteries and the worn suit pieces, J. */
+    static double available(ServerPlayer p) {
+        return available(carried(p), worn(p));
+    }
+
+    /** All that drain can take, given time: carried batteries that discharge at all (a rift capacitor doesn't), and
+     *  the worn pieces. */
+    static double available(java.util.List<Cell> carried, java.util.List<Cell> worn) {
+        double sum = 0;
+        for (Cell c : carried) if (c.discharge() > 0) sum += Math.max(0, c.energy());
+        for (Cell c : worn) sum += Math.max(0, c.energy());
         return sum;
     }
 
@@ -144,32 +186,30 @@ final class Suits {
 
     /** ... leaving each suit piece reserve (a share of its store). */
     static double drain(ServerPlayer p, double maxJ, double reserve) {
+        return drain(carried(p), worn(p), maxJ, reserve);
+    }
+
+    static double drain(java.util.List<Cell> carried, java.util.List<Cell> worn, double maxJ, double reserve) {
         double left = maxJ;
-        var inv = p.getInventory();
-        for (int i = 0; i < 36 && left > 1e-6; i++) {
-            ItemStack src = inv.getItem(i);
-            if (src.isEmpty() || src.getItem() instanceof TimeSuit || !(src.getItem() instanceof IItemEnergyBattery sb)) continue;
-            double take = Math.min(left, Math.min(sb.getDischagePower(src), sb.getEnergy(src)));
+        for (int i = 0; i < carried.size() && left > 1e-6; i++) {
+            Cell c = carried.get(i);
+            double take = Math.min(left, Math.min(c.discharge(), c.energy()));
             if (take <= 0) continue;
-            sb.setEnergy(src, sb.getEnergy(src) - take);
+            c.set(c.energy() - take);
             left -= take;
         }
-        java.util.List<ItemStack> pieces = new java.util.ArrayList<>();
-        for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
-            if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b && b.getEnergy(s) > reserve * b.getEnergyMax(s) + 1e-6) pieces.add(s);
-        }
+        java.util.List<Cell> pieces = new java.util.ArrayList<>();
+        for (Cell c : worn) if (c.energy() > reserve * c.max() + 1e-6) pieces.add(c);
         // in equal shares, so the pieces run down together
         while (left > 1e-6 && !pieces.isEmpty()) {
             double share = left / pieces.size();
             for (var it = pieces.iterator(); it.hasNext(); ) {
-                ItemStack s = it.next();
-                IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
-                double floor = reserve * b.getEnergyMax(s);
-                double take = Math.min(share, b.getEnergy(s) - floor);
-                b.setEnergy(s, b.getEnergy(s) - take);
+                Cell c = it.next();
+                double floor = reserve * c.max();
+                double take = Math.min(share, c.energy() - floor);
+                c.set(c.energy() - take);
                 left -= take;
-                if (b.getEnergy(s) <= floor + 1e-6) it.remove();
+                if (c.energy() <= floor + 1e-6) it.remove();
             }
         }
         return maxJ - left;
