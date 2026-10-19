@@ -54,6 +54,7 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue HARD_SPREAD_HOURS;
     static final ModConfigSpec.DoubleValue SPREAD_CAP;
     static final ModConfigSpec.IntValue SPREAD_RADIUS;
+    static final ModConfigSpec.DoubleValue SPREAD_CONNECTED_UNTIL;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -138,6 +139,10 @@ public final class StasisConfig {
         SPREAD_RADIUS = b.comment("Spreading mode: radius in blocks around world spawn that the spread map covers (and keeps",
                 "navigable). Land beyond it is stilled from the start. Read once, when the map is built (a world's first",
                 "start in spreading mode).").defineInRange("spreadRadius", 8000, 64, 30000);
+        SPREAD_CONNECTED_UNTIL = b.comment("Spreading mode: up to this coverage running land connects to spawn through running land (only",
+                "high ground may stand as running islands); above it the stillness rises like water over the map's stability",
+                "terrain and leaves high regions running on their own (Baughn 2026-10-19). Only read when a world's map is built.")
+            .defineInRange("spreadConnectedUntil", SpreadMap.CONNECTED_UNTIL, 0.0, 1.0);
         SPEC = b.build();
     }
 
@@ -174,6 +179,7 @@ public final class StasisConfig {
     static volatile boolean spreading = false;
     static volatile double spreadHours = 48, hardSpreadHours = 48, spreadCap = 0.8;
     static volatile int spreadRadius = 8000;
+    static volatile double spreadConnectedUntil = SpreadMap.CONNECTED_UNTIL;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -227,6 +233,7 @@ public final class StasisConfig {
         m.put("hardSpreadHours", hardSpreadHours);
         m.put("spreadCap", spreadCap);
         m.put("spreadRadius", spreadRadius);
+        m.put("spreadConnectedUntil", spreadConnectedUntil);
         return m;
     }
 
@@ -275,5 +282,6 @@ public final class StasisConfig {
         hardSpreadHours = HARD_SPREAD_HOURS.get();
         spreadCap = SPREAD_CAP.get();
         spreadRadius = SPREAD_RADIUS.get();
+        spreadConnectedUntil = SPREAD_CONNECTED_UNTIL.get();
     }
 }

@@ -261,7 +261,7 @@ public final class Spread {
         int seed = FieldData.get(ow).deepSeed();
         var spawn = ow.getRespawnData().pos();
         long t0 = System.nanoTime();
-        SpreadMap m = SpreadMap.build(seed, spawn.getX(), spawn.getZ(), StasisConfig.spreadRadius);
+        SpreadMap m = SpreadMap.build(seed, spawn.getX(), spawn.getZ(), StasisConfig.spreadRadius, StasisConfig.spreadConnectedUntil);
         StasisDelvers.LOG.info("Spread map built in {} ms: {} cells of {} blocks within {} of spawn {} {}", (System.nanoTime() - t0) / 1_000_000,
             m.count, SpreadMap.CELL, m.radius, spawn.getX(), spawn.getZ());
         MapData d = MapData.get(ow);
