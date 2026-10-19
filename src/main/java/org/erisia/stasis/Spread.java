@@ -189,6 +189,9 @@ public final class Spread {
         // completion stops the Nether and the End: players there who were safe get the usual grace (as a field going)
         Map<ServerLevel, List<ServerPlayer>> safe = new HashMap<>();
         if (complete != s.complete()) for (ServerLevel l : srv.getAllLevels()) safe.put(l, Freezing.running(l));
+        // the front passing over a player who stood in running land: the same grace as a field going (Baughn: leeway,
+        // AdventurAgent check 6: a player 2.5 blocks inside stilled land dies in ~5 s without it)
+        List<ServerPlayer> overrun = p > s.p() && !safe.containsKey(ow) ? Freezing.running(ow) : null;
         server = new State(s.map(), s.count(), p, k.hard, complete);
         // nothing on the server caches a P-dependent answer (the field index is fields only, StaticDeeps' section cache
         // is geometry, and Stasis.version is read by client chunk meshing only), so no version bump here: a global bump
@@ -202,6 +205,7 @@ public final class Spread {
             SpreadRanks m = s.map();
             relightNearPlayers(srv, ow, (cx, cz) -> SpreadMap.chunkMin1024(m, cx, cz) < hi && SpreadMap.chunkMax1024(m, cx, cz) >= lo);
         }
+        if (overrun != null) Freezing.graceIfStopped(ow, overrun, "The stillness has reached you: time stops here. Get back to running land!");
         if (complete != s.complete()) {
             for (ServerLevel l : srv.getAllLevels()) Stasis.invalidate(l);
             for (ServerLevel l : srv.getAllLevels()) if (l.dimension() != Level.OVERWORLD) relightNearPlayers(srv, l, (cx, cz) -> true);

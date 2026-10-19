@@ -260,12 +260,16 @@ public final class Freezing {
      * stopped land get the grace period, not just the 5 s freeze (softlock audit 4). A collapse is gradual and warned.
      */
     static void graceIfStopped(ServerLevel level, java.util.List<ServerPlayer> wereSafe) {
+        graceIfStopped(level, wereSafe, "The field around you is gone: time stops here. Get to safety!");
+    }
+
+    static void graceIfStopped(ServerLevel level, java.util.List<ServerPlayer> wereSafe, String message) {
         for (ServerPlayer p : wereSafe) {
             if (p.isRemoved() || Stasis.isRunning(level, p.blockPosition())) continue;
             State s = state(p);
             s.ticks = 0;
             s.graceUntil = Math.max(s.graceUntil, level.getGameTime() + StasisConfig.graceTicks);
-            p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("The field around you is gone: time stops here. Get to safety!"));
+            p.sendOverlayMessage(net.minecraft.network.chat.Component.literal(message));
         }
     }
 
