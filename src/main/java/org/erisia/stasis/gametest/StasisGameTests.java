@@ -2298,9 +2298,13 @@ public final class StasisGameTests {
             // a dragon still alive at the command's entry (AdventurAgent): it goes at the flash, with no XP and the fight ended
             var dragon = net.minecraft.world.entity.EntityTypes.ENDER_DRAGON.create(end, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
             if (dragon != null) {
-                dragon.setPos(300.5, 30, 60.5);
-                end.addFreshEntity(dragon);
+                // (above the players, its chunk held loaded: a dragon added to an unloaded chunk isn't in the level's lookups)
+                if (end.setChunkForced(300 >> 4, 0, true)) c.cleanup.add(() -> end.setChunkForced(300 >> 4, 0, false));
+                dragon.setPos(300.5, 30, 5.5);
+                dragon.setNoAi(true);   // (it would fly about the test End for the 6 s)
+                boolean added = end.addFreshEntity(dragon);
                 c.cleanup.add(dragon::discard);
+                c.check("a dragon is alive in the End at the entry", added && !dragon.isRemoved());
             }
             boolean first = org.erisia.stasis.HardMode.enter(server, "test"), again = org.erisia.stasis.HardMode.enter(server, "test again");
             c.check("the entry point enters once", first && !again && org.erisia.stasis.Spread.hard(server), first + " " + again);
@@ -2328,15 +2332,19 @@ public final class StasisGameTests {
             boolean[] diedOk = {dies.isAlive() && dies.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && hasBreakingIt(dies)};
             boolean[] stillThere = {stays.level() == end};
             boolean[] flashed = new boolean[1], endStopped = new boolean[1], blocked = new boolean[1], shieldAfter = new boolean[1],
-                dragonGone = new boolean[1], fightOver = new boolean[1];
+                dragonGone = new boolean[1], fightOver = new boolean[1], fightSeen = new boolean[1];
+            String[] dragonInfo = {""};
             h.runAfterDelay(org.erisia.stasis.HardMode.flashTicks() + 5, () -> {
                 flashed[0] = Boolean.TRUE.equals(org.erisia.stasis.HardMode.testFlashed());
                 endStopped[0] = Stasis.stops(end) && org.erisia.stasis.Spread.testServerState().endStill();
                 shieldAfter[0] = org.erisia.stasis.HardMode.shields(stays, end.damageSources().generic());
-                dragonGone[0] = dragon != null && dragon.isRemoved() && end.getEntities(net.minecraft.world.entity.EntityTypes.ENDER_DRAGON, x -> true).isEmpty()
-                    && end.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, new net.minecraft.world.phys.AABB(-400, -64, -400, 400, 320, 400)).isEmpty();
+                int dragons = end.getEntities(net.minecraft.world.entity.EntityTypes.ENDER_DRAGON, x -> true).size();
+                var orbs = end.getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, new net.minecraft.world.phys.AABB(-400, -64, -400, 400, 320, 400));
+                dragonGone[0] = dragon != null && dragon.isRemoved() && dragons == 0 && orbs.isEmpty();
+                dragonInfo[0] = dragons + " dragons, " + orbs.size() + " orbs" + (orbs.isEmpty() ? "" : " at " + orbs.get(0).position());
                 var fight = end.getDragonFight();
                 fightOver[0] = fight == null || fight.hasPreviouslyKilledDragon() && fight.dragonKilled && !fight.dragonEvent.isVisible();
+                fightSeen[0] = fight != null;
                 // the way back is closed for survival players
                 var into = new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(300.5, 4, 0.5), Vec3.ZERO, 0, 0,
                     net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING);
@@ -2351,8 +2359,8 @@ public final class StasisGameTests {
                 c.check("the flash came, then the End stilled", flashed[0] && endStopped[0], flashed[0] + " " + endStopped[0]);
                 c.check("after hard mode the End can't be entered", blocked[0]);
                 c.check("after the flash damage counts again", !shieldAfter[0]);
-                c.check("the flash removes a dragon still alive, no XP", dragonGone[0], dragon == null ? "no dragon made" : "removed " + dragon.isRemoved());
-                c.check("and ends the fight as a kill would (killed, no boss bar)", fightOver[0]);
+                c.check("the flash removes a dragon still alive, no XP", dragonGone[0], dragon == null ? "no dragon made" : "removed " + dragon.isRemoved() + ", " + dragonInfo[0]);
+                c.check("and ends the fight as a kill would (killed, no boss bar)", fightOver[0], fightSeen[0] ? "the test End's fight" : "no fight in the test End");
             };
         }, false, true));
         // the End rift's pieces (EndRift, step 5), in the test area: a pillar sector's column loses only its end stone and a

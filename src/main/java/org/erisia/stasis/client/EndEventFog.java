@@ -11,7 +11,9 @@ import org.erisia.stasis.Spread;
 /**
  * During the End event (the spread's endEvent: from the first pillar's stage until the flash) the End's fog is pushed
  * out to the render distance, eased over 2 s each way, so the island breaking up and the shards' flight can be seen
- * (AdventurAgent: the End's fog hid the show past ~40 blocks). Only the atmospheric fog, and only ever raised.
+ * (AdventurAgent: the End's fog hid the show past ~40 blocks). Only the atmospheric fog, and only ever raised. The End
+ * sets no fog distance in 26.3 (a faint 0-1024 haze), so this clears the haze; the render-distance fog at the edge of
+ * the loaded chunks stays (nothing past it to show).
  */
 public final class EndEventFog {
     private EndEventFog() {

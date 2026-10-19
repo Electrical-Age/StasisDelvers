@@ -367,8 +367,11 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
 - `SpreadState` carries `endStill` and `stormOrigin` (protocol 12), so the client's End stops with the server's and its
   tau and storms (`Storms.clientOrigin`) match, and `endEvent` (protocol 13; `EndRift.crystalBroken` refreshes it).
 - During the End event `client/EndEventFog` (`ViewportEvent.RenderFog`, atmospheric fog in the End only) eases the
-  fog's start and end out to the render distance's over 2 s, and back after the flash (AdventurAgent: the fog hid the
-  show past ~40 blocks). **AdventurAgent to check by eye.**
+  environmental fog's start and end out to the render distance's over 2 s, and back after the flash (AdventurAgent:
+  the fog hid the show past ~40 blocks). Note: in 26.3 the End sets no fog distance (the defaults, a faint linear haze
+  from 0 to 1024 blocks), so this only clears that haze; a hard cutoff near 40 blocks is the render-distance fog of
+  the client's effective render distance (min of its own setting and the server's view-distance, 10-16 on the labs),
+  which no fog setting can push past the chunks it has. **AdventurAgent to check by eye, and its render distance.**
 - Re-meshing: `FrozenSprites.spreadMoved` (at most once a second) re-meshes and relights the loaded chunks whose
   [`chunkMin1024`, `chunkMax1024`] the new P crossed, and those a new tile covers that aren't wholly running. Near a
   player that is a handful of chunks a minute.

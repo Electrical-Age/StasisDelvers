@@ -90,7 +90,9 @@ These are deliberately soft, so a pass proves less than it seems:
 - Most `StasisCommands` (only `field add` and `field rate`, through `rate_command`).
 - `Tickets` across a restart, `TowerSignalNode`, `FieldSleep`, `MapDeskBlock`, `RiftBarometerBlock`,
   `RiftCompassItem`.
-- Client rendering and the cosmetic mixins (checked by eye), the End wall's particles (`EndBarrierFx`).
+- Client rendering and the cosmetic mixins (checked by eye), the End wall's particles (`EndBarrierFx`), the End
+  event's fog (`EndEventFog`), and the client's half of `EndBarrierMixin` (the feel at the wall: the server's `move` is
+  tested).
 - `EnderDragonFightMixin` (no exit portal, gateway or egg after a real dragon kill; no respawn): needs a dragon fight
   with its own dragon, so it is checked in the lab.
 - There is no CI. Run `build` and `runGameTestServer` before pushing.
