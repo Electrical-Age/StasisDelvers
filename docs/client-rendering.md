@@ -91,4 +91,5 @@ through hooks set in `StasisClient`.
   The cosmetic mixin config warns instead of crashing (mixins.md).
 - Post chains are loaded by id. The data texture must exist before the chain is requested (`tick` waits for
   `texture != null`).
-- `TowerRenderer` buffers are native (`MemoryUtil.memAlloc`). A superseded build must free them (fixed in 1e07087).
+- `TowerRenderer` buffers are native (`MemoryUtil.memAlloc`). A superseded build must free them (fixed in 1e07087), as must a
+  pending build dropped because the layout went back to the drawn one.
