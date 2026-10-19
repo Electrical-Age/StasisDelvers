@@ -175,12 +175,51 @@ public final class Deeps {
     /** Horizontal intensity 0..1 of the drifting deeps at (x, z): soft over the last 4 blocks, with a ragged edge. */
     public static float horizontal(float x, float z, double t, int seed) {
         float best = 0;
-        for (Deep d : near(x, z, t, seed)) {
-            float dx = x - d.x(), dz = z - d.z();
-            float dist = (float) Math.sqrt(dx * dx + dz * dz) + 3 * (Noise.value32(x / 7f, 0.5f, z / 7f, d.id()) - 0.5f) * 2;
-            float in = smooth((d.radius() - dist) / 4f) * Math.min(1, d.strength() * 1.5f);
-            best = Math.max(best, in);
+        for (Deep d : near(x, z, t, seed)) best = Math.max(best, intensity(d, x, z));
+        return best;
+    }
+
+    /** One deep's horizontal intensity at (x, z) (stasis.fsh deepStops mirrors it). */
+    static float intensity(Deep d, float x, float z) {
+        float dx = x - d.x(), dz = z - d.z();
+        float dist = (float) Math.sqrt(dx * dx + dz * dz) + 3 * (Noise.value32(x / 7f, 0.5f, z / 7f, d.id()) - 0.5f) * 2;
+        return smooth((d.radius() - dist) / 4f) * Math.min(1, d.strength() * 1.5f);
+    }
+
+    // ---- the deeps of one tick by 256-block region: at() is asked per block (rateAt in running spread land, Baughn
+    // 2026-10-19: a drifting deep stops time there), and near() costs 25 cells and the rifts' puffs each time
+
+    static final int REGION = 256;
+    /** A deep reaches at most radius 42 x 1.15 breathing + 3 ragged + slack from its centre. */
+    static final float REGION_REACH = REGION / 2f + 64;
+
+    private record Snapshot(long gameTime, int seed, double t, java.util.concurrent.ConcurrentHashMap<Long, Deep[]> regions) {
+    }
+
+    private static final java.util.Map<Level, Snapshot> SNAPSHOTS = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /** The deeps that can touch region (rx, rz) now (the same deeps within() finds: no deep near() would see is missed). */
+    static Deep[] region(Level level, int seed, int rx, int rz) {
+        long now = level.getGameTime();
+        Snapshot s = SNAPSHOTS.get(level);
+        if (s == null || s.gameTime() != now || s.seed() != seed) {
+            s = new Snapshot(now, seed, time(level), new java.util.concurrent.ConcurrentHashMap<>());
+            SNAPSHOTS.put(level, s);
         }
+        double t = s.t();
+        return s.regions().computeIfAbsent(net.minecraft.world.level.ChunkPos.pack(rx, rz), k -> {
+            float cx = rx * (float) REGION + REGION / 2f, cz = rz * (float) REGION + REGION / 2f;
+            List<Deep> out = new ArrayList<>();
+            for (Deep d : within(cx, cz, REGION_REACH, t, seed))
+                if (d.strength() > 0 && Math.abs(d.x() - cx) <= REGION / 2f + d.radius() + 8 && Math.abs(d.z() - cz) <= REGION / 2f + d.radius() + 8) out.add(d);
+            return out.toArray(new Deep[0]);
+        });
+    }
+
+    /** horizontal() for a block column of this level now, from the tick's region cache. */
+    static float horizontalAt(Level level, int seed, int x, int z) {
+        float best = 0, fx = x + 0.5f, fz = z + 0.5f;
+        for (Deep d : region(level, seed, Math.floorDiv(x, REGION), Math.floorDiv(z, REGION))) best = Math.max(best, intensity(d, fx, fz));
         return best;
     }
 
@@ -196,8 +235,21 @@ public final class Deeps {
         if (!Stasis.stops(level)) return 0;
         int seed = seed(level);
         if (seed == 0) return 0;
-        float h = horizontal(x + 0.5f, z + 0.5f, time(level), seed);
+        float h = horizontalAt(level, seed, x, z);
         return h > 0 && inBand(level, x, y, z) ? h : 0;
+    }
+
+    /** Where a block counts as in a drifting deep: Freezing's deep, and the stop over running spread land (rateAt). */
+    public static final float THRESHOLD = 0.5f;
+
+    /**
+     * Does a drifting deep stop this block of running spread land (Baughn 2026-10-19: in spreading mode a drifting deep
+     * stops time on running land it passes over wherever no field holds it; Stasis.rateAt asks)? Main thread only (a
+     * heightmap read): elsewhere false, and callers off the main thread use Stasis.rateAtLand anyway.
+     */
+    static boolean stopsRunningLand(Level level, int x, int y, int z) {
+        if (level instanceof net.minecraft.server.level.ServerLevel sl && !sl.getServer().isSameThread()) return false;
+        return at(level, x, y, z) > THRESHOLD;
     }
 
     /** GameTests run without deeps (their spots must be ordinary Grey), except tests that switch them on. */

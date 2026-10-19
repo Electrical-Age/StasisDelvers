@@ -140,19 +140,25 @@ public final class Stasis {
      * that holds the whole block (collapsed blocks don't count). This is the one rule: stopped means rate 0.
      */
     public static double rateAt(Level level, int x, int y, int z) {
-        return rateAt(level, x, y, z, true);
+        return rateAt(level, x, y, z, true, true, true);
     }
 
     /**
-     * The rate without eddies (Eddies): for what must not churn as pockets drift past (flame light, EA nodes, the
-     * tower) and to tell an eddy from stopped land (Freezing holds players in eddies).
+     * The rate without eddies (Eddies): for what must not churn as pockets drift past (EA nodes, the tower) and to tell
+     * an eddy from stopped land (Freezing holds players in eddies). Drifting deeps over running spread land still stop
+     * here (Baughn 2026-10-19: EA nodes in a passing deep stop like everything else).
      */
     public static double rateAtSteady(Level level, int x, int y, int z) {
-        return rateAt(level, x, y, z, false);
+        return rateAt(level, x, y, z, false, true, true);
     }
 
-    static double rateAt(Level level, int x, int y, int z, boolean eddies) {
-        return rateAt(level, x, y, z, eddies, true);
+    /**
+     * The rate of the land itself: no eddies and no drifting deeps over running spread land, so nothing passing by
+     * changes it. For caches that nobody refreshes as weather drifts by (flame light in the light engine, chunk meshing,
+     * map overlays), and safe off the main thread (it never reads a heightmap). In stopped mode it is rateAtSteady.
+     */
+    public static double rateAtLand(Level level, int x, int y, int z) {
+        return rateAt(level, x, y, z, false, true, false);
     }
 
     /**
@@ -160,14 +166,26 @@ public final class Stasis {
      * animals spawned out in the grey: natural spawning ran during the few seconds a new chunk settles).
      */
     public static boolean spawnsHere(Level level, BlockPos pos) {
-        return rateAt(level, pos.getX(), pos.getY(), pos.getZ(), true, false) > 0;
+        return rateAt(level, pos.getX(), pos.getY(), pos.getZ(), true, false, true) > 0;
     }
 
-    static double rateAt(Level level, int x, int y, int z, boolean eddies, boolean grace) {
+    /**
+     * Is column (x, z) land the spreading stillness hasn't reached yet (spreading mode, the overworld, before
+     * completion)? There the rate is 1 whatever the fields, except in rifts and drifting deeps (rateAt).
+     */
+    public static boolean spreadRuns(Level level, int x, int z) {
+        return stops(level) && Spread.active(level) && Spread.runs(level, x, z);
+    }
+
+    static double rateAt(Level level, int x, int y, int z, boolean eddies, boolean grace, boolean deeps) {
         if (!stops(level)) return 1.0;
-        // spreading mode: a column the stillness hasn't reached runs at full rate, fields or not; rifts stop as ever.
-        // Stilled columns go on to the base rules below. (CLIENT STEP: the client answers this from its rank tiles.)
-        if (Spread.active(level) && Spread.runs(level, x, z)) return StaticDeeps.inRift(level, x, y, z) ? 0.0 : 1.0;
+        // spreading mode: a column the stillness hasn't reached runs at full rate, fields or not; rifts stop as ever, and
+        // so does a drifting deep where no field (or the spawn area) holds it off (Baughn 2026-10-19). Stilled columns
+        // go on to the base rules below. The client answers from its rank tiles (Spread.client).
+        if (Spread.active(level) && Spread.runs(level, x, z)) {
+            if (StaticDeeps.inRift(level, x, y, z)) return 0.0;
+            return deeps && Deeps.stopsRunningLand(level, x, y, z) && !heldOff(level, x, y, z) ? 0.0 : 1.0;
+        }
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz) || grace && NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
@@ -184,13 +202,23 @@ public final class Stasis {
         return rate;
     }
 
-    /** sectionState: every block of the section is stopped (rateAtSteady 0), every one runs, or it varies. */
+    /** Does a field or the spawn area hold the block against a drifting deep (as fields do in stopped land)? */
+    private static boolean heldOff(Level level, int x, int y, int z) {
+        int cx = x >> 4, cz = z >> 4;
+        if (inSpawn(level, cx, cz)) return true;
+        Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
+        if (fs == null) return false;
+        for (Field f : fs) if (f.containsBlock(x, y, z)) return true;
+        return false;
+    }
+
+    /** sectionState: every block of the section is stopped (rateAtLand 0), every one runs, or it varies. */
     public static final int SECTION_STOPPED = 0, SECTION_RUNNING = 1, SECTION_MIXED = 2;
 
     /**
-     * Does time run (rateAtSteady above 0) in all, none or some of the 16-block section (sx, sy, sz)? A cheap
+     * Does time run (rateAtLand above 0) in all, none or some of the 16-block section (sx, sy, sz)? A cheap
      * conservative test (MIXED when unsure) so chunk meshing only asks per block where a field's edge, a collapse or a
-     * rift may cross the section.
+     * rift may cross the section. The land's answer: drifting deeps over running spread land don't count (they pass).
      */
     public static int sectionState(Level level, int sx, int sy, int sz) {
         if (!stops(level)) return SECTION_RUNNING;
@@ -228,6 +256,10 @@ public final class Stasis {
 
     public static boolean isRunningSteady(Level level, BlockPos pos) {
         return rateAtSteady(level, pos.getX(), pos.getY(), pos.getZ()) > 0.0;
+    }
+
+    public static boolean isRunningLand(Level level, BlockPos pos) {
+        return rateAtLand(level, pos.getX(), pos.getY(), pos.getZ()) > 0.0;
     }
 
     public static double rateAt(Level level, BlockPos pos) {

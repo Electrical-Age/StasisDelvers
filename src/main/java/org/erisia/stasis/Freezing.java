@@ -26,6 +26,17 @@ public final class Freezing {
 
     static final Identifier SLOW = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "freezing");
 
+    /**
+     * THE SWITCH, pending Baughn's answer (2026-10-19): in spreading mode a drifting deep stops time on running land
+     * it passes over (Stasis.rateAt). true: an unsuited player caught in one gets the Delver hold (frozen in place, no
+     * statue, released when the deep has passed, at most HOLD_TICKS), as the deep is passing weather. false: the
+     * normal freeze to a statue, as in stilled land.
+     */
+    public static volatile boolean SPREAD_DEEP_HOLDS = true;
+
+    /** The longest a deep holds a player (a deep crosses in a minute, 3 at worst: Baughn). */
+    static final int HOLD_TICKS = 2400;
+
     private static final class State {
         int ticks;
         int counted;
@@ -33,6 +44,8 @@ public final class Freezing {
         /** Held by a deep until this game time (a full freeze in a drifting deep: no statue, Baughn). */
         long heldUntil;
         float sent;
+        /** The hold is an unsuited player's in a deep over running spread land (SPREAD_DEEP_HOLDS): no suit messages. */
+        boolean quietHold;
         /** The freeze's fractional ticks while a weak suit lets it creep in (a Delver suit or missing pieces in a deep). */
         double creep;
     }
@@ -90,12 +103,15 @@ public final class Freezing {
         // storms (stage 3): storm rift is a rift, storm mist a drifting deep (passing weather: the Delver hold)
         int storm = stopped && zone < 2 ? Storms.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) : 0;
         if (storm == 2) zone = 2;
-        boolean deep = stopped && !eddy && (zone > 0 || strataMist || storm == 1 || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > 0.5f);
+        boolean deep = stopped && !eddy && (zone > 0 || strataMist || storm == 1 || Deeps.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) > Deeps.THRESHOLD);
+        // only a drifting deep stops this spot: running spread land (Baughn 2026-10-19), passing weather
+        boolean spreadDeep = deep && zone == 0 && !strataMist && storm == 0 && Stasis.spreadRuns(level, p.getBlockX(), p.getBlockZ());
         // a hold lasts while the deep is over the player (Baughn: it crosses in a minute at worst), 2 min at most
         boolean held = level.getGameTime() < s.heldUntil && deep;
         if (s.heldUntil != 0 && !held) {   // the hold is over: start fresh
             s.heldUntil = 0;
             s.ticks = 0;
+            s.quietHold = false;
         }
         // missing suit pieces (a chest piece is enough in the plain Grey: λ-Nero, Baughn): in a deep each one adds to the
         // drain and lets the freeze creep in a quarter faster
@@ -110,7 +126,15 @@ public final class Freezing {
         } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
             suited = true;
-        } else if (stopped && !grace && !(suited = isProtected(p, (zone == 1 ? 3 : deep ? 2 : 1) * (1 + missing), true))) s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
+        } else if (stopped && !grace && !(suited = isProtected(p, (zone == 1 ? 3 : deep ? 2 : 1) * (1 + missing), true))) {
+            s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
+            // a drifting deep over running spread land holds an unsuited player instead (the switch above)
+            if (spreadDeep && SPREAD_DEEP_HOLDS && s.ticks >= StasisConfig.freezeTicks - 1) {
+                s.ticks = StasisConfig.freezeTicks - 1;
+                s.heldUntil = level.getGameTime() + HOLD_TICKS;
+                s.quietHold = true;
+            }
+        }
         else if (stopped && !grace && deep && !p.isCreative() && !p.isSpectator() && (Suits.delverOnly(p) || missing > 0)) {
             // the freeze creeps in: a quarter rate for a Delver suit, a quarter per missing piece (the worse wins); a
             // rift capacitor takes it (a raw shard half of it)
@@ -127,7 +151,7 @@ public final class Freezing {
             if (zone == 1 || strataMist) {
                 // (falls through to the statue check below)
             } else if (s.ticks >= StasisConfig.freezeTicks - 1) {
-                s.heldUntil = level.getGameTime() + 2400;
+                s.heldUntil = level.getGameTime() + HOLD_TICKS;
                 if (StasisConfig.debugMessages) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal("(debug) held by a deep while it passes"));
             }
         } else s.ticks = Math.max(0, s.ticks - 3);
@@ -137,7 +161,7 @@ public final class Freezing {
             if (fatigue == null || fatigue.getDuration() < 20)
                 p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.MINING_FATIGUE, 40, 0, true, true));
         }
-        if (stopped && !grace && !p.isCreative() && !p.isSpectator() && s.counted % 20 == 0) {
+        if (stopped && !grace && !p.isCreative() && !p.isSpectator() && s.counted % 20 == 0 && !(held && s.quietHold)) {
             if (suited) {
                 double left = Suits.secondsLeft(p);
                 if (left < 120) p.sendOverlayMessage(net.minecraft.network.chat.Component.literal(

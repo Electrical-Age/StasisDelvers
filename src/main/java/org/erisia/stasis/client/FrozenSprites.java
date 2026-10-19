@@ -46,7 +46,7 @@ import java.util.Optional;
  * frame of every animated texture under textures/block (any namespace, resource packs included) and
  * textures/entity/conduit to the block atlas as stasisdelvers:frozen/&lt;ns&gt;/&lt;path&gt;, without animation.</li>
  * <li><b>Meshing:</b> chunk meshing (SectionCompilerMixin, FluidRendererMixin; worker threads) draws a block whose
- * whole block is stopped (rateAtSteady 0: eddies drifting by mustn't re-mesh) with the still copies.</li>
+ * whole block is stopped (rateAtLand 0: eddies and deeps drifting by mustn't re-mesh) with the still copies.</li>
  * <li><b>Re-meshing:</b> when the fields change shape, the sections they cover (before and after) are re-meshed, at
  * most once a second (a collapse changes the field every 5 ticks).</li>
  * </ul>
@@ -223,14 +223,14 @@ public final class FrozenSprites {
         return c.state;
     }
 
-    /** Is the whole block at pos stopped (rateAtSteady 0)? False where it can't tell. */
+    /** Is the whole block at pos stopped (rateAtLand 0)? False where it can't tell. */
     public static boolean stopped(BlockAndTintGetter getter, BlockPos pos) {
         if (frozen.isEmpty()) return false;
         Level level = levelOf(getter);
         if (level == null) return false;
         int s = sectionState(level, pos);
         return s == Stasis.SECTION_STOPPED
-            || s == Stasis.SECTION_MIXED && Stasis.rateAtSteady(level, pos.getX(), pos.getY(), pos.getZ()) <= 0;
+            || s == Stasis.SECTION_MIXED && Stasis.rateAtLand(level, pos.getX(), pos.getY(), pos.getZ()) <= 0;
     }
 
     /** Wraps a block's quad output: animated sprites on a stopped block go to their still copies. One per thread. */
@@ -247,7 +247,7 @@ public final class FrozenSprites {
                 if (stopped < 0) {
                     int s = sectionState(level, pos);
                     stopped = s == Stasis.SECTION_STOPPED
-                        || s == Stasis.SECTION_MIXED && Stasis.rateAtSteady(level, pos.getX(), pos.getY(), pos.getZ()) <= 0 ? 1 : 0;
+                        || s == Stasis.SECTION_MIXED && Stasis.rateAtLand(level, pos.getX(), pos.getY(), pos.getZ()) <= 0 ? 1 : 0;
                 }
                 if (stopped == 1) quad = remapped(quad, f);
             }

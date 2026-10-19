@@ -1043,7 +1043,7 @@ public final class StasisGameTests {
                             for (int bx = x << 4; bx < (x << 4) + 16; bx++)
                                 for (int by = y << 4; by < (y << 4) + 16; by++)
                                     for (int bz = z << 4; bz < (z << 4) + 16; bz++)
-                                        if ((Stasis.rateAtSteady(level, bx, by, bz) > 0) != (st == Stasis.SECTION_RUNNING)) {
+                                        if ((Stasis.rateAtLand(level, bx, by, bz) > 0) != (st == Stasis.SECTION_RUNNING)) {
                                             if (wrong++ == 0) first = "section " + x + "," + y + "," + z + " state " + st + " block " + bx + "," + by + "," + bz;
                                         }
                         }
@@ -2125,7 +2125,7 @@ public final class StasisGameTests {
                 for (int x = 0; x < 16; x++)
                     for (int y = 0; y < 16; y++)
                         for (int z = 0; z < 16; z++) {
-                            boolean r = Stasis.isRunningSteady(level, new BlockPos((sx << 4) + x, (sy << 4) + y, (sz << 4) + z));
+                            boolean r = Stasis.isRunningLand(level, new BlockPos((sx << 4) + x, (sy << 4) + y, (sz << 4) + z));
                             any |= r;
                             all &= r;
                         }
@@ -2147,6 +2147,58 @@ public final class StasisGameTests {
             c.check("back in stopped mode: the stilled column is stopped, its field runs", Stasis.rateAt(level, b) == 0.6 && Stasis.rateAt(level, b.east(9)) == 0.0);
             if (nether != null) c.check("back in stopped mode the Nether stops", Stasis.stops(nether));
             c.check("slow field", slow.rate() == 0.3);
+        }, false, true));
+        // spreading mode, drifting deeps (Baughn 2026-10-19): a drifting deep stops time on running land it passes over
+        // where no field holds it (rateAt 0, so a block tick doesn't run); the land's own rate (flames, meshing) stays 1;
+        // an unsuited player caught in one is held, not made a statue (Freezing.SPREAD_DEEP_HOLDS)
+        CASES.put("spread_deep_stops_running_land", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            int old = org.erisia.stasis.Deeps.seed(level);
+            org.erisia.stasis.Deeps.testDeeps = true;
+            FieldData.get(level).testDeepSeed(777);
+            c.cleanup.add(() -> {
+                org.erisia.stasis.Deeps.testDeeps = false;
+                FieldData.get(level).testDeepSeed(old);
+            });
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            var near = org.erisia.stasis.Deeps.near(0, 0, org.erisia.stasis.Deeps.time(level), 777);
+            var d = near.stream().filter(x -> x.strength() > 0.9f && x.radius() > 20 && !x.puff()).findFirst();
+            if (d.isEmpty()) {
+                c.check("found a strong deep", false, near.toString());
+                return;
+            }
+            int bx = (int) Math.floor(d.get().x()), bz = (int) Math.floor(d.get().z());
+            for (int cx = -1; cx <= 1; cx++)
+                for (int cz = -1; cz <= 1; cz++) level.getChunk((bx >> 4) + cx, (bz >> 4) + cz);
+            int surf = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
+            BlockPos in = new BlockPos(bx, surf + 1, bz);
+            // a map round the deep at P 0: every column inside it runs
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(777, bx, bz, 600);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            c.check("the deep's centre column is running spread land", Stasis.spreadRuns(level, bx, bz));
+            c.check("the deep is there", org.erisia.stasis.Deeps.at(level, in.getX(), in.getY(), in.getZ()) > org.erisia.stasis.Deeps.THRESHOLD,
+                "" + org.erisia.stasis.Deeps.at(level, in.getX(), in.getY(), in.getZ()));
+            c.check("a drifting deep stops running land", Stasis.rateAt(level, in) == 0.0 && Stasis.rateAtSteady(level, in.getX(), in.getY(), in.getZ()) == 0.0);
+            c.check("so a block tick there doesn't run", !Stasis.ticksNow(level, in));
+            c.check("the land itself still runs (flame light, meshing)", Stasis.rateAtLand(level, in.getX(), in.getY(), in.getZ()) == 1.0);
+            c.check("caves far under it run", Stasis.rateAt(level, in.below(40)) == 1.0 || org.erisia.stasis.StaticDeeps.inRift(level, bx, in.getY() - 40, bz));
+            BlockPos far = in.east((int) d.get().radius() + 80);
+            if (org.erisia.stasis.Deeps.at(level, far.getX(), far.getY(), far.getZ()) <= 0)
+                c.check("outside the deep: running", Stasis.rateAt(level, far) == 1.0);
+            Field f = FieldData.get(level).add(level, bx + 0.5, surf + 1.5, bz + 0.5, 4.0, false, 0.5);
+            c.cleanup.add(0, () -> FieldData.get(level).remove(level, f.id()));
+            c.check("a field holds the deep off: rate 1 (running land)", Stasis.rateAt(level, in) == 1.0, "" + Stasis.rateAt(level, in));
+            FieldData.get(level).remove(level, f.id());
+            // an unsuited player caught in it is held (one game tick: the deep stands still meanwhile)
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            p.teleportTo(in.getX() + 0.5, in.getY(), in.getZ() + 0.5);
+            boolean was = Freezing.SPREAD_DEEP_HOLDS;
+            Freezing.SPREAD_DEEP_HOLDS = true;
+            for (int i = 0; i < org.erisia.stasis.StasisConfig.freezeTicks() + 50; i++) Freezing.tick(p);
+            Freezing.SPREAD_DEEP_HOLDS = was;
+            c.check("held by the deep, not a statue", p.isAlive() && Freezing.describe(p).contains("held by a deep"),
+                "alive " + p.isAlive() + ", " + Freezing.describe(p));
+            remove(h, p);
         }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range
         CASES.put("rate_command", new Spec(1, (h, c) -> () -> {

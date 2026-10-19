@@ -75,7 +75,7 @@ public final class Flames {
         if (level == null) return base;
         if (StaticDeeps.inRift(level, pos.getX(), pos.getY(), pos.getZ())) return 0;   // no light in a rift, of any kind
         if (!state.is(TAG)) return base;
-        if (!Stasis.isRunningSteady(level, pos)) return 0;   // eddies don't relight flames (Baughn)
+        if (!Stasis.isRunningLand(level, pos)) return 0;   // eddies (Baughn) and passing deeps don't relight flames
         Byte dim = dims(level).get(pos.asLong());
         return dim == null ? base : Math.min(base, dim);
     }
