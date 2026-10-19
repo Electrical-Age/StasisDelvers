@@ -350,7 +350,9 @@ public final class EndRift {
             ensureStarted(end);
         }
         long now = end.getGameTime();
-        boolean watched = end.players().stream().anyMatch(p -> !p.isSpectator());
+        // anyone there watches, spectators too (AdventurAgent: a spectator 50 blocks off saw a sector vanish whole, no
+        // shards); only the under-foot warnings skip spectators
+        boolean watched = !end.players().isEmpty();
         if (watched && now < heaveUntil) heave(end, now);
         if (JOBS.isEmpty() || testPaused) return;
         EndRiftPlan pl = plan(end);
