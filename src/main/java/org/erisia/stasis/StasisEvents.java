@@ -110,6 +110,7 @@ public final class StasisEvents {
             Gates.publish(level);
             Lance.publish(level);
             Spread.levelLoad(level);   // a saved spread map is back before chunks ask rateAt
+            RegenRifts.applyDone(level);   // chunks the offline tool deleted: forget their buds and gutters
         }
     }
 

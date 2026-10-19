@@ -121,4 +121,12 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   - `riftDestinations`: `client/StasisPost` (each eye's destination, data slots 200-203)
 - `DeepFeature` only touches chunks generated after it existed. Old chunks keep their terrain. The one exception is
   hard mode's gate rifts (`HardRifts`), which are written into existing chunks on purpose.
+- To give old chunks their rifts (Baughn 2026-10-19: no reset, "just the chunks with rifts in them"): `RegenRifts`.
+  `/stasis regenrifts plan` writes `<world>/stasisdelvers-regen-plan.txt`, every generated overworld chunk that
+  `DeepFeature.deepsAt` (the test `place` uses) reaches, read off the region files' location tables (no chunk loads);
+  the spawn area and recorded portal rooms are `EXCLUDE`. Then, server stopped, `tools/regen-rift-chunks.py` (outside the
+  repo, in `/var/lib/mclab/agent/tools`) deletes the planned chunks nobody settled (InhabitedTime, EA block entities, OPAC
+  claims) and writes `stasisdelvers-regen-done.txt`; at the next overworld load `RegenRifts.applyDone` forgets those
+  chunks' rift crystal buds and swept marks (`Crystals.Data`) and gutters, then renames the file. Kept chunks inside the
+  plan (inhabited) keep their old terrain: expect cliffs on their borders with regenerated ones.
 - Worldgen runs on worker threads. Use `peekDeepSeed` and pure functions there, never `FieldData.get`.

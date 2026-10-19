@@ -45,13 +45,7 @@ public record DeepFeature() implements Feature {
         int x0 = origin.getX() & ~15, z0 = origin.getZ() & ~15;
         boolean any = false;
         int minY = level.getMinY(), maxY = level.getMaxY();
-        java.util.List<StaticDeeps.Deep> deeps = new java.util.ArrayList<>();
-        for (int j = Math.floorDiv(minY, StaticDeeps.CY) - 1; j <= Math.floorDiv(maxY, StaticDeeps.CY) + 1; j++)
-            for (int i = Math.floorDiv(x0 + 8, StaticDeeps.CX) - 1; i <= Math.floorDiv(x0 + 8, StaticDeeps.CX) + 1; i++)
-                for (int k = Math.floorDiv(z0 + 8, StaticDeeps.CZ) - 1; k <= Math.floorDiv(z0 + 8, StaticDeeps.CZ) + 1; k++) {
-                    StaticDeeps.Deep d = StaticDeeps.cell(i, j, k, seed);
-                    if (d != null && reaches(d, x0, z0, true)) deeps.add(d);
-                }
+        java.util.List<StaticDeeps.Deep> deeps = deepsAt(seed, x0, z0, minY, maxY);
         long t0 = System.nanoTime();
         Supported w = new Supported((p, st) -> level.setBlock(p, st, 2));
         for (StaticDeeps.Deep d : deeps) any |= carve(level, w, Heightmap.Types.WORLD_SURFACE_WG, d, x0, z0, minY, maxY);
@@ -74,6 +68,21 @@ public record DeepFeature() implements Feature {
     @FunctionalInterface
     public interface Writer {
         void set(BlockPos p, BlockState st);
+    }
+
+    /**
+     * The static deeps whose worldgen place writes into the chunk with corner (x0, z0), for deep seed seed: the one
+     * test, shared by place and RegenRifts' plan (Baughn: regenerate only the chunks with rifts in them).
+     */
+    static java.util.List<StaticDeeps.Deep> deepsAt(int seed, int x0, int z0, int minY, int maxY) {
+        java.util.List<StaticDeeps.Deep> deeps = new java.util.ArrayList<>();
+        for (int j = Math.floorDiv(minY, StaticDeeps.CY) - 1; j <= Math.floorDiv(maxY, StaticDeeps.CY) + 1; j++)
+            for (int i = Math.floorDiv(x0 + 8, StaticDeeps.CX) - 1; i <= Math.floorDiv(x0 + 8, StaticDeeps.CX) + 1; i++)
+                for (int k = Math.floorDiv(z0 + 8, StaticDeeps.CZ) - 1; k <= Math.floorDiv(z0 + 8, StaticDeeps.CZ) + 1; k++) {
+                    StaticDeeps.Deep d = StaticDeeps.cell(i, j, k, seed);
+                    if (d != null && reaches(d, x0, z0, true)) deeps.add(d);
+                }
+        return deeps;
     }
 
     /** Can deep d's worldgen reach into the chunk with corner (x0, z0)? withStrata: the strata's reach too. */

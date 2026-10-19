@@ -134,6 +134,22 @@ public final class Flames {
         send(level, ChunkPos.containing(pos), Map.of(k, light));
     }
 
+    /** Forget the gutters in the given chunks (RegenRifts: chunks deleted for regeneration; level load, no chunk loaded yet). */
+    static int forgetChunks(ServerLevel level, java.util.Set<Long> chunks) {
+        Data d = Data.get(level);
+        int n = 0;
+        for (var it = d.until.keySet().iterator(); it.hasNext(); ) {
+            long k = it.next();
+            if (!chunks.contains(ChunkPos.containing(BlockPos.of(k)).pack())) continue;
+            it.remove();
+            d.light.remove(k);
+            dims(level).remove(k);
+            n++;
+        }
+        if (n > 0) d.setDirty();
+        return n;
+    }
+
     private static void clear(ServerLevel level, Data d, long k) {
         d.until.remove(k);
         d.light.remove(k);

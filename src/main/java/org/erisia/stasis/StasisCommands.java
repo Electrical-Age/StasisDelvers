@@ -250,6 +250,18 @@ final class StasisCommands {
                         : "Test supply " + (int) w + " W into the lance core at " + bp.toShortString()), true);
                     return 1;
                 }))))
+            // the generated chunks rift worldgen reaches, for tools/regen-rift-chunks.py (Baughn: regenerate just them)
+            .then(Commands.literal("regenrifts").then(Commands.literal("plan").executes(c -> {
+                var src = c.getSource();
+                try {
+                    String msg = RegenRifts.plan(src.getServer().overworld());
+                    src.sendSuccess(() -> Component.literal(msg), true);
+                    return 1;
+                } catch (java.io.IOException e) {
+                    src.sendFailure(Component.literal("No plan: " + e.getMessage()));
+                    return 0;
+                }
+            })))
             .then(Commands.literal("rifts").executes(c -> {
                 var src = c.getSource();
                 var level = src.getLevel();
