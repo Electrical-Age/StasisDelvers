@@ -3648,7 +3648,13 @@ public final class StasisGameTests {
                 && org.erisia.stasis.Lance.isOpen(level, d.id()), "step " + gs.get().step() + " after " + ticks + " ticks");
             c.check("the zones follow each step", followed && org.erisia.stasis.Lance.effectiveRadius(level, d) == d.radius() * 0.25f);
             if (probe != null) c.check("the rift's body shrank: the probe is outer zone now", org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 1);
-            c.check("the eye's core is still rift", org.erisia.stasis.StaticDeeps.zone(seed, k[0], k[1], k[2]) == 2);
+            // (at a quarter a r 9 rift's black is under a block across: somewhere at the eye, if not its exact solved centre)
+            boolean riftAtEye = false;
+            for (float dx = -1; dx <= 1; dx += 0.5f)
+                for (float dy = -1; dy <= 1; dy += 0.5f)
+                    for (float dz = -1; dz <= 1; dz += 0.5f)
+                        if (org.erisia.stasis.StaticDeeps.zone(seed, k[0] + dx, k[1] + dy, k[2] + dz) == 2) riftAtEye = true;
+            c.check("the eye is still rift", riftAtEye);
             c.check("the beam is on", t.beam());
             var forced = org.erisia.stasis.LanceTickets.forced(level, t.getBlockPos());
             c.check("the core's and the rift core's chunks are forced", forced.contains(net.minecraft.world.level.ChunkPos.pack((int) Math.floor(k[0]) >> 4,
