@@ -119,6 +119,8 @@ public final class TowerRenderer {
                 if (key.equals(e.key) || key.equals(e.pendingKey)) return;
                 Layout layout = s.layout;
                 int seed = s.seed;
+                // a build still in flight for an older layout: nobody will upload it, so free its buffers when it lands
+                discard(e.pending);
                 e.pendingKey = key;
                 e.pending = CompletableFuture.supplyAsync(() -> build(key, layout, seed), BUILD);
             }
@@ -136,7 +138,7 @@ public final class TowerRenderer {
     private static void drop(BlockPos core) {
         Entry e = TOWERS.remove(core);
         if (e != null) {
-            if (e.pending != null) e.pending.thenAccept(TowerRenderer::free);
+            discard(e.pending);
             e.close();
         }
     }
@@ -151,10 +153,15 @@ public final class TowerRenderer {
 
     public static void clear() {
         for (Entry e : TOWERS.values()) {
-            if (e.pending != null) e.pending.thenAccept(TowerRenderer::free);
+            discard(e.pending);
             e.close();
         }
         TOWERS.clear();
+    }
+
+    /** A build (or null) whose result will never be uploaded: free its native buffers once it finishes. */
+    private static void discard(CompletableFuture<Built> pending) {
+        if (pending != null) pending.thenAccept(TowerRenderer::free);
     }
 
     private static void free(Built b) {
