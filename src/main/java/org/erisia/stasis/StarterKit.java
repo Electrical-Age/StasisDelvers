@@ -20,7 +20,8 @@ public final class StarterKit {
     public static final String TAG = "stasisdelvers_starter_suit";
 
     public static void login(PlayerEvent.PlayerLoggedInEvent e) {
-        if (!StasisConfig.starterSuit || !(e.getEntity() instanceof ServerPlayer p)) return;
+        // spreading mode: no free suit (Baughn 2026-10-19: players have the whole spread to make one)
+        if (!StasisConfig.starterSuit || StasisConfig.spreading || !(e.getEntity() instanceof ServerPlayer p)) return;
         CompoundTag persisted = p.getPersistentData().getCompoundOrEmpty(Player.PERSISTED_NBT_TAG);
         if (persisted.getBooleanOr(TAG, false)) return;
         give(p);

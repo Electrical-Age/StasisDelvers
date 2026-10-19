@@ -49,6 +49,11 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue STORM_WARN_MINUTES;
     static final ModConfigSpec.DoubleValue DELVER_SUIT_MINUTES;
     static final ModConfigSpec.BooleanValue STARTER_SUIT;
+    static final ModConfigSpec.ConfigValue<String> MODE;
+    static final ModConfigSpec.DoubleValue SPREAD_HOURS;
+    static final ModConfigSpec.DoubleValue HARD_SPREAD_HOURS;
+    static final ModConfigSpec.DoubleValue SPREAD_CAP;
+    static final ModConfigSpec.IntValue SPREAD_RADIUS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -119,6 +124,20 @@ public final class StasisConfig {
         DELVER_SUIT_MINUTES = b.comment("Minutes a fully charged Delver suit lasts in stopped land (Baughn: 30). Its store scales with it",
                 "(10 W per piece: 18 kJ at 30 minutes).").defineInRange("delverSuitMinutes", 30.0, 1.0, 600.0);
         STARTER_SUIT = b.comment("Give each player a full, charged Delver suit on their first join.").define("starterSuit", true);
+        MODE = b.comment("Game mode (Baughn 2026-10-19; docs/spreading-mode.md). \"stopped\": time stands still outside fields from the",
+                "start (the base mod). \"spreading\": the world starts running and the stillness spreads from the rifts over",
+                "spreadHours of online time; no spawn cottage, no starter suit, no storms; the Nether and the End run until the",
+                "spread is complete, after which everything behaves as \"stopped\".")
+            .define("mode", "stopped", o -> "stopped".equals(o) || "spreading".equals(o));
+        SPREAD_HOURS = b.comment("Spreading mode: hours of online time (at least one player on) for the stillness to cover spreadCap",
+                "of the land within spreadRadius.").defineInRange("spreadHours", 48.0, 0.01, 10000.0);
+        HARD_SPREAD_HOURS = b.comment("Spreading mode: hours of online time after hard mode starts for the stillness to go from",
+                "spreadCap to all of the land.").defineInRange("hardSpreadHours", 48.0, 0.01, 10000.0);
+        SPREAD_CAP = b.comment("Spreading mode: the share of the land the stillness covers before hard mode.")
+            .defineInRange("spreadCap", 0.8, 0.0, 1.0);
+        SPREAD_RADIUS = b.comment("Spreading mode: radius in blocks around world spawn that the spread map covers (and keeps",
+                "navigable). Land beyond it is stilled from the start. Read once, when the map is built (a world's first",
+                "start in spreading mode).").defineInRange("spreadRadius", 8000, 64, 30000);
         SPEC = b.build();
     }
 
@@ -151,12 +170,21 @@ public final class StasisConfig {
     static volatile int stormMinutes = 20, stormWarnMinutes = 60;
     static volatile double delverSuitMinutes = 30;
     static volatile boolean starterSuit = true;
+    /** mode = "spreading" (Spread). */
+    static volatile boolean spreading = false;
+    static volatile double spreadHours = 48, hardSpreadHours = 48, spreadCap = 0.8;
+    static volatile int spreadRadius = 8000;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
 
     static {
         if (NO_SPAWN_AREA) spawnRadius = -1;
+    }
+
+    /** Is the game mode "spreading" (Spread; docs/spreading-mode.md)? */
+    public static boolean spreading() {
+        return spreading;
     }
 
     public static int freezeTicks() {
@@ -194,6 +222,11 @@ public final class StasisConfig {
         m.put("stormWarnMinutes", stormWarnMinutes);
         m.put("delverSuitMinutes", delverSuitMinutes);
         m.put("starterSuit", starterSuit);
+        m.put("mode", spreading ? "spreading" : "stopped");
+        m.put("spreadHours", spreadHours);
+        m.put("hardSpreadHours", hardSpreadHours);
+        m.put("spreadCap", spreadCap);
+        m.put("spreadRadius", spreadRadius);
         return m;
     }
 
@@ -225,7 +258,10 @@ public final class StasisConfig {
         Gates.configure(RIFT_DESTINATIONS.get(), RIFT_SCATTER.get());
         riftScatterRate = RIFT_SCATTER_RATE.get();
         endPortalRifts = END_PORTAL_RIFTS.get();
-        storms = STORMS.get();
+        spreading = "spreading".equals(MODE.get());
+        // spreading mode: no storms (Baughn: storms only come with hard mode, which needs the storm clock's origin
+        // moved to its start first, else tau jumps for all past time). Both sides read the synced config: they agree.
+        storms = STORMS.get() && !spreading;
         timeScars = TIME_SCARS.get();
         ruins = RUINS.get();
         skyIslands = SKY_ISLANDS.get();
@@ -235,5 +271,9 @@ public final class StasisConfig {
         stormWarnMinutes = STORM_WARN_MINUTES.get();
         delverSuitMinutes = DELVER_SUIT_MINUTES.get();
         starterSuit = STARTER_SUIT.get();
+        spreadHours = SPREAD_HOURS.get();
+        hardSpreadHours = HARD_SPREAD_HOURS.get();
+        spreadCap = SPREAD_CAP.get();
+        spreadRadius = SPREAD_RADIUS.get();
     }
 }

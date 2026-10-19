@@ -27,7 +27,9 @@ public abstract class StrongholdPortalRoomMixin {
     private void stasis$gateRift(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                                  BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos, CallbackInfo ci) {
         ServerLevel sl = level.getLevel();
-        if (!StasisConfig.endPortalRifts || !Stasis.stops(sl)) return;
+        // spreading mode: the portal room stays intact until hard mode (spread-DESIGN.md: the End's portal is how players
+        // reach the dragon whose death starts hard mode; a gate room here would be permanent worldgen)
+        if (!StasisConfig.endPortalRifts || StasisConfig.spreading() || !Stasis.stops(sl)) return;
         net.minecraft.world.level.levelgen.structure.StructurePiece piece = (net.minecraft.world.level.levelgen.structure.StructurePiece) (Object) this;
         // the frame ring (x 3..7, z 8..12 at y 3) and the portal inside it
         for (int x = 3; x <= 7; x++)

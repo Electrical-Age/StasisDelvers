@@ -33,6 +33,9 @@ public final class SpawnCottage {
     static final int BLEND = 16;
 
     static void serverStarted(net.neoforged.neoforge.event.server.ServerStartedEvent e) {
+        // spreading mode: no cottage (the world runs at the start; Baughn 2026-10-19). Not marked done, so a world
+        // switched back to stopped mode still gets one.
+        if (StasisConfig.spreading) return;
         ServerLevel level = e.getServer().overworld();
         FieldData data = FieldData.get(level);
         if (data.cottageDone()) return;
