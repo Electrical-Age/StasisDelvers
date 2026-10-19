@@ -144,6 +144,9 @@ public final class HardRifts {
                     if (st.is(Blocks.END_PORTAL_FRAME) || st.is(Blocks.END_PORTAL)) w.set(p, Blocks.AIR.defaultBlockState());
                 }
             GateRoom.shatter(level, w, piece, chunkBB);
+            // a chunk first generated after the instant has the new-chunk grace: its lava and debris would settle first
+            // (the mixin's stopped path exempts the room's chunks the same way)
+            if (nearRoom(r, ChunkPos.getX(k), ChunkPos.getZ(k))) NewChunkGrace.exempt(level, k);
             r.shattered().add(k);
         }
         if (!r.carved().contains(k)) {

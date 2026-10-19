@@ -46,7 +46,7 @@ public final class PendingGates {
         static final Codec<Room> CODEC = RecordCodecBuilder.create(i -> i.group(
             BoundingBox.CODEC.fieldOf("box").forGetter(Room::box),
             BlockPos.CODEC.fieldOf("centre").forGetter(Room::centre),
-            Direction.CODEC.optionalFieldOf("dir").forGetter(r -> Optional.of(r.dir())),
+            Direction.CODEC.optionalFieldOf("dir").forGetter(r -> Optional.ofNullable(r.dir())),
             CHUNKS.optionalFieldOf("shattered", Set.of()).forGetter(Room::shattered),
             CHUNKS.optionalFieldOf("carved", Set.of()).forGetter(Room::carved)).apply(i, (b, c, d, s, k) ->
             new Room(b, c, d.orElseGet(() -> orientationOf(b, c)), new HashSet<>(s), new HashSet<>(k))));
@@ -71,7 +71,8 @@ public final class PendingGates {
 
     /** From the portal room mixin (a worldgen thread), in spreading mode before hard mode. */
     public static void portalRoom(ServerLevel level, BoundingBox box, BlockPos centre, Direction dir) {
-        PENDING.add(new Object[]{level, new Room(box, centre.immutable(), dir)});
+        // (vanilla always orients stronghold pieces; getOrientation is nullable all the same)
+        PENDING.add(new Object[]{level, new Room(box, centre.immutable(), dir == null ? orientationOf(box, centre) : dir)});
     }
 
     /**

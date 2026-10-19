@@ -206,6 +206,8 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
   Chunks loaded at the instant are queued at once; the others when they next load (`ChunkEvent.Load` → the server tick).
   The queue is worked `CHUNKS_PER_TICK` (2) a tick. A chunk within 16 blocks of the centre whose room part is still due
   waits until its entities are loaded (the shards and silverfish are entities; added earlier they could be lost).
+  Such chunks get no new-chunk grace (`NewChunkGrace.exempt`, as the mixin's room chunks), or a chunk first generated
+  after the instant would let the room's lava and debris settle.
 - Progress is saved per room and chunk (`shattered`, `carved`): a restart resumes (the first hard-mode tick re-activates
   every room, idempotently, and queues their loaded chunks) and nothing is written twice.
 - The writes: flags `UPDATE_CLIENTS | UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`. `LevelChunk.setBlockState` keeps the light
