@@ -2435,6 +2435,133 @@ public final class StasisGameTests {
                 c.check("their lifts are queued", jobs[0].contains("part 0 lift") && jobs[0].contains("part 2 lift"), jobs[0]);
             };
         }, false, true));
+        // two of the End's stages carried out whole in the test End with nobody there (EndRift: the build's pace, its own
+        // chunk tickets): a restart midway (the memory dropped) resumes from the saved state; then each sector's columns hold
+        // no end stone, its islands stand, the core is untouched and no chunk stays forced
+        CASES.put("end_rift_stage_builds", new Spec(1500, (h, c) -> {
+            var server = h.getLevel().getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return () -> { };
+            }
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, 0, 0, 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.EndRift.testReset(end);
+            c.cleanup.add(() -> org.erisia.stasis.EndRift.testReset(end));
+            var pl = org.erisia.stasis.EndRift.testPlan(end);
+            // (the islands may hang over their own sector's columns: their blocks aren't the island's)
+            java.util.Set<Long> islands = new java.util.HashSet<>();
+            for (int p = 0; p < pl.parts; p++) for (long b : pl.blocks(p)) islands.add(b);
+            java.util.function.BiFunction<Integer, Integer, Integer> stone = (x, z) -> {
+                int n = 0;
+                for (int y = end.getMinY(); y < 128; y++)
+                    if (end.getBlockState(new BlockPos(x, y, z)).is(Blocks.END_STONE) && !islands.contains(BlockPos.asLong(x, y, z))) n++;
+                return n;
+            };
+            c.cleanup.add(() -> restoreFlatEnd(end, islands));
+            int coreBefore = stone.apply(20, 12);
+            long[] cols3 = pl.columns(3);
+            int sectorBefore = 0;
+            for (int i = 0; i < cols3.length; i += 97) sectorBefore += stone.apply(BlockPos.getX(cols3[i]), BlockPos.getZ(cols3[i]));
+            c.check("before: the core and the sector have end stone", coreBefore > 0 && sectorBefore > 0, coreBefore + " " + sectorBefore);
+            // slowly at first, so the restart finds them midway
+            org.erisia.stasis.EndRift.testWrites = 200;
+            c.cleanup.add(() -> org.erisia.stasis.EndRift.testWrites = 0);
+            boolean ok = org.erisia.stasis.EndRift.crystalBroken(end, 3) && org.erisia.stasis.EndRift.crystalBroken(end, 5);
+            c.check("two stages begin", ok);
+            int[] mid = new int[4];
+            h.runAfterDelay(25, () -> {
+                int[] st = org.erisia.stasis.EndRift.testState(end);
+                mid[0] = st[1];
+                mid[1] = st[4];
+                org.erisia.stasis.EndRift.testRestart(end);
+                org.erisia.stasis.EndRift.testWrites = 0;
+            });
+            return () -> {
+                int[] st = org.erisia.stasis.EndRift.testState(end);
+                c.check("a restart came midway, with some chunks done and saved", mid[0] != 0b101000 && mid[1] > 0,
+                    Integer.toBinaryString(mid[0]) + ", " + mid[1] + " chunks");
+                c.check("both lifted and placed", (st[1] & 0b101000) == 0b101000 && (st[2] & 0b101000) == 0b101000,
+                    Integer.toBinaryString(st[1]) + " " + Integer.toBinaryString(st[2]));
+                c.check("no chunk stays forced", st[3] == 0, String.valueOf(st[3]));
+                int left = 0;
+                for (int p : new int[]{3, 5}) {
+                    long[] cs = pl.columns(p);
+                    for (int i = 0; i < cs.length; i += 37) left += stone.apply(BlockPos.getX(cs[i]), BlockPos.getZ(cs[i]));
+                }
+                c.check("the sectors' columns hold no end stone", left == 0, String.valueOf(left));
+                int missing = 0, n = 0;
+                for (int p : new int[]{3, 5})
+                    for (long b : pl.blocks(p)) {
+                        n++;
+                        if (end.getBlockState(BlockPos.of(b)).isAir()) missing++;
+                    }
+                c.check("their islands stand", n > 0 && missing == 0, missing + " of " + n + " missing");
+                c.check("the core is untouched", stone.apply(20, 12) == coreBefore, coreBefore + " -> " + stone.apply(20, 12));
+            };
+        }, false, true));
+        // the dragon's death in the test End with nobody there (EndRift.finale, as HardMode.explodeEnd calls it): every part
+        // is lifted and every island placed; the island's columns hold no end stone (the core no pillar obsidian or fountain
+        // bedrock either) but the islands'; the End rift's core is registered; no chunk stays forced
+        CASES.put("end_rift_finale_builds", new Spec(3000, (h, c) -> {
+            var server = h.getLevel().getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return () -> { };
+            }
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, 0, 0, 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.EndRift.testReset(end);
+            c.cleanup.add(() -> org.erisia.stasis.EndRift.testReset(end));
+            var pl = org.erisia.stasis.EndRift.testPlan(end);
+            java.util.Set<Long> islands = new java.util.HashSet<>();
+            for (int p = 0; p < pl.parts; p++) for (long b : pl.blocks(p)) islands.add(b);
+            var spike = net.minecraft.world.level.levelgen.feature.EndSpikeFeature.getSpikesForLevel(end).get(0);
+            java.util.function.BiFunction<Integer, Integer, int[]> column = (x, z) -> {
+                int[] n = new int[2];
+                for (int y = end.getMinY(); y < 128; y++) {
+                    var st = end.getBlockState(new BlockPos(x, y, z));
+                    if (islands.contains(BlockPos.asLong(x, y, z))) continue;
+                    if (st.is(Blocks.END_STONE)) n[0]++;
+                    if (st.is(Blocks.OBSIDIAN) || st.is(Blocks.BEDROCK)) n[1]++;
+                }
+                return n;
+            };
+            c.cleanup.add(() -> restoreFlatEnd(end, islands));
+            // (the test End is flat: bedrock and three end stone; a pillar's stump, the fountain's bedrock and a player's block)
+            for (int y = 4; y < 12; y++) end.setBlock(new BlockPos(spike.getCenterX(), y, spike.getCenterZ()), Blocks.OBSIDIAN.defaultBlockState(), 2);
+            end.setBlock(new BlockPos(0, 4, 0), Blocks.BEDROCK.defaultBlockState(), 2);
+            BlockPos mine = new BlockPos(30, 5, 30);
+            end.setBlock(mine, Blocks.COBBLESTONE.defaultBlockState(), 2);
+            int[] pillar = column.apply(spike.getCenterX(), spike.getCenterZ()), mid = column.apply(20, 12);
+            c.check("before: a pillar and island under it", pillar[1] >= 8 && mid[0] >= 3, pillar[1] + " obsidian, " + mid[0] + " end stone");
+            org.erisia.stasis.EndRift.testFinale(end);
+            return () -> {
+                int[] st = org.erisia.stasis.EndRift.testState(end);
+                c.check("built: every part lifted and placed", org.erisia.stasis.EndRift.testBuilt(end),
+                    Integer.toBinaryString(st[1]) + " " + Integer.toBinaryString(st[2]));
+                c.check("no chunk stays forced", st[3] == 0, String.valueOf(st[3]));
+                int stoneLeft = 0, pillarsLeft = 0;
+                for (int x = -150; x <= 150; x += 9)
+                    for (int z = -150; z <= 150; z += 9)
+                        if (x * x + z * z <= org.erisia.stasis.EndRiftPlan.ISLAND_RADIUS * org.erisia.stasis.EndRiftPlan.ISLAND_RADIUS)
+                            stoneLeft += column.apply(x, z)[0];
+                pillarsLeft = column.apply(spike.getCenterX(), spike.getCenterZ())[1] + column.apply(0, 0)[1];
+                c.check("the island is gone", stoneLeft == 0, stoneLeft + " end stone left");
+                c.check("its pillar and the fountain too", pillarsLeft == 0, pillarsLeft + " obsidian/bedrock left");
+                c.check("a player's block stays, floating", end.getBlockState(mine).is(Blocks.COBBLESTONE));
+                int missing = 0;
+                for (long b : islands) if (end.getBlockState(BlockPos.of(b)).isAir()) missing++;
+                c.check("the rift's islands stand", missing == 0, missing + " of " + islands.size() + " missing");
+                int seed = org.erisia.stasis.FieldData.get(end).deepSeed();
+                c.check("the End rift's core is registered", org.erisia.stasis.StaticDeeps.hasEndRift(seed)
+                    && org.erisia.stasis.StaticDeeps.near(0, 64, 0, 4, seed).stream().anyMatch(org.erisia.stasis.StaticDeeps::isGate));
+            };
+        }, false, true));
         // spreading mode's End wall (EndBarrier; λ-Nero): a survival player past endBarrierRadius is put back where they
         // last stood on the ground inside (or just inside the wall without one); creative players pass; in the stopped mode
         // there is no wall. The check is driven directly (a mock player gets no tick events), within one tick and beyond
@@ -3193,6 +3320,22 @@ public final class StasisGameTests {
     }
 
     /** Collected checks; the test fails at the end listing every failed one. */
+    /**
+     * After an End rift test: the test End's flat ground (bedrock and three end stone) back under the main island's columns
+     * and the rift's islands gone, so other tests in the End (the wall's) find it as it was.
+     */
+    static void restoreFlatEnd(ServerLevel end, java.util.Set<Long> islands) {
+        int r = org.erisia.stasis.EndRiftPlan.ISLAND_RADIUS;
+        for (long b : islands) end.setBlock(BlockPos.of(b), Blocks.AIR.defaultBlockState(), 2 | 16);
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int x = -r; x <= r; x++)
+            for (int z = -r; z <= r; z++) {
+                if (x * x + z * z > r * r) continue;
+                end.setBlock(p.set(x, 0, z), Blocks.BEDROCK.defaultBlockState(), 2 | 16);
+                for (int y = 1; y < 4; y++) end.setBlock(p.set(x, y, z), Blocks.END_STONE.defaultBlockState(), 2 | 16);
+            }
+    }
+
     static final class Checks {
         final List<String> failures = new ArrayList<>();
         final List<Runnable> cleanup = new ArrayList<>();

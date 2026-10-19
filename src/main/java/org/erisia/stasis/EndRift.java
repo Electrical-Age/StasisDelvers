@@ -90,6 +90,8 @@ public final class EndRift {
     public static volatile boolean testOff;
     /** GameTests: stages are recorded and queued, but no block is written (the test End stays as it is). */
     public static volatile boolean testPaused;
+    /** GameTests: writes per tick instead of the usual (0: the usual), to catch the work midway. */
+    public static volatile int testWrites;
 
     static final TicketController TICKETS = new TicketController(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "end_rift"), (level, helper) -> {
         // forced only while a chunk is worked: whatever was saved is stale, the work forces again what it needs
@@ -336,7 +338,7 @@ public final class EndRift {
         if (JOBS.isEmpty() || testPaused) return;
         EndRiftPlan pl = plan(end);
         Data d = Data.get(end);
-        int[] budget = {watched ? STAGE_WRITES : BUILD_WRITES};
+        int[] budget = {testWrites > 0 ? testWrites : watched ? STAGE_WRITES : BUILD_WRITES};
         for (Iterator<Job> it = JOBS.iterator(); it.hasNext() && budget[0] > 0; ) {
             Job j = it.next();
             if (now < j.notBefore || j.waitEmpty && watched) continue;
@@ -449,6 +451,7 @@ public final class EndRift {
         d.liftDone.add(key);
         d.setDirty();
         release(end, cx, cz);
+        if (j.idx < cols.length) loaded(end, BlockPos.getX(cols[j.idx]) >> 4, BlockPos.getZ(cols[j.idx]) >> 4);   // (the next, on its way)
     }
 
     /** Is a player standing on column (x, z) (or about to)? */
@@ -576,6 +579,7 @@ public final class EndRift {
                 d.placeDone.add(key);
                 d.setDirty();
                 release(end, cx, cz);
+                if (j.idx < bs.length) loaded(end, BlockPos.getX(bs[j.idx]) >> 4, BlockPos.getZ(bs[j.idx]) >> 4);   // (the next, on its way)
             }
         }
         return j.idx >= bs.length;
@@ -718,6 +722,35 @@ public final class EndRift {
     /** Tests: the jobs queued, as status lines ("part 3 lift: ..."). */
     public static String testJobs(ServerLevel end) {
         return status(end);
+    }
+
+    /** Tests: as a restart would leave it: the memory gone (jobs, shards, tickets), the saved state kept. */
+    public static void testRestart(ServerLevel end) {
+        JOBS.clear();
+        for (Shard s : SHARDS) s.e.discard();
+        SHARDS.clear();
+        releaseAll(end);
+        started = false;
+    }
+
+    /** Tests: {broken, lifted, placed} bits, the chunks forced now, and the chunks lifted (saved). */
+    public static int[] testState(ServerLevel end) {
+        Data d = Data.get(end);
+        return new int[]{d.broken, d.lifted, d.placed, FORCED.size(), d.liftDone.size()};
+    }
+
+    /** Tests: the dragon's death, as HardMode.explodeEnd calls it; and whether the rift is built. */
+    public static void testFinale(ServerLevel end) {
+        finale(end);
+    }
+
+    public static boolean testBuilt(ServerLevel end) {
+        return Data.get(end).done(plan(end).parts);
+    }
+
+    /** Tests: the live End's plan. */
+    public static EndRiftPlan testPlan(ServerLevel end) {
+        return plan(end);
     }
 
     /** Tests: shards in the air. */
