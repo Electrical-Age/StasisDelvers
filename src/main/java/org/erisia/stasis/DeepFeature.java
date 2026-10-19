@@ -53,11 +53,12 @@ public record DeepFeature() implements Feature {
                     if (d != null && reaches(d, x0, z0, true)) deeps.add(d);
                 }
         long t0 = System.nanoTime();
-        Writer w = (p, st) -> level.setBlock(p, st, 2);
+        Supported w = new Supported((p, st) -> level.setBlock(p, st, 2));
         for (StaticDeeps.Deep d : deeps) any |= carve(level, w, Heightmap.Types.WORLD_SURFACE_WG, d, x0, z0, minY, maxY);
         for (StaticDeeps.Deep d : deeps) any |= strata(level, w, Heightmap.Types.WORLD_SURFACE_WG, d, x0, z0, minY, maxY);
         if (StasisConfig.timeScars) for (StaticDeeps.Deep d : deeps) any |= TimeScars.place(level, d, x0, z0, minY, maxY);
         if (StasisConfig.ruins) for (StaticDeeps.Deep d : deeps) any |= Ruins.place(level, d, x0, z0);
+        w.dropUnsupported(level, x0, z0);   // (last: scars and ruins may have taken a crystal's rock)
         if (any) {
             // vents, spires and sinkholes change the top: the chunk's heightmaps (rain, spawning, sky light, later
             // features) must follow, as for EA's oil outcrops (2caba052)
@@ -90,11 +91,45 @@ public record DeepFeature() implements Feature {
      * worldgen one, which a full chunk no longer keeps). Pure per (deep, position): only the chunk's own columns are
      * written, so chunks may be done in any order.
      */
-    public static boolean apply(WorldGenLevel level, Writer w, Heightmap.Types surface, StaticDeeps.Deep d, int x0, int z0, boolean withStrata) {
+    public static boolean apply(WorldGenLevel level, Writer out, Heightmap.Types surface, StaticDeeps.Deep d, int x0, int z0, boolean withStrata) {
         int minY = level.getMinY(), maxY = level.getMaxY();
+        Supported w = new Supported(out);
         boolean any = carve(level, w, surface, d, x0, z0, minY, maxY);
         if (withStrata) any |= strata(level, w, surface, d, x0, z0, minY, maxY);
+        w.dropUnsupported(level, x0, z0);
         return any;
+    }
+
+    /**
+     * A writer that remembers the rift crystals it wrote, so that none is left without its rock (ErisiAgent, live: rift
+     * crystal clusters floating in the air over a sky rift). Worldgen writes don't update shapes, so a crystal whose
+     * support never came, or went later in the chunk's generation, would hang there until a neighbour changed.
+     */
+    static final class Supported implements Writer {
+        private final Writer w;
+        private final java.util.List<BlockPos> crystals = new java.util.ArrayList<>();
+
+        Supported(Writer w) {
+            this.w = w;
+        }
+
+        @Override
+        public void set(BlockPos p, BlockState st) {
+            if (st.getBlock() instanceof net.minecraft.world.level.block.AmethystClusterBlock) crystals.add(p.immutable());
+            w.set(p, st);
+        }
+
+        /** Take away each crystal written here that has no sturdy rock on its attached face now. Its rock must be in
+         *  this chunk too (the chunk's own columns only: another chunk may not be generated yet). */
+        void dropUnsupported(WorldGenLevel level, int x0, int z0) {
+            for (BlockPos p : crystals) {
+                BlockState st = level.getBlockState(p);
+                if (!(st.getBlock() instanceof net.minecraft.world.level.block.AmethystClusterBlock)) continue;
+                BlockPos rock = p.relative(st.getValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING).getOpposite());
+                boolean inChunk = (rock.getX() & ~15) == x0 && (rock.getZ() & ~15) == z0;
+                if (!inChunk || !st.canSurvive(level, p)) w.set(p, Blocks.AIR.defaultBlockState());
+            }
+        }
     }
 
     private static boolean carve(WorldGenLevel level, Writer w, Heightmap.Types surfaceType, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
@@ -318,13 +353,16 @@ public record DeepFeature() implements Feature {
                     }
                 }
             }
-        // crystal buds in the cavities, on faces of budding walls (the wall may sit in a neighbouring chunk: budding()
-        // is a pure function, so both chunks agree)
+        // crystal buds in the cavities, on faces of budding walls that are there. budding() only says where a budding
+        // block belongs; the columns above wrote one only where rock may go: not into open sky off the islands (ErisiAgent:
+        // clusters floating over a sky rift at y ~200, on air), not into the carved hollow or a fluid. And only walls in
+        // this chunk: a neighbouring chunk's rock may not be generated yet (chunk-order independence)
         for (BlockPos c : cavities) {
             if (Noise.hash32(c.getX(), c.getY(), c.getZ(), id ^ 0xB0E) >= 0.6f) continue;
             for (Direction dir : Direction.values()) {
                 BlockPos wall = c.relative(dir);
-                if (!budding(d, wall.getX(), wall.getY(), wall.getZ())) continue;
+                if ((wall.getX() & ~15) != x0 || (wall.getZ() & ~15) != z0) continue;
+                if (!budding(d, wall.getX(), wall.getY(), wall.getZ()) || !level.getBlockState(wall).is(bud.getBlock())) continue;
                 float h = Noise.hash32(c.getX(), c.getY(), c.getZ(), id ^ 0xB0F);
                 var block = h < 0.35f ? StasisRegistry.RIFT_CRYSTAL_SMALL : h < 0.6f ? StasisRegistry.RIFT_CRYSTAL_MEDIUM
                     : h < 0.85f ? StasisRegistry.RIFT_CRYSTAL_LARGE : StasisRegistry.RIFT_CRYSTAL_CLUSTER;

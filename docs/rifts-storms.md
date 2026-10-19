@@ -41,7 +41,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
   - `weather`, `exposure` (closed form, for crystals), `masked` (4-block strata mask cells), `at(level,...)`.
 - `Crystals.java`: analytic rift-crystal growth. Nothing ticks in stopped land, so each bud accumulates exposure
   seconds (`Pockets.exposure`) while no field covers it.
-  - `sweep` runs on chunk load and every 30 s. `stageFor(e)` uses `crystalStageSeconds`.
+  - `sweep` runs on chunk load and every 30 s. `stageFor(e)` uses `crystalStageSeconds`. A bud grows only on its
+    budding block (gone: the bud is forgotten; never a crystal on air).
   - SavedData `rift_crystals` (`buds[pos, dir, t, e, stage]`, `swept`).
 - `StormCrystals.java`: while a storm runs, clusters form on open ground under storm rift, one per 32x32 cell,
   checked every 5 s within 128 blocks of a player. They are removed after the storm, in chunks loaded later too.

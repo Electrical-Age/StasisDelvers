@@ -1305,9 +1305,12 @@ public final class StasisGameTests {
                     level.setBlockAndUpdate(face, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
                     sweepAll.run();
                     c.check("mined: it starts over", org.erisia.stasis.Crystals.testExposure(level, face, 0) < 5 && level.getBlockState(face).isAir());
+                    // a bud owed a cluster whose budding block is gone grows nothing on the air (ErisiAgent: floating clusters)
+                    org.erisia.stasis.Crystals.testExposure(level, face, 10000);
                     level.setBlockAndUpdate(bud0, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
                     sweepAll.run();
                     c.check("the budding block gone: its buds are forgotten", Double.isNaN(org.erisia.stasis.Crystals.testExposure(level, gen, 0)));
+                    c.check("the budding block gone: nothing grows on the air", level.getBlockState(face).isAir(), level.getBlockState(face).toString());
                 } finally {
                     org.erisia.stasis.Pockets.TEST_STRATA.remove(box);
                 }
@@ -1662,6 +1665,59 @@ public final class StasisGameTests {
             int ore = placed.values().stream().mapToInt(Integer::intValue).sum();
             boolean onlyRift = placed.keySet().stream().allMatch(riftOres::contains);
             c.check("ores in the test rift's shell, all riftstone ores", ore > 0 && onlyRift, filled.size() + " shell blocks, " + placed);
+        }, false));
+        // every rift crystal worldgen leaves has its support (ErisiAgent, live: clusters floating at y ~200 over a sky
+        // rift, their budding wall never written): test rifts in the sky and near the ground, each written chunk by chunk
+        // over every chunk it reaches (as worldgen would, in no particular order), as worldgen writes (no shape updates)
+        CASES.put("rift_crystals_supported", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            java.util.Map<BlockPos, net.minecraft.world.level.block.state.BlockState> before = new java.util.HashMap<>();
+            java.util.Set<BlockPos> crystals = new java.util.HashSet<>();
+            var stages = java.util.List.of(org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_SMALL.get(), org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_MEDIUM.get(),
+                org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_LARGE.get(), org.erisia.stasis.StasisRegistry.RIFT_CRYSTAL_CLUSTER.get());
+            org.erisia.stasis.DeepFeature.Writer w = (p, st) -> {
+                BlockPos k = p.immutable();
+                before.putIfAbsent(k, level.getBlockState(k));
+                if (stages.contains(st.getBlock())) crystals.add(k);
+                level.setBlock(k, st, 2 | 16);
+            };
+            int present = 0, floating = 0;
+            java.util.Set<org.erisia.stasis.Strata.Shape> shapes = java.util.EnumSet.noneOf(org.erisia.stasis.Strata.Shape.class);
+            StringBuilder bad = new StringBuilder();
+            try {
+                for (int i = 0; i < 8; i++) {
+                    int bx = 52000 + 400 * i, bz = 52000;
+                    level.getChunk(bx >> 4, bz >> 4);
+                    int ground = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, bx, bz);
+                    // most high in the sky (the live case), every third low enough for its strata to reach the ground
+                    var d = new org.erisia.stasis.StaticDeeps.Deep(bx + 3.5f, ground + (i % 3 == 2 ? 24 : 80) + 0.5f, bz + 11.5f, 16 + 2 * (i % 4), 0x51C00 + 7919 * i);
+                    shapes.add(org.erisia.stasis.Strata.shapeOf(d));
+                    double reach = org.erisia.stasis.Strata.bounds(d).radius() + 2 + 16;
+                    // the chunks in a scrambled order: worldgen order is anyone's
+                    java.util.List<int[]> chunks = new java.util.ArrayList<>();
+                    for (int cx = (int) Math.floor((d.x() - reach) / 16); cx <= (int) Math.floor((d.x() + reach) / 16); cx++)
+                        for (int cz = (int) Math.floor((d.z() - reach) / 16); cz <= (int) Math.floor((d.z() + reach) / 16); cz++)
+                            if (org.erisia.stasis.DeepFeature.reaches(d, cx << 4, cz << 4, true)) chunks.add(new int[]{cx, cz});
+                    java.util.Collections.shuffle(chunks, new java.util.Random(i));
+                    for (int[] ch : chunks) {
+                        level.getChunk(ch[0], ch[1]);
+                        org.erisia.stasis.DeepFeature.apply(level, w, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, d, ch[0] << 4, ch[1] << 4, true);
+                    }
+                }
+                for (BlockPos p : crystals) {
+                    var st = level.getBlockState(p);
+                    if (!stages.contains(st.getBlock())) continue;
+                    present++;
+                    if (!st.canSurvive(level, p)) {
+                        floating++;
+                        if (bad.length() < 300) bad.append(p.toShortString()).append(' ').append(st.getValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING)).append("; ");
+                    }
+                }
+            } finally {
+                before.forEach((p, st) -> level.setBlock(p, st, 2 | 16));
+            }
+            c.check("the test rifts grew crystals", present > 20, present + " crystals, shapes " + shapes);
+            c.check("every crystal has its support", floating == 0, floating + " of " + present + " floating: " + bad);
         }, false));
         // the drifting deeps' clock never wraps: a deep moves smoothly (< 0.2 blocks in 0.05 s, but it moves) across the
         // old 14.5 h wrap of Eddies.time and weeks or a year into a world

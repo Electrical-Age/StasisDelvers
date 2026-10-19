@@ -223,8 +223,10 @@ public final class Crystals {
             }
             b.t = t;
             int want = stageFor(b.e);
-            if (open && want > b.stage) {
-                level.setBlock(pos, stages.get(want).defaultBlockState().setValue(AmethystClusterBlock.FACING, dir), Block.UPDATE_CLIENTS);
+            BlockState grown = want >= 0 ? stages.get(want).defaultBlockState().setValue(AmethystClusterBlock.FACING, dir) : null;
+            // (never on air: its budding block was checked above, and the bud must stand on it; ErisiAgent saw floaters)
+            if (open && want > b.stage && grown.canSurvive(level, pos)) {
+                level.setBlock(pos, grown, Block.UPDATE_CLIENTS);
                 b.stage = (byte) want;
             }
             data.setDirty();
