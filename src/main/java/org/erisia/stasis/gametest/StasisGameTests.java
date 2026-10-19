@@ -2309,16 +2309,22 @@ public final class StasisGameTests {
             c.check("after: storms are scheduled from the origin", next != null && next.start() >= o
                 && org.erisia.stasis.Storms.intensity(12345, null, o, next.start() + next.length() / 2) > 0.99, String.valueOf(next));
             c.check("the End keeps running until the flash", !Stasis.stops(end) && Boolean.FALSE.equals(org.erisia.stasis.HardMode.testFlashed()));
+            // the finale hurts nobody (AdventurAgent took 10.5 before the flash); /kill still works
+            var ds = end.damageSources();
+            c.check("until the flash no damage in the End", org.erisia.stasis.HardMode.shields(stays, ds.explosion(null, null))
+                && org.erisia.stasis.HardMode.shields(stays, ds.fall()) && org.erisia.stasis.HardMode.shields(stays, ds.generic())
+                && !org.erisia.stasis.HardMode.shields(stays, ds.genericKill()));
             // a death in the End before the flash: sent home instead
             // (die directly: a mock player has no loaded client, so ServerPlayer.isInvulnerableTo turns all damage away)
             dies.setHealth(0);
             dies.die(end.damageSources().fellOutOfWorld());
             boolean[] diedOk = {dies.isAlive() && dies.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && hasBreakingIt(dies)};
             boolean[] stillThere = {stays.level() == end};
-            boolean[] flashed = new boolean[1], endStopped = new boolean[1], blocked = new boolean[1];
+            boolean[] flashed = new boolean[1], endStopped = new boolean[1], blocked = new boolean[1], shieldAfter = new boolean[1];
             h.runAfterDelay(org.erisia.stasis.HardMode.flashTicks() + 5, () -> {
                 flashed[0] = Boolean.TRUE.equals(org.erisia.stasis.HardMode.testFlashed());
                 endStopped[0] = Stasis.stops(end) && org.erisia.stasis.Spread.testServerState().endStill();
+                shieldAfter[0] = org.erisia.stasis.HardMode.shields(stays, end.damageSources().generic());
                 // the way back is closed for survival players
                 var into = new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(300.5, 4, 0.5), Vec3.ZERO, 0, 0,
                     net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING);
@@ -2332,6 +2338,7 @@ public final class StasisGameTests {
                     && hasBreakingIt(stays), "in " + stays.level().dimension().identifier() + ", advancement " + hasBreakingIt(stays));
                 c.check("the flash came, then the End stilled", flashed[0] && endStopped[0], flashed[0] + " " + endStopped[0]);
                 c.check("after hard mode the End can't be entered", blocked[0]);
+                c.check("after the flash damage counts again", !shieldAfter[0]);
             };
         }, false, true));
         // the End rift's pieces (EndRift, step 5), in the test area: a pillar sector's column loses only its end stone and a

@@ -173,6 +173,10 @@ rewrite) and 5 (the island's breaking up into the End rift, as the crystals fall
     (5 s) before the flash. `Spread.update` then invalidates and relights the End.
   - For 30 s after the kill (`END_WINDOW`) a player dying in the End is sent home the same way instead
     (`LivingDeathEvent`, highest priority, cancelled, health restored).
+  - From the kill until the flash nothing hurts a player in the End (`HardMode.damage`/`shields`,
+    `LivingIncomingDamageEvent`; damage tagged `bypasses_invulnerability`, `/kill`, still counts). The show is sounds,
+    particles and block displays only (no `explode()` anywhere in it); AdventurAgent took 10.5 just before the flash,
+    most likely from the dragon still alive after `/stasis spread hardmode`, or a fall.
   - A broadcast: "Something broke in the End. The stillness stirs again, and storms will rise from the rifts."
 - `mixin/EnderDragonFightMixin` (spreading mode only): `setDragonKilled` keeps vanilla's bookkeeping (boss bar off,
   `dragonKilled`, `hasPreviouslyKilledDragon`) and calls `HardMode.enter`, but opens no exit portal, spawns no End

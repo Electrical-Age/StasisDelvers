@@ -150,6 +150,23 @@ public final class HardMode {
         return new Vec3(spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5);
     }
 
+    /**
+     * LivingIncomingDamageEvent: from the kill until the flash nothing hurts a player in the End (AdventurAgent took
+     * 10.5 damage just before the flash; the show is sounds, particles and displays only, with no real explosion, but
+     * a dragon still alive after /stasis spread hardmode, a fall or a crystal can still hit). The void during the End
+     * event is a rescue instead.
+     */
+    static void damage(net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer p) || p.level().dimension() != Level.END) return;
+        if (e.getSource().is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD) && voidRescue(p)) e.setCanceled(true);
+        else if (shields(p, e.getSource())) e.setCanceled(true);
+    }
+
+    /** Is this damage to a player turned away by the finale (kill to flash, in the End; /kill still works)? Public for tests. */
+    public static boolean shields(ServerPlayer p, net.minecraft.world.damagesource.DamageSource s) {
+        return holdsEndOpen() && p.level().dimension() == Level.END && !s.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY);
+    }
+
     /** Within END_WINDOW of the kill (deaths in the End become teleports)? */
     static boolean inWindow() {
         return event != null;
