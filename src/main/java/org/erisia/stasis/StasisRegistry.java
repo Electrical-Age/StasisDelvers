@@ -131,6 +131,11 @@ public final class StasisRegistry {
             ITEMS.registerSimpleBlockItem(b);
     }
 
+    // riftstone ores (RiftOres; λ-Nero): one per ore material the rift scatter places, after the strata blocks
+    static {
+        RiftOres.register();
+    }
+
     /** Crystal uses: the rift compass (to the nearest rift; spins in storms) and the rift barometer (storm warning). */
     public static final net.neoforged.neoforge.registries.DeferredItem<RiftCompassItem> RIFT_COMPASS = ITEMS.registerItem("rift_compass", RiftCompassItem::new,
         p -> p.stacksTo(1));

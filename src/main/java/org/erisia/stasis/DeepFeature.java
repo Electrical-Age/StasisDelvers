@@ -337,7 +337,9 @@ public record DeepFeature() implements Feature {
     }
 
     /** The overworld ores (NeoForge's c:ores_in_ground/stone and /deepslate tags; pack ores included), with weights:
-     * the rare ones rarer. Built once the tags are loaded. */
+     * the rare ones rarer, each as its riftstone ore (RiftOres; λ-Nero: ore in riftstone, not stone ore set into it), or
+     * as itself when it has none. The draw is over the sources, so a material with both a stone and a deepslate ore
+     * keeps its double share. Built once the tags are loaded. */
     private static volatile java.util.List<BlockState> ORES;
     private static volatile float[] ORE_CUM;
 
@@ -351,7 +353,8 @@ public record DeepFeature() implements Feature {
                 net.minecraft.core.registries.BuiltInRegistries.BLOCK.getTagOrEmpty(net.minecraft.tags.TagKey.create(
                     net.minecraft.core.registries.Registries.BLOCK, net.minecraft.resources.Identifier.fromNamespaceAndPath("c", tag))).forEach(h -> {
                     String n = h.value().getDescriptionId();
-                    l.add(h.value().defaultBlockState());
+                    BlockState v = RiftOres.variantOf(h.value());
+                    l.add(v != null ? v : h.value().defaultBlockState());
                     w.add(n.contains("diamond") || n.contains("emerald") ? 0.15f : n.contains("gold") || n.contains("lapis") || n.contains("redstone") ? 0.5f : 1f);
                 });
             float[] cum = new float[w.size()];
@@ -365,6 +368,10 @@ public record DeepFeature() implements Feature {
         float u = Noise.hash32(x, y, z, seed ^ 0x0F) * cum[cum.length - 1];
         for (int i = 0; i < cum.length; i++) if (u < cum[i]) return ores.get(i);
         return ores.get(ores.size() - 1);
+    }
+
+    public static BlockState oreForTest(int x, int y, int z, int seed) {
+        return ore(x, y, z, seed);
     }
 
     /** Worldgen time of chunks the rift features touched (/stasis strata stats). */
