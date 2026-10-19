@@ -116,7 +116,14 @@ public final class TowerRenderer {
                 if (s.layout == null) return;
                 String key = s.layout + "#" + s.seed;
                 Entry e = TOWERS.computeIfAbsent(core, Entry::new);
-                if (key.equals(e.key) || key.equals(e.pendingKey)) return;
+                if (key.equals(e.pendingKey)) return;
+                if (key.equals(e.key)) {
+                    // back to the drawn layout (A, then B, then A again): B's build must not replace A when it lands
+                    discard(e.pending);
+                    e.pending = null;
+                    e.pendingKey = null;
+                    return;
+                }
                 Layout layout = s.layout;
                 int seed = s.seed;
                 // a build still in flight for an older layout: nobody will upload it, so free its buffers when it lands
