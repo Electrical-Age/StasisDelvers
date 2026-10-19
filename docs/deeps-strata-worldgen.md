@@ -83,7 +83,12 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   hard mode's rewrite of them: `spread_hard_mode_gate_rooms`. `HardRifts` writes into existing chunks with the same
   pure functions and the same chunk-local rule (each chunk only its own columns, any order). Ruined cottages: `ruined_cottage_core`, `ruined_cottage_templates`.
 - End sites (registration only): `end_sites_replace_cities`.
-- Crystals in worldgen: `rift_crystal_grades`.
+- Crystals in worldgen: `rift_crystal_grades`; `rift_crystals_supported` (test rifts in the sky and near the ground,
+  written chunk by chunk in a shuffled order: every crystal has its rock).
+- **Every crystal has its rock** (ErisiAgent: clusters floated over a sky rift). `budding()` only says where a budding block
+  belongs; `strata` writes one only where rock may go (not open sky off the islands, not the carved hollow), so a cavity
+  bud goes only on a wall in the same chunk that really is a budding block. `DeepFeature.Supported` (the writer of `place`
+  and `apply`) then takes away, last of all (after scars and ruins), any crystal it wrote that can't survive.
 
 ## Gotchas
 - Some config keys look worldgen-only but are also read at runtime. Changing them mid-world desyncs the game
