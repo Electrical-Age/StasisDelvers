@@ -2531,6 +2531,167 @@ public final class StasisGameTests {
                 c.check("its centre is over the portal", centre.getY() == b3.minY() + 4, centre.toShortString());
             };
         }, false, true));
+        // hard mode's stronghold rewrite (step 4b; Baughn's decision 6, the full gate rift): a portal room recorded before
+        // hard mode becomes a gate room (no frames, shards) with its gate rift registered, and the rift's carve hollows
+        // its core; the chunks loaded at the instant are written paced, not at once; an EA node and a chest in the way go
+        // with their blocks (the node removed, the chest's items not dropped); a running player the new rift stops gets
+        // the grace; each chunk is written once, also after the progress was saved and read back and the chunks loaded
+        // again. A room generated after the instant gets stopped mode's room at worldgen and isn't recorded.
+        CASES.put("spread_hard_mode_gate_rooms", new Spec(500, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            BlockPos base = h.absolutePos(new BlockPos(0, 24, 0));
+            org.erisia.stasis.Spread.testInstall(org.erisia.stasis.SpreadMap.build(7, base.getX(), base.getZ(), 400), 0);
+            double[] was = org.erisia.stasis.Spread.testClock(server, 0, false, 0);   // coverage 0: everything runs
+            c.cleanup.add(org.erisia.stasis.HardMode::testReset);
+            c.cleanup.add(() -> org.erisia.stasis.Spread.testClockRestore(server, was));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            java.util.function.BiConsumer<net.minecraft.world.level.levelgen.structure.BoundingBox, net.minecraft.world.level.block.state.BlockState> fill = (b, st) -> {
+                for (BlockPos q : BlockPos.betweenClosed(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ())) level.setBlock(q, st, 2 | 16);
+            };
+            java.util.function.Consumer<net.minecraft.world.level.levelgen.structure.StructurePiece> gen = piece -> {
+                var b = piece.getBoundingBox();
+                for (int cx = b.minX() >> 4; cx <= b.maxX() >> 4; cx++)
+                    for (int cz = b.minZ() >> 4; cz <= b.maxZ() >> 4; cz++) {
+                        var chunkBB = new net.minecraft.world.level.levelgen.structure.BoundingBox(cx << 4, level.getMinY(), cz << 4, (cx << 4) + 15, level.getMaxY(), (cz << 4) + 15);
+                        piece.postProcess(level, level.structureManager(), level.getChunkSource().getGenerator(), net.minecraft.util.RandomSource.create(cx * 31L + cz),
+                            chunkBB, new net.minecraft.world.level.ChunkPos(cx, cz), b.getCenter());
+                    }
+            };
+            // the room straddles four chunks, in a block of rock big enough for the carve
+            int rx = ((base.getX() + 64) & ~15) + 8, rz = (base.getZ() & ~15) + 8;
+            var b0 = net.minecraft.world.level.levelgen.structure.BoundingBox.orientBox(0, 0, 0, -4, -1, 0, 11, 8, 16, net.minecraft.core.Direction.SOUTH);
+            var box = b0.moved(rx - b0.minX(), base.getY() - b0.minY(), rz - b0.minZ());
+            var room = new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.PortalRoom(1, box, net.minecraft.core.Direction.SOUTH);
+            BlockPos centre = room.getWorldPos(5, 4, 10).immutable();
+            // rooms recorded before the orientation was kept: it follows from the box and centre, for all four
+            for (var dir : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                var ob = net.minecraft.world.level.levelgen.structure.BoundingBox.orientBox(rx, base.getY(), rz, -4, -1, 0, 11, 8, 16, dir);
+                var or = new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.PortalRoom(1, ob, dir);
+                c.check("the orientation follows from box and centre: " + dir, org.erisia.stasis.PendingGates.orientationOf(ob, or.getWorldPos(5, 4, 10)) == dir);
+            }
+            var rock = new net.minecraft.world.level.levelgen.structure.BoundingBox(centre.getX() - 22, centre.getY() - 18, centre.getZ() - 22,
+                centre.getX() + 22, centre.getY() + 14, centre.getZ() + 22);
+            var deep = org.erisia.stasis.Gates.gateForTest(centre);
+            List<Long> chunks = org.erisia.stasis.HardRifts.testChunks(new org.erisia.stasis.PendingGates.Room(box, centre, net.minecraft.core.Direction.SOUTH));
+            for (long k : chunks) level.setChunkForced(net.minecraft.world.level.ChunkPos.getX(k), net.minecraft.world.level.ChunkPos.getZ(k), true);
+            BlockPos[] centre2 = new BlockPos[1];
+            var clearBox = rock.inflatedBy(4);
+            c.cleanup.add(() -> {
+                org.erisia.stasis.PendingGates.testForget(level, centre);
+                org.erisia.stasis.Gates.testForget(level, centre);
+                if (centre2[0] != null) org.erisia.stasis.Gates.testForget(level, centre2[0]);
+                fill.accept(clearBox, Blocks.AIR.defaultBlockState());
+                for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.Entity.class, AABB.of(clearBox).inflate(8), e -> !(e instanceof ServerPlayer)))
+                    e.discard();
+                for (long k : chunks) level.setChunkForced(net.minecraft.world.level.ChunkPos.getX(k), net.minecraft.world.level.ChunkPos.getZ(k), false);
+            });
+            fill.accept(rock, Blocks.STONE.defaultBlockState());
+            gen.accept(room);
+            c.check("before: a working portal room (12 frames)", count(level, box, Blocks.END_PORTAL_FRAME) == 12, String.valueOf(count(level, box, Blocks.END_PORTAL_FRAME)));
+            // in the rift's hollow: an EA node, a chest with an item, a player (running land: no grace yet)
+            // (blocks deep in the hollow, s < 0.22, with air above: the shatter's debris and dripstone stay outside it)
+            java.util.function.Function<BlockPos, BlockPos> hollow = not -> {
+                for (BlockPos q : BlockPos.betweenClosed(centre.offset(-3, -2, -3), centre.offset(3, 2, 3)))
+                    if (org.erisia.stasis.StaticDeeps.shape(deep, q.getX() + 0.5f, q.getY() + 0.5f, q.getZ() + 0.5f) < 0.22f
+                        && !q.equals(centre) && level.getBlockState(q).isAir() && level.getBlockState(q.above()).isAir()
+                        && (not == null || Math.abs(q.getX() - not.getX()) + Math.abs(q.getZ() - not.getZ()) >= 2)) return q.immutable();
+                return null;
+            };
+            BlockPos ea = hollow.apply(null), chest = ea == null ? null : hollow.apply(ea);
+            c.check("the hollow has room for the EA node and the chest", ea != null && chest != null && !ea.equals(chest),
+                ea + " " + chest + String.format(" shape at the centre %.3f, %s", org.erisia.stasis.StaticDeeps.shape(deep, centre.getX() + 0.5f, centre.getY() + 0.5f,
+                    centre.getZ() + 0.5f), level.getBlockState(centre)));
+            if (ea == null || chest == null || ea.equals(chest)) return () -> { };
+            level.setBlock(ea.below(), Blocks.STONE.defaultBlockState(), 2);
+            eaSix(h, ea.subtract(h.absolutePos(BlockPos.ZERO)), 0 + (3 << 6));   // an Electrical Source
+            var eaAt = new mods.eln.misc.Coordonate(ea, level);
+            c.check("before: the EA node is there", mods.eln.node.NodeManager.instance.getNodeFromCoordonate(eaAt) != null);
+            level.setBlock(chest, Blocks.CHEST.defaultBlockState(), 2);
+            if (level.getBlockEntity(chest) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity cb) cb.setItem(0, new ItemStack(Items.DIAMOND, 7));
+            Vec3 standAt = Vec3.atBottomCenterOf(centre).subtract(Vec3.atLowerCornerOf(h.absolutePos(BlockPos.ZERO)));
+            ServerPlayer p = survivalPlayer(h, standAt, true);
+            c.cleanup.add(0, () -> remove(h, p));
+            c.check("before: the player runs, no grace", Stasis.isRunning(level, p.blockPosition()) && !org.erisia.stasis.Freezing.describe(p).contains("in grace"),
+                org.erisia.stasis.Freezing.describe(p));
+
+            // static deeps on from here (GameTests run without; before, a drifting deep could stop the player's spot)
+            org.erisia.stasis.Deeps.testDeeps = true;
+            c.cleanup.add(() -> org.erisia.stasis.Deeps.testDeeps = false);
+            boolean entered = org.erisia.stasis.HardMode.enter(server, "test");
+            c.check("hard mode begins", entered);
+            c.check("the gate rift is registered at once", org.erisia.stasis.Gates.list(level).contains(centre.asLong())
+                && org.erisia.stasis.StaticDeeps.near(centre.getX(), centre.getY(), centre.getZ(), 4, org.erisia.stasis.Deeps.seed(level))
+                .stream().anyMatch(org.erisia.stasis.StaticDeeps::isGate));
+            c.check("its core is a rift now; the player there has the grace", org.erisia.stasis.StaticDeeps.inRift(level, centre.getX(), centre.getY(), centre.getZ())
+                && org.erisia.stasis.Freezing.describe(p).contains("in grace"), org.erisia.stasis.Freezing.describe(p));
+            var live = org.erisia.stasis.PendingGates.testRoom(level, centre);
+            c.check("paced: the loaded chunks are queued, not written at once", live != null && live.carved().isEmpty()
+                && org.erisia.stasis.HardRifts.testQueued(level) >= chunks.size() - 2, org.erisia.stasis.HardRifts.testQueued(level) + " of " + chunks.size());
+            int[] hollowAir = new int[2];
+            boolean[] sentinelKept = new boolean[1];
+            BlockPos sentinel = ea.above(2);
+            // (the test server ticks unthrottled, and a chunk near the room waits for its entities to load from disk:
+            // look each tick until every chunk is done, for at most 420 ticks)
+            boolean[] phase2 = new boolean[1];
+            Runnable second = () -> {
+                var r = org.erisia.stasis.PendingGates.testRoom(level, centre);
+                c.check("every chunk is shattered and carved", r != null && r.carved().containsAll(chunks) && r.shattered().containsAll(chunks),
+                    r == null ? "no room" : r.carved().size() + "/" + r.shattered().size() + " of " + chunks.size() + ", left: " + chunks.stream()
+                        .filter(k -> !r.carved().contains(k)).map(k -> net.minecraft.world.level.ChunkPos.unpack(k) + (level.hasChunk(net.minecraft.world.level.ChunkPos.getX(k),
+                            net.minecraft.world.level.ChunkPos.getZ(k)) ? " loaded" : " unloaded") + (level.areEntitiesLoaded(k) ? " entities" : " no entities")
+                        + (level.getChunkSource().isPositionTicking(k) ? " ticking" : " not ticking")).toList()
+                        + ", queued " + org.erisia.stasis.HardRifts.testQueued(level));
+                c.check("the room is shattered: no frames, no portal", count(level, box, Blocks.END_PORTAL_FRAME) == 0 && count(level, box, Blocks.END_PORTAL) == 0);
+                c.check("its shards hang there", !level.getEntitiesOfClass(net.minecraft.world.entity.Display.BlockDisplay.class, AABB.of(box).inflate(4),
+                    e -> e.entityTags().contains(org.erisia.stasis.GateRoom.DEBRIS)).isEmpty());
+                for (BlockPos q : BlockPos.betweenClosed(centre.offset(-6, -6, -6), centre.offset(6, 6, 6)))
+                    if (org.erisia.stasis.StaticDeeps.shape(deep, q.getX() + 0.5f, q.getY() + 0.5f, q.getZ() + 0.5f) < 0.30f) {
+                        hollowAir[1]++;
+                        if (level.getBlockState(q).isAir()) hollowAir[0]++;
+                    }
+                c.check("the rift's core is carved hollow", hollowAir[1] > 30 && hollowAir[0] >= hollowAir[1] * 0.95, hollowAir[0] + " of " + hollowAir[1]);
+                c.check("the EA node went with its block", mods.eln.node.NodeManager.instance.getNodeFromCoordonate(eaAt) == null
+                    && !level.getBlockState(ea).is(mods.eln.Eln.sixNodeBlock), level.getBlockState(ea).toString());
+                c.check("the chest went, its items not dropped", !level.getBlockState(chest).is(Blocks.CHEST)
+                    && level.getEntitiesOfClass(ItemEntity.class, AABB.of(clearBox).inflate(4), e -> e.getItem().is(Items.DIAMOND)).isEmpty());
+                // once only: a block put into the hollow stays through a reload of the progress and the chunks loading again
+                level.setBlock(sentinel, Blocks.GLASS.defaultBlockState(), 2);
+                org.erisia.stasis.PendingGates.testReload(level);
+                var copy = org.erisia.stasis.PendingGates.testRoom(level, centre);
+                c.check("the progress survives a save and load", copy != null && copy != r && copy.carved().containsAll(chunks)
+                    && copy.shattered().containsAll(chunks) && copy.dir() == net.minecraft.core.Direction.SOUTH);
+                if (copy != null) org.erisia.stasis.HardRifts.testReload(level, copy);
+                // a room generated after the instant: stopped mode's room at worldgen, not recorded
+                var b2 = b0.moved(rx - b0.minX(), base.getY() - b0.minY(), rz + 64 - b0.minZ());
+                fill.accept(b2, Blocks.STONE.defaultBlockState());
+                var room2 = new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.PortalRoom(1, b2, net.minecraft.core.Direction.SOUTH);
+                centre2[0] = room2.getWorldPos(5, 4, 10).immutable();
+                c.cleanup.add(() -> fill.accept(b2.inflatedBy(4), Blocks.AIR.defaultBlockState()));
+                c.cleanup.add(() -> {
+                    for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.Entity.class, AABB.of(b2).inflate(20), e -> !(e instanceof ServerPlayer)))
+                        e.discard();
+                });
+                gen.accept(room2);
+                c.check("after the instant a new room is shattered at worldgen", count(level, b2, Blocks.END_PORTAL_FRAME) == 0
+                    && org.erisia.stasis.PendingGates.testRoom(level, centre2[0]) == null);
+            };
+            for (int t = 1; t <= 420; t++) {
+                boolean last = t == 420;
+                h.runAfterDelay(t, () -> {
+                    if (phase2[0]) return;
+                    var r = org.erisia.stasis.PendingGates.testRoom(level, centre);
+                    if (!last && (r == null || !r.carved().containsAll(chunks) || !r.shattered().containsAll(chunks))) return;
+                    phase2[0] = true;
+                    second.run();
+                });
+            }
+            h.runAfterDelay(480, () -> sentinelKept[0] = level.getBlockState(sentinel).is(Blocks.GLASS));
+            return () -> {
+                c.check("each chunk written once (the block put in the hollow stayed)", sentinelKept[0]);
+                c.check("the new room's gate rift is registered", centre2[0] != null && org.erisia.stasis.Gates.list(level).contains(centre2[0].asLong()));
+            };
+        }, false, true));
         // the stability compass (Baughn 2026-10-19): in spreading mode it points at the nearest cell of stability >= 90 %
         // (rank >= 0.9 N); in stopped mode it spins
         CASES.put("stability_compass_target", new Spec(1, (h, c) -> () -> {
@@ -2817,6 +2978,13 @@ public final class StasisGameTests {
             b.setEnergy(st, charged ? b.getEnergyMax(st) : 0);
             p.setItemSlot(slots[i], st);
         }
+    }
+
+    /** How many blocks of this kind in the box. */
+    static int count(ServerLevel level, net.minecraft.world.level.levelgen.structure.BoundingBox b, net.minecraft.world.level.block.Block block) {
+        int n = 0;
+        for (BlockPos q : BlockPos.betweenClosed(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ())) if (level.getBlockState(q).is(block)) n++;
+        return n;
     }
 
     /** Has the player "Good job breaking it, hero" (HardMode)? */

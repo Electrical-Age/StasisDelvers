@@ -20,7 +20,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Vanilla End portals are gone (Baughn, rift stage 1b): a stronghold portal room's frame and portal are cleared, a gate
  * rift to the End stands there instead (Gates), and the room is caught mid-collapse around it (GateRoom). In spreading
- * mode (Baughn 2026-10-19) the room stays a working End portal room until hard mode, and is recorded (PendingGates).
+ * mode (Baughn 2026-10-19) the room stays a working End portal room until hard mode, and is recorded (PendingGates);
+ * HardRifts rewrites it at hard mode. From hard mode on, new rooms generate as in stopped mode.
  */
 @Mixin(targets = "net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces$PortalRoom")
 public abstract class StrongholdPortalRoomMixin {
@@ -33,8 +34,11 @@ public abstract class StrongholdPortalRoomMixin {
         // spreading mode: the portal room stays intact until hard mode (spread-DESIGN.md: the End's portal is how players
         // reach the dragon whose death starts hard mode; a gate room here would be permanent worldgen). It is recorded
         // (whole piece and gate centre; PendingGates dedupes) so hard mode can turn it into a gate room then.
-        if (StasisConfig.spreading()) {
-            org.erisia.stasis.PendingGates.portalRoom(sl, piece.getBoundingBox(), piece.getWorldPos(5, 4, 10).immutable());
+        // After hard mode began (HardRifts rewrites the rooms recorded before), a new room generates as in stopped mode;
+        // a chunk of a room recorded before the instant (a stronghold straddling it) is noted, so it isn't shattered twice.
+        boolean spreading = StasisConfig.spreading();
+        if (spreading && !org.erisia.stasis.Spread.hardNow()) {
+            org.erisia.stasis.PendingGates.portalRoom(sl, piece.getBoundingBox(), piece.getWorldPos(5, 4, 10).immutable(), piece.getOrientation());
             return;
         }
         // the frame ring (x 3..7, z 8..12 at y 3) and the portal inside it
@@ -50,5 +54,6 @@ public abstract class StrongholdPortalRoomMixin {
         org.erisia.stasis.NewChunkGrace.exempt(sl, chunkPos.pack());
         // recorded from whichever of the room's chunks comes first (Gates dedupes)
         Gates.portalRoom(sl, piece.getWorldPos(5, 4, 10).immutable());
+        if (spreading) org.erisia.stasis.PendingGates.shatteredAtWorldgen(sl, piece.getWorldPos(5, 4, 10).immutable(), chunkPos.pack());
     }
 }

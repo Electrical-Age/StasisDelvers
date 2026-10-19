@@ -91,7 +91,9 @@ public final class StasisDelvers {
         // item's use for a non-op under spawn protection before we cancel it
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, SpawnUse::useOn);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Gates::tick);
-        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, PendingGates::tick);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, HardRifts::tick);
+        NeoForge.EVENT_BUS.addListener(HardRifts::chunkLoad);
+        NeoForge.EVENT_BUS.addListener(HardRifts::serverStopped);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, StormCrystals::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, GateRoom::fallDebris);
         NeoForge.EVENT_BUS.addListener(Crystals::chunkUnload);

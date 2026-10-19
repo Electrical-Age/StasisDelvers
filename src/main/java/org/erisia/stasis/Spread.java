@@ -385,6 +385,14 @@ public final class Spread {
         update(srv.overworld(), Clock.get(srv.overworld()));
     }
 
+    /**
+     * Has hard mode begun, as the server's state last said (any thread: StrongholdPortalRoomMixin on worldgen threads).
+     * It follows the clock from the hard-mode instant on (HardMode.enter refreshes it); false before the server started.
+     */
+    public static boolean hardNow() {
+        return server.hard();
+    }
+
     /** Has hard mode begun (server; the saved clock, also while a test map is installed)? */
     public static boolean hard(MinecraftServer srv) {
         return Clock.get(srv.overworld()).hard;

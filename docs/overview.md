@@ -49,7 +49,8 @@ Javadocs often cite them as `notes/...`.
 - [spawn-cottage.md](spawn-cottage.md): the spawn site placed once per world.
 - [spreading-mode.md](spreading-mode.md): the `spreading` game mode: the world starts running and the stillness
   spreads from the rifts over online time (`SpreadMap`, `Spread`; client sync `SpreadSync`, `SpreadTiles`); hard mode
-  at the dragon's death (`HardMode`), the End's wall (`EndBarrier`, `client/EndBarrierFx`).
+  at the dragon's death (`HardMode`), the strongholds torn into gate rifts (`HardRifts`), the End's wall (`EndBarrier`,
+  `client/EndBarrierFx`).
 - [client-rendering.md](client-rendering.md): post chain, data-texture slots, frozen textures, tower meshes.
 - [networking.md](networking.md): `StasisNet` payloads, protocol version.
 - [mixins.md](mixins.md): the 27 mixins, the required and cosmetic configs, `CosmeticPlugin`.
@@ -76,6 +77,7 @@ Javadocs often cite them as `notes/...`.
   - `NodeFreezer.FROZEN`
   - `Tickets.FORCED`, which is rebuilt from NeoForge's saved tickets at level load
   - `HardMode`'s End event (a restart mid-event stills the End at once), `EndBarrier`'s last ground positions
+  - `HardRifts`' chunk queue (rebuilt from `pending_gates`' saved progress and chunk loads)
 - **Config:** `StasisConfig` is SYNCED. Values are cached in static volatiles by `refresh()`.
   Some keys that look like worldgen-only keys are also read at runtime (see deeps-strata-worldgen.md).
   The client-only config is `client/report/ReportConfig` (`stasisdelvers-client.toml`).

@@ -68,6 +68,7 @@ public final class HardMode {
         ServerLevel end = srv.getLevel(Level.END);
         if (end != null) explodeEnd(end);
         Spread.refresh(srv);   // the storms' origin to every client; the End keeps running until the flash
+        HardRifts.begin(srv);   // the strongholds' portal rooms tear open into gate rifts (step 4b)
         StasisDelvers.LOG.info("Hard mode begins ({})", cause);
         srv.getPlayerList().broadcastSystemMessage(Component.literal(
             "Something broke in the End. The stillness stirs again, and storms will rise from the rifts.").withStyle(ChatFormatting.DARK_PURPLE), false);
@@ -184,7 +185,7 @@ public final class HardMode {
 
     private static final Map<UUID, Long> TOLD = new HashMap<>();
 
-    /** EntityTravelToDimensionEvent: after hard mode nothing goes into the End (the stronghold portals until step 4b). */
+    /** EntityTravelToDimensionEvent: after hard mode nothing goes into the End (a stronghold portal not yet rewritten: HardRifts). */
     static void travel(net.neoforged.neoforge.event.entity.EntityTravelToDimensionEvent e) {
         if (e.getDimension() != Level.END || !(e.getEntity().level() instanceof ServerLevel level) || !endClosed(level.getServer())) return;
         if (e.getEntity() instanceof ServerPlayer p) {

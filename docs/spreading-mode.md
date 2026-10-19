@@ -3,8 +3,8 @@
 Paths are relative to `src/main/java/org/erisia/stasis/`. Design: `notes/timestop/spread-DESIGN.md` (with Argon's
 review and Baughn's decisions of 2026-10-19). Step 1 is in: the server core (1a) and the client sync, shader and
 drifting deeps over running land (1b); step 2 (the stronghold library desk, portal rooms recorded) and step 3 (front
-warnings) too, and step 4a (hard mode's entry: the dragon's death, the End before and after). Still to come: 4b (the
-stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
+warnings) too, step 4a (hard mode's entry: the dragon's death, the End before and after) and 4b (the stronghold
+rewrite). Still to come: 5 (the island's explosion and the end-stone rift).
 
 ## What it is
 - Config `mode = "spreading"` (default `"stopped"`, the base mod). The world starts running; the stillness spreads
@@ -15,7 +15,7 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
 - First join: one stability compass and nothing else (`StarterKit`, persisted flag `stasisdelvers_starter_compass`).
 - Off in spreading mode: the spawn cottage (not marked done), the starter suit and flashlight, storms until hard mode
   (`Storms.origin` is NaN; from hard mode on the schedule counts from its instant, so tau doesn't jump), and the
-  stronghold portal room's gate rift (the room stays intact; hard mode will need it).
+  stronghold portal room's gate rift until hard mode (the room stays intact; hard mode tears it open: `HardRifts`).
 - Strongholds (step 2): each library has a surveyor's desk (`MapDeskBlock`, maps to ruined cottages; the spawn
   cottage's desk is off with the cottage), and each portal room is a working End portal room, recorded for hard mode.
 - The Nether runs until the spread is complete (`Stasis.stops` is false there), then follows the base rules. The End
@@ -149,10 +149,11 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
   gate rooms and gate rifts (Baughn's decision 6: the full rift). `StrongholdPortalRoomMixin` queues each room (whole
   piece `BoundingBox` + centre) from the worldgen thread; `PendingGates.tick` (server thread) records it, deduplicated
   by centre (postProcess runs once per chunk the piece touches). The centre is the piece's local (5, 4, 10), the block
-  above the portal's middle, the same one `Gates.portalRoom` takes, so hard mode can pass it on as it is. Rooms
-  generated after hard mode began are recorded as well (still intact): hard mode's rewrite must handle them on load.
-  Nothing reads the list yet (`PendingGates.list`). `endPortalRifts = false` turns recording off too (no gate rooms
-  ever).
+  above the portal's middle, the same one `Gates.portalRoom` takes, so hard mode can pass it on as it is; the
+  orientation is kept too (`dir`; derived from box and centre for rooms recorded before it was, `orientationOf`).
+  Only rooms generated before hard mode are recorded (`Spread.hardNow`, the worldgen threads' view; one queued in the
+  moment before they saw it is activated as it is recorded). `endPortalRifts = false` turns recording off too (no gate
+  rooms ever).
 
 ## Hard mode (step 4a)
 - `HardMode.enter(server, cause)`: the one entry point, for the dragon's death and `/stasis spread hardmode`. Once only
@@ -179,11 +180,53 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
   "The Next Generation" advancement can't be had in this mode). `tryRespawn` is cancelled: no second dragon (it would
   build an exit portal). `LivingDeathEvent` isn't used: it comes 10 s before, at the start of the death animation.
 - After hard mode no way leads into the End (`HardMode.endClosed`: `EntityTravelToDimensionEvent` to the End is
-  cancelled for everything but creative and spectator players; the stronghold portals still stand until step 4b).
+  cancelled for everything but creative and spectator players; a stronghold portal still stands until its chunk is
+  rewritten, `HardRifts`).
   The lance (later) will open the way. A player who logs in in the End after the flash (a restart mid-event, a long
   absence) is sent home the same way, with the advancement.
 - A restart during the event: hard mode stays, the event is gone, the End is stilled at once. Step 5 will need to
   persist its build progress.
+
+## The strongholds at hard mode (step 4b)
+Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardRifts.java`.
+- At the instant (`HardMode.enter` → `HardRifts.begin`): the rooms worldgen queued are recorded, then every recorded
+  room is activated: its gate rift is registered at once (`Gates.register`: `rift_gates`, `StaticDeeps.setGates`,
+  `GateRifts` to the level's players; it has to come before any block is written, since `isGate` gives the rift its
+  destination, the End, for the shell's scatter). Players within 64 blocks get a chat line ("The ground heaves: ...");
+  players the new rift stopped who stood in running time get the usual grace (`Freezing.graceIfStopped`, in chat).
+  Nobody is teleported: the rift's core is ~3 blocks across and the grace is enough to step out.
+- What is written: what the stopped mode generates for the room (the frame ring and portal cleared, `GateRoom.shatter`),
+  plus the gate rift's carve (`DeepFeature.apply`: the hollow, shattered shell with its scatter, crevasses, the sinkhole
+  to the surface when the room lies within ~40 blocks of it, dislocations, dripstone, sky shards). Gate rifts have no
+  strata anywhere (`StaticDeeps.isGate` is skipped by `StrataMask`, `Pockets`, `Crystals`, `Ruins`), so none are
+  written: strata rock there would be inert (no pockets, no crystal growth, no client mask).
+- Per chunk, from the recorded box, orientation and centre (Argon's second option): `shatter` and the carve touch
+  only the chunk's own columns, as at worldgen, so no chunk waits for its neighbours and the order doesn't matter. The
+  chunks are those the carve reaches (`DeepFeature.reaches` without strata: ~37 blocks round the centre, ~30 chunks).
+  Chunks loaded at the instant are queued at once; the others when they next load (`ChunkEvent.Load` → the server tick).
+  The queue is worked `CHUNKS_PER_TICK` (2) a tick. A chunk within 16 blocks of the centre whose room part is still due
+  waits until its entities are loaded (the shards and silverfish are entities; added earlier they could be lost).
+- Progress is saved per room and chunk (`shattered`, `carved`): a restart resumes (the first hard-mode tick re-activates
+  every room, idempotently, and queues their loaded chunks) and nothing is written twice.
+- The writes: flags `UPDATE_CLIENTS | UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`. `LevelChunk.setBlockState` keeps the light
+  and the four live heightmaps up to date itself, and the chunk holder sends each tick's changes per section with the
+  light, so no chunk is resent and no heightmap re-primed (the carve reads the live `WORLD_SURFACE`, the worldgen one's
+  not-air rule). Block entities in the way are removed: EA's `NodeBlockEntity.setRemoved` then removes its node (and
+  any orphan). Containers' contents are destroyed with them, not dropped (cheaper, and no item floods in a rift). EA's
+  ghost blocks (multiblock parts) get `UPDATE_NEIGHBORS` too: their `affectNeighborsAfterRemoval` breaks the element.
+  Players' builds in the carve go (intended). The shatter's lava ribbons flow where the land still runs.
+- After the instant new portal rooms generate as in the stopped mode (`StrongholdPortalRoomMixin`: shattered at
+  worldgen, gate registered, no carve, as there). A stronghold straddling the instant has its later chunks shattered
+  at worldgen; the mixin notes them (`PendingGates.shatteredAtWorldgen`) and only their carve is done here.
+- Lab check (a real world, not run yet): a lab server in spreading mode with a fresh world; `/locate structure
+  minecraft:stronghold`, fly there and find the portal room (spectator), so its chunks generate and the room is
+  recorded (the log: "Stronghold portal room at X, Y, Z recorded for hard mode"); put a chest, an EA cable and battery
+  in the room and stand a survival player beside the portal; also note a second stronghold's coordinates without
+  visiting it. `/stasis spread hardmode`: the log names the rooms; the near player gets the chat line and grace; within
+  a second the room shatters (no frames, shards, debris, lava ribbons), the rift hollows its core and a sinkhole opens
+  above if it is shallow; the EA nodes are gone (`/elnlab` or the node count in F7), no items dropped. Relog: nothing
+  changes again. Then visit the second stronghold: it tears open as its chunks load. Restart mid-way (with chunks still
+  queued): it resumes. Generate a new stronghold after hard mode (far `/locate`): a gate room at worldgen.
 
 ## The End's wall (λ-Nero)
 - `EndBarrier`: a vertical cylinder of radius `endBarrierRadius` (default 140) round 0, 0, on while `endBarrier` (default
@@ -206,8 +249,10 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
   `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`, `hard_c` (coverage at the instant, -1 in older saves:
   the cap), `hard_game` (game seconds at the instant: the storms' origin, -1 unknown), and the spawn move: `spawn_move` 0 not moved / 1
   moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
-- SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre}`.
-- Memory only: the End event (`HardMode`), the wall's last ground positions (`EndBarrier`).
+- SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre, dir,
+  shattered: [chunk], carved: [chunk]}` (packed ChunkPos; `dir` derived and both lists empty in older saves).
+- Memory only: the End event (`HardMode`), the wall's last ground positions (`EndBarrier`), the stronghold rewrite's
+  queue (`HardRifts`: rebuilt from the progress and chunk loads).
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -250,7 +295,13 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
   nothing in a field, nothing once stilled); `spread_tiles_follow_player` (the server's tile list follows the player); `spread_stronghold_rooms` (vanilla
   library and portal room pieces built chunk by chunk, each straddling four chunks: no desk in stopped mode, one desk
   per library in spreading mode, in rock and in a cave; the portal room keeps its 12 frames, and its portal when all
-  12 eyes rolled, gets no shards, and is recorded once with its whole box although generated twice over).
+  12 eyes rolled, gets no shards, and is recorded once with its whole box although generated twice over);
+  `spread_hard_mode_gate_rooms` (a recorded room in a block of rock, an EA source and a chest with diamonds in the
+  rift's hollow, a running player at the centre: at hard mode the gate is registered at once, its core is rift, the
+  player has the grace, the chunks are queued and not yet written; then (looked at each tick) every chunk is shattered and carved,
+  no frames or portal, shards hang, the hollow is air, the EA node is gone, no diamonds dropped; a block put in the
+  hollow survives the progress saved and read back and every chunk loading again; a room generated after the instant
+  is shattered at worldgen, not recorded, and its gate registered).
 - `spread_hard_mode_entry` (two players in the test End beyond 192 blocks of the centre, so its dragon fight stays
   asleep): the entry point enters once; P doesn't jump and status names the instant's coverage; the storms' origin is
   the instant, tau = t before it and storms are scheduled after it; the End runs until the flash; a death in the End

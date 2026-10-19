@@ -28,6 +28,9 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
     3. `TimeScars.place` (config `timeScars`)
     4. `Ruins.place` (config `ruins`)
   - It then re-primes the chunk's heightmaps.
+  - Writes go through a `Writer` (worldgen: `setBlock` flag 2) and the surface heightmap is a parameter, so one deep can
+    be written into one existing chunk: `apply(level, writer, surface, deep, x0, z0, withStrata)` (hard mode's gate
+    rifts, `HardRifts`, with the live `WORLD_SURFACE`). `reaches(deep, x0, z0, withStrata)` is the reach test.
 - `Strata.java`: four shapes (`Shape`: SADDLE, STAIRCASE, SPLASH, PODS), weighted by config `strataShapes`
   (`setWeights`). `shapeOf`, `bounds`, `at(deep, x, y, z)` returns the strata class. SADDLE roots are cached
   (`roots`).
@@ -37,12 +40,18 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   strata and cut by tilted noise. They keep vanilla loot. Not in gate rifts.
 - `Gates.java`: each static rift leads somewhere by weight (config `riftDestinations`, default End 2 : Nether 1).
   - `scatter` puts the destination's blocks into the shell (config `riftScatter`).
-  - Gate rifts replace End portals: `StrongholdPortalRoomMixin` → `GateRoom.shatter`. In spreading mode the room
-    stays a working End portal room until hard mode and is recorded in SavedData `pending_gates` (`PendingGates`;
-    spreading-mode.md) instead.
+  - Gate rifts replace End portals: `StrongholdPortalRoomMixin` → `GateRoom.shatter`. In stopped mode a gate rift has
+    no worldgen of its own (no carve, no strata): the room is its terrain. In spreading mode the room stays a working
+    End portal room until hard mode and is recorded in SavedData `pending_gates` (`PendingGates`) instead; at hard mode
+    `HardRifts` writes the shattered room and the gate rift's carve (Baughn: the full rift, a cataclysm; still no
+    strata) into the existing chunks, chunk by chunk (spreading-mode.md). Rooms generated after hard mode get the
+    stopped mode's room at worldgen.
+  - `Gates.register`: the server-thread registration (saved, published, sent); `Gates.tick` and `HardRifts` use it.
   - Gate centres are SavedData `rift_gates`, synced as `GateRifts`, and enter `StaticDeeps.setGates`.
 - `GateRoom.java`: the stronghold portal room frozen mid-implosion: block-display shards and hanging debris
-  (`fallDebris` ticks). Its chunks are exempt from the new-chunk grace (`NewChunkGrace.exempt`).
+  (`fallDebris` ticks). Its chunks are exempt from the new-chunk grace (`NewChunkGrace.exempt`). `shatter` writes
+  only inside the chunk box it is given, through a `DeepFeature.Writer` (so `HardRifts` can rebuild the piece from a
+  recorded box and orientation and shatter a live chunk).
 - `RuinedCottages.java`: structure type `ruined_cottage` (`worldgen/structure/ruined_cottage.json`,
   structure set ~1/km²). Templates come from `stasisdelvers/structure/ruined_cottage/*.nbt`.
   - The `RuinedCore` processor rewrites tower NBT: dead, `coreDrop` 0, `ruined`.
@@ -55,7 +64,8 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
 - `StructureTemplateMixin`: crops in structure templates get random growth stages (`TimeScars.cropAge`).
 
 ## Persistent state
-- `FieldData.deep_seed`; SavedData `rift_gates`; in spreading mode `pending_gates` (portal rooms for hard mode).
+- `FieldData.deep_seed`; SavedData `rift_gates`; in spreading mode `pending_gates` (portal rooms for hard mode, and
+  per chunk whether hard mode's rewrite shattered and carved it).
 - Generated blocks are the only record of worldgen. Nothing else about strata or rifts is saved; it is all
   recomputed from the seed.
 - `RuinedCottages` and `EndSites` keep their StructureStarts in their chunks (phase-2 swaps are possible).
@@ -69,7 +79,9 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   inside the chunk being generated. The one exception is `DeepFeature.carvable`, which reads fluids in
   neighbouring blocks, possibly in the next chunk; it refuses to carve next to fluid.
 - Strata: `strata_shapes`, `strata_pockets`, `strata_rift_pocket`, `strata_mist_pocket`.
-- Gates and rooms: `rift_gates`; spreading mode's library desk and recorded portal rooms: `spread_stronghold_rooms`. Ruined cottages: `ruined_cottage_core`, `ruined_cottage_templates`.
+- Gates and rooms: `rift_gates`; spreading mode's library desk and recorded portal rooms: `spread_stronghold_rooms`;
+  hard mode's rewrite of them: `spread_hard_mode_gate_rooms`. `HardRifts` writes into existing chunks with the same
+  pure functions and the same chunk-local rule (each chunk only its own columns, any order). Ruined cottages: `ruined_cottage_core`, `ruined_cottage_templates`.
 - End sites (registration only): `end_sites_replace_cities`.
 - Crystals in worldgen: `rift_crystal_grades`.
 
@@ -78,5 +90,6 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   from rock that is already generated:
   - `strataShapes`: `Pockets.masked`, `Crystals`, `client/StrataMask`
   - `riftDestinations`: `client/StasisPost` (each eye's destination, data slots 200-203)
-- `DeepFeature` only touches chunks generated after it existed. Old chunks keep their terrain.
+- `DeepFeature` only touches chunks generated after it existed. Old chunks keep their terrain. The one exception is
+  hard mode's gate rifts (`HardRifts`), which are written into existing chunks on purpose.
 - Worldgen runs on worker threads. Use `peekDeepSeed` and pure functions there, never `FieldData.get`.

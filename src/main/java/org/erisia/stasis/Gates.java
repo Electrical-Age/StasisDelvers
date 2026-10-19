@@ -115,6 +115,11 @@ public final class Gates {
         return (int) (Noise.hash32(p.getX(), p.getY(), p.getZ(), 0x6A7E) * 0xFFFFFF) | 1;
     }
 
+    /** Tests: gate(). */
+    public static StaticDeeps.Deep gateForTest(BlockPos p) {
+        return gate(p);
+    }
+
     static StaticDeeps.Deep gate(BlockPos p) {
         return new StaticDeeps.Deep(p.getX() + 0.5f, p.getY() + 0.5f, p.getZ() + 0.5f, GATE_RADIUS, gateId(p));
     }
@@ -130,16 +135,33 @@ public final class Gates {
     static void tick(ServerTickEvent.Post e) {
         Object[] o;
         while ((o = PENDING.poll()) != null) {
-            ServerLevel level = (ServerLevel) o[0];
-            BlockPos p = (BlockPos) o[1];
-            Data d = Data.get(level);
-            if (d.gates.contains(p.asLong())) continue;
-            d.gates.add(p.asLong());
-            d.setDirty();
-            StasisDelvers.LOG.info("A gate rift stands in the stronghold portal room at {}", p.toShortString());
-            publish(level);
-            for (var pl : level.players()) StasisNet.sendGates(pl);
+            register((ServerLevel) o[0], (BlockPos) o[1]);
         }
+    }
+
+    /**
+     * Server thread: a gate rift stands at centre from now on (saved, into StaticDeeps, sent to the level's players).
+     * False if it was known. HardRifts registers spreading mode's portal rooms at once at hard mode: isGate (its
+     * destination, the End, for the scatter) must answer before the rift is carved.
+     */
+    static boolean register(ServerLevel level, BlockPos p) {
+        Data d = Data.get(level);
+        if (d.gates.contains(p.asLong())) return false;
+        d.gates.add(p.asLong());
+        d.setDirty();
+        StasisDelvers.LOG.info("A gate rift stands in the stronghold portal room at {}", p.toShortString());
+        publish(level);
+        for (var pl : level.players()) StasisNet.sendGates(pl);
+        return true;
+    }
+
+    /** Tests: forget the gate rift at centre (and tell StaticDeeps and the players). */
+    public static void testForget(ServerLevel level, BlockPos p) {
+        Data d = Data.get(level);
+        if (!d.gates.remove(p.asLong())) return;
+        d.setDirty();
+        publish(level);
+        for (var pl : level.players()) StasisNet.sendGates(pl);
     }
 
     /** The level's gate rifts into StaticDeeps (server side: on load and when one is added). */
@@ -149,7 +171,7 @@ public final class Gates {
     }
 
     /** This level's gate rift centres (packed block positions), for the client. */
-    static List<Long> list(ServerLevel level) {
+    public static List<Long> list(ServerLevel level) {
         return List.copyOf(Data.get(level).gates);
     }
 
