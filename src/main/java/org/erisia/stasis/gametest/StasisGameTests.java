@@ -2274,6 +2274,94 @@ public final class StasisGameTests {
                     org.erisia.stasis.Spread.status(server, null));
             };
         }, false, true));
+        // spreading mode's strongholds (spread-DESIGN.md step 3; Baughn 2026-10-19): each library gets one surveyor's
+        // desk on its floor (and a floor under it where a cave ate the library's), none in stopped mode; the portal room
+        // stays a working End portal room (12 frames, the portal only if every frame rolled an eye) and is recorded once
+        // in pending_gates with its whole box, though postProcess runs once per chunk it touches (twice here). The pieces
+        // are built as worldgen does, chunk by chunk, each straddling four chunks.
+        CASES.put("spread_stronghold_rooms", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos base = h.absolutePos(new BlockPos(0, 20, 0));
+            List<net.minecraft.world.level.levelgen.structure.BoundingBox> boxes = new ArrayList<>();
+            // a piece's box with its min corner at chunk-relative (8, 8), so it touches four chunks
+            java.util.function.BiFunction<net.minecraft.world.level.levelgen.structure.BoundingBox, Integer, net.minecraft.world.level.levelgen.structure.BoundingBox> place = (b, dx) -> {
+                int x = ((base.getX() + dx) & ~15) + 8, z = (base.getZ() & ~15) + 8;
+                var m = b.moved(x - b.minX(), base.getY() - b.minY(), z - b.minZ());
+                boxes.add(m);
+                return m;
+            };
+            java.util.function.BiConsumer<net.minecraft.world.level.levelgen.structure.BoundingBox, net.minecraft.world.level.block.state.BlockState> fill = (b, st) -> {
+                for (BlockPos q : BlockPos.betweenClosed(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ())) level.setBlock(q, st, 2 | 16);
+            };
+            java.util.function.Consumer<net.minecraft.world.level.levelgen.structure.StructurePiece> gen = piece -> {
+                var b = piece.getBoundingBox();
+                for (int cx = b.minX() >> 4; cx <= b.maxX() >> 4; cx++)
+                    for (int cz = b.minZ() >> 4; cz <= b.maxZ() >> 4; cz++) {
+                        var chunkBB = new net.minecraft.world.level.levelgen.structure.BoundingBox(cx << 4, level.getMinY(), cz << 4, (cx << 4) + 15, level.getMaxY(), (cz << 4) + 15);
+                        piece.postProcess(level, level.structureManager(), level.getChunkSource().getGenerator(), net.minecraft.util.RandomSource.create(cx * 31L + cz),
+                            chunkBB, new net.minecraft.world.level.ChunkPos(cx, cz), b.getCenter());
+                    }
+            };
+            java.util.function.ToIntFunction<net.minecraft.world.level.levelgen.structure.BoundingBox> desks = b -> {
+                int n = 0;
+                for (BlockPos q : BlockPos.betweenClosed(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ()))
+                    if (level.getBlockState(q).is(org.erisia.stasis.StasisRegistry.MAP_DESK_BLOCK.get())) n++;
+                return n;
+            };
+            var stone = Blocks.STONE.defaultBlockState();
+            // stopped mode: a library, no desk
+            var b0 = place.apply(net.minecraft.world.level.levelgen.structure.BoundingBox.orientBox(0, 0, 0, -4, -1, 0, 14, 11, 15, net.minecraft.core.Direction.WEST), 0);
+            fill.accept(b0, stone);
+            gen.accept(new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.Library(1, net.minecraft.util.RandomSource.create(1), b0, net.minecraft.core.Direction.WEST));
+            c.check("stopped mode: no desk in the library", desks.applyAsInt(b0) == 0);
+            c.cleanup.add(() -> {
+                for (var b : boxes) fill.accept(b.inflatedBy(1), Blocks.AIR.defaultBlockState());
+            });
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.Spread.testInstall(org.erisia.stasis.SpreadMap.build(7, base.getX(), base.getZ(), 200), 0);
+            // a tall library in rock, a short one in a cave (air: its floor has holes)
+            var b1 = place.apply(net.minecraft.world.level.levelgen.structure.BoundingBox.orientBox(0, 0, 0, -4, -1, 0, 14, 11, 15, net.minecraft.core.Direction.NORTH), 32);
+            fill.accept(b1, stone);
+            var lib1 = new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.Library(1, net.minecraft.util.RandomSource.create(2), b1, net.minecraft.core.Direction.NORTH);
+            gen.accept(lib1);
+            var b2 = place.apply(net.minecraft.world.level.levelgen.structure.BoundingBox.orientBox(0, 0, 0, -4, -1, 0, 14, 6, 15, net.minecraft.core.Direction.EAST), 64);
+            var lib2 = new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.Library(1, net.minecraft.util.RandomSource.create(3), b2, net.minecraft.core.Direction.EAST);
+            gen.accept(lib2);
+            for (var lib : List.of(lib1, lib2)) {
+                var b = lib.getBoundingBox();
+                BlockPos d = lib.getWorldPos(6, 1, 13);
+                c.check("one desk in the library at " + b, desks.applyAsInt(b) == 1, String.valueOf(desks.applyAsInt(b)));
+                c.check("at the back wall, on a floor", level.getBlockState(d).is(org.erisia.stasis.StasisRegistry.MAP_DESK_BLOCK.get())
+                    && level.getBlockState(d.below()).isFaceSturdy(level, d.below(), net.minecraft.core.Direction.UP), d.toShortString());
+                c.check("the way from the door is clear", level.getBlockState(lib.getWorldPos(6, 1, 12)).isAir() || level.getBlockState(lib.getWorldPos(6, 1, 12)).is(Blocks.COBWEB));
+            }
+            // the portal room, generated twice over
+            var b3 = place.apply(net.minecraft.world.level.levelgen.structure.BoundingBox.orientBox(0, 0, 0, -4, -1, 0, 11, 8, 16, net.minecraft.core.Direction.SOUTH), 96);
+            fill.accept(b3, stone);
+            var room = new net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces.PortalRoom(1, b3, net.minecraft.core.Direction.SOUTH);
+            gen.accept(room);
+            gen.accept(room);
+            BlockPos centre = room.getWorldPos(5, 4, 10).immutable();
+            c.cleanup.add(() -> org.erisia.stasis.PendingGates.testForget(level, centre));
+            int frames = 0, eyes = 0, portal = 0;
+            for (BlockPos q : BlockPos.betweenClosed(b3.minX(), b3.minY(), b3.minZ(), b3.maxX(), b3.maxY(), b3.maxZ())) {
+                var st = level.getBlockState(q);
+                if (st.is(Blocks.END_PORTAL_FRAME)) {
+                    frames++;
+                    if (st.getValue(net.minecraft.world.level.block.EndPortalFrameBlock.HAS_EYE)) eyes++;
+                }
+                if (st.is(Blocks.END_PORTAL)) portal++;
+            }
+            c.check("the portal room keeps its 12 frames", frames == 12, String.valueOf(frames));
+            c.check("and its portal if every eye is in", portal == (eyes == 12 ? 9 : 0), eyes + " eyes, " + portal + " portal");
+            c.check("no shards or debris (not a gate room)", level.getEntitiesOfClass(net.minecraft.world.entity.Display.BlockDisplay.class, AABB.of(b3).inflate(4)).isEmpty());
+            return () -> {
+                var rooms = org.erisia.stasis.PendingGates.list(level).stream().filter(r -> r.centre().equals(centre)).toList();
+                c.check("the portal room is recorded once", rooms.size() == 1, rooms.toString());
+                c.check("with the whole piece's box", rooms.size() == 1 && rooms.get(0).box().equals(b3), rooms + " vs " + b3);
+                c.check("its centre is over the portal", centre.getY() == b3.minY() + 4, centre.toShortString());
+            };
+        }, false, true));
         // the stability compass (Baughn 2026-10-19): in spreading mode it points at the nearest cell of stability >= 90 %
         // (rank >= 0.9 N); in stopped mode it spins
         CASES.put("stability_compass_target", new Spec(1, (h, c) -> () -> {

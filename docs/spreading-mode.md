@@ -2,7 +2,8 @@
 
 Paths are relative to `src/main/java/org/erisia/stasis/`. Design: `notes/timestop/spread-DESIGN.md` (with Argon's
 review and Baughn's decisions of 2026-10-19). Step 1 is in: the server core (1a) and the client sync, shader and
-drifting deeps over running land (1b); front warnings, the stronghold desk and hard mode's effects come later.
+drifting deeps over running land (1b); step 2 (the stronghold library desk, portal rooms recorded) too. Front
+warnings and hard mode's effects come later.
 
 ## What it is
 - Config `mode = "spreading"` (default `"stopped"`, the base mod). The world starts running; the stillness spreads
@@ -13,6 +14,8 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
 - Off in spreading mode: the spawn cottage (not marked done), the starter suit and flashlight, storms
   (`StasisConfig.storms` is false: storms come with hard mode, after the storm clock's origin moves, or tau jumps),
   and the stronghold portal room's gate rift (the room stays intact; hard mode will need it).
+- Strongholds (step 2): each library has a surveyor's desk (`MapDeskBlock`, maps to ruined cottages; the spawn
+  cottage's desk is off with the cottage), and each portal room is a working End portal room, recorded for hard mode.
 - The Nether and the End run until the spread is complete (`Stasis.stops` is false there), then follow the base rules.
 - Drifting deeps (Baughn, 2026-10-19): a drifting deep stops time on running land it passes over wherever no field
   (or the spawn area) holds it, on both sides: `rateAt` and `rateAtSteady` are 0 there (block ticks, entities, EA
@@ -113,12 +116,27 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   "Temporal stability here: NN %" on the action bar. Recipe: a compass with amethyst shards N, E, S, W. Model: the
   vanilla compass models with a constant pale-amethyst tint (`items/stability_compass.json`).
 
+- `mixin/StrongholdLibraryMixin`: `StrongholdPieces$Library.postProcess` TAIL, spreading mode only. One desk per
+  library at the piece's local (6, 1, 13): on the floor against the back wall, facing the entry door, behind the last
+  shelf row, off the tall library's ladder (x 10). A fixed spot, written only from the chunk it is in, so it is one desk
+  whatever order the library's chunks generate in. It goes only into air or cobweb; under it, stone bricks if a cave
+  left no floor (same column).
+- `PendingGates.java`: SavedData `stasisdelvers:pending_gates` (per level): the portal rooms hard mode will turn into
+  gate rooms and gate rifts (Baughn's decision 6: the full rift). `StrongholdPortalRoomMixin` queues each room (whole
+  piece `BoundingBox` + centre) from the worldgen thread; `PendingGates.tick` (server thread) records it, deduplicated
+  by centre (postProcess runs once per chunk the piece touches). The centre is the piece's local (5, 4, 10), the block
+  above the portal's middle, the same one `Gates.portalRoom` takes, so hard mode can pass it on as it is. Rooms
+  generated after hard mode began are recorded as well (still intact): hard mode's rewrite must handle them on load.
+  Nothing reads the list yet (`PendingGates.list`). `endPortalRifts = false` turns recording off too (no gate rooms
+  ever).
+
 ## Persistent state
 - Overworld SavedData `stasisdelvers:spread_map` (`algorithm`, `spawn_x`, `spawn_z`, `radius`, `ranks` int array),
   written once. A saved map is never rebuilt, whatever its algorithm: a world made with v1 keeps its v1 map (logged at
   load). A missing `algorithm` reads as 1 (DFU drops fields equal to their default, so v1 saves lack it). Delete
   `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`, and the spawn move: `spawn_move` 0 not moved / 1
   moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
+- SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre}`.
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -151,7 +169,12 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   once P passes its rank it moves to a running column of rank >= max(0.9 N, P + 1) on dry solid ground with air above;
   P past the new spawn's rank leaves it there; status says so); `stability_compass_first_join` (one compass, nothing else, not again); `spread_deep_stops_running_land` (rate 0 and no block tick in a drifting
   deep over running land, the land's rate 1, a field holds it off, an unsuited player is held, not a statue);
-  `spread_tiles_follow_player` (the server's tile list follows the player).
+  `spread_tiles_follow_player` (the server's tile list follows the player); `spread_stronghold_rooms` (vanilla
+  library and portal room pieces built chunk by chunk, each straddling four chunks: no desk in stopped mode, one desk
+  per library in spreading mode, in rock and in a cave; the portal room keeps its 12 frames, and its portal when all
+  12 eyes rolled, gets no shards, and is recorded once with its whole box although generated twice over).
+- Eyes of Ender: nothing here changes where strongholds are placed or `#eye_of_ender_located`; the portal room's
+  blocks are vanilla's. The GameTest world has no strongholds, so this is not tested in a real one.
 
 ## Gotchas
 - The spawn move is once only (Baughn): a spawn that stills again stays, and a `/setworldspawn` after the move is

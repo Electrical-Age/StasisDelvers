@@ -19,7 +19,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Vanilla End portals are gone (Baughn, rift stage 1b): a stronghold portal room's frame and portal are cleared, a gate
- * rift to the End stands there instead (Gates), and the room is caught mid-collapse around it (GateRoom).
+ * rift to the End stands there instead (Gates), and the room is caught mid-collapse around it (GateRoom). In spreading
+ * mode (Baughn 2026-10-19) the room stays a working End portal room until hard mode, and is recorded (PendingGates).
  */
 @Mixin(targets = "net.minecraft.world.level.levelgen.structure.structures.StrongholdPieces$PortalRoom")
 public abstract class StrongholdPortalRoomMixin {
@@ -27,10 +28,15 @@ public abstract class StrongholdPortalRoomMixin {
     private void stasis$gateRift(WorldGenLevel level, StructureManager structureManager, ChunkGenerator generator, RandomSource random,
                                  BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos, CallbackInfo ci) {
         ServerLevel sl = level.getLevel();
-        // spreading mode: the portal room stays intact until hard mode (spread-DESIGN.md: the End's portal is how players
-        // reach the dragon whose death starts hard mode; a gate room here would be permanent worldgen)
-        if (!StasisConfig.endPortalRifts || StasisConfig.spreading() || !Stasis.stops(sl)) return;
+        if (!StasisConfig.endPortalRifts || !Stasis.stops(sl)) return;   // (in spreading mode the overworld stops() too)
         net.minecraft.world.level.levelgen.structure.StructurePiece piece = (net.minecraft.world.level.levelgen.structure.StructurePiece) (Object) this;
+        // spreading mode: the portal room stays intact until hard mode (spread-DESIGN.md: the End's portal is how players
+        // reach the dragon whose death starts hard mode; a gate room here would be permanent worldgen). It is recorded
+        // (whole piece and gate centre; PendingGates dedupes) so hard mode can turn it into a gate room then.
+        if (StasisConfig.spreading()) {
+            org.erisia.stasis.PendingGates.portalRoom(sl, piece.getBoundingBox(), piece.getWorldPos(5, 4, 10).immutable());
+            return;
+        }
         // the frame ring (x 3..7, z 8..12 at y 3) and the portal inside it
         for (int x = 3; x <= 7; x++)
             for (int z = 8; z <= 12; z++) {

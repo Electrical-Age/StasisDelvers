@@ -23,7 +23,7 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * The surveyor's desk at spawn (Baughn 2026-10-17): each player gets a map to a ruined cottage nobody else has a map
  * to (vanilla's one-map-per-structure rule), nearest first. One map per player, ever (Baughn). Not craftable: it's part
- * of the spawn cottage.
+ * of the spawn cottage, and in spreading mode (no cottage) one stands in each stronghold library (StrongholdLibraryMixin).
  */
 public class MapDeskBlock extends Block {
     public static final TagKey<Structure> COTTAGES = TagKey.create(Registries.STRUCTURE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "on_cottage_maps"));

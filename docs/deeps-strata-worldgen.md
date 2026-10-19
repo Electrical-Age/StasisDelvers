@@ -37,7 +37,9 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   strata and cut by tilted noise. They keep vanilla loot. Not in gate rifts.
 - `Gates.java`: each static rift leads somewhere by weight (config `riftDestinations`, default End 2 : Nether 1).
   - `scatter` puts the destination's blocks into the shell (config `riftScatter`).
-  - Gate rifts replace End portals: `StrongholdPortalRoomMixin` → `GateRoom.shatter`.
+  - Gate rifts replace End portals: `StrongholdPortalRoomMixin` → `GateRoom.shatter`. In spreading mode the room
+    stays a working End portal room until hard mode and is recorded in SavedData `pending_gates` (`PendingGates`;
+    spreading-mode.md) instead.
   - Gate centres are SavedData `rift_gates`, synced as `GateRifts`, and enter `StaticDeeps.setGates`.
 - `GateRoom.java`: the stronghold portal room frozen mid-implosion: block-display shards and hanging debris
   (`fallDebris` ticks). Its chunks are exempt from the new-chunk grace (`NewChunkGrace.exempt`).
@@ -48,11 +50,12 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
 - `EndSites.java`: End towers and frozen airships replace end cities and ships
   (`src/main/resources/data/minecraft/tags/worldgen/biome/has_structure/end_city.json` is emptied). Without a template, a marker is placed.
 - `MapDeskBlock.java`: the surveyor's desk. One map to an unclaimed ruined cottage per player, ever
-  (player NBT `stasisdelvers_map_desk`; structure tag `on_cottage_maps`).
+  (player NBT `stasisdelvers_map_desk`; structure tag `on_cottage_maps`). In spreading mode one stands in each
+  stronghold library (`StrongholdLibraryMixin`, a fixed spot written from its own chunk only).
 - `StructureTemplateMixin`: crops in structure templates get random growth stages (`TimeScars.cropAge`).
 
 ## Persistent state
-- `FieldData.deep_seed`; SavedData `rift_gates`.
+- `FieldData.deep_seed`; SavedData `rift_gates`; in spreading mode `pending_gates` (portal rooms for hard mode).
 - Generated blocks are the only record of worldgen. Nothing else about strata or rifts is saved; it is all
   recomputed from the seed.
 - `RuinedCottages` and `EndSites` keep their StructureStarts in their chunks (phase-2 swaps are possible).
@@ -66,7 +69,7 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   inside the chunk being generated. The one exception is `DeepFeature.carvable`, which reads fluids in
   neighbouring blocks, possibly in the next chunk; it refuses to carve next to fluid.
 - Strata: `strata_shapes`, `strata_pockets`, `strata_rift_pocket`, `strata_mist_pocket`.
-- Gates and rooms: `rift_gates`. Ruined cottages: `ruined_cottage_core`, `ruined_cottage_templates`.
+- Gates and rooms: `rift_gates`; spreading mode's library desk and recorded portal rooms: `spread_stronghold_rooms`. Ruined cottages: `ruined_cottage_core`, `ruined_cottage_templates`.
 - End sites (registration only): `end_sites_replace_cities`.
 - Crystals in worldgen: `rift_crystal_grades`.
 

@@ -10,6 +10,7 @@
     "BlockStateBaseMixin",
     "LivingEntityMixin",
     "StrongholdPortalRoomMixin",
+    "StrongholdLibraryMixin",
     "StructureTemplateMixin",
     "SpawnUseMixin",
     "BucketItemMixin",
