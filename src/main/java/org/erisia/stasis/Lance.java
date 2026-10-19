@@ -417,8 +417,12 @@ public final class Lance {
                 int tx = (int) Math.round(Math.cos(a) * dist), tz = (int) Math.round(Math.sin(a) * dist);
                 ChunkPos site = endSite(dest, tx >> 4, tz >> 4);
                 if (site != null) {   // beside the site, on the side towards the main island
-                    tx = site.getMiddleBlockX() - (int) Math.round(Math.cos(a) * 24);
-                    tz = site.getMiddleBlockZ() - (int) Math.round(Math.sin(a) * 24);
+                    int sx = site.getMiddleBlockX() - (int) Math.round(Math.cos(a) * 24), sz = site.getMiddleBlockZ() - (int) Math.round(Math.sin(a) * 24);
+                    // (unless the nearest site lies inside the outer End: the arrival came out at 993 once)
+                    if (Math.hypot(sx, sz) >= 1040) {
+                        tx = sx;
+                        tz = sz;
+                    }
                 }
                 BlockPos f = endGround(dest, tx, tz, 32);
                 return new Spot(key, f != null ? f : new BlockPos(tx, 64, tz), dir, false);
