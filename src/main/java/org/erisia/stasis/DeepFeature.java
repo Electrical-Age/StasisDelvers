@@ -50,14 +50,12 @@ public record DeepFeature() implements Feature {
             for (int i = Math.floorDiv(x0 + 8, StaticDeeps.CX) - 1; i <= Math.floorDiv(x0 + 8, StaticDeeps.CX) + 1; i++)
                 for (int k = Math.floorDiv(z0 + 8, StaticDeeps.CZ) - 1; k <= Math.floorDiv(z0 + 8, StaticDeeps.CZ) + 1; k++) {
                     StaticDeeps.Deep d = StaticDeeps.cell(i, j, k, seed);
-                    if (d == null) continue;
-                    double reach = Math.max(d.radius() * 1.5 + 24, Strata.bounds(d).radius() + 2);
-                    double dx = Math.max(0, Math.max(x0 - d.x(), d.x() - (x0 + 16))), dz = Math.max(0, Math.max(z0 - d.z(), d.z() - (z0 + 16)));
-                    if (dx * dx + dz * dz <= reach * reach) deeps.add(d);
+                    if (d != null && reaches(d, x0, z0, true)) deeps.add(d);
                 }
         long t0 = System.nanoTime();
-        for (StaticDeeps.Deep d : deeps) any |= carve(level, d, x0, z0, minY, maxY);
-        for (StaticDeeps.Deep d : deeps) any |= strata(level, d, x0, z0, minY, maxY);
+        Writer w = (p, st) -> level.setBlock(p, st, 2);
+        for (StaticDeeps.Deep d : deeps) any |= carve(level, w, Heightmap.Types.WORLD_SURFACE_WG, d, x0, z0, minY, maxY);
+        for (StaticDeeps.Deep d : deeps) any |= strata(level, w, Heightmap.Types.WORLD_SURFACE_WG, d, x0, z0, minY, maxY);
         if (StasisConfig.timeScars) for (StaticDeeps.Deep d : deeps) any |= TimeScars.place(level, d, x0, z0, minY, maxY);
         if (StasisConfig.ruins) for (StaticDeeps.Deep d : deeps) any |= Ruins.place(level, d, x0, z0);
         if (any) {
@@ -71,7 +69,35 @@ public record DeepFeature() implements Feature {
         return any;
     }
 
-    private static boolean carve(WorldGenLevel level, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
+    /** Where a deep's blocks go: worldgen writes with flag 2; hard mode's rewrite of live chunks (HardRifts) with its own. */
+    @FunctionalInterface
+    public interface Writer {
+        void set(BlockPos p, BlockState st);
+    }
+
+    /** Can deep d's worldgen reach into the chunk with corner (x0, z0)? withStrata: the strata's reach too. */
+    public static boolean reaches(StaticDeeps.Deep d, int x0, int z0, boolean withStrata) {
+        double reach = d.radius() * 1.5 + 24;
+        if (withStrata) reach = Math.max(reach, Strata.bounds(d).radius() + 2);
+        double dx = Math.max(0, Math.max(x0 - d.x(), d.x() - (x0 + 16))), dz = Math.max(0, Math.max(z0 - d.z(), d.z() - (z0 + 16)));
+        return dx * dx + dz * dz <= reach * reach;
+    }
+
+    /**
+     * Write one deep into one existing chunk (corner x0, z0) as {@link #place} would have at worldgen: carve (with the
+     * destination's scatter in the shell), then the strata if withStrata. Outside worldgen (HardRifts: gate rifts torn
+     * into strongholds at hard mode) the surface is the live WORLD_SURFACE heightmap (the same not-air rule as the
+     * worldgen one, which a full chunk no longer keeps). Pure per (deep, position): only the chunk's own columns are
+     * written, so chunks may be done in any order.
+     */
+    public static boolean apply(WorldGenLevel level, Writer w, Heightmap.Types surface, StaticDeeps.Deep d, int x0, int z0, boolean withStrata) {
+        int minY = level.getMinY(), maxY = level.getMaxY();
+        boolean any = carve(level, w, surface, d, x0, z0, minY, maxY);
+        if (withStrata) any |= strata(level, w, surface, d, x0, z0, minY, maxY);
+        return any;
+    }
+
+    private static boolean carve(WorldGenLevel level, Writer w, Heightmap.Types surfaceType, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
         int yLo = Math.max(minY + 1, (int) (d.y() - d.radius() * 1.3 - 12)), yHi = Math.min(maxY - 1, (int) (d.y() + d.radius() * 1.3 + 12));
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         BlockState air = Blocks.AIR.defaultBlockState();
@@ -79,7 +105,7 @@ public record DeepFeature() implements Feature {
         boolean changed = false;
         for (int x = x0; x < x0 + 16; x++)
             for (int z = z0; z < z0 + 16; z++) {
-                int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+                int surface = level.getHeight(surfaceType, x, z);
                 // crevasse: a winding crack (a ridge of 2D noise) through the outer zone, open from the surface down
                 float ridge = Math.abs(Noise.value32(x / 22f, 3.5f, z / 22f, id ^ 0xC4E) - 0.5f);
                 boolean crack = ridge < 0.025f;
@@ -96,7 +122,7 @@ public record DeepFeature() implements Feature {
                     BlockState st = level.getBlockState(p);
                     if (s < 0.30f) {                       // the hollow rift
                         if (!st.isAir()) {
-                            level.setBlock(p, air, 2);
+                            w.set(p, air);
                             changed = true;
                         }
                         riftTop = y;
@@ -113,7 +139,7 @@ public record DeepFeature() implements Feature {
                             if (sc != null) shell = sc;
                         }
                         if (shell != null) {
-                            level.setBlock(p, shell, 2);
+                            w.set(p, shell);
                             changed = true;
                         }
                         continue;
@@ -121,8 +147,8 @@ public record DeepFeature() implements Feature {
                     if (s <= 1.0f && !st.isAir() && Noise.hash32(x, y, z, id ^ 0xD15) < 0.012f) {   // a lifted dislocation
                         BlockPos up = p.above(2 + (int) (Noise.hash32(x, y, z, id ^ 0xD16) * 4));
                         if (level.getBlockState(up).isAir() && up.getY() < maxY) {
-                            level.setBlock(up, st, 2);
-                            level.setBlock(p, air, 2);
+                            w.set(up, st);
+                            w.set(p, air);
                             changed = true;
                         }
                     }
@@ -136,8 +162,8 @@ public record DeepFeature() implements Feature {
                         p.set(x, y, z);
                         if (!level.getBlockState(p).isAir()) continue;
                         float h = Noise.hash32(x, y, z, id ^ 0xF11);
-                        level.setBlock(p, (h < 0.1f ? Blocks.CRYING_OBSIDIAN : h < 0.55f ? Blocks.BLACKSTONE : h < 0.75f ? Blocks.TUFF
-                            : StasisRegistry.RIFTSTONE.get()).defaultBlockState(), 2);
+                        w.set(p, (h < 0.1f ? Blocks.CRYING_OBSIDIAN : h < 0.55f ? Blocks.BLACKSTONE : h < 0.75f ? Blocks.TUFF
+                            : StasisRegistry.RIFTSTONE.get()).defaultBlockState());
                         changed = true;
                     }
                 // cracks and the sinkhole: from the surface down into the rift (only in the outer zone's columns)
@@ -147,7 +173,7 @@ public record DeepFeature() implements Feature {
                         float s = StaticDeeps.shape(d, x + 0.5f, y + 0.5f, z + 0.5f);
                         if (s > 1.0f && !sink) break;
                         if (!level.getBlockState(p).isAir()) {
-                            level.setBlock(p, air, 2);
+                            w.set(p, air);
                             changed = true;
                         }
                     }
@@ -163,7 +189,7 @@ public record DeepFeature() implements Feature {
                     if (!floor && !ceil) continue;
                     Direction dir = floor ? Direction.UP : Direction.DOWN;
                     int len = 1 + (int) (Noise.hash32(x, y, z, id ^ 0x57B) * 4);
-                    changed |= speleothem(level, p.immutable(), dir, len);
+                    changed |= speleothem(level, w, p.immutable(), dir, len);
                 }
             }
         return changed;
@@ -225,7 +251,7 @@ public record DeepFeature() implements Feature {
         return false;
     }
 
-    private static boolean strata(WorldGenLevel level, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
+    private static boolean strata(WorldGenLevel level, Writer w, Heightmap.Types surfaceType, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
         Strata.Bounds b = Strata.bounds(d);
         int yLo = Math.max(minY + 1, b.minY()), yHi = Math.min(maxY - 1, b.maxY());
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
@@ -237,7 +263,7 @@ public record DeepFeature() implements Feature {
         for (int x = x0; x < x0 + 16; x++)
             for (int z = z0; z < z0 + 16; z++) {
                 if (Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) > b.radius()) continue;
-                int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+                int surface = level.getHeight(surfaceType, x, z);
                 for (int y = yLo; y <= yHi; y++) {
                     int k = Strata.at(d, x, y, z);
                     if (k == Strata.OUT) continue;
@@ -257,11 +283,11 @@ public record DeepFeature() implements Feature {
                             // islands' tops grow crystals (cavities above ground are open sky: budding() rarely fires)
                             if (island && put != bud && Noise.hash32(x, y, z, id ^ 0x15B) < 0.06f && level.getBlockState(p.above()).isAir()
                                 && !island(d, x, y + 1, z, y + 1 - surface) && ((p.getY() + 1) < maxY)) {
-                                level.setBlock(p, bud, 2);
+                                w.set(p, bud);
                                 float hb = Noise.hash32(x, y, z, id ^ 0x15C);
                                 var cb = hb < 0.35f ? StasisRegistry.RIFT_CRYSTAL_SMALL : hb < 0.6f ? StasisRegistry.RIFT_CRYSTAL_MEDIUM
                                     : hb < 0.85f ? StasisRegistry.RIFT_CRYSTAL_LARGE : StasisRegistry.RIFT_CRYSTAL_CLUSTER;
-                                level.setBlock(p.above(), cb.get().defaultBlockState(), 2);
+                                w.set(p.above(), cb.get().defaultBlockState());
                                 changed = true;
                                 continue;
                             }
@@ -273,7 +299,7 @@ public record DeepFeature() implements Feature {
                                     if (sc != null) put = sc;
                                 }
                             }
-                            level.setBlock(p, put, 2);
+                            w.set(p, put);
                             changed = true;
                         }
                         case Strata.CAVITY, Strata.VENT -> {
@@ -282,7 +308,7 @@ public record DeepFeature() implements Feature {
                                 continue;
                             }
                             if (!st.isAir() && carvable(level, p, st)) {
-                                level.setBlock(p, air, 2);
+                                w.set(p, air);
                                 changed = true;
                             }
                             if (k == Strata.CAVITY && level.getBlockState(p).isAir()) cavities.add(p.immutable());
@@ -297,12 +323,12 @@ public record DeepFeature() implements Feature {
         for (BlockPos c : cavities) {
             if (Noise.hash32(c.getX(), c.getY(), c.getZ(), id ^ 0xB0E) >= 0.6f) continue;
             for (Direction dir : Direction.values()) {
-                BlockPos w = c.relative(dir);
-                if (!budding(d, w.getX(), w.getY(), w.getZ())) continue;
+                BlockPos wall = c.relative(dir);
+                if (!budding(d, wall.getX(), wall.getY(), wall.getZ())) continue;
                 float h = Noise.hash32(c.getX(), c.getY(), c.getZ(), id ^ 0xB0F);
                 var block = h < 0.35f ? StasisRegistry.RIFT_CRYSTAL_SMALL : h < 0.6f ? StasisRegistry.RIFT_CRYSTAL_MEDIUM
                     : h < 0.85f ? StasisRegistry.RIFT_CRYSTAL_LARGE : StasisRegistry.RIFT_CRYSTAL_CLUSTER;
-                level.setBlock(c, block.get().defaultBlockState().setValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING, dir.getOpposite()), 2);
+                w.set(c, block.get().defaultBlockState().setValue(net.minecraft.world.level.block.AmethystClusterBlock.FACING, dir.getOpposite()));
                 changed = true;
                 break;
             }
@@ -354,15 +380,15 @@ public record DeepFeature() implements Feature {
     }
 
     /** A pointed dripstone column of up to len blocks growing in dir (base, middle, frustum, tip), stopping at a block. */
-    private static boolean speleothem(WorldGenLevel level, BlockPos start, Direction dir, int len) {
+    private static boolean speleothem(WorldGenLevel level, Writer w, BlockPos start, Direction dir, int len) {
         int n = 0;
         while (n < len && level.getBlockState(start.relative(dir, n)).isAir()) n++;
         if (n == 0) return false;
         for (int i = 0; i < n; i++) {
             SpeleothemThickness t = i == n - 1 ? SpeleothemThickness.TIP : i == n - 2 ? SpeleothemThickness.FRUSTUM
                 : i == 0 && n > 3 ? SpeleothemThickness.BASE : SpeleothemThickness.MIDDLE;
-            level.setBlock(start.relative(dir, i), Blocks.POINTED_DRIPSTONE.defaultBlockState()
-                .setValue(PointedDripstoneBlock.TIP_DIRECTION, dir).setValue(PointedDripstoneBlock.THICKNESS, t), 2);
+            w.set(start.relative(dir, i), Blocks.POINTED_DRIPSTONE.defaultBlockState()
+                .setValue(PointedDripstoneBlock.TIP_DIRECTION, dir).setValue(PointedDripstoneBlock.THICKNESS, t));
         }
         return true;
     }

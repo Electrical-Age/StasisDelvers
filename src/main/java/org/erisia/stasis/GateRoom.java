@@ -72,6 +72,11 @@ public final class GateRoom {
     static final int CX = 5, CY = 4, CZ = 10;
 
     public static void shatter(WorldGenLevel level, StructurePiece piece, BoundingBox chunkBB) {
+        shatter(level, (p, st) -> level.setBlock(p, st, 2), piece, chunkBB);
+    }
+
+    /** shatter with the block writes through w (HardRifts: a live chunk, with its own flags). Only chunkBB is touched. */
+    public static void shatter(WorldGenLevel level, DeepFeature.Writer w, StructurePiece piece, BoundingBox chunkBB) {
         BlockPos c = piece.getWorldPos(CX, CY, CZ).immutable();
         int seed = Gates.gateId(c);
         Vec3 cv = Vec3.atCenterOf(c);
@@ -88,18 +93,18 @@ public final class GateRoom {
                     float h = Noise.hash32(p.getX(), p.getY(), p.getZ(), seed);
                     float patch = Noise.value32(p.getX() / 3f, p.getY() / 3f, p.getZ() / 3f, seed ^ 0x6A1);
                     if (d < 2.8) {   // swallowed
-                        if (!st.isAir()) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                        if (!st.isAir()) w.set(p, Blocks.AIR.defaultBlockState());
                         continue;
                     }
                     if (st.isAir() || st.is(Blocks.LAVA)) {
                         // debris hanging just outside the core, pulled in and up
                         if (inside && d > 3.2 && d < 6.5 && ly >= 2 && h < 0.08f)
-                            level.setBlock(p, debris(h * 14.3f), 2);
+                            w.set(p, debris(h * 14.3f));
                         continue;
                     }
                     if (inside && d < 7.5 && ly <= 3 && h < 0.35f && patch > 0.45f) {
                         // the platform, stairs and pool rims torn away towards the core
-                        level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                        w.set(p, Blocks.AIR.defaultBlockState());
                         continue;
                     }
                     boolean shell = !inside && lx >= 0 && lx <= 10 && ly >= 0 && ly <= 7 && lz >= 0 && lz <= 15;
@@ -107,24 +112,24 @@ public final class GateRoom {
                         // bulged: the wall pushed out a block where the blast hit it (ragged, not a straight wall)
                         BlockPos q = BlockPos.containing(Vec3.atCenterOf(p).add(v.normalize()));
                         if (chunkBB.isInside(q) && level.getBlockState(q).isAir())
-                            level.setBlock(q, h < 0.5f ? Blocks.CRACKED_STONE_BRICKS.defaultBlockState() : st, 2);
+                            w.set(q, h < 0.5f ? Blocks.CRACKED_STONE_BRICKS.defaultBlockState() : st);
                     }
                     if (shell && d >= 6.0 && patch > 0.62f && h < 0.6f) {
                         // blasted outward: a hole in the wall, the block thrown into the rock behind it
-                        level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                        w.set(p, Blocks.AIR.defaultBlockState());
                         Vec3 out = Vec3.atCenterOf(p).add(v.normalize().scale(2.0));
                         BlockPos q = BlockPos.containing(out);
                         if (chunkBB.isInside(q) && !level.getBlockState(q).isAir()) {
                             BlockPos behind = BlockPos.containing(Vec3.atCenterOf(p).add(v.normalize()));
-                            if (chunkBB.isInside(behind)) level.setBlock(behind, Blocks.AIR.defaultBlockState(), 2);
-                            level.setBlock(q, Blocks.CRACKED_STONE_BRICKS.defaultBlockState(), 2);
+                            if (chunkBB.isInside(behind)) w.set(behind, Blocks.AIR.defaultBlockState());
+                            w.set(q, Blocks.CRACKED_STONE_BRICKS.defaultBlockState());
                         }
                         continue;
                     }
                     // the stone near the core transmuted; the rest cracked
-                    if (d < 6.5 && h < 0.45f) level.setBlock(p, transmuted(h / 0.45f), 2);
-                    else if (d < 11 && st.is(Blocks.STONE_BRICKS) && h < 0.7f) level.setBlock(p, Blocks.CRACKED_STONE_BRICKS.defaultBlockState(), 2);
-                    else if (st.is(Blocks.SPAWNER)) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    if (d < 6.5 && h < 0.45f) w.set(p, transmuted(h / 0.45f));
+                    else if (d < 11 && st.is(Blocks.STONE_BRICKS) && h < 0.7f) w.set(p, Blocks.CRACKED_STONE_BRICKS.defaultBlockState());
+                    else if (st.is(Blocks.SPAWNER)) w.set(p, Blocks.AIR.defaultBlockState());
                 }
         // debris thrown out through the walls: where open space lies outside (a cave), blocks hang along rays from the
         // centre 2-7 blocks past the wall, flying away
@@ -135,17 +140,17 @@ public final class GateRoom {
             BlockPos bp = BlockPos.containing(q);
             if (!chunkBB.isInside(bp) || !level.getBlockState(bp).isAir()) continue;
             // only past the room (its inside stays as it is) and into open air
-            level.setBlock(bp, debris(Noise.hash32(i, 23, 0, seed)), 2);
+            w.set(bp, debris(Noise.hash32(i, 23, 0, seed)));
         }
         // the entrance grate (the door at local 4..6, 1..3, 0) blown out down the corridor
         for (int lx = 4; lx <= 6; lx++)
             for (int ly = 1; ly <= 3; ly++) {
                 BlockPos p = piece.getWorldPos(lx, ly, 0).immutable();
-                if (chunkBB.isInside(p) && level.getBlockState(p).is(Blocks.IRON_BARS)) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                if (chunkBB.isInside(p) && level.getBlockState(p).is(Blocks.IRON_BARS)) w.set(p, Blocks.AIR.defaultBlockState());
             }
         for (int i = 0; i < 3; i++) {
             BlockPos p = piece.getWorldPos(4 + i, 1 + (int) (Noise.hash32(i, 1, 0, seed) * 2), -2 - (int) (Noise.hash32(i, 2, 0, seed) * 3)).immutable();
-            if (chunkBB.isInside(p) && level.getBlockState(p).isAir()) level.setBlock(p, Blocks.IRON_BARS.defaultBlockState(), 2);
+            if (chunkBB.isInside(p) && level.getBlockState(p).isAir()) w.set(p, Blocks.IRON_BARS.defaultBlockState());
         }
         // frozen lava ribbons from the two side pools up towards the core's edge
         for (int side = 0; side < 2; side++) {
@@ -158,8 +163,8 @@ public final class GateRoom {
                 Vec3 q = a.scale((1 - t) * (1 - t)).add(ctrl.scale(2 * t * (1 - t))).add(b.scale(t * t));
                 BlockPos p = BlockPos.containing(q);
                 if (!chunkBB.isInside(p) || !level.getBlockState(p).isAir()) continue;
-                level.setBlock(p, Noise.hash32(p.getX(), p.getY(), p.getZ(), seed ^ 0x1A7A) < 0.2f
-                    ? Blocks.MAGMA_BLOCK.defaultBlockState() : Blocks.LAVA.defaultBlockState(), 2);
+                w.set(p, Noise.hash32(p.getX(), p.getY(), p.getZ(), seed ^ 0x1A7A) < 0.2f
+                    ? Blocks.MAGMA_BLOCK.defaultBlockState() : Blocks.LAVA.defaultBlockState());
             }
         }
         // the frame's shards, tilted towards the core, some still holding their eyes
