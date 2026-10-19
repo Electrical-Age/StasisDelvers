@@ -142,6 +142,58 @@ class NetCodecTest {
         assertEquals(b, trip(StasisNet.Bolt.CODEC, b));
     }
 
+    @Property(tries = 200)
+    void spreadStateRoundTrips(@ForAll boolean reset, @ForAll boolean map, @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int count,
+                               @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int p, @ForAll boolean hard, @ForAll boolean complete) {
+        var s = new StasisNet.SpreadState(reset, map, count, p, hard, complete);
+        assertEquals(s, trip(StasisNet.SpreadState.CODEC, s));
+    }
+
+    /** Any tile of ranks (-1..N-1 as sent, and MISSING or other extremes all the same) comes back cell for cell. */
+    @Property(tries = 200)
+    void spreadTileRoundTrips(@ForAll int tx, @ForAll int tz, @ForAll("tileRanks") int[] ranks) {
+        var t = new StasisNet.SpreadTile(tx, tz, ranks);
+        assertEquals(t, trip(StasisNet.SpreadTile.CODEC, t));
+    }
+
+    @Provide
+    Arbitrary<int[]> tileRanks() {
+        Arbitrary<Integer> rank = Arbitraries.oneOf(Arbitraries.integers().between(-1, 3_000_000),
+            Arbitraries.of(-1, 0, SpreadTiles.MISSING, Integer.MIN_VALUE));
+        Arbitrary<int[]> mixed = rank.array(int[].class).ofSize(SpreadTiles.TILE_CELLS);
+        Arbitrary<int[]> uniform = rank.map(v -> {
+            int[] r = new int[SpreadTiles.TILE_CELLS];
+            java.util.Arrays.fill(r, v);
+            return r;
+        });
+        return Arbitraries.oneOf(mixed, uniform);
+    }
+
+    @Example
+    void spreadTileIsSmall() {
+        // a tile beyond the map's radius is a few bytes; a real one about 3 KB (ranks of a 8 km map are 1-3 bytes)
+        int[] out = new int[SpreadTiles.TILE_CELLS];
+        java.util.Arrays.fill(out, -1);
+        RegistryFriendlyByteBuf b = buf();
+        StasisNet.SpreadTile.CODEC.encode(b, new StasisNet.SpreadTile(-3, 7, out));
+        assertTrue(b.readableBytes() < 16, b.readableBytes() + " bytes");
+        SpreadMap m = SpreadMap.build(5, 0, 0, 8000);
+        RegistryFriendlyByteBuf c = buf();
+        StasisNet.SpreadTile.CODEC.encode(c, new StasisNet.SpreadTile(0, 0, SpreadTiles.cut(m, 0, 0)));
+        assertTrue(c.readableBytes() < 3 * SpreadTiles.TILE_CELLS + 16, c.readableBytes() + " bytes");
+    }
+
+    @Example
+    void spreadTileRefusesAWrongSize() {
+        assertThrows(IllegalArgumentException.class, () -> StasisNet.SpreadTile.CODEC.encode(buf(), new StasisNet.SpreadTile(0, 0, new int[5])));
+    }
+
+    @Property(tries = 100)
+    void spreadForgetRoundTrips(@ForAll @Size(max = 40) List<Long> keys) {
+        var f = new StasisNet.SpreadForget(keys);
+        assertEquals(f, trip(StasisNet.SpreadForget.CODEC, f));
+    }
+
     /** FIELD's float rounding must not move a block across the field's edge, except right on it (|norm - 1| tiny). */
     @Property(tries = 1000)
     void sentFieldsAgreeOnBlocks(@ForAll("fieldsInRange") Field f, @ForAll @net.jqwik.api.constraints.IntRange(min = -20, max = 20) int bx,

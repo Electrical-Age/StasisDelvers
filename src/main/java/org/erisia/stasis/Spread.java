@@ -26,22 +26,69 @@ import java.util.stream.IntStream;
  * static volatiles (rateAt is read from the light engine and mesh threads); the saved data (the map, the clock) is
  * only touched on the server thread.
  * <p>
- * CLIENT: the client has no map or P yet (the next step sends rank tiles and P): until then {@link #client} is empty and
- * the client treats the overworld as running everywhere but rifts, and the spread as not complete.
+ * CLIENT: the server sends the client N, P, hard mode and completion (StasisNet.SpreadState, at most once a second as P
+ * moves) and the rank tiles around the player (SpreadTile, SpreadForget; SpreadSync); {@link #client} holds them, with
+ * a SpreadTiles as its map, so the client's rateAt gives the server's answer for every column near the player. Before
+ * the state comes (or while the server has no map) the client treats the overworld as running everywhere but rifts.
  */
 public final class Spread {
     private Spread() {
     }
 
     /** One side's view: the map (null until built or received), the progress, hard mode, complete. */
-    record State(SpreadRanks map, int count, int p, boolean hard, boolean complete) {
+    public record State(SpreadRanks map, int count, int p, boolean hard, boolean complete) {
         static final State EMPTY = new State(null, 0, 0, false, false);
     }
 
     /** The server's state (the overworld of the running server). */
     static volatile State server = State.EMPTY;
-    /** The client's state: CLIENT STEP fills this from the server's tiles and P (rank tiles as a SpreadRanks). */
+    /** The client's state, from the server's SpreadState; its map is {@link #clientTiles} (or null: no map). */
     public static volatile State client = State.EMPTY;
+    /** The rank tiles the server sent this client (the client's map once the server says it has one). */
+    public static final SpreadTiles clientTiles = new SpreadTiles();
+
+    /** What the client needs to hear (set by client/StasisClient): to re-mesh and relight where the answers changed. */
+    public interface ClientListener {
+        /** P moved: columns whose rank1024 lies in [lo, hi) changed (stilled now if P grew). */
+        void moved(long lo1024, long hi1024);
+
+        /** Tile (tx, tz) arrived: its columns were MISSING (running) until now. */
+        void tile(int tx, int tz);
+    }
+
+    public static volatile ClientListener clientListener;
+
+    // ---- the client (StasisNet handlers, main thread)
+
+    static void clientState(boolean reset, boolean hasMap, int count, int p, boolean hard, boolean complete) {
+        State old = client;
+        if (reset || !hasMap) clientTiles.clear();
+        client = new State(hasMap ? clientTiles : null, count, p, hard, complete);
+        // answers cached per section (FrozenSprites) re-ask; chunk meshes and flame light are redone where P moved
+        Stasis.bumpVersion();
+        ClientListener l = clientListener;
+        if (l != null && !reset && hasMap && old.map() != null && old.p() != p)
+            l.moved((long) Math.min(p, old.p()) * SpreadMap.SCALE, (long) Math.max(p, old.p()) * SpreadMap.SCALE);
+    }
+
+    static void clientTile(int tx, int tz, int[] ranks) {
+        clientTiles.put(tx, tz, ranks);
+        Stasis.bumpVersion();
+        ClientListener l = clientListener;
+        if (l != null && client.map() != null) l.tile(tx, tz);
+    }
+
+    static void clientForget(java.util.List<Long> keys) {
+        for (long k : keys) clientTiles.remove(k);
+        Stasis.bumpVersion();
+    }
+
+    /** Leaving the server: forget everything. */
+    public static void clientClear() {
+        clientTiles.clear();
+        client = State.EMPTY;
+        Stasis.bumpVersion();
+    }
 
     /** Tests: the clock leaves the state alone while a test map is installed. */
     private static volatile boolean testing;
@@ -56,7 +103,7 @@ public final class Spread {
     }
 
     /** Does the spread decide this level's columns now: spreading mode, the overworld, not complete? */
-    static boolean active(Level level) {
+    public static boolean active(Level level) {
         return StasisConfig.spreading && level.dimension() == Level.OVERWORLD && !state(level).complete();
     }
 
@@ -143,10 +190,11 @@ public final class Spread {
         Map<ServerLevel, List<ServerPlayer>> safe = new HashMap<>();
         if (complete != s.complete()) for (ServerLevel l : srv.getAllLevels()) safe.put(l, Freezing.running(l));
         server = new State(s.map(), s.count(), p, k.hard, complete);
-        // nothing on the server caches a P-dependent answer (the field index is fields only; StaticDeeps' section
-        // cache is geometry): the bump is for version() readers. CLIENT STEP: don't re-mesh the world on each P
-        // change; re-mesh the chunks whose [chunkMin1024, chunkMax1024] P crossed.
-        Stasis.bumpVersion();
+        // nothing on the server caches a P-dependent answer (the field index is fields only, StaticDeeps' section cache
+        // is geometry, and Stasis.version is read by client chunk meshing only), so no version bump here: a global bump
+        // every second would only make clients re-ask. The clients hear of P at most once a second (SpreadSync) and
+        // re-mesh just the chunks whose [chunkMin1024, chunkMax1024] it crossed.
+        SpreadSync.stateChanged(complete != s.complete() || k.hard != s.hard() || p < s.p());
         // flame light is cached in the light engine: relight the loaded chunks the front just crossed (chunks loaded
         // later relight on load, Flames.chunkLoad)
         if (p != s.p() && s.map() != null) {
@@ -215,12 +263,14 @@ public final class Spread {
 
     private static void install(ServerLevel ow, SpreadMap m) {
         server = new State(m, m.count, 0, false, false);
+        SpreadSync.mapInstalled();
         lastNanos = 0;
         update(ow, Clock.get(ow));
     }
 
     static void serverStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent e) {
         server = State.EMPTY;
+        SpreadSync.clear();
         lastNanos = 0;
         testing = false;
     }
@@ -298,6 +348,7 @@ public final class Spread {
         testing = true;
         StasisConfig.spreading = true;
         server = new State(m, m.count, p, false, false);
+        SpreadSync.mapInstalled();
         Stasis.bumpVersion();
     }
 
@@ -306,6 +357,7 @@ public final class Spread {
         server = saved;
         StasisConfig.spreading = savedMode;
         testing = false;
+        SpreadSync.mapInstalled();
         Stasis.bumpVersion();
     }
 

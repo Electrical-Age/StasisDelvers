@@ -2088,7 +2088,8 @@ public final class StasisGameTests {
         }));
         // spreading mode (Baughn 2026-10-19; Spread): a column the stillness hasn't reached runs at rate 1 with or without
         // a field; a stilled one follows the base rules (stopped, or its field's rate); P moving on changes the answer
-        // and Stasis.version; the Nether runs until the spread is complete; sectionState agrees with the blocks
+        // (the server keeps no P-dependent cache: Stasis.version is the client's); the Nether runs until the spread is
+        // complete; sectionState agrees with the blocks
         CASES.put("spread_rates", new Spec(1, (h, c) -> () -> {
             ServerLevel level = h.getLevel();
             BlockPos spawn = h.absolutePos(new BlockPos(3, 1, 4));
@@ -2135,10 +2136,8 @@ public final class StasisGameTests {
             var nether = level.getServer().getLevel(net.minecraft.world.level.Level.NETHER);
             if (nether != null) c.check("the Nether runs until the spread is complete", !Stasis.stops(nether) && Stasis.rateAt(nether, BlockPos.ZERO) == 1.0);
             // P back to 0: nothing inside the map is stilled
-            int v1 = Stasis.version();
             org.erisia.stasis.Spread.testInstall(m, 0);
             c.check("P 0: the stilled column runs again, at 1 (over its field's 0.6)", Stasis.rateAt(level, b) == 1.0);
-            c.check("a change of P bumps the version", Stasis.version() != v1);
             // P = N: everything is stilled, spawn too (Baughn: decision 2), fields still work
             org.erisia.stasis.Spread.testInstall(m, m.count);
             c.check("P N: spawn is stilled; its slow field runs it at 0.3", Stasis.rateAt(level, spawn) == 0.3 && Stasis.rateAt(level, spawn.above(40)) == 0.0);

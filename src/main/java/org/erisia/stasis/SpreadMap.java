@@ -111,6 +111,22 @@ public final class SpreadMap implements SpreadRanks {
         return rank1024(s, x, z) < (long) p * SCALE;
     }
 
+    /**
+     * stilled() the way stasis.fsh computes it, for parity (SpreadTilesTest): GLSL 330 has only 32-bit ints, and
+     * rank x SCALE overflows them once a map has over ~2M cells (a 30 km radius). The column is stilled iff
+     * sum w (r - p) < 0 (the four bilinear weights sum to SCALE); each r - p is split into its high and low 16 bits, so
+     * no product or sum leaves int range: A = sum w hi, B = sum w lo (0 <= B < 2^26), and the sum is 65536 (A + B >> 16)
+     * plus 0..65535, negative iff A + (B >> 16) < 0. r00 is cell (i, k), r10 (i + 1, k), r01 (i, k + 1), r11 (i + 1, k + 1);
+     * a, b the column's offsets 0..31 from cell (i, k)'s centre (as in rank1024). Ranks >= -1 (MISSING too), p >= 0.
+     */
+    public static boolean stilledSplit(int r00, int r10, int r01, int r11, int a, int b, int p) {
+        int w00 = (CELL - a) * (CELL - b), w10 = a * (CELL - b), w01 = (CELL - a) * b, w11 = a * b;
+        int d00 = r00 - p, d10 = r10 - p, d01 = r01 - p, d11 = r11 - p;
+        int hi = w00 * (d00 >> 16) + w10 * (d10 >> 16) + w01 * (d01 >> 16) + w11 * (d11 >> 16);
+        int lo = w00 * (d00 & 0xFFFF) + w10 * (d10 & 0xFFFF) + w01 * (d01 & 0xFFFF) + w11 * (d11 & 0xFFFF);
+        return hi + (lo >> 16) < 0;
+    }
+
     /** The least rank1024 over chunk (cx, cz)'s columns: at a corner, as the chunk lies in one bilinear patch. */
     public static long chunkMin1024(SpreadRanks s, int cx, int cz) {
         int x0 = cx << 4, z0 = cz << 4;

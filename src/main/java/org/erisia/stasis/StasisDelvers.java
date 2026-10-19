@@ -59,6 +59,12 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(Spread::serverStarted);
         NeoForge.EVENT_BUS.addListener(Spread::serverStopped);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Spread::tick);
+        // (after Spread::tick: the clients hear this tick's P)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, SpreadSync::tick);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedInEvent.class, SpreadSync::join);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, SpreadSync::join);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerChangedDimensionEvent.class, SpreadSync::join);
+        NeoForge.EVENT_BUS.addListener(SpreadSync::leave);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, PlayerRates::tick);
         NeoForge.EVENT_BUS.addListener(PlayerRates::logout);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, PlayerRates::miningClock);

@@ -67,6 +67,85 @@ public final class StasisNet {
         }
     }
 
+    // ---- spreading mode (Spread, SpreadSync): the state and the rank tiles around the player
+
+    /**
+     * The spread's state: reset (login, respawn, dimension change, a new map: forget all tiles), whether the server has
+     * a map yet, N, P, hard mode, complete. Sent when P moves (at most once a second) and on those occasions.
+     */
+    public record SpreadState(boolean reset, boolean map, int count, int p, boolean hard, boolean complete) implements CustomPacketPayload {
+        public static final Type<SpreadState> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "spread_state"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SpreadState> CODEC = StreamCodec.of(
+            (buf, s) -> {
+                buf.writeByte((s.reset() ? 1 : 0) | (s.map() ? 2 : 0) | (s.hard() ? 4 : 0) | (s.complete() ? 8 : 0));
+                buf.writeVarInt(s.count());
+                buf.writeVarInt(s.p());
+            },
+            buf -> {
+                int f = buf.readByte();
+                return new SpreadState((f & 1) != 0, (f & 2) != 0, buf.readVarInt(), buf.readVarInt(), (f & 4) != 0, (f & 8) != 0);
+            });
+
+        @Override
+        public Type<SpreadState> type() {
+            return TYPE;
+        }
+    }
+
+    /**
+     * One rank tile (SpreadTiles: 32 x 32 cells, row by row). On the wire: a tile of one value (all -1 beyond the map's
+     * radius) is that value alone; otherwise each rank + 1 as a VarInt (ranks are -1..N-1: 1-3 bytes each, ~3 KB).
+     */
+    public record SpreadTile(int tx, int tz, int[] ranks) implements CustomPacketPayload {
+        public static final Type<SpreadTile> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "spread_tile"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SpreadTile> CODEC = StreamCodec.of(
+            (buf, t) -> {
+                if (t.ranks().length != SpreadTiles.TILE_CELLS) throw new IllegalArgumentException("spread tile: " + t.ranks().length + " cells");
+                buf.writeVarInt(t.tx());
+                buf.writeVarInt(t.tz());
+                int[] r = t.ranks();
+                boolean uniform = true;
+                for (int v : r) uniform &= v == r[0];
+                buf.writeBoolean(uniform);
+                if (uniform) buf.writeVarInt(r[0] + 1);
+                else for (int v : r) buf.writeVarInt(v + 1);
+            },
+            buf -> {
+                int tx = buf.readVarInt(), tz = buf.readVarInt();
+                int[] r = new int[SpreadTiles.TILE_CELLS];
+                if (buf.readBoolean()) java.util.Arrays.fill(r, buf.readVarInt() - 1);
+                else for (int i = 0; i < r.length; i++) r[i] = buf.readVarInt() - 1;
+                return new SpreadTile(tx, tz, r);
+            });
+
+        @Override
+        public Type<SpreadTile> type() {
+            return TYPE;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof SpreadTile t && t.tx == tx && t.tz == tz && java.util.Arrays.equals(t.ranks, ranks);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * (31 * tx + tz) + java.util.Arrays.hashCode(ranks);
+        }
+    }
+
+    /** Tiles the client should drop (SpreadTiles.key): the player moved away from them. */
+    public record SpreadForget(List<Long> tiles) implements CustomPacketPayload {
+        public static final Type<SpreadForget> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "spread_forget"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, SpreadForget> CODEC = StreamCodec.composite(
+            ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), SpreadForget::tiles, SpreadForget::new);
+
+        @Override
+        public Type<SpreadForget> type() {
+            return TYPE;
+        }
+    }
+
     /** The storm test override (/stasis storm start|stop): active, start, end, earlier overrides' tau offset. */
     public record StormOverride(boolean active, double start, double end, double folded) implements CustomPacketPayload {
         public static final Type<StormOverride> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "storm_override"));
@@ -287,7 +366,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("10");   // 10: the unused chunk_clocks payload is gone
+            var r = e.registrar("11");   // 11: spread_state, spread_tile, spread_forget (spreading mode's client sync)
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -327,6 +406,10 @@ public final class StasisNet {
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
+            r.playToClient(SpreadState.TYPE, SpreadState.CODEC, (p, ctx) ->
+                Spread.clientState(p.reset(), p.map(), p.count(), p.p(), p.hard(), p.complete()));
+            r.playToClient(SpreadTile.TYPE, SpreadTile.CODEC, (p, ctx) -> Spread.clientTile(p.tx(), p.tz(), p.ranks()));
+            r.playToClient(SpreadForget.TYPE, SpreadForget.CODEC, (p, ctx) -> Spread.clientForget(p.tiles()));
             // optional per channel: a peer without the bug-report channels (same network version) still connects
             var opt = r.optional();
             opt.playToServer(ReportQuery.TYPE, ReportQuery.CODEC, (p, ctx) -> {
@@ -340,7 +423,7 @@ public final class StasisNet {
     }
 
     /** Only to clients that have the mod (a vanilla client, or a test's mock player, would refuse the payload). */
-    private static void send(ServerPlayer player, CustomPacketPayload payload) {
+    static void send(ServerPlayer player, CustomPacketPayload payload) {
         if (player.connection != null && player.connection.hasChannel(payload)) PacketDistributor.sendToPlayer(player, payload);
     }
 
