@@ -30,7 +30,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`; data paths to `src/mai
 - `MapDeskBlock.java`: the surveyor's desk inside the cottage, not craftable (deeps-strata-worldgen.md).
 - `SpawnUse.java` + `SpawnUseMixin`: under vanilla spawn protection, EA and Stasis blocks (and
   `#stasisdelvers:usable_at_spawn`) can be used as if with an empty hand. Placing, breaking and item use stay
-  blocked. `SpawnUse.useOn` handles NeoForge's `UseItemOnBlockEvent`.
+  blocked. `SpawnUse.useOn` handles NeoForge's `UseItemOnBlockEvent` at `EventPriority.HIGHEST`, so other mods'
+  listeners (which skip cancelled events) can't run the held item's use first, as with the mixin it replaced.
 - `StasisCommands`: `/stasis savetemplate <from> <to> <name>` writes a template from the world.
 
 ## Tools (outside the Java build)

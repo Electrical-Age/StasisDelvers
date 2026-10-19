@@ -68,7 +68,9 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(Crystals::chunkLoad);
         NeoForge.EVENT_BUS.addListener(StilledLiquids::use);
         NeoForge.EVENT_BUS.addListener(StilledLiquids::useOnBlock);
-        NeoForge.EVENT_BUS.addListener(SpawnUse::useOn);
+        // HIGHEST: the mixin this replaced ran before every listener; another mod's listener must not run the held
+        // item's use for a non-op under spawn protection before we cancel it
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, SpawnUse::useOn);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Gates::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, StormCrystals::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, GateRoom::fallDebris);

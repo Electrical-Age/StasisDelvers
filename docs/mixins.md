@@ -20,7 +20,8 @@ The background audit (written before the cleanup, with 36 mixins) is
 - Moved to events in the cleanup:
   - the server mining clock (`PlayerRates.miningClock`)
   - the attack cooldown (`PlayerRates.attackClock`)
-  - spawn-protection block use (`SpawnUse.useOn`, `UseItemOnBlockEvent`)
+  - spawn-protection block use (`SpawnUse.useOn`, `UseItemOnBlockEvent` at `HIGHEST`: the mixin ran before
+    every listener, so the event must too)
 
 ## Required config: `stasisdelvers.mixins.json` (gameplay; `required: true`, `defaultRequire: 1`)
 If one of these can't apply, the game stops at startup, on purpose: without them time doesn't stop correctly.
