@@ -2086,6 +2086,68 @@ public final class StasisGameTests {
             c.check("raised the 0.3 field to 0.9: now the fastest", Stasis.rateAt(level, h.absolutePos(new BlockPos(12, 1, 4))) == 0.9);
             c.check("rates clamp into (0, 1]", b.withRate(5).rate() == 1.0 && b.withRate(0).rate() > 0);
         }));
+        // spreading mode (Baughn 2026-10-19; Spread): a column the stillness hasn't reached runs at rate 1 with or without
+        // a field; a stilled one follows the base rules (stopped, or its field's rate); P moving on changes the answer
+        // and Stasis.version; the Nether runs until the spread is complete; sectionState agrees with the blocks
+        CASES.put("spread_rates", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            BlockPos spawn = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, spawn.getX(), spawn.getZ(), 200);
+            // the centre column of the first cell to still (rank 0)
+            BlockPos still = null;
+            for (int i = 0; i < m.n && still == null; i++)
+                for (int k = 0; k < m.n && still == null; k++)
+                    if (m.rank(m.cellX0 + i, m.cellZ0 + k) == 0)
+                        still = new BlockPos((m.cellX0 + i) * org.erisia.stasis.SpreadMap.CELL + 16, spawn.getY(), (m.cellZ0 + k) * org.erisia.stasis.SpreadMap.CELL + 16);
+            if (still == null) {
+                c.check("the map has a rank 0 cell", false);
+                return;
+            }
+            BlockPos b = still;
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            int v0 = Stasis.version();
+            org.erisia.stasis.Spread.testInstall(m, m.count / 2);
+            c.check("installing bumps the version", Stasis.version() != v0);
+            c.check("spawn column runs (no field needed)", Stasis.rateAt(level, spawn) == 1.0 && Stasis.rateAt(level, spawn.above(40)) == 1.0);
+            c.check("a stilled column is stopped", Stasis.rateAt(level, b) == 0.0 && !Stasis.isRunning(level, b.below(30)));
+            c.check("mayRunInColumn: spawn's chunk", Stasis.mayRunInColumn(level, net.minecraft.world.level.ChunkPos.pack(spawn.getX() >> 4, spawn.getZ() >> 4)));
+            Field slow = field(h, c, h.relativeVec(Vec3.atCenterOf(spawn)), 3.0, 0.3);
+            c.check("a slow field in running land: still 1", Stasis.rateAt(level, spawn) == 1.0, "" + Stasis.rateAt(level, spawn));
+            Field f = FieldData.get(level).add(level, b.getX() + 0.5, b.getY() + 0.5, b.getZ() + 0.5, 3.0, false, 0.6);
+            c.cleanup.add(0, () -> FieldData.get(level).remove(level, f.id()));
+            c.check("a field in stilled land runs at its rate", Stasis.rateAt(level, b) == 0.6, "" + Stasis.rateAt(level, b));
+            c.check("just outside it: stopped", Stasis.rateAt(level, b.east(5)) == 0.0 || !org.erisia.stasis.SpreadMap.stilled(m, b.getX() + 5, b.getZ(), m.count / 2));
+            // sectionState never claims RUNNING or STOPPED for a section with a block that disagrees
+            for (BlockPos at : new BlockPos[]{spawn, b}) {
+                int sx = at.getX() >> 4, sy = at.getY() >> 4, sz = at.getZ() >> 4;
+                int st = Stasis.sectionState(level, sx, sy, sz);
+                boolean any = false, all = true;
+                for (int x = 0; x < 16; x++)
+                    for (int y = 0; y < 16; y++)
+                        for (int z = 0; z < 16; z++) {
+                            boolean r = Stasis.isRunningSteady(level, new BlockPos((sx << 4) + x, (sy << 4) + y, (sz << 4) + z));
+                            any |= r;
+                            all &= r;
+                        }
+                c.check("sectionState agrees with the blocks at " + at.toShortString(),
+                    st == Stasis.SECTION_MIXED || (st == Stasis.SECTION_RUNNING) == all && (st == Stasis.SECTION_STOPPED) == !any, "state " + st + " any " + any + " all " + all);
+            }
+            var nether = level.getServer().getLevel(net.minecraft.world.level.Level.NETHER);
+            if (nether != null) c.check("the Nether runs until the spread is complete", !Stasis.stops(nether) && Stasis.rateAt(nether, BlockPos.ZERO) == 1.0);
+            // P back to 0: nothing inside the map is stilled
+            int v1 = Stasis.version();
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            c.check("P 0: the stilled column runs again, at 1 (over its field's 0.6)", Stasis.rateAt(level, b) == 1.0);
+            c.check("a change of P bumps the version", Stasis.version() != v1);
+            // P = N: everything is stilled, spawn too (Baughn: decision 2), fields still work
+            org.erisia.stasis.Spread.testInstall(m, m.count);
+            c.check("P N: spawn is stilled; its slow field runs it at 0.3", Stasis.rateAt(level, spawn) == 0.3 && Stasis.rateAt(level, spawn.above(40)) == 0.0);
+            c.check("outside the map: stilled from the start", Stasis.rateAt(level, spawn.east(500)) == 0.0);
+            org.erisia.stasis.Spread.testReset();
+            c.check("back in stopped mode: the stilled column is stopped, its field runs", Stasis.rateAt(level, b) == 0.6 && Stasis.rateAt(level, b.east(9)) == 0.0);
+            if (nether != null) c.check("back in stopped mode the Nether stops", Stasis.stops(nether));
+            c.check("slow field", slow.rate() == 0.3);
+        }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range
         CASES.put("rate_command", new Spec(1, (h, c) -> () -> {
             ServerLevel level = h.getLevel();
