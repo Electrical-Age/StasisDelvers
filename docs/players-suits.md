@@ -75,7 +75,10 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   `stasis_armor_protects`.
 - `Suits.available` never counts batteries that can't discharge (rift capacitors).
   Tests: `SuitsTest.bugB_aCapacitorIsNotPower`, `drainingTakesWhatAvailablePromised`, `drainRespectsLimits`.
-- Rifts are never protected (Baughn's rule). Capacitors don't help there.
+- Rifts are never protected (Baughn's rule). Capacitors don't help there. The exceptions are doors, not protection:
+  an open lance gate's disc and the part of its rift outside the 25 % it is held to, and a return rift's body
+  (`Lance.spares`: the outer zone's rules there; lance.md). `Lance.step` runs first in `Freezing.tick`, so stepping into
+  a disc is a trip, not the eye's statue.
 - The starter suit is given once per player, across deaths: `starter_suit_once`. In spreading mode there is no suit:
   one stability compass instead (`StarterKit.COMPASS_TAG`), `stability_compass_first_join`.
 - Crafting keeps the charge: `suit_craft_keeps_charge`. Capacitors: `capacitor_takes_mist`.

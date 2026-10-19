@@ -18,6 +18,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
   - A jittered 3D grid (`CX`/`CY`/`CZ` = 512/192/512) with 25% occupancy, radius 24-64; the rift is the inner 35%.
   - `cell`, `near`, `core`, `shape`, `zone` (0 none, 1 outer, 2 rift), `inRift`.
   - Gate rifts: `setGates`, `isGate`, `gateCount`.
+  - Lance return rifts: `returnRift` (radius `RETURN_RADIUS` 3), `setReturns`, `isReturn` (`isGate` too: no strata, no
+    puffs); per deep seed from `Lance`'s arrivals, synced in `GateRifts`, listed by `near` after the gate rifts.
   - The End rift (spreading mode, hard mode): `endRift(seed)` at (0.5, 64.5, 0.5), radius 40, added per deep seed by
     `addEndRift` and listed first by `near`; `isGate` is true for it (no strata, no puffs). See spreading-mode.md.
   - `sectionMayHave`: a concurrent cache per deep seed, used by `Stasis.sectionState` from mesh threads.
@@ -56,7 +58,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 
 ## Effects on gameplay
 - Rift (`StaticDeeps.inRift`, pocket `RIFT`, storm rift): `Stasis.rateAt` returns 0 even inside a field.
-  An unprotected player becomes a statue in about 3 s; touching the eye is instant. Nothing protects.
+  An unprotected player becomes a statue in about 3 s; touching the eye is instant. Nothing protects. (Open lance
+  gates and return rifts are doors: lance.md.)
 - Outer zone, mist pockets: suit drain x3 or x2, and the Delver freeze creeps (players-suits.md).
 - Drifting deeps and storm mist: drain x2, and the Delver hold instead of a statue.
 - Towers: `weatherFactor` (towers.md). Storm mist x2, storm rift x3, drifting deep up to x1.5, static outer

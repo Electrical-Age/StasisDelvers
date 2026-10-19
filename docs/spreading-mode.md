@@ -190,8 +190,8 @@ rewrite) and 5 (the island's breaking up into the End rift, as the crystals fall
 - After hard mode no way leads into the End (`HardMode.endClosed`: `EntityTravelToDimensionEvent` to the End is
   cancelled for everything but creative and spectator players; a stronghold portal still stands until its chunk is
   rewritten, `HardRifts`).
-  The lance (later) will open the way. A player who logs in in the End after the flash (a restart mid-event, a long
-  absence) is sent home the same way, with the advancement.
+  Only the lance gets through (`Lance.travelling`; docs/lance.md). A player who logs in in the End after the flash (a restart mid-event, a long
+  absence) is sent home the same way, with the advancement, unless they came in by lance (`HardMode.evictsOnLogin`).
 - A restart during the event: hard mode stays, the event is gone, the End is stilled at once. The End rift's build
   resumes from its saved progress (`end_rift`, below).
 
@@ -323,7 +323,8 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
 
 ## The End's wall (λ-Nero)
 - `EndBarrier`: a vertical cylinder of radius `endBarrierRadius` (default 140) round 0, 0, on while `endBarrier` (default
-  true) in spreading mode, before and after hard mode (`EndBarrier.active`); it stays round the End rift as a wall.
+  true) in spreading mode before hard mode (`EndBarrier.active`, both sides: the server's and the client's spread state). It
+  goes at hard mode (Baughn's decision 7 for the lance: lance arrivals land on the rift's islands and in the outer End).
   Creative and spectator players pass.
 - It stops movement like a world border (AdventurAgent: the old server-only put-back rubber-banded, 1.4 blocks every
   0.4 s): `mixin/EndBarrierMixin` clamps `Entity.collide`'s result with `EndBarrier.clamp` on both sides, so the client

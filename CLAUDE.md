@@ -64,6 +64,7 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 - `docs/rifts-storms.md`: drifting and static deeps, rifts, storms (tau never jumps), pockets, crystals.
 - `docs/deeps-strata-worldgen.md`: the per-level random deep seed, `DeepFeature`, strata, gates, ruins, end sites.
 - `docs/spawn-cottage.md`: spawn site placement, the EA node data, spawn protection use.
+- `docs/lance.md`: the rift lance (L1): gate state, travel, destinations, arrival pads, return rifts, hard-mode guards.
 - `docs/spreading-mode.md`: config `mode = spreading`, `SpreadMap` ranks, the online clock, `Spread` in `rateAt`.
 - `docs/client-rendering.md`: the post chain, data-texture slot layout, `MAX_FIELDS`, frozen textures, tower meshes.
 - `docs/networking.md`: the `StasisNet` payloads both ways, the protocol version, size limits.
