@@ -7,7 +7,10 @@ through hooks set in `StasisClient`.
 ## Classes
 - `StasisClient.java` (`@Mod(dist = CLIENT)`): registers everything below and sets the common-code hooks.
 - `StasisPost.java`: the main post effect `stasisdelvers:stasis`.
-  - `tick` adds or removes the effect from the player's active post effects (`Stasis.stops(level)`).
+  - `tick` adds or removes the effect from the player's active post effects (`Stasis.stops(level)`, or `returnsOnly`:
+    a running level with a lance's return rifts, spreading mode's Nether and End before they still; AdventurAgent).
+    There slot 22 is on, the spawn rectangle (slots 25-28) covers the world so all the land runs, and only the return
+    rifts go into the static-deep slots.
   - `frame` (`FrameGraphSetupEvent`) packs the data texture every frame.
 - `StrataMask.java`: a 64³-cell strata mask (4-block cells, 256 blocks) built on a background thread when the
   camera enters another 32-block cell. It is a 512x512 texture (`stasisdelvers:stratamask`) with its corner in

@@ -84,13 +84,24 @@ public final class StasisPost {
         if (mc.player == null || mc.level == null) return;
         List<Identifier> effects = mc.player.getActivePostEffects();
         // only once the data texture exists: the chain binds it when it loads
-        boolean want = texture != null && Stasis.stops(mc.level);
+        boolean want = texture != null && (Stasis.stops(mc.level) || returnsOnly(mc.level));
         if (want != effects.contains(EFFECT)) {
             List<Identifier> l = new ArrayList<>(effects);
             if (want) l.add(EFFECT);
             else l.remove(EFFECT);
             mc.player.setActivePostEffects(l);
         }
+    }
+
+    /**
+     * A level where time runs but a lance's return rifts hang (spreading mode: the Nether until the spread is complete,
+     * the End until it stills; AdventurAgent: the return rift at a Nether pad wasn't drawn, though it worked as a door).
+     * The post chain runs there for them alone, with all the land running: their black, fringe, mist and eye, as a rift
+     * in the overworld's running land, and nothing grey.
+     */
+    static boolean returnsOnly(net.minecraft.world.level.Level level) {
+        int seed = ClientFields.deepSeed();
+        return !Stasis.stops(level) && seed != 0 && org.erisia.stasis.StaticDeeps.hasReturns(seed);
     }
 
     static void frame(FrameGraphSetupEvent e) {
@@ -109,7 +120,8 @@ public final class StasisPost {
         d[19] = (float) (cam.x - fx);
         d[20] = (float) (cam.y - fy);
         d[21] = (float) (cam.z - fz);
-        d[22] = Stasis.stops(mc.level) ? 1 : 0;
+        boolean returnsOnly = returnsOnly(mc.level);
+        d[22] = Stasis.stops(mc.level) || returnsOnly ? 1 : 0;
         d[23] = StasisNet.clientFreeze;
         // all time-driven visuals on the smoothed clock: in a slow field the client ticks slowly and the server's time
         // packet steps its game time every second (AdventurAgent: the whole screen stepped once a second)
@@ -122,7 +134,10 @@ public final class StasisPost {
         // eddy time (Eddies.time), with the partial tick so the mist drifts smoothly
         d[30] = (float) (clock % (1048576 / 20.0));
         int[] spawn = Stasis.spawnArea(mc.level);
-        if (spawn != null) {
+        if (returnsOnly) {   // (time runs everywhere here: the spawn area's rectangle over the whole world)
+            d[25] = d[26] = -3.0e7f;
+            d[27] = d[28] = 3.0e7f;
+        } else if (spawn != null) {
             d[25] = spawn[0];
             d[26] = spawn[1];
             d[27] = spawn[2];
@@ -243,9 +258,10 @@ public final class StasisPost {
         d[182] = (float) ((0.39 * mt) % (2 * Math.PI));
         // static deeps near the camera (StaticDeeps): centre - floor(camera), radius, shape id; at most 4
         int ns = 0;
-        if (Stasis.stops(mc.level) && ClientFields.deepSeed() != 0) {
+        if ((Stasis.stops(mc.level) || returnsOnly) && ClientFields.deepSeed() != 0) {
             for (var sd : org.erisia.stasis.StaticDeeps.near((float) cam.x, (float) cam.y, (float) cam.z, 260, ClientFields.deepSeed())) {
                 if (ns == 4) break;
+                if (returnsOnly && !org.erisia.stasis.StaticDeeps.isReturn(sd)) continue;   // (the land's own rifts aren't there yet)
                 double dist = Math.sqrt(Math.pow(sd.x() - cam.x, 2) + Math.pow(sd.y() - cam.y, 2) + Math.pow(sd.z() - cam.z, 2));
                 if (dist - sd.radius() * 1.5 > 200) continue;
                 // the mist's reach (stasis.fsh STATIC_REACH): the warped, roughened shape stays within ~1.3 r + 8

@@ -68,6 +68,11 @@ public final class StaticDeeps {
         return new Deep(p.getX() + 0.5f, p.getY() + 0.5f, p.getZ() + 0.5f, RETURN_RADIUS, id);
     }
 
+    /** Does the level with this deep seed have return rifts (the client draws them even where time runs)? */
+    public static boolean hasReturns(int seed) {
+        return RETURNS.containsKey(seed);
+    }
+
     /** Set the return rifts for a deep seed (server: Lance.publish; client: the GateRifts packet). */
     public static void setReturns(int seed, java.util.Collection<Long> centres) {
         List<Deep> l = new ArrayList<>();

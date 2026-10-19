@@ -133,7 +133,9 @@ Kept simple, all in the tower's materials:
 - The return rift: a static deep of radius 3 (`StaticDeeps.returnRift`, `isReturn`, `isGate` too), its centre
   `RETURN_ALONG` (5) blocks along the pad and one up (body height). Registered per deep seed (`setReturns`, from
   `StasisEvents.levelLoad` and when one is made) and synced in `GateRifts` (protocol 14; 15 adds the steps), so clients draw it.
-  `Gates.destination` says "minecraft:overworld" for it (the shader's eye code 2).
+  `Gates.destination` says "minecraft:overworld" for it (the shader's eye code 2). Where time runs (spreading mode's
+  Nether, and the End before it stills) the client draws them anyway (`StasisPost.returnsOnly`: the post chain for
+  them alone, the land running), as a rift in the overworld's running land (AdventurAgent: it wasn't drawn).
 - Stepping into a return rift's core (the same reach rule) goes home (`Lance.goHome`, `Lance.choose`, Baughn's
   decision 3):
   - on the End rift's islands (`central`): the gate the player last came out of (persisted NBT
