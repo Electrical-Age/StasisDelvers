@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "stasisdelvers:block/lance_core_top",
+    "bottom": "stasisdelvers:block/stasis_tower",
+    "side": "stasisdelvers:block/lance_core"
+  }
+}

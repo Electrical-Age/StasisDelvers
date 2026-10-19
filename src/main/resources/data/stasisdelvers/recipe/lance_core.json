@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": "#c:plates/iron",
+    "S": "stasisdelvers:rift_shard",
+    "B": "eln:cost_oriented_battery",
+    "M": "eln:machine_block",
+    "C": "eln:copper_coil"
+  },
+  "pattern": [
+    "PSP",
+    "BMB",
+    "PCP"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:lance_core"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "R": "stasisdelvers:charged_rift_shard",
+    "A": "stasisdelvers:riftstone",
+    "F": "stasisdelvers:rift_focus"
+  },
+  "pattern": [
+    "ARA",
+    "RFR",
+    "ARA"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:charged_rift_focus"
+  }
+}

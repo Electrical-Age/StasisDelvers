@@ -336,6 +336,8 @@ public final class Stasis {
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
         var be = level.getBlockEntity(pos);
         if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
+        // a lance core drives its gate's breach, hold and relax, at a rift's rim in stopped land (Lance)
+        if (be instanceof LanceBlockEntity) return true;
         // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
         // EA's light blocks (lamps, flashlights) time out in their tick: frozen, a flashlight sweep would leave its
@@ -347,7 +349,7 @@ public final class Stasis {
     public static final int TOWER_YARD = 6;
 
     /**
-     * Is pos within TOWER_YARD blocks (per axis) of a formed tower core (its 2 blocks)? Only loaded chunks are looked at (an unloaded
+     * Is pos within TOWER_YARD blocks (per axis) of a formed tower core (its 2 blocks) or a lance core? Only loaded chunks are looked at (an unloaded
      * one counts as having no tower). Replaces the old "in the tower's chunk", which a 3x3x2 core next to a chunk line
      * made a lottery.
      */
@@ -358,11 +360,14 @@ public final class Stasis {
                 var chunk = level.getChunkSource().getChunkNow(cx, cz);
                 if (chunk == null) continue;
                 for (var be : chunk.getBlockEntities().values()) {
-                    if (!(be instanceof TowerBlockEntity t) || !t.isMaster()) continue;
+                    // a lance core has the same yard (Lance: its EA cables, batteries and exporter run beside it)
+                    boolean lance = be instanceof LanceBlockEntity;
+                    if (!lance && (!(be instanceof TowerBlockEntity t) || !t.isMaster())) continue;
                     BlockPos m = be.getBlockPos();
-                    int dx = Math.abs(pos.getX() - m.getX());   // the core is 1x1x2
+                    int dx = Math.abs(pos.getX() - m.getX());   // the core is 1x1x2 (a lance's 1x1x1)
                     int dz = Math.abs(pos.getZ() - m.getZ());
-                    int dy = pos.getY() < m.getY() ? m.getY() - pos.getY() : Math.max(pos.getY() - (m.getY() + TowerBlock.HEIGHT - 1), 0);
+                    int top = m.getY() + (lance ? 0 : TowerBlock.HEIGHT - 1);
+                    int dy = pos.getY() < m.getY() ? m.getY() - pos.getY() : Math.max(pos.getY() - top, 0);
                     if (Math.max(dx, Math.max(dy, dz)) <= TOWER_YARD) return true;
                 }
             }

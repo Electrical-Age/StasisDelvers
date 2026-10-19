@@ -105,7 +105,8 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent.class, e -> {
             var it = e.getItemStack().getItem();
             String key = it == org.erisia.stasis.StasisRegistry.TOWER_ITEM.get() ? "tooltip.stasisdelvers.stasis_tower"
-                : it == org.erisia.stasis.StasisRegistry.TOWER_SEGMENT_ITEM.get() ? "tooltip.stasisdelvers.stasis_tower_segment" : null;
+                : it == org.erisia.stasis.StasisRegistry.TOWER_SEGMENT_ITEM.get() ? "tooltip.stasisdelvers.stasis_tower_segment"
+                : it == org.erisia.stasis.StasisRegistry.LANCE_ITEM.get() ? "tooltip.stasisdelvers.lance_core" : null;
             if (key == null) return;
             for (int i = 0; i < 3; i++)
                 e.getToolTip().add(net.minecraft.network.chat.Component.translatable(key + "." + i).withStyle(net.minecraft.ChatFormatting.GRAY));

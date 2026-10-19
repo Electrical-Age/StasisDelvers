@@ -270,7 +270,7 @@ public final class Lance {
     }
 
     /** publish, and tell the level's players (the GateRifts payload). */
-    static void publishAndSend(ServerLevel level) {
+    public static void publishAndSend(ServerLevel level) {
         publish(level);
         for (ServerPlayer pl : level.players()) StasisNet.sendGates(pl);
     }
@@ -585,10 +585,26 @@ public final class Lance {
     }
 
     /**
-     * Where a trip home lands: the base of the gate's lance. L1 has no lance block yet, so this is a safe spot at the
-     * rift's rim ({@link #rim}); L2 puts the lance's own base here.
+     * Where a trip home lands: the base of the gate's lance (Baughn: "the base of the tower"), a standable spot beside
+     * its core, the side away from the rift first. With no lance standing (the test command's gates, a dismantled one):
+     * a safe spot at the rift's rim ({@link #rim}).
      */
     public static BlockPos basePosition(ServerLevel level, Gate g) {
+        if (g.hasLance()) {
+            BlockPos core = BlockPos.of(g.lance());
+            level.getChunk(core.getX() >> 4, core.getZ() >> 4);
+            if (level.getBlockEntity(core) instanceof LanceBlockEntity) {
+                float[] c = StaticDeeps.core(g.deep());
+                List<BlockPos> around = new ArrayList<>();
+                for (int dy : new int[]{0, 1, -1})
+                    for (int dx = -1; dx <= 1; dx++)
+                        for (int dz = -1; dz <= 1; dz++) if (dx != 0 || dz != 0) around.add(core.offset(dx, dy, dz));
+                // the side away from the eye first (nobody walks straight back in), the core's own level before others
+                around.sort(java.util.Comparator.comparingInt((BlockPos q) -> Math.abs(q.getY() - core.getY()))
+                    .thenComparingDouble(q -> -Math.hypot(q.getX() + 0.5 - c[0], q.getZ() + 0.5 - c[2])));
+                for (BlockPos f : around) if (standable(level, f)) return f;
+            }
+        }
         return rim(level, g);
     }
 
@@ -822,6 +838,7 @@ public final class Lance {
     static void serverStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent e) {
         LAST.clear();
         TRAVELLING.clear();
+        DRIVEN.clear();
     }
 
     /** Tests: the pad's blocks of an arrival (to take them away again). */
@@ -846,6 +863,267 @@ public final class Lance {
             publish(dest);
         }
     }
+
+    // ---- the breach (L2): costs and times (pure; LanceTest), the state machine, binding, orphans, dormancy
+
+    /** The rift radii the costs scale between: a stronghold gate (r 9) and the largest wild rifts (Baughn: r 60). */
+    public static final float R_SMALL = 9, R_LARGE = 60;
+
+    /** Hold draw (W) for a radius: Baughn's ~10 kW "to break even", the same for every rift. */
+    public static double holdW(float r, double hold) {
+        return hold;
+    }
+
+    /** Breach draw (W): the hold draw times a factor rising linearly from `min` at r 9 to `max` at r 60 (clamped). */
+    public static double breachW(float r, double hold, double min, double max) {
+        double t = Mth.clamp((r - R_SMALL) / (R_LARGE - R_SMALL), 0, 1);
+        return hold * (min + (max - min) * t);
+    }
+
+    /** Seconds of a whole breach (or relax) given its r 9 length: longer by sqrt(r / 9) on larger rifts. */
+    public static double seconds(float r, double atSmall) {
+        return atSmall * Math.sqrt(Math.max(1, r) / R_SMALL);
+    }
+
+    public static double holdW(float r) {
+        return holdW(r, StasisConfig.lanceHoldW);
+    }
+
+    public static double breachW(float r) {
+        return breachW(r, StasisConfig.lanceHoldW, StasisConfig.lanceBreachMin, StasisConfig.lanceBreachMax);
+    }
+
+    /**
+     * One tick's inputs to a gate: `want` (a bound, standing lance with a focus that fits), `powered` (its draw met this
+     * tick), `storm` (a storm over the rift), and the lengths in ticks of a breach step, a relax step and the grace.
+     */
+    public record Drive(boolean want, boolean powered, boolean storm, double stepTicks, double relaxTicks, int graceTicks) {
+    }
+
+    /** The Drive lengths for a rift of radius r (config; `speed` > 1 only in tests). */
+    public static Drive drive(float r, boolean want, boolean powered, boolean storm, double speed) {
+        double step = seconds(r, StasisConfig.lanceBreachSeconds) * 20 / STEPS / speed, relax = seconds(r, StasisConfig.lanceRelaxSeconds) * 20 / STEPS / speed;
+        return new Drive(want, powered, storm, Math.max(1, step), Math.max(1, relax), (int) Math.round(StasisConfig.lanceGraceSeconds * 20 / speed));
+    }
+
+    /**
+     * One tick of a gate (pure; LanceTest). Powered and wanted: the grace resets; a gate not yet latched breaches (no
+     * progress in a storm), stepping down every stepTicks, and latches OPEN at the last step; a latched gate holds.
+     * Otherwise a gate past step 0 counts its grace (the klaxon), then unlatches and relaxes back (progress runs down,
+     * a step every relaxTicks; never a snap: it would swallow the gantry). Power back mid-relax breaches on from there.
+     */
+    static final float EPS = 1e-4f;
+
+    public static Gate advance(Gate g, Drive d) {
+        boolean open = g.open();
+        int step = g.step(), grace = g.grace();
+        float pr = g.progress();
+        if (d.want() && d.powered()) {
+            grace = 0;
+            if (!open && !d.storm()) {
+                pr += (float) (1 / d.stepTicks());
+                if (pr >= 1 - EPS) {   // (float sums of 1/n: a step after n ticks, not n + 1)
+                    step = Math.min(STEPS, step + 1);
+                    pr = 0;
+                    if (step == STEPS) open = true;
+                }
+            }
+        } else if (open || step > 0 || pr > 0) {
+            if (grace < d.graceTicks()) grace++;
+            else {
+                open = false;
+                pr -= (float) (1 / d.relaxTicks());
+                if (pr < -EPS) {
+                    if (step > 0) {
+                        step--;
+                        pr += 1;
+                    } else pr = 0;
+                }
+                if (pr < 0) pr = 0;
+            }
+        } else grace = 0;
+        if (step == 0 && pr == 0 && !open) grace = 0;
+        return g.withBreach(open, step, pr, grace);
+    }
+
+    /** Is the gate's klaxon sounding (without power, in its grace window)? */
+    public static boolean klaxon(Gate g, int graceTicks) {
+        return g.grace() > 0 && g.grace() <= graceTicks && (g.open() || g.step() > 0 || g.progress() > 0);
+    }
+
+    /** Game time a lance last drove each gate (memory; orphans are driven by {@link #tick}). */
+    private static final Map<Ref, Long> DRIVEN = new HashMap<>();
+
+    /**
+     * A tick of gate `id` (in level) from its lance (or from {@link #tick} for a gate whose lance is gone). Saves it, and
+     * on a new step or a latch tells StaticDeeps and the level's players. Returns the gate as it is now (null if none).
+     */
+    public static Gate drive(ServerLevel level, int id, boolean want, boolean powered, boolean storm, double speed) {
+        GateData gd = GateData.get(level);
+        Gate g = gd.gate(id);
+        if (g == null) return null;
+        Gate n = advance(g, drive(g.r(), want, powered, storm, speed));
+        DRIVEN.put(new Ref(dimId(level), id), level.getGameTime());
+        if (n.equals(g)) return g;
+        gd.gates.put(id, n);
+        gd.setDirty();
+        if (n.step() != g.step() || n.open() != g.open()) {
+            publishAndSend(level);
+            float[] c = StaticDeeps.core(n.deep());
+            if (n.open() && !g.open()) {
+                level.playSound(null, c[0], c[1], c[2], SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 2f, 1.4f);
+                StasisDelvers.LOG.info("Lance gate on rift {} in {} latched OPEN", id, dimId(level));
+            } else if (!n.open() && g.open()) {
+                level.playSound(null, c[0], c[1], c[2], SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 2f, 0.5f);
+                StasisDelvers.LOG.info("Lance gate on rift {} in {} unlatched: no power", id, dimId(level));
+            } else {
+                level.playSound(null, c[0], c[1], c[2], n.step() > g.step() ? SoundEvents.RESPAWN_ANCHOR_CHARGE : SoundEvents.RESPAWN_ANCHOR_DEPLETE.value(),
+                    SoundSource.BLOCKS, 1.5f, 0.5f + 0.1f * n.step());
+                StasisDelvers.LOG.info("Lance breach on rift {} in {}: step {} ({} % of r {})", id, dimId(level), n.step(),
+                    Math.round(100 * n.strength()), n.r());
+            }
+        }
+        return n;
+    }
+
+    /** The lanceable rift whose eye a boom tip covers: within 1.5 r horizontally of its core, the tip above it; nearest. */
+    public static StaticDeeps.Deep riftUnder(ServerLevel level, BlockPos tip) {
+        int seed = FieldData.get(level).deepSeed();
+        if (seed == 0) return null;
+        float tx = tip.getX() + 0.5f, ty = tip.getY() + 0.5f, tz = tip.getZ() + 0.5f;
+        StaticDeeps.Deep best = null;
+        double bd = Double.MAX_VALUE;
+        for (StaticDeeps.Deep d : StaticDeeps.near(tx, ty, tz, 96, seed)) {
+            if (!lanceable(d)) continue;
+            float[] c = StaticDeeps.core(d);
+            double h = Math.hypot(tx - c[0], tz - c[2]);
+            if (h > 1.5 * d.radius() || ty <= c[1] || h >= bd) continue;
+            bd = h;
+            best = d;
+        }
+        return best;
+    }
+
+    /**
+     * Bind the lance core at `core` (in level) to rift d: refused (a reason) if another lance still stands bound to it
+     * (one lance per rift; a lance in an unloaded chunk counts as standing). Wakes the gate's dormant return rifts.
+     */
+    public static String bind(ServerLevel level, StaticDeeps.Deep d, BlockPos core) {
+        GateData gd = GateData.get(level);
+        Gate g = gd.gate(d.id());
+        if (g == null) g = Gate.of(d, false);
+        if (g.hasLance() && g.lance() != core.asLong()) {
+            BlockPos other = BlockPos.of(g.lance());
+            boolean stands = !level.isLoaded(other)
+                || level.getBlockEntity(other) instanceof LanceBlockEntity l && l.boundId() == d.id();
+            if (stands) return "This rift already has a lance, at " + other.toShortString() + ".";
+        }
+        if (g.lance() == core.asLong() && g.dismantled() < 0) return null;
+        gd.gates.put(d.id(), g.withLance(core.asLong(), -1));
+        gd.setDirty();
+        wake(level.getServer(), new Ref(dimId(level), d.id()));
+        StasisDelvers.LOG.info("Lance at {} in {} bound to rift {}", core.toShortString(), dimId(level), d.id());
+        return null;
+    }
+
+    /** The lance at `core` no longer holds rift id (dismantled, or its boom moved): the gate is an orphan from now. */
+    public static void unbind(ServerLevel level, int id, BlockPos core) {
+        GateData gd = GateData.get(level);
+        Gate g = gd.gate(id);
+        if (g == null || g.lance() != core.asLong()) return;
+        gd.gates.put(id, g.withLance(NO_LANCE, level.getGameTime()));
+        gd.setDirty();
+        StasisDelvers.LOG.info("Lance at {} in {} let go of rift {}", core.toShortString(), dimId(level), id);
+    }
+
+    /** A return rift goes dormant this long after its home lance is gone (Argon: 15 min), with nobody near it. */
+    static final long DORMANT_AFTER = 15 * 60 * 20;
+    /** ... nobody within this of it, on the far side. */
+    static final double DORMANT_NOBODY = 256;
+
+    /** The arrivals made for gate `home` come back (their home has a lance again). */
+    static void wake(MinecraftServer srv, Ref home) {
+        for (ServerLevel l : srv.getAllLevels()) {
+            ArrivalData ad = ArrivalData.get(l);
+            boolean any = false;
+            for (var e : ad.arrivals.entrySet())
+                if (e.getValue().dormant() && e.getValue().home().equals(home)) {
+                    e.setValue(e.getValue().withDormant(false));
+                    any = true;
+                }
+            if (any) {
+                ad.setDirty();
+                publishAndSend(l);
+            }
+        }
+    }
+
+    /**
+     * Should this arrival's return rift go dormant (pure)? Its home gate's lance is gone (not merely unpowered: while
+     * the multiblock stands it is always usable), for DORMANT_AFTER, and nobody is near it. Never on the End rift's
+     * islands (shared by several gates: Baughn's decision 3 sends their players to any lance).
+     */
+    public static boolean dormant(Arrival a, Gate home, long now, boolean nobodyNear) {
+        return !a.central() && home != null && !home.hasLance() && home.dismantled() >= 0 && now - home.dismantled() >= DORMANT_AFTER && nobodyNear;
+    }
+
+    /** Every 5 s: put return rifts whose home lance has been gone a while to sleep (Argon). */
+    static void dormancy(MinecraftServer srv) {
+        for (ServerLevel l : srv.getAllLevels()) {
+            ArrivalData ad = ArrivalData.get(l);
+            boolean any = false;
+            for (var e : ad.arrivals.entrySet()) {
+                Arrival a = e.getValue();
+                if (a.dormant()) continue;
+                ResourceKey<Level> hk = dimKey(a.homeDim());
+                ServerLevel hl = hk == null ? null : srv.getLevel(hk);
+                Gate home = hl == null ? null : GateData.get(hl).gate(a.homeId());
+                if (home == null || home.hasLance()) continue;
+                BlockPos r = a.retPos();
+                boolean nobody = l.getNearestPlayer(r.getX() + 0.5, r.getY() + 0.5, r.getZ() + 0.5, DORMANT_NOBODY, false) == null;
+                if (dormant(a, home, l.getGameTime(), nobody)) {
+                    e.setValue(a.withDormant(true));
+                    any = true;
+                    StasisDelvers.LOG.info("Return rift {} in {} went dormant: its home lance is gone", a.key(), dimId(l));
+                }
+            }
+            if (any) {
+                ad.setDirty();
+                publishAndSend(l);
+            }
+        }
+    }
+
+    /**
+     * ServerTickEvent.Post: gates whose lance is gone (or hasn't driven them for 10 s: its chunk unloaded) relax as if
+     * unpowered; dormancy every 5 s. Gates that never had a lance (the test command's) stay as set.
+     */
+    static void tick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post e) {
+        MinecraftServer srv = e.getServer();
+        for (ServerLevel l : srv.getAllLevels()) {
+            GateData gd = GateData.get(l);
+            if (gd.gates.isEmpty()) continue;
+            long now = l.getGameTime();
+            for (Gate g : List.copyOf(gd.gates.values())) {
+                if (!(g.open() || g.step() > 0 || g.progress() > 0)) continue;
+                boolean orphan;
+                if (!g.hasLance()) orphan = g.dismantled() >= 0;
+                else {
+                    Long last = DRIVEN.get(new Ref(dimId(l), g.id()));
+                    if (last == null) DRIVEN.put(new Ref(dimId(l), g.id()), now);
+                    orphan = last != null && now - last > 200;
+                }
+                if (orphan) {
+                    drive(l, g.id(), false, false, false, testSpeed);
+                    if (g.hasLance()) DRIVEN.put(new Ref(dimId(l), g.id()), now - 201);   // (still an orphan next tick)
+                }
+            }
+        }
+        if (srv.getTickCount() % 100 == 0) dormancy(srv);
+    }
+
+    /** Tests: the speed orphans relax at (1 in play). */
+    public static double testSpeed = 1;
 
     // ---- the test command (/stasis lance)
 
@@ -875,13 +1153,15 @@ public final class Lance {
                 n++;
                 float[] c = StaticDeeps.core(g.deep());
                 ServerLevel dest = destination(srv, g.deep());
-                String line = String.format(java.util.Locale.ROOT, "%s rift %d %s, core %.0f %.0f %.0f, r %.0f, to %s%s", dimId(l), g.id(),
-                    g.open() ? "OPEN" : "closed", c[0], c[1], c[2], g.r(), kind(srv, g.deep()), dest == null ? " (no such level)" : " in " + dimId(dest));
+                String line = String.format(java.util.Locale.ROOT, "%s rift %d %s, step %d/%d, core %.0f %.0f %.0f, r %.0f, to %s%s, %s", dimId(l), g.id(),
+                    g.open() ? "OPEN" : "closed", g.step(), STEPS, c[0], c[1], c[2], g.r(), kind(srv, g.deep()),
+                    dest == null ? " (no such level)" : " in " + dimId(dest),
+                    g.hasLance() ? "lance at " + BlockPos.of(g.lance()).toShortString() : g.dismantled() >= 0 ? "lance dismantled" : "no lance");
                 src.sendSuccess(() -> Component.literal(line), false);
             }
             for (Arrival a : ArrivalData.get(l).arrivals.values())
                 src.sendSuccess(() -> Component.literal("  arrival " + a.key() + " in " + dimId(l) + " at " + a.footPos().toShortString()
-                    + ", return rift " + a.retPos().toShortString()), false);
+                    + ", return rift " + a.retPos().toShortString() + (a.dormant() ? " (dormant)" : "")), false);
         }
         if (n == 0) src.sendSuccess(() -> Component.literal("No lance gates"), false);
         return n;

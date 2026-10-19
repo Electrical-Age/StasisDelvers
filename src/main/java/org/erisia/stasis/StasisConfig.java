@@ -58,6 +58,8 @@ public final class StasisConfig {
     static final ModConfigSpec.BooleanValue END_BARRIER;
     static final ModConfigSpec.IntValue END_BARRIER_RADIUS;
     static final ModConfigSpec.DoubleValue HARD_MODE_TELEPORT_SECONDS;
+    static final ModConfigSpec.DoubleValue LANCE_HOLD_W, LANCE_BREACH_MIN, LANCE_BREACH_MAX, LANCE_BREACH_SECONDS, LANCE_RELAX_SECONDS,
+        LANCE_GRACE_SECONDS, LANCE_STORM_DRAW, LANCE_STORE_SECONDS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -152,6 +154,22 @@ public final class StasisConfig {
             .defineInRange("endBarrierRadius", 140, 32, 4000);
         HARD_MODE_TELEPORT_SECONDS = b.comment("Spreading mode: seconds from the dragon's death (hard mode) to the flash that sends everyone in",
                 "the End to their respawn point; the island's explosion plays meanwhile.").defineInRange("hardModeTeleportSeconds", 6.0, 0.0, 30.0);
+        // the rift lance (Lance, LanceBlockEntity; docs/lance.md). Baughn 2026-10-19: holding a gate ~10 kW "to break even",
+        // the breach more (3-5x by the rift's radius: a r9 stronghold gate the starter, a r60 wild rift the endgame)
+        LANCE_HOLD_W = b.comment("Rift lance: watts to hold an open gate (any rift).").defineInRange("lanceHoldW", 10000.0, 0.0, 1e9);
+        LANCE_BREACH_MIN = b.comment("Rift lance: the breach draws this many times the hold draw on the smallest rifts (r 9, stronghold gates)...")
+            .defineInRange("lanceBreachMinFactor", 3.0, 0.0, 1000.0);
+        LANCE_BREACH_MAX = b.comment("... rising linearly to this many times on the largest (r 60).").defineInRange("lanceBreachMaxFactor", 5.0, 0.0, 1000.0);
+        LANCE_BREACH_SECONDS = b.comment("Rift lance: seconds the breach (8 steps from the whole rift to a quarter) takes on a r 9 rift;",
+            "longer rifts take this x sqrt(r / 9) (r 60: about 2.6 x).").defineInRange("lanceBreachSeconds", 120.0, 1.0, 36000.0);
+        LANCE_RELAX_SECONDS = b.comment("Rift lance: seconds an unpowered rift takes to relax back from a quarter to whole (r 9; x sqrt(r / 9)).")
+            .defineInRange("lanceRelaxSeconds", 240.0, 1.0, 36000.0);
+        LANCE_GRACE_SECONDS = b.comment("Rift lance: seconds without power (the klaxon) before the gate unlatches and starts relaxing.")
+            .defineInRange("lanceGraceSeconds", 30.0, 0.0, 3600.0);
+        LANCE_STORM_DRAW = b.comment("Rift lance: a storm over the rift multiplies the breach's draw by this (and the breach makes no progress).")
+            .defineInRange("lanceStormDrawFactor", 2.0, 1.0, 100.0);
+        LANCE_STORE_SECONDS = b.comment("Rift lance: the core's store holds this many seconds of its breach draw. After running dry it waits",
+            "until full again, so a supply short of the draw can't hold a gate.").defineInRange("lanceStoreSeconds", 30.0, 1.0, 3600.0);
         SPEC = b.build();
     }
 
@@ -192,6 +210,8 @@ public final class StasisConfig {
     static volatile boolean endBarrier = true;
     static volatile int endBarrierRadius = 140;
     static volatile double hardModeTeleportSeconds = 6;
+    static volatile double lanceHoldW = 10000, lanceBreachMin = 3, lanceBreachMax = 5, lanceBreachSeconds = 120, lanceRelaxSeconds = 240,
+        lanceGraceSeconds = 30, lanceStormDraw = 2, lanceStoreSeconds = 30;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
     static final boolean NO_SPAWN_AREA = Boolean.getBoolean("stasisdelvers.noSpawnArea");
@@ -254,6 +274,13 @@ public final class StasisConfig {
         m.put("endBarrier", endBarrier);
         m.put("endBarrierRadius", endBarrierRadius);
         m.put("hardModeTeleportSeconds", hardModeTeleportSeconds);
+        m.put("lanceHoldW", lanceHoldW);
+        m.put("lanceBreachFactor", lanceBreachMin + ".." + lanceBreachMax);
+        m.put("lanceBreachSeconds", lanceBreachSeconds);
+        m.put("lanceRelaxSeconds", lanceRelaxSeconds);
+        m.put("lanceGraceSeconds", lanceGraceSeconds);
+        m.put("lanceStormDrawFactor", lanceStormDraw);
+        m.put("lanceStoreSeconds", lanceStoreSeconds);
         return m;
     }
 
@@ -305,5 +332,13 @@ public final class StasisConfig {
         endBarrier = END_BARRIER.get();
         endBarrierRadius = END_BARRIER_RADIUS.get();
         hardModeTeleportSeconds = HARD_MODE_TELEPORT_SECONDS.get();
+        lanceHoldW = LANCE_HOLD_W.get();
+        lanceBreachMin = LANCE_BREACH_MIN.get();
+        lanceBreachMax = LANCE_BREACH_MAX.get();
+        lanceBreachSeconds = LANCE_BREACH_SECONDS.get();
+        lanceRelaxSeconds = LANCE_RELAX_SECONDS.get();
+        lanceGraceSeconds = LANCE_GRACE_SECONDS.get();
+        lanceStormDraw = LANCE_STORM_DRAW.get();
+        lanceStoreSeconds = LANCE_STORE_SECONDS.get();
     }
 }

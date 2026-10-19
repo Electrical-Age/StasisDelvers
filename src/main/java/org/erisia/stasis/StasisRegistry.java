@@ -90,6 +90,19 @@ public final class StasisRegistry {
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TowerCellBlockEntity>> TOWER_CELL_ENTITY =
         BLOCK_ENTITIES.register("stasis_tower_cell", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TowerCellBlockEntity::new, TOWER.get()));
 
+    /** The rift lance (Lance, LanceBlockEntity; docs/lance.md): its core block, and the crystal foci it takes. */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<LanceBlock> LANCE = BLOCKS.registerBlock("lance_core",
+        LanceBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(5f, 6f)
+            .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.METAL).lightLevel(st -> 4));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> LANCE_ITEM = ITEMS.registerSimpleBlockItem(LANCE);
+    public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<LanceBlockEntity>> LANCE_ENTITY =
+        BLOCK_ENTITIES.register("lance_core", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(LanceBlockEntity::new, LANCE.get()));
+    /** Tier 1 (rift shards): breaches rifts to the Nether. Tier 2 (charged shards): the End too. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<RiftFocusItem> RIFT_FOCUS = ITEMS.registerItem("rift_focus",
+        p -> new RiftFocusItem(p, 1), p -> p.stacksTo(1));
+    public static final net.neoforged.neoforge.registries.DeferredItem<RiftFocusItem> CHARGED_RIFT_FOCUS = ITEMS.registerItem("charged_rift_focus",
+        p -> new RiftFocusItem(p, 2), p -> p.stacksTo(1).rarity(net.minecraft.world.item.Rarity.UNCOMMON));
+
     // ---- the strata around rifts (Strata, DeepFeature): riftstone, its brighter veins, and rift crystals (budding
     // walls and four growth stages, like amethyst; Baughn: violet with dark spots, script/gen_crystals.py)
     public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> RIFTSTONE = BLOCKS.registerSimpleBlock("riftstone",
@@ -220,9 +233,16 @@ public final class StasisRegistry {
         modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->
             e.registerBlock(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, (level, pos, state, be, side) ->
                 level.getBlockEntity(TowerBlock.master(pos, state)) instanceof TowerBlockEntity t ? t.energy() : null, TOWER.get()));
+        modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->
+            e.registerBlock(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, (level, pos, state, be, side) ->
+                be instanceof LanceBlockEntity l ? l.energy() : null, LANCE.get()));
+        modBus.addListener(LanceTickets::register);
         modBus.addListener(Tickets::register);
         modBus.addListener(EndRift::registerTickets);
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStoppedEvent.class, e -> Tickets.clear());
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStoppedEvent.class, e -> {
+            Tickets.clear();
+            LanceTickets.clear();
+        });
         TABS.register(modBus);
     }
 }

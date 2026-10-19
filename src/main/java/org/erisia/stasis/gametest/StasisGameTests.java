@@ -1,6 +1,7 @@
 package org.erisia.stasis.gametest;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -3513,6 +3514,194 @@ public final class StasisGameTests {
                 c.check("left the End: no longer 'arrived by lance'", !org.erisia.stasis.Lance.arrivedByLance(p));
             }
             return () -> { };
+        }, false, true));
+    }
+
+    // ---- the lance, L2: the multiblock, power, breach, hold and relax (LanceBlockEntity, Lance; docs/lance.md)
+
+    /** A gate rift (r 9) registered at a local position, not opened; forgotten (with its gate) afterwards. */
+    static org.erisia.stasis.StaticDeeps.Deep lanceRift(GameTestHelper h, Checks c, BlockPos local) {
+        ServerLevel level = h.getLevel();
+        BlockPos centre = h.absolutePos(local);
+        org.erisia.stasis.Gates.testRegister(level, centre);
+        var d = org.erisia.stasis.Gates.gateForTest(centre);
+        c.cleanup.add(() -> {
+            org.erisia.stasis.Gates.testForget(level, centre);
+            org.erisia.stasis.Lance.testForget(level, d.id(), null);
+            org.erisia.stasis.Lance.publishAndSend(level);
+        });
+        return d;
+    }
+
+    /** A lance core at local `core` with a mast of `mast` poles and a boom of `boom` poles off its top towards `dir`. */
+    static org.erisia.stasis.LanceBlockEntity lance(GameTestHelper h, Checks c, BlockPos core, int mast, Direction dir, int boom) {
+        h.setBlock(core, org.erisia.stasis.StasisRegistry.LANCE.get());
+        var pole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState();
+        for (int i = 1; i <= mast; i++) h.setBlock(core.above(i), pole);
+        for (int i = 1; i <= boom; i++)
+            h.setBlock(core.above(mast).relative(dir, i), pole.setValue(org.erisia.stasis.TowerPoleBlock.AXIS, dir.getAxis()));
+        var t = (org.erisia.stasis.LanceBlockEntity) h.getLevel().getBlockEntity(h.absolutePos(core));
+        c.cleanup.add(() -> {
+            for (int i = 1; i <= boom; i++) h.setBlock(core.above(mast).relative(dir, i), Blocks.AIR);
+            for (int i = 1; i <= mast; i++) h.setBlock(core.above(i), Blocks.AIR);
+            h.setBlock(core, Blocks.AIR);
+        });
+        return t;
+    }
+
+    static {
+        // the multiblock binds to the rift whose eye the boom's tip covers (within 1.5 r, above it); one lance per rift;
+        // dismantled, the rift is free for another; the base (where return trips land) is beside the core
+        CASES.put("lance_multiblock_binds", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var d = lanceRift(h, c, new BlockPos(13, 2, 4));
+            var g0 = (java.util.function.Supplier<org.erisia.stasis.Lance.Gate>) () -> org.erisia.stasis.Lance.GateData.get(level).gate(d.id());
+            // a bare core, then a short mast: unbound
+            h.setBlock(new BlockPos(1, 1, 4), org.erisia.stasis.StasisRegistry.LANCE.get());
+            var t = (org.erisia.stasis.LanceBlockEntity) level.getBlockEntity(h.absolutePos(new BlockPos(1, 1, 4)));
+            t.testTick();
+            c.check("a bare core: unbound, asks for a mast", t.boundId() == 0 && t.problem().contains("mast"), t.problem());
+            h.setBlock(new BlockPos(1, 1, 4), Blocks.AIR);
+            // a boom pointing away: its tip is over no eye
+            var away = lance(h, c, new BlockPos(1, 1, 4), 3, Direction.WEST, 6);
+            away.testTick();
+            c.check("a boom away from the rift: unbound", away.boundId() == 0 && away.problem().contains("no rift"), away.problem());
+            for (int i = 1; i <= 6; i++) h.setBlock(new BlockPos(1 - i, 4, 4), Blocks.AIR);
+            // the boom out over the eye: bound
+            var pole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState().setValue(org.erisia.stasis.TowerPoleBlock.AXIS, Direction.Axis.X);
+            for (int i = 1; i <= 12; i++) h.setBlock(new BlockPos(1 + i, 4, 4), pole);
+            c.cleanup.add(() -> {
+                for (int i = 1; i <= 12; i++) h.setBlock(new BlockPos(1 + i, 4, 4), Blocks.AIR);
+            });
+            away.testTick();
+            BlockPos core = h.absolutePos(new BlockPos(1, 1, 4));
+            c.check("the boom's tip over the eye: bound to that rift", away.boundId() == d.id() && g0.get() != null && g0.get().lance() == core.asLong(),
+                away.problem() + " " + g0.get());
+            c.check("the tip is the boom's last pole", h.absolutePos(new BlockPos(13, 4, 4)).equals(away.tip()), String.valueOf(away.tip()));
+            BlockPos base = org.erisia.stasis.Lance.basePosition(level, g0.get());
+            c.check("home is the lance's base: beside the core", Math.abs(base.getX() - core.getX()) <= 1 && Math.abs(base.getZ() - core.getZ()) <= 1
+                && Math.abs(base.getY() - core.getY()) <= 1, base.toShortString() + " core " + core.toShortString());
+            // a second lance over the same rift: refused
+            var second = lance(h, c, new BlockPos(1, 1, 1), 3, Direction.EAST, 12);
+            second.testTick();
+            c.check("one lance per rift: the second is refused", second.boundId() == 0 && second.problem().contains("already"), second.problem());
+            // two booms: not a lance
+            h.setBlock(new BlockPos(1, 4, 5), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
+                .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, Direction.Axis.Z));
+            away.testTick();
+            c.check("two booms: unbound, the rift let go", away.boundId() == 0 && away.problem().contains("one boom") && !g0.get().hasLance()
+                && g0.get().dismantled() >= 0, away.problem());
+            h.setBlock(new BlockPos(1, 4, 5), Blocks.AIR);
+            // the first lance dismantled: the second takes the rift
+            h.setBlock(new BlockPos(1, 1, 4), Blocks.AIR);
+            second.testTick();
+            c.check("the rift free: the second lance binds", second.boundId() == d.id() && g0.get().lance() == h.absolutePos(new BlockPos(1, 1, 1)).asLong(),
+                second.problem());
+            return () -> { };
+        }, false, true));
+
+        // powered with a fitting focus: the rift steps down a step at a time to a quarter (zones and the client's strength
+        // follow), latches OPEN, holds on the hold draw; a storm over it stalls the breach at twice the draw; without power
+        // the klaxon's grace, then it unlatches and relaxes back a step at a time (Baughn, LANCE-v2 decisions)
+        CASES.put("lance_breach_hold_relax", new Spec(40, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            if (org.erisia.stasis.Spread.status(server, null).startsWith("mode spreading")) {
+                c.check("the test server is in stopped mode", false);
+                return () -> { };
+            }
+            var d = lanceRift(h, c, new BlockPos(13, 2, 4));
+            var t = lance(h, c, new BlockPos(1, 1, 4), 3, Direction.EAST, 12);
+            int seed = FieldData.get(level).deepSeed();
+            java.util.function.Supplier<org.erisia.stasis.Lance.Gate> gs = () -> org.erisia.stasis.Lance.GateData.get(level).gate(d.id());
+            t.testSpeed = 100;   // r 9: a step in 3 ticks, the grace 6, a relax step 6
+            t.testSupplyW = 1e9;
+            t.testStorm = false;
+            t.testTick();
+            c.check("bound", t.boundId() == d.id(), t.problem());
+            // a probe inside the whole rift but outside its quarter
+            float[] k = org.erisia.stasis.StaticDeeps.core(d);
+            float[] probe = null;
+            for (float dx = 0; dx < 4 && probe == null; dx += 0.25f) {
+                float s = org.erisia.stasis.StaticDeeps.shape(d, k[0] + dx, k[1], k[2]);
+                if (s > 0.15f && s < 0.3f) probe = new float[]{k[0] + dx, k[1], k[2]};
+            }
+            c.check("a probe in the rift's body", probe != null && org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 2);
+            // no focus, then a tier-1 focus on an End-bound stronghold gate: nothing moves
+            for (int i = 0; i < 20; i++) t.testTick();
+            c.check("no focus: no breach, no draw", gs.get().step() == 0 && t.drawW() == 0);
+            t.setFocus(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_FOCUS.get()));
+            for (int i = 0; i < 20; i++) t.testTick();
+            c.check("a rift focus can't breach an End gate", gs.get().step() == 0 && t.statusText().getString().contains("too weak"), t.statusText().getString());
+            t.setFocus(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.CHARGED_RIFT_FOCUS.get()));
+            // the breach
+            int last = 0, ticks = 0;
+            boolean oneAtATime = true, followed = true;
+            while (!gs.get().open() && ticks++ < 200) {
+                t.testTick();
+                int st = gs.get().step();
+                if (st < last || st > last + 1) oneAtATime = false;
+                if (org.erisia.stasis.StaticDeeps.strength(seed, d) != org.erisia.stasis.Lance.strength(st)) followed = false;
+                last = st;
+            }
+            c.check("the breach steps one at a time to the floor and latches OPEN", oneAtATime && gs.get().step() == org.erisia.stasis.Lance.STEPS
+                && org.erisia.stasis.Lance.isOpen(level, d.id()), "step " + gs.get().step() + " after " + ticks + " ticks");
+            c.check("the zones follow each step", followed && org.erisia.stasis.Lance.effectiveRadius(level, d) == d.radius() * 0.25f);
+            if (probe != null) c.check("the rift's body shrank: the probe is outer zone now", org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 1);
+            c.check("the eye's core is still rift", org.erisia.stasis.StaticDeeps.zone(seed, k[0], k[1], k[2]) == 2);
+            c.check("the beam is on", t.beam());
+            var forced = org.erisia.stasis.LanceTickets.forced(level, t.getBlockPos());
+            c.check("the core's and the rift core's chunks are forced", forced.contains(net.minecraft.world.level.ChunkPos.pack((int) Math.floor(k[0]) >> 4,
+                (int) Math.floor(k[2]) >> 4)) && forced.contains(net.minecraft.world.level.ChunkPos.pack(t.getBlockPos().getX() >> 4, t.getBlockPos().getZ() >> 4)),
+                forced.toString());
+            // the hold: the hold draw, and it stays
+            for (int i = 0; i < 40; i++) t.testTick();
+            c.check("held open on the hold draw", gs.get().open() && t.drawW() == org.erisia.stasis.Lance.holdW(d.radius()), "draw " + t.drawW());
+            // power fails: the grace (klaxon), then unlatched and a step back at a time, never a snap
+            t.testSupplyW = Double.NaN;
+            t.energy().set(0);
+            for (int i = 0; i < 4; i++) t.testTick();
+            c.check("in the grace: still open, the klaxon", gs.get().open() && org.erisia.stasis.Lance.klaxon(gs.get(), 6), gs.get().toString());
+            last = gs.get().step();
+            ticks = 0;
+            oneAtATime = true;
+            boolean unlatched = false;
+            while ((gs.get().step() > 0 || gs.get().progress() > 0) && ticks++ < 200) {
+                t.testTick();
+                int st = gs.get().step();
+                if (st > last || st < last - 1) oneAtATime = false;
+                if (!gs.get().open()) unlatched = true;
+                last = st;
+            }
+            c.check("then unlatched, relaxing a step at a time to the whole rift", unlatched && oneAtATime && gs.get().step() == 0 && !gs.get().open()
+                && ticks >= 6 * org.erisia.stasis.Lance.STEPS, "after " + ticks + " ticks: " + gs.get());
+            c.check("the zones are whole again", org.erisia.stasis.StaticDeeps.strength(seed, d) == 1f
+                && (probe == null || org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 2));
+            for (int i = 0; i < 3; i++) t.testTick();
+            c.check("at rest: the tickets released, the beam off", org.erisia.stasis.LanceTickets.forced(level, t.getBlockPos()).isEmpty() && !t.beam());
+            // a storm over the rift (at the boom's tip): no progress, twice the draw
+            t.testStorm = null;
+            t.testSupplyW = 1e9;
+            BlockPos tip = t.tip();
+            var box = new net.minecraft.world.phys.AABB(tip).inflate(1);
+            for (int i = 0; i < 8; i++) t.testTick();
+            int before = gs.get().step();
+            org.erisia.stasis.Storms.TEST.put(box, 1);
+            c.cleanup.add(() -> org.erisia.stasis.Storms.TEST.remove(box));
+            t.testTick();
+            float pr = gs.get().progress();
+            for (int i = 0; i < 30; i++) t.testTick();
+            c.check("a storm over the rift stalls the breach", before > 0 && gs.get().step() == before && gs.get().progress() == pr, gs.get().toString());
+            c.check("at twice the breach draw", t.drawW() == 2 * org.erisia.stasis.Lance.breachW(d.radius()), "draw " + t.drawW());
+            org.erisia.stasis.Storms.TEST.remove(box);
+            for (int i = 0; i < 6; i++) t.testTick();
+            c.check("the storm gone: on again", gs.get().step() > before);
+            // dismantled mid-breach: the orphan relaxes by itself (Lance.tick), its grace first
+            h.setBlock(new BlockPos(1, 1, 4), Blocks.AIR);
+            c.check("dismantled: the rift is let go", !gs.get().hasLance() && gs.get().dismantled() >= 0);
+            org.erisia.stasis.Lance.testSpeed = 100;
+            c.cleanup.add(() -> org.erisia.stasis.Lance.testSpeed = 1);
+            return () -> c.check("the orphan relaxed back to whole", gs.get() == null || gs.get().step() == 0, String.valueOf(gs.get()));
         }, false, true));
     }
 

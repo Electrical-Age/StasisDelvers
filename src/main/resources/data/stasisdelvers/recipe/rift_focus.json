@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "S": "stasisdelvers:rift_shard",
+    "D": "stasisdelvers:rift_dust",
+    "G": "minecraft:glass"
+  },
+  "pattern": [
+    "DSD",
+    "SGS",
+    "DSD"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:rift_focus"
+  }
+}

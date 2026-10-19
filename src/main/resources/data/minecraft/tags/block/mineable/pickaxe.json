@@ -2,6 +2,7 @@
   "replace": false,
   "values": [
     "stasisdelvers:stasis_tower",
+    "stasisdelvers:lance_core",
     "stasisdelvers:stasis_tower_segment",
     "stasisdelvers:riftstone",
     "stasisdelvers:riftstone_vein",
