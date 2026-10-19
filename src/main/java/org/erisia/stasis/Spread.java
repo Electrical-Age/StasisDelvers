@@ -279,6 +279,7 @@ public final class Spread {
     static void serverStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent e) {
         server = State.EMPTY;
         SpreadSync.clear();
+        StabilityCompassItem.clearCache();
         lastNanos = 0;
         testing = false;
     }

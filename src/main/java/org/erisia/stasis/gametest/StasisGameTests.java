@@ -2230,6 +2230,55 @@ public final class StasisGameTests {
                     org.erisia.stasis.SpreadSync.tilesSent(p) + " vs " + want.getAsInt());
             };
         }, false, true));
+        // the stability compass (Baughn 2026-10-19): in spreading mode it points at the nearest cell of stability >= 90 %
+        // (rank >= 0.9 N); in stopped mode it spins
+        CASES.put("stability_compass_target", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(23, at.getX(), at.getZ(), 300);
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.Spread.testInstall(m, m.count / 4);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(0, () -> remove(h, p));
+            ItemStack compass = new ItemStack(org.erisia.stasis.StasisRegistry.STABILITY_COMPASS.get());
+            org.erisia.stasis.StabilityCompassItem.update(compass, level, p);
+            var tr = compass.get(net.minecraft.core.component.DataComponents.LODESTONE_TRACKER);
+            int min = (int) Math.ceil(org.erisia.stasis.StabilityCompassItem.TARGET * m.count);
+            int[] want = org.erisia.stasis.SpreadMap.nearestAtLeast(m, p.getBlockX(), p.getBlockZ(), min, m.n * 2);
+            c.check("a target is set", tr != null && tr.target().isPresent(), "" + tr);
+            if (tr != null && tr.target().isPresent()) {
+                BlockPos t = tr.target().get().pos();
+                c.check("the target's stability is >= 90 %", m.rank1024(t.getX(), t.getZ()) >= (long) min * org.erisia.stasis.SpreadMap.SCALE,
+                    "rank " + m.rank1024(t.getX(), t.getZ()) / org.erisia.stasis.SpreadMap.SCALE + " of " + m.count);
+                c.check("it is the nearest such cell", want != null && t.getX() == want[0] && t.getZ() == want[1], t.toShortString());
+                c.check("in the overworld", tr.target().get().dimension() == net.minecraft.world.level.Level.OVERWORLD);
+            }
+            org.erisia.stasis.Spread.testReset();
+            org.erisia.stasis.StabilityCompassItem.update(compass, level, p);
+            var spin = compass.get(net.minecraft.core.component.DataComponents.LODESTONE_TRACKER);
+            c.check("stopped mode: the needle spins", spin != null && spin.target().isEmpty(), "" + spin);
+        }, false, true));
+        // spreading mode's first join (Baughn 2026-10-19): exactly one stability compass, no suit, not again on the next
+        // login
+        CASES.put("stability_compass_first_join", new Spec(1, (h, c) -> () -> {
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(29, at.getX(), at.getZ(), 200);
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            // (survivalPlayer marks the suit as given: so would a suit come, it would be the starterSuit path's fault)
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(0, () -> remove(h, p));
+            org.erisia.stasis.StarterKit.login(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p));
+            int compasses = 0, other = 0;
+            for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
+                ItemStack st = p.getInventory().getItem(i);
+                if (st.isEmpty()) continue;
+                if (st.is(org.erisia.stasis.StasisRegistry.STABILITY_COMPASS.get())) compasses += st.getCount();
+                else other++;
+            }
+            c.check("exactly one stability compass after joining and logging in again", compasses == 1, compasses + " compasses");
+            c.check("nothing else", other == 0, other + " other stacks");
+        }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range
         CASES.put("rate_command", new Spec(1, (h, c) -> () -> {
             ServerLevel level = h.getLevel();

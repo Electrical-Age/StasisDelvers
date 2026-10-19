@@ -121,6 +121,9 @@ public final class StasisRegistry {
     /** Crystal uses: the rift compass (to the nearest rift; spins in storms) and the rift barometer (storm warning). */
     public static final net.neoforged.neoforge.registries.DeferredItem<RiftCompassItem> RIFT_COMPASS = ITEMS.registerItem("rift_compass", RiftCompassItem::new,
         p -> p.stacksTo(1));
+    /** Spreading mode: the stability compass (to the nearest place of stability >= 90 %; StarterKit gives one). */
+    public static final net.neoforged.neoforge.registries.DeferredItem<StabilityCompassItem> STABILITY_COMPASS = ITEMS.registerItem("stability_compass",
+        StabilityCompassItem::new, p -> p.stacksTo(1));
     public static final net.neoforged.neoforge.registries.DeferredBlock<RiftBarometerBlock> RIFT_BAROMETER_BLOCK = BLOCKS.registerBlock("rift_barometer",
         RiftBarometerBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(2.5f, 9f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> st.getValue(RiftBarometerBlock.POWER) / 3));
