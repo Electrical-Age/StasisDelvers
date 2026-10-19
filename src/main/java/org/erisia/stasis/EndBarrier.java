@@ -23,16 +23,21 @@ import java.util.UUID;
  * platform; the client draws it (client/EndBarrierFx). Creative and spectator players pass.
  * <p>
  * Every way in already lands inside: the End portal on the obsidian platform at (100, 50, 0), and no End gateway ever
- * appears in spreading mode (EnderDragonFightMixin), so no pearl or player goes through one. It stays after hard mode
- * (the End is stilled then, and nobody gets in until the lance): step 5 may change {@link #active}.
+ * appears in spreading mode (EnderDragonFightMixin), so no pearl or player goes through one. It goes at hard mode
+ * (Baughn's decision 7 for the lance): lance arrivals land on the rift's islands and in the outer End.
  */
 public final class EndBarrier {
     private EndBarrier() {
     }
 
-    /** Does the wall stand in this level (both sides: the config is synced)? */
+    /**
+     * Does the wall stand in this level (both sides: the config is synced, hard mode from the spread's state)? Only
+     * before hard mode: after it the End is stilled and lance arrivals must reach the outer End (Baughn's decision 7,
+     * 2026-10-19).
+     */
     public static boolean active(Level level) {
-        return StasisConfig.spreading && StasisConfig.endBarrier && level.dimension() == Level.END;
+        return StasisConfig.spreading && StasisConfig.endBarrier && level.dimension() == Level.END
+            && !(level.isClientSide() ? Spread.client.hard() : Spread.server.hard());
     }
 
     public static int radius() {

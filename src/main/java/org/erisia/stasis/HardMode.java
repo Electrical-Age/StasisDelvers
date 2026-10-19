@@ -174,7 +174,7 @@ public final class HardMode {
         return event != null;
     }
 
-    /** After hard mode no way leads into the End until the lance (Baughn: decision 7); creative and spectators pass. */
+    /** After hard mode no way leads into the End but the lance (Baughn: decision 7; Lance); creative and spectators pass. */
     static boolean endClosed(MinecraftServer srv) {
         return StasisConfig.spreading && Spread.server.hard();
     }
@@ -293,8 +293,12 @@ public final class HardMode {
 
     private static final Map<UUID, Long> TOLD = new HashMap<>();
 
-    /** EntityTravelToDimensionEvent: after hard mode nothing goes into the End (a stronghold portal not yet rewritten: HardRifts). */
+    /**
+     * EntityTravelToDimensionEvent: after hard mode nothing goes into the End (a stronghold portal not yet rewritten:
+     * HardRifts) but a lance trip (Argon: the guard must let lance arrivals through).
+     */
     static void travel(net.neoforged.neoforge.event.entity.EntityTravelToDimensionEvent e) {
+        if (Lance.travelling(e.getEntity())) return;
         if (e.getDimension() != Level.END || !(e.getEntity().level() instanceof ServerLevel level) || !endClosed(level.getServer())) return;
         if (e.getEntity() instanceof ServerPlayer p) {
             if (p.isCreative() || p.isSpectator()) return;
@@ -308,11 +312,18 @@ public final class HardMode {
         e.setCanceled(true);
     }
 
-    /** PlayerLoggedInEvent: someone who logs in in the End after the flash (a restart mid-event, a long absence) goes home. */
+    /**
+     * PlayerLoggedInEvent: someone who logs in in the End after the flash (a restart mid-event, a long absence) goes home;
+     * not a player who came in by lance (Argon: they'd be evicted from their End base at every login).
+     */
     static void login(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent e) {
-        if (!(e.getEntity() instanceof ServerPlayer p) || p.isCreative() || p.isSpectator() || p.level().dimension() != Level.END) return;
-        if (!endClosed(p.level().getServer()) || holdsEndOpen()) return;
-        rescue(p);
+        if (e.getEntity() instanceof ServerPlayer p && evictsOnLogin(p)) rescue(p);
+    }
+
+    /** Would login send this player out of the End (public for tests)? */
+    public static boolean evictsOnLogin(ServerPlayer p) {
+        if (p.isCreative() || p.isSpectator() || p.level().dimension() != Level.END || Lance.arrivedByLance(p)) return false;
+        return endClosed(p.level().getServer()) && !holdsEndOpen();
     }
 
     static void serverStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent e) {

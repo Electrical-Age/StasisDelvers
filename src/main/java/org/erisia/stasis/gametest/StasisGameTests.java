@@ -3297,6 +3297,182 @@ public final class StasisGameTests {
         return n;
     }
 
+    // ---- the lance, L1: travel (Lance, docs/lance.md)
+
+    /** A gate rift (r 9) registered at a local position and opened; forgotten with its arrivals afterwards. */
+    static org.erisia.stasis.StaticDeeps.Deep lanceGate(GameTestHelper h, Checks c, BlockPos local, List<ServerLevel> dests) {
+        ServerLevel level = h.getLevel();
+        BlockPos centre = h.absolutePos(local);
+        org.erisia.stasis.Gates.testRegister(level, centre);
+        var d = org.erisia.stasis.Gates.gateForTest(centre);
+        org.erisia.stasis.Lance.setOpen(level, d, true);
+        c.cleanup.add(() -> {
+            org.erisia.stasis.Gates.testForget(level, centre);
+            for (ServerLevel dest : dests) {
+                for (var a : org.erisia.stasis.Lance.ArrivalData.get(dest).all())
+                    if (a.homeId() == d.id()) for (BlockPos q : org.erisia.stasis.Lance.testPad(a)) dest.setBlock(q, Blocks.AIR.defaultBlockState(), 2);
+                org.erisia.stasis.Lance.testForget(level, d.id(), dest);
+            }
+        });
+        return d;
+    }
+
+    /** Put the player in the disc's centre (feet just under the core) and take one step. */
+    static boolean stepIntoCore(ServerPlayer p, ServerLevel level, org.erisia.stasis.StaticDeeps.Deep d) {
+        float[] k = org.erisia.stasis.StaticDeeps.core(d);
+        if (p.level() != level)
+            p.teleport(new net.minecraft.world.level.portal.TeleportTransition(level, new Vec3(k[0], k[1] - 0.9, k[2]), Vec3.ZERO, 0, 0,
+                net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+        else p.teleportTo(k[0], k[1] - 0.9, k[2]);
+        org.erisia.stasis.Lance.testCooldown(p);
+        return org.erisia.stasis.Lance.step(p);
+    }
+
+    static {
+        // stopped mode: a stronghold gate rift opened by the test command's code; a player at the rift's edge stays, one
+        // stepping into the disc's centre arrives on a pad in the End with grace; the pad and its return rift are made
+        // once (a second trip only clears the foot pocket); the return rift sends them to the rim of the home rift; with
+        // the home gate closed to another open gate leading there, and with none open home regardless (Baughn's Q3 order)
+        CASES.put("lance_travel_and_return", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null || org.erisia.stasis.Spread.status(server, null).startsWith("mode spreading")) {
+                c.check("the test server has the End, in stopped mode", false);
+                return () -> { };
+            }
+            var gate = lanceGate(h, c, new BlockPos(8, 2, 4), List.of(end));
+            ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 1.0, 1.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            c.check("a stronghold gate leads to the End near the island", org.erisia.stasis.Lance.kind(false, false, true, "minecraft:the_end")
+                == org.erisia.stasis.Lance.Kind.STRONGHOLD_END && org.erisia.stasis.StaticDeeps.isStrongholdGate(gate));
+            float[] k = org.erisia.stasis.StaticDeeps.core(gate);
+            // the rift's edge is not the disc
+            p.teleportTo(k[0] + 3.5, k[1] - 0.9, k[2]);
+            org.erisia.stasis.Lance.testCooldown(p);
+            c.check("at the rift's edge: no trip", !org.erisia.stasis.Lance.step(p) && p.level() == level);
+            p.teleportTo(k[0], k[1] - 0.9, k[2]);
+            c.check("the open gate's disc spares the player the rift's statue", org.erisia.stasis.Lance.spares(level, p));
+            boolean went = stepIntoCore(p, level, gate);
+            var arrivals = org.erisia.stasis.Lance.ArrivalData.get(end).all().stream().filter(a -> a.homeId() == gate.id()).toList();
+            c.check("into the disc's centre: in the End", went && p.level() == end, p.level().dimension().toString());
+            c.check("one arrival made", arrivals.size() == 1, arrivals.toString());
+            if (arrivals.size() != 1) return () -> { };
+            var a = arrivals.get(0);
+            BlockPos foot = a.footPos();
+            c.check("on the pad", p.blockPosition().equals(foot) && end.getBlockState(foot.below()).is(org.erisia.stasis.StasisRegistry.RIFTSTONE.get()),
+                p.blockPosition().toShortString() + " vs " + foot.toShortString());
+            double fromCentre = Math.hypot(foot.getX(), foot.getZ());
+            c.check("150-200 blocks from the island's middle", fromCentre >= 148 && fromCentre <= 202, String.valueOf(fromCentre));
+            c.check("with grace on arrival", org.erisia.stasis.Freezing.inGrace(p) && org.erisia.stasis.Freezing.ticks(p) == 0);
+            int endSeed = FieldData.get(end).deepSeed();
+            BlockPos ret = a.retPos();
+            c.check("a return rift beside the pad, registered", org.erisia.stasis.StaticDeeps.near(ret.getX(), ret.getY(), ret.getZ(), 2, endSeed).stream()
+                .anyMatch(org.erisia.stasis.StaticDeeps::isReturn) && org.erisia.stasis.Lance.returns(end).contains(ret.asLong()));
+            c.check("the cooldown holds the player on the pad", !org.erisia.stasis.Lance.step(p) && p.level() == end);
+            // a second trip: no new pad, the foot pocket cleared
+            end.setBlock(foot, Blocks.END_STONE.defaultBlockState(), 3);
+            end.setBlock(foot.above(), Blocks.END_STONE.defaultBlockState(), 3);
+            boolean again = stepIntoCore(p, level, gate);
+            c.check("a second trip: same arrival, pocket cleared", again && p.level() == end && p.blockPosition().equals(foot)
+                && end.getBlockState(foot).isAir() && end.getBlockState(foot.above()).isAir()
+                && org.erisia.stasis.Lance.ArrivalData.get(end).all().stream().filter(x -> x.homeId() == gate.id()).count() == 1);
+            // home: into the return rift's core
+            int seed = FieldData.get(level).deepSeed();
+            java.util.function.BiFunction<org.erisia.stasis.StaticDeeps.Deep, ServerPlayer, String> rimCheck = (d, pl) -> {
+                float[] q = org.erisia.stasis.StaticDeeps.core(d);
+                double hd = Math.hypot(pl.getX() - q[0], pl.getZ() - q[2]);
+                boolean ok = pl.level() == level && hd >= d.radius() * 0.35 && hd <= d.radius() + 14
+                    && org.erisia.stasis.StaticDeeps.zone(seed, (float) pl.getX(), (float) pl.getY() + 0.5f, (float) pl.getZ()) != 2;
+                return ok ? null : pl.level().dimension() + " " + pl.position() + " " + hd;
+            };
+            java.util.function.Supplier<Boolean> takeReturn = () -> {
+                if (p.level() != end) p.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, Vec3.atBottomCenterOf(foot), Vec3.ZERO, 0, 0,
+                    net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+                p.teleportTo(ret.getX() + 0.5, foot.getY(), ret.getZ() + 0.5);
+                org.erisia.stasis.Lance.testCooldown(p);
+                return org.erisia.stasis.Lance.step(p);
+            };
+            boolean home = takeReturn.get();
+            String bad = rimCheck.apply(gate, p);
+            c.check("the return rift: home to the rift's rim", home && bad == null, String.valueOf(bad));
+            c.check("home with grace", org.erisia.stasis.Freezing.inGrace(p));
+            // the home gate closed, another open one leading to the End (over a platform above the test): there
+            BlockPos other = new BlockPos(8, 40, 4);
+            for (int dx = -14; dx <= 14; dx++)
+                for (int dz = -14; dz <= 14; dz++) h.setBlock(other.offset(dx, -2, dz), Blocks.STONE);
+            c.cleanup.add(() -> {
+                for (int dx = -14; dx <= 14; dx++)
+                    for (int dz = -14; dz <= 14; dz++) h.setBlock(other.offset(dx, -2, dz), Blocks.AIR);
+            });
+            var gate2 = lanceGate(h, c, other, List.of(end));
+            org.erisia.stasis.Lance.setOpen(level, gate, false);
+            boolean toOther = takeReturn.get();
+            bad = rimCheck.apply(gate2, p);
+            c.check("home gate closed: to another open gate's rim", toOther && bad == null, String.valueOf(bad));
+            org.erisia.stasis.Lance.setOpen(level, gate2, false);
+            boolean regardless = takeReturn.get();
+            bad = rimCheck.apply(gate, p);
+            c.check("none open: home regardless", regardless && bad == null, String.valueOf(bad));
+            // a closed gate takes nobody
+            c.check("a closed gate's disc: no trip", !stepIntoCore(p, level, gate) && p.level() == level);
+            c.check("a closed gate spares nobody", !org.erisia.stasis.Lance.spares(level, p));
+            return () -> { };
+        }, false, true));
+        // spreading mode (Baughn's decisions 5-7): before hard mode a gate leads to the Nether, whatever the rift; after it a
+        // stronghold gate leads onto the End rift's islands (the closed End lets the lance through, and only it), the
+        // player isn't evicted at login, and the End's wall is down
+        CASES.put("lance_spreading_rules", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END), nether = server.getLevel(net.minecraft.world.level.Level.NETHER);
+            if (end == null || nether == null) {
+                c.check("the test server has the End and the Nether", false);
+                return () -> { };
+            }
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, at.getX(), at.getZ(), 400);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            double[] was = org.erisia.stasis.Spread.testClock(server, 60, false, 0);
+            org.erisia.stasis.EndRift.testOff = true;   // (hard mode below would start rebuilding the test End)
+            c.cleanup.add(() -> org.erisia.stasis.EndRift.testOff = false);
+            c.cleanup.add(() -> org.erisia.stasis.Spread.testClockRestore(server, was));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            var gate = lanceGate(h, c, new BlockPos(8, 2, 4), List.of(end, nether));
+            ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 1.0, 1.5), true), q = survivalPlayer(h, new Vec3(1.5, 1.0, 2.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            c.cleanup.add(() -> remove(h, q));
+            c.check("before hard mode: the wall stands", org.erisia.stasis.EndBarrier.active(end));
+            boolean went = stepIntoCore(p, level, gate);
+            c.check("before hard mode: a stronghold gate leads to the Nether", went && p.level() == nether, p.level().dimension().toString());
+            var na = org.erisia.stasis.Lance.ArrivalData.get(nether).all().stream().filter(a -> a.homeId() == gate.id()).toList();
+            c.check("a Nether pad, over the lava sea", na.size() == 1 && na.get(0).footPos().getY() > nether.getSeaLevel()
+                && p.blockPosition().equals(na.get(0).footPos()), na.toString());
+            org.erisia.stasis.Spread.testClock(server, 60, true, 30);
+            c.check("after hard mode: the wall is down", !org.erisia.stasis.EndBarrier.active(end));
+            q.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(300.5, 10, 0.5), Vec3.ZERO, 0, 0,
+                net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+            c.check("a plain teleport into the closed End is turned away", q.level() != end);
+            boolean toEnd = stepIntoCore(p, level, gate);
+            var ea = org.erisia.stasis.Lance.ArrivalData.get(end).all().stream().filter(a -> a.homeId() == gate.id()).toList();
+            c.check("after hard mode: through the lance into the End", toEnd && p.level() == end, p.level().dimension().toString());
+            c.check("onto one of the rift's islands", ea.size() == 1 && ea.get(0).central() && ea.get(0).key().startsWith("island:")
+                && end.getBlockState(ea.get(0).footPos().below()).is(org.erisia.stasis.StasisRegistry.RIFTSTONE.get()), ea.toString());
+            c.check("arrived by lance: login leaves them in the End", org.erisia.stasis.Lance.arrivedByLance(p)
+                && !org.erisia.stasis.HardMode.evictsOnLogin(p));
+            // the central return rift: back to the gate the player came out of (open)
+            if (ea.size() == 1) {
+                BlockPos ret = ea.get(0).retPos();
+                p.teleportTo(ret.getX() + 0.5, ea.get(0).footPos().getY(), ret.getZ() + 0.5);
+                org.erisia.stasis.Lance.testCooldown(p);
+                boolean home = org.erisia.stasis.Lance.step(p);
+                c.check("the islands' return rift: home to the lance came out of", home && p.level() == level, p.level().dimension().toString());
+                c.check("left the End: no longer 'arrived by lance'", !org.erisia.stasis.Lance.arrivedByLance(p));
+            }
+            return () -> { };
+        }, false, true));
+    }
+
     static org.erisia.stasis.TowerBlockEntity tower(GameTestHelper h, BlockPos base, int segments) {
         for (int i = 1; i <= segments; i++) h.setBlock(base.above(1 + i), org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get());
         if (!org.erisia.stasis.TowerBlock.placeCore(h.getLevel(), h.absolutePos(base))) throw new IllegalStateException("no room for the core");
