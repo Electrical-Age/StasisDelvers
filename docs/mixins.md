@@ -1,6 +1,6 @@
 # Mixins
 
-There are 27 mixin classes in three configs, plus an access transformer. Mixin sources are in
+There are 28 mixin classes in three configs, plus an access transformer. Mixin sources are in
 `src/main/java/org/erisia/stasis/mixin/`; the configs are in `src/main/resources/`. All three configs are listed
 in `src/main/templates/META-INF/neoforge.mods.toml` (`[[mixins]]`), along with the AT (`[[accessTransformers]]`).
 The background audit (written before the cleanup, with 36 mixins) is
@@ -41,6 +41,7 @@ If one of these can't apply, the game stops at startup, on purpose: without them
 | `SpawnUseMixin` | `ServerGamePacketListenerImpl.handleUseItemOn` (`isUnderSpawnProtection`, `mayInteract`; `@WrapOperation`) | Lets EA and Stasis blocks be used under spawn protection | No spawn-protection event |
 | `BucketItemMixin` | `BucketItem.emptyContents` (`Level.setBlock`) | Water poured in stopped land becomes stilled water | Events would mean reimplementing bucket placement |
 | `EntityPushMixin` | `Entity.push(DDD)` (HEAD cancel) | A push moves a frozen entity one tick's worth, with no momentum | `LivingKnockBackEvent` covers knockback only |
+| `EndBarrierMixin` | `Entity.collide` (RETURN) | Spreading mode's End wall stops movement like a world border, predicted by the client (`EndBarrier.clamp`) | No movement or collision event; a circle can't be an axis-aligned collision shape |
 | `PathfindingContextMixin` | `PathfindingContext.<init>` (RETURN), implements `StasisPathContext` | Remembers the mob's level for the next mixin | None |
 | `WalkNodeEvaluatorMixin` | `WalkNodeEvaluator.getPathTypeStatic` (RETURN) | Stopped land counts as dangerous to path into | `getBlockPathType` applies only to our own blocks |
 

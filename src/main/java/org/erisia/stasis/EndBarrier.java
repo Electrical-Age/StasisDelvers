@@ -16,8 +16,10 @@ import java.util.UUID;
 /**
  * Spreading mode's wall round the End's main island (λ-Nero, spread-DESIGN.md: before the dragon dies every way into the
  * End leads to the main island, and a barrier that looks like a time field with black lines keeps people on it; no outer
- * End). A vertical cylinder of radius endBarrierRadius round 0, 0. The server puts a player who got past it (walking,
- * flying, a pearl, a boat) back where they last stood on the ground inside, as a world border would, or onto the arrival
+ * End). A vertical cylinder of radius endBarrierRadius round 0, 0. Movement stops at it like a world border's
+ * ({@link #clamp}, from mixin/EndBarrierMixin on both sides: the client predicts it, so nothing snaps back; AdventurAgent
+ * found the server-only put-back rubber-banding). As a fallback (a pearl, lag, a client without the mod's movement) the
+ * server puts a player well past it (SLACK) back where they last stood on the ground inside, or onto the arrival
  * platform; the client draws it (client/EndBarrierFx). Creative and spectator players pass.
  * <p>
  * Every way in already lands inside: the End portal on the obsidian platform at (100, 50, 0), and no End gateway ever
@@ -37,6 +39,27 @@ public final class EndBarrier {
         return StasisConfig.endBarrierRadius;
     }
 
+    /** The server puts a player back only this far past the wall (the clamp keeps everyone else inside). */
+    public static final double SLACK = 2;
+
+    /**
+     * Entity.collide's result, clamped to the wall (EndBarrierMixin; both sides). For a survival or adventure player, or
+     * a vehicle one steers: the horizontal end point is pulled radially back to the wall (the player's box touching it),
+     * so a player walking into it stops and one walking along it slides round it; one already outside may move inward or
+     * along, not further out. Returns `move` itself when nothing changes.
+     */
+    public static Vec3 clamp(net.minecraft.world.entity.Entity e, Vec3 move) {
+        if (!StasisConfig.spreading || !StasisConfig.endBarrier || (move.x == 0 && move.z == 0) || !active(e.level())) return move;
+        net.minecraft.world.entity.Entity who = e instanceof net.minecraft.world.entity.player.Player ? e : e.getControllingPassenger();
+        if (!(who instanceof net.minecraft.world.entity.player.Player p) || p.isCreative() || p.isSpectator()) return move;
+        double lim = radius() - e.getBbWidth() / 2;
+        double x = e.getX(), z = e.getZ(), nx = x + move.x, nz = z + move.z, d2 = nx * nx + nz * nz;
+        if (d2 <= lim * lim) return move;
+        double d = Math.sqrt(d2), to = Math.max(lim, Math.min(Math.sqrt(x * x + z * z), d)), s = to / d;
+        if (s >= 1) return move;
+        return new Vec3(nx * s - x, move.y, nz * s - z);
+    }
+
     /** Where each player last stood on the ground inside (server thread). */
     private static final Map<UUID, Vec3> LAST = new HashMap<>();
     private static final Map<UUID, Long> TOLD = new HashMap<>();
@@ -46,7 +69,7 @@ public final class EndBarrier {
         if (e.getEntity() instanceof ServerPlayer p) check(p);
     }
 
-    /** One check of one player (public for tests). Returns true if the player was put back. */
+    /** One check of one player (public for tests). Returns true if the player was put back (more than SLACK past the wall). */
     public static boolean check(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level) || !active(level) || p.isCreative() || p.isSpectator()) {
             LAST.remove(p.getUUID());
@@ -57,6 +80,7 @@ public final class EndBarrier {
             if (p.onGround() && d2 <= (r - 1) * (r - 1)) LAST.put(p.getUUID(), p.position());
             return false;
         }
+        if (d2 <= (r + SLACK) * (r + SLACK)) return false;   // (the clamp holds them: no snap back)
         Vec3 back = LAST.get(p.getUUID());
         if (back == null || back.x * back.x + back.z * back.z > r * r) back = fallback(level, p, r);
         if (p.isPassenger()) p.stopRiding();

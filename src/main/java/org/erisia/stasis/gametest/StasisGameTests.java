@@ -2616,6 +2616,59 @@ public final class StasisGameTests {
             org.erisia.stasis.Spread.testReset();
             c.check("the stopped mode has no wall", !org.erisia.stasis.EndBarrier.active(end) && !org.erisia.stasis.EndBarrier.check(p) && p.getX() > r);
         }, false, true));
+        // the End's wall stops a player like a world border (EndBarrier.clamp via EndBarrierMixin; AdventurAgent: the old
+        // put-back rubber-banded): a survival player walking or sprint-jumping into it ends at it, never past it, and is
+        // never put back; one pressing along it slides round it; creative players pass. Within one tick (the dragon fight).
+        CASES.put("spread_end_barrier_stops", new Spec(1, (h, c) -> () -> {
+            var server = h.getLevel().getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return;
+            }
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, 0, 0, 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            int r = org.erisia.stasis.EndBarrier.radius();
+            p.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(r - 3.5, 4, 0.5), Vec3.ZERO, 0, 0,
+                net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+            java.util.function.DoubleSupplier d = () -> Math.hypot(p.getX(), p.getZ());
+            double wall = r - p.getBbWidth() / 2;
+            double max = 0;
+            int putBack = 0;
+            for (int i = 0; i < 30; i++) {
+                p.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(0.28, 0, 0.02));   // walking
+                max = Math.max(max, d.getAsDouble());
+                if (org.erisia.stasis.EndBarrier.check(p)) putBack++;
+            }
+            for (int i = 0; i < 10; i++) {
+                p.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(0.7, 0, -0.1));   // sprint-jumping
+                max = Math.max(max, d.getAsDouble());
+                if (org.erisia.stasis.EndBarrier.check(p)) putBack++;
+            }
+            c.check("walking and sprinting into the wall: never past it", max <= wall + 1e-6, max + " > " + wall);
+            c.check("stopped at the wall", d.getAsDouble() > wall - 0.05, String.valueOf(d.getAsDouble()));
+            c.check("never put back (no teleport)", putBack == 0, String.valueOf(putBack));
+            double a0 = Math.atan2(p.getZ(), p.getX());
+            for (int i = 0; i < 20; i++) {
+                p.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(0.1, 0, 0.25));   // along it, pressing outward
+                max = Math.max(max, d.getAsDouble());
+            }
+            double moved = (Math.atan2(p.getZ(), p.getX()) - a0) * r;
+            c.check("pressing along the wall: slides round it, inside", moved > 3 && max <= wall + 1e-6, moved + " blocks, max " + max);
+            // already outside (lag, a pearl): only inward or along, never further out
+            p.teleportTo(r + 1.0, 4, 0.5);
+            double out = d.getAsDouble();
+            p.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(0.3, 0, 0));
+            c.check("outside: no further out", d.getAsDouble() <= out + 1e-6, out + " -> " + d.getAsDouble());
+            p.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
+            p.teleportTo(r - 1.0, 4, 0.5);
+            for (int i = 0; i < 10; i++) p.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(0.5, 0, 0));
+            c.check("creative players pass", d.getAsDouble() > r + 2, String.valueOf(d.getAsDouble()));
+            p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        }, false, true));
         // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
         // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
         // the server's list of what it sent is what a client would hold)

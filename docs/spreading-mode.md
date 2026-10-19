@@ -311,10 +311,17 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
 - `EndBarrier`: a vertical cylinder of radius `endBarrierRadius` (default 140) round 0, 0, on while `endBarrier` (default
   true) in spreading mode, before and after hard mode (`EndBarrier.active`); it stays round the End rift as a wall.
   Creative and spectator players pass.
-- Server (`PlayerTickEvent.Post`, `check`): a player past it (walking, flying, a pearl, a boat) is put back where they
-  last stood on the ground at least a block inside, or, with none on record, on the surface 4 blocks inside the wall
-  towards them, or on the obsidian arrival platform (100, 50, 0) if that column is void. "A wall of stilled time holds
-  you to the island" on the action bar.
+- It stops movement like a world border (AdventurAgent: the old server-only put-back rubber-banded, 1.4 blocks every
+  0.4 s): `mixin/EndBarrierMixin` clamps `Entity.collide`'s result with `EndBarrier.clamp` on both sides, so the client
+  predicts it (the config is synced) and the server's own move check (`handleMovePlayer` runs `player.move`) agrees.
+  For a survival or adventure player, or a vehicle one steers, the horizontal end point is pulled radially back so the
+  box touches the wall: walking in stops, pressing along it slides round it, someone already outside may move inward or
+  along only. Not a collision `VoxelShape`: boxes are axis-aligned, and a staircase circle catches a sliding player at
+  every inner corner.
+- Fallback (`PlayerTickEvent.Post`, `check`): a player more than `SLACK` (2) blocks past it (a pearl, lag) is put back
+  where they last stood on the ground at least a block inside, or, with none on record, on the surface 4 blocks inside
+  the wall towards them, or on the obsidian arrival platform (100, 50, 0) if that column is void. "A wall of stilled
+  time holds you to the island" on the action bar.
 - Every way in lands inside: the End portal's arrival platform is at 100 blocks, and no End gateway ever appears in
   this mode (the mixin), so no player or pearl goes through one. The outer islands' return gateways are out of reach.
 - Client: `client/EndBarrierFx`, particles on the cylinder within 20 blocks of it (pale dust over its face, black dust
@@ -390,7 +397,9 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
   the instant, tau = t before it and storms are scheduled after it; the End runs until the flash; a death in the End
   before it is a teleport home with the advancement; at the flash the other is sent home with it and the End stills;
   then the End can't be entered. `spread_end_barrier`: past the wall with no ground on record, put just inside on the
-  ground; after standing inside, put back there; creative passes; no wall in the stopped mode. The mixin's suppression
+  ground; after standing inside, put back there; creative passes; no wall in the stopped mode.
+  `spread_end_barrier_stops`: a mock player walking and sprinting into the wall (`move`) ends at it, never past it, is
+  never put back; pressing along it slides round; outside, no further out; creative passes. The mixin's suppression
   of the portal, gateway and egg needs a real dragon fight: not tested (by eye in the lab). Both switch the End rift
   off (`EndRift.testOff`): its finale would rebuild the test End.
 - The End rift: `EndRiftPlanTest` (unit, jqwik): the plan is deterministic and within its budget; every island block
