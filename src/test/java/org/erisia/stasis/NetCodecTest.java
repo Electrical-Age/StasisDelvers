@@ -1,0 +1,168 @@
+package org.erisia.stasis;
+
+import io.netty.buffer.Unpooled;
+import net.jqwik.api.Arbitraries;
+import net.jqwik.api.Arbitrary;
+import net.jqwik.api.Combinators;
+import net.jqwik.api.Example;
+import net.jqwik.api.ForAll;
+import net.jqwik.api.Property;
+import net.jqwik.api.Provide;
+import net.jqwik.api.constraints.Size;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** decode(encode(x)) = x for every StasisNet payload (none of them needs registries), and the whole buffer is read. */
+class NetCodecTest {
+    static RegistryFriendlyByteBuf buf() {
+        return new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY, net.neoforged.neoforge.network.connection.ConnectionType.NEOFORGE);
+    }
+
+    static <T> T trip(StreamCodec<RegistryFriendlyByteBuf, T> codec, T value) {
+        RegistryFriendlyByteBuf b = buf();
+        codec.encode(b, value);
+        T back = codec.decode(b);
+        assertEquals(0, b.readableBytes(), "bytes left over");
+        return back;
+    }
+
+    @Provide
+    Arbitrary<Double> anyDouble() {
+        return Arbitraries.oneOf(Arbitraries.doubles().between(-1e9, 1e9),
+            Arbitraries.of(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, -0.0, Double.MIN_VALUE, Double.MAX_VALUE));
+    }
+
+    @Provide
+    Arbitrary<BlockPos> positions() {
+        return Combinators.combine(Arbitraries.integers().between(-30_000_000, 30_000_000), Arbitraries.integers().between(-2048, 2047),
+            Arbitraries.integers().between(-30_000_000, 30_000_000)).as(BlockPos::new);
+    }
+
+    @Provide
+    Arbitrary<Field> fields() {
+        Arbitrary<Double> d = anyDouble();
+        Arbitrary<Double> f = Arbitraries.doubles().between(-10, 10);
+        Arbitrary<Field.Stretch> st = Combinators.combine(f, f, f, f).as(Field.Stretch::new);
+        return Combinators.combine(Arbitraries.integers().greaterOrEqual(0), d, d, d, d, d, d, Arbitraries.of(true, false))
+            .flatAs((id, x, y, z, r, failing, collapse, column) -> Combinators.combine(d, Arbitraries.integers(), Arbitraries.longs(), f, f, f, st)
+                .as((rate, seed, formed, amber, dropout, side, s) ->
+                    new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formed, amber, dropout, side, s)));
+    }
+
+    /** FIELD sends the shield's look and the stretch as floats: what comes back is the float-rounded field. */
+    static Field rounded(Field f) {
+        var s = f.stretch();
+        return new Field(f.id(), f.x(), f.y(), f.z(), f.radius(), f.failing(), f.collapse(), f.column(), f.rate(), f.seed(), f.formedAt(),
+            (float) f.amber(), (float) f.dropout(), (float) f.side(),
+            new Field.Stretch((float) s.e(), (float) s.s(), (float) s.w(), (float) s.n()));
+    }
+
+    @Property(tries = 300)
+    void fieldsRoundTrip(@ForAll @Size(max = 8) List<@net.jqwik.api.From("fields") Field> fs, @ForAll int deepSeed) {
+        StasisNet.Fields back = trip(StasisNet.Fields.CODEC, new StasisNet.Fields(fs, deepSeed));
+        assertEquals(new StasisNet.Fields(fs.stream().map(NetCodecTest::rounded).toList(), deepSeed), back);
+    }
+
+    @Property(tries = 200)
+    void gateRiftsRoundTrip(@ForAll int seed, @ForAll @Size(max = 20) List<Long> centres) {
+        var p = new StasisNet.GateRifts(seed, centres);
+        assertEquals(p, trip(StasisNet.GateRifts.CODEC, p));
+    }
+
+    @Property(tries = 200)
+    void stormOverrideRoundTrips(@ForAll boolean active, @ForAll("anyDouble") double a, @ForAll("anyDouble") double b, @ForAll("anyDouble") double c) {
+        var p = new StasisNet.StormOverride(active, a, b, c);
+        assertEquals(p, trip(StasisNet.StormOverride.CODEC, p));
+    }
+
+    @Property(tries = 300)
+    void consolePayloadsRoundTrip(@ForAll("positions") BlockPos pos, @ForAll("anyDouble") double target, @ForAll boolean override,
+                                  @ForAll @Size(max = 16) List<@net.jqwik.api.From("anyDouble") Double> v, @ForAll String text) {
+        assertEquals(new StasisNet.ConsoleQuery(pos), trip(StasisNet.ConsoleQuery.CODEC, new StasisNet.ConsoleQuery(pos)));
+        assertEquals(new StasisNet.ConsoleFeed(pos), trip(StasisNet.ConsoleFeed.CODEC, new StasisNet.ConsoleFeed(pos)));
+        // (a NaN target means "the preferred range": it must survive)
+        assertEquals(new StasisNet.ConsoleSet(pos, target, override), trip(StasisNet.ConsoleSet.CODEC, new StasisNet.ConsoleSet(pos, target, override)));
+        var st = new StasisNet.ConsoleState(pos, v, text);
+        assertEquals(st, trip(StasisNet.ConsoleState.CODEC, st));
+    }
+
+    @Example
+    void digStilledRoundTrips() {
+        assertEquals(new StasisNet.DigStilled(), trip(StasisNet.DigStilled.CODEC, new StasisNet.DigStilled()));
+    }
+
+    @Property(tries = 300)
+    void reportPayloadsRoundTrip(@ForAll int nonce, @ForAll("positions") BlockPos look, @ForAll boolean hasLook, @ForAll byte face,
+                                 @ForAll @Size(max = 2000) String json) {
+        var q = new StasisNet.ReportQuery(nonce, hasLook ? Optional.of(look) : Optional.empty(), face);
+        assertEquals(q, trip(StasisNet.ReportQuery.CODEC, q));
+        var s = new StasisNet.ReportState(nonce, json);
+        assertEquals(s, trip(StasisNet.ReportState.CODEC, s));
+    }
+
+    @Example
+    void reportStateOverTheCapThrows() {
+        String big = "x".repeat(StasisNet.ReportState.REPORT_MAX + 1);
+        assertThrows(Exception.class, () -> StasisNet.ReportState.CODEC.encode(buf(), new StasisNet.ReportState(1, big)));
+        String atCap = "x".repeat(StasisNet.ReportState.REPORT_MAX);
+        assertEquals(atCap, trip(StasisNet.ReportState.CODEC, new StasisNet.ReportState(1, atCap)).json());
+    }
+
+    @Property(tries = 200)
+    void freezeRoundTrips(@ForAll float progress) {
+        assertEquals(new StasisNet.Freeze(progress), trip(StasisNet.Freeze.CODEC, new StasisNet.Freeze(progress)));
+    }
+
+    @Property(tries = 200)
+    void clockMapsRoundTrip(@ForAll @Size(max = 20) Map<Integer, Double> fieldTimes, @ForAll @Size(max = 20) Map<Long, Double> chunks,
+                            @ForAll @Size(max = 20) Map<Long, Byte> lights) {
+        Map<Integer, double[]> clocks = new HashMap<>();
+        fieldTimes.forEach((id, t) -> clocks.put(id, new double[]{t, t / 7}));
+        var back = trip(StasisNet.FieldClocks.CODEC, new StasisNet.FieldClocks(clocks)).clocks();
+        assertEquals(clocks.keySet(), back.keySet());
+        clocks.forEach((id, v) -> assertArrayEquals(v, back.get(id)));
+        assertEquals(new StasisNet.ChunkClocks(chunks), trip(StasisNet.ChunkClocks.CODEC, new StasisNet.ChunkClocks(chunks)));
+        assertEquals(new StasisNet.Gutters(lights), trip(StasisNet.Gutters.CODEC, new StasisNet.Gutters(lights)));
+    }
+
+    @Property(tries = 200)
+    void boltRoundTrips(@ForAll("anyDouble") double fx, @ForAll("anyDouble") double fy, @ForAll("anyDouble") double fz,
+                        @ForAll("anyDouble") double tx, @ForAll("anyDouble") double ty, @ForAll("anyDouble") double tz, @ForAll int seed) {
+        var b = new StasisNet.Bolt(fx, fy, fz, tx, ty, tz, seed);
+        assertEquals(b, trip(StasisNet.Bolt.CODEC, b));
+    }
+
+    /** FIELD's float rounding must not move a block across the field's edge, except right on it (|norm - 1| tiny). */
+    @Property(tries = 1000)
+    void sentFieldsAgreeOnBlocks(@ForAll("fieldsInRange") Field f, @ForAll @net.jqwik.api.constraints.IntRange(min = -20, max = 20) int bx,
+                                 @ForAll @net.jqwik.api.constraints.IntRange(min = -20, max = 20) int by,
+                                 @ForAll @net.jqwik.api.constraints.IntRange(min = -20, max = 20) int bz) {
+        Field g = trip(StasisNet.Fields.CODEC, new StasisNet.Fields(List.of(f), 0)).fields().getFirst();
+        double n = 0;
+        for (int i = 0; i < 8; i++)
+            n = Math.max(n, f.norm(bx + (i & 1) - f.x(), f.column() ? 0 : by + (i >> 1 & 1) - f.y(), bz + (i >> 2 & 1) - f.z()));
+        if (Math.abs(n - 1) < 1e-5) return;
+        assertEquals(f.containsBlock(bx, by, bz), g.containsBlock(bx, by, bz));
+        assertTrue(f.stretch().isOne() == g.stretch().isOne());
+    }
+
+    @Provide
+    Arbitrary<Field> fieldsInRange() {
+        Arbitrary<Double> c = Arbitraries.doubles().between(-5, 5);
+        Arbitrary<Double> reach = Arbitraries.oneOf(Arbitraries.just(1.0), Arbitraries.doubles().between(1, 2.5));
+        return Combinators.combine(c, c, c, Arbitraries.doubles().between(1, 12), reach, reach, reach, reach)
+            .as((x, y, z, r, e, s, w, n) -> new Field(1, x, y, z, r).withStretch(new Field.Stretch(e, s, w, n)));
+    }
+}
