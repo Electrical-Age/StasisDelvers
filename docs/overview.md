@@ -48,7 +48,7 @@ Javadocs often cite them as `notes/...`.
 - [deeps-strata-worldgen.md](deeps-strata-worldgen.md): `DeepFeature`, strata, gates, ruins, end sites, the deep seed.
 - [spawn-cottage.md](spawn-cottage.md): the spawn site placed once per world.
 - [spreading-mode.md](spreading-mode.md): the `spreading` game mode: the world starts running and the stillness
-  spreads from the rifts over online time (`SpreadMap`, `Spread`).
+  spreads from the rifts over online time (`SpreadMap`, `Spread`; client sync `SpreadSync`, `SpreadTiles`).
 - [client-rendering.md](client-rendering.md): post chain, data-texture slots, frozen textures, tower meshes.
 - [networking.md](networking.md): `StasisNet` payloads, protocol version.
 - [mixins.md](mixins.md): the 25 mixins, the required and cosmetic configs, `CosmeticPlugin`.

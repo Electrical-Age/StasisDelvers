@@ -38,15 +38,16 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 - Push with `git push origin HEAD:main` (origin: github.com/Electrical-Age/StasisDelvers), and only when asked to.
 
 ## Conventions
-- One rule for time: `Stasis.rateAt` / `rateAtSteady`. Stopped means rate 0. Don't add new "is it stopped"
-  tests elsewhere.
+- One rule for time: `Stasis.rateAt` / `rateAtSteady` (no eddies) / `rateAtLand` (no eddies, no drifting deeps over
+  running spread land: for chunk meshing, flame light and map overlays, which nobody refreshes as weather passes, and
+  for off-thread callers). Stopped means rate 0. Don't add new "is it stopped" tests elsewhere.
 - Both sides compute the world from synced state (fields, deep seed, gates, storm override, config). Java mirrored
   in GLSL (`Noise`, `Field.collapseScore`, the data-texture slots, `MAX_FIELDS` = 13) must change on both sides.
 - Prefer, in this order: a NeoForge event, an access transformer (`src/main/resources/META-INF/accesstransformer.cfg`),
   then a mixin. Gameplay mixins go in the required config; look-only ones in the cosmetic config.
   See `docs/mixins.md`.
 - Common code never imports client classes. Client hooks are set in `client/StasisClient`.
-- A payload change needs a protocol bump (`StasisNet.register`, `registrar("10")`) and a `NetCodecTest` case.
+- A payload change needs a protocol bump (`StasisNet.register`, `registrar("11")`) and a `NetCodecTest` case.
 - Saved state needs a codec default for older saves (`optionalFieldOf`, `getXOr`).
 - Off the main thread (light engine, worldgen, chunk meshing) never call `FieldData.get`. Use `peek`,
   `peekDeepSeed`, `Deeps.seed`.

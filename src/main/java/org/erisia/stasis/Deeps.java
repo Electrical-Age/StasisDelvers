@@ -17,8 +17,9 @@ import java.util.List;
  * Effects (outside fields; a field holds against a deep, as "weather"): suits drain twice as fast; a Delver suit
  * isn't fully protective (freeze builds at a quarter rate, and a full freeze holds the player about a minute, no
  * statue); a tower whose field a deep crosses draws up to +50% and its shield brightens there; the post shader
- * darkens and drains the colour further and adds mist. Both sides compute the same deeps from the level's deep seed
- * (FieldData, synced with the fields).
+ * darkens and drains the colour further and adds mist. In spreading mode a deep also stops time on running land it
+ * passes over where no field holds it (Baughn 2026-10-19; Stasis.rateAt, stopsRunningLand). Both sides compute the
+ * same deeps from the level's deep seed (FieldData, synced with the fields).
  */
 public final class Deeps {
     private Deeps() {
