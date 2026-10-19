@@ -30,7 +30,7 @@ import org.erisia.stasis.Field;
 import org.erisia.stasis.FrozenTextures;
 import org.erisia.stasis.Stasis;
 import org.erisia.stasis.StasisDelvers;
-import org.erisia.stasis.mixin.client.RenderSectionRegionAccessor;
+import net.minecraft.client.renderer.chunk.RenderSectionRegion;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -205,7 +205,7 @@ public final class FrozenSprites {
     private static final ThreadLocal<SectionCache> SECTIONS = ThreadLocal.withInitial(SectionCache::new);
 
     static Level levelOf(BlockAndTintGetter getter) {
-        if (getter instanceof RenderSectionRegionAccessor r) return r.stasis$level();
+        if (getter instanceof RenderSectionRegion r) return r.level;
         return getter instanceof Level l ? l : null;
     }
 

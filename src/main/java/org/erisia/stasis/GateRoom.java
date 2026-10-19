@@ -12,9 +12,7 @@ import net.minecraft.world.level.block.EndPortalFrameBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.Vec3;
-import org.erisia.stasis.mixin.BlockDisplayInvoker;
-import org.erisia.stasis.mixin.DisplayInvoker;
-import org.erisia.stasis.mixin.StructurePieceInvoker;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
@@ -60,7 +58,7 @@ public final class GateRoom {
                     && x.distanceToSqr(g.x(), g.y(), g.z()) < 12 * 12))) {
                     BlockPos bp = d.blockPosition();
                     if (!Stasis.isRunning(level, bp)) continue;
-                    BlockState st = ((BlockDisplayInvoker) d).stasis$getBlockState();
+                    BlockState st = d.getBlockState();
                     if (st.is(Blocks.END_PORTAL_FRAME)) st = Blocks.END_STONE_BRICKS.defaultBlockState();
                     d.discard();
                     if (level.getBlockState(bp).isAir())
@@ -73,15 +71,15 @@ public final class GateRoom {
     /** Room-local coordinates of the gate's centre (over the old frame platform). */
     static final int CX = 5, CY = 4, CZ = 10;
 
-    public static void shatter(WorldGenLevel level, StructurePieceInvoker piece, BoundingBox chunkBB) {
-        BlockPos c = piece.stasis$worldPos(CX, CY, CZ).immutable();
+    public static void shatter(WorldGenLevel level, StructurePiece piece, BoundingBox chunkBB) {
+        BlockPos c = piece.getWorldPos(CX, CY, CZ).immutable();
         int seed = Gates.gateId(c);
         Vec3 cv = Vec3.atCenterOf(c);
         // the frame ring is gone already (StrongholdPortalRoomMixin); now the room, plus 3 blocks of rock around it
         for (int lx = -3; lx <= 13; lx++)
             for (int ly = -1; ly <= 10; ly++)
                 for (int lz = -3; lz <= 18; lz++) {
-                    BlockPos p = piece.stasis$worldPos(lx, ly, lz).immutable();
+                    BlockPos p = piece.getWorldPos(lx, ly, lz).immutable();
                     if (!chunkBB.isInside(p)) continue;
                     boolean inside = lx >= 1 && lx <= 9 && ly >= 1 && ly <= 6 && lz >= 1 && lz <= 14;
                     Vec3 v = Vec3.atCenterOf(p).subtract(cv);
@@ -142,16 +140,16 @@ public final class GateRoom {
         // the entrance grate (the door at local 4..6, 1..3, 0) blown out down the corridor
         for (int lx = 4; lx <= 6; lx++)
             for (int ly = 1; ly <= 3; ly++) {
-                BlockPos p = piece.stasis$worldPos(lx, ly, 0).immutable();
+                BlockPos p = piece.getWorldPos(lx, ly, 0).immutable();
                 if (chunkBB.isInside(p) && level.getBlockState(p).is(Blocks.IRON_BARS)) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             }
         for (int i = 0; i < 3; i++) {
-            BlockPos p = piece.stasis$worldPos(4 + i, 1 + (int) (Noise.hash32(i, 1, 0, seed) * 2), -2 - (int) (Noise.hash32(i, 2, 0, seed) * 3)).immutable();
+            BlockPos p = piece.getWorldPos(4 + i, 1 + (int) (Noise.hash32(i, 1, 0, seed) * 2), -2 - (int) (Noise.hash32(i, 2, 0, seed) * 3)).immutable();
             if (chunkBB.isInside(p) && level.getBlockState(p).isAir()) level.setBlock(p, Blocks.IRON_BARS.defaultBlockState(), 2);
         }
         // frozen lava ribbons from the two side pools up towards the core's edge
         for (int side = 0; side < 2; side++) {
-            Vec3 a = Vec3.atCenterOf(piece.stasis$worldPos(side == 0 ? 1 : 9, 1, 2));
+            Vec3 a = Vec3.atCenterOf(piece.getWorldPos(side == 0 ? 1 : 9, 1, 2));
             Vec3 toward = cv.subtract(a).normalize();
             Vec3 b = cv.subtract(toward.scale(4.2));
             Vec3 ctrl = a.add(b).scale(0.5).add(0, 3.5, 0);
@@ -178,14 +176,14 @@ public final class GateRoom {
                 .rotateX((float) (Noise.hash32(i, 8, 0, seed) * 1.2 - 0.6));
             Display.BlockDisplay e = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, level.getLevel());
             e.setPos(pos.x, pos.y, pos.z);
-            ((BlockDisplayInvoker) e).stasis$setBlockState(shard);
-            ((DisplayInvoker) e).stasis$setTransformation(new Transformation(new Matrix4f().rotate(q).scale(scale).translate(-0.5f, -0.5f, -0.5f)));
+            e.setBlockState(shard);
+            e.setTransformation(new Transformation(new Matrix4f().rotate(q).scale(scale).translate(-0.5f, -0.5f, -0.5f)));
             e.addTag(DEBRIS);
             level.addFreshEntity(e);
         }
         // the spawner's silverfish, mid-leap away from the blast
         for (int i = 0; i < 3; i++) {
-            Vec3 pos = Vec3.atCenterOf(piece.stasis$worldPos(3 + 2 * i, 3, 4)).add(0, Noise.hash32(i, 9, 0, seed) * 1.5, -Noise.hash32(i, 10, 0, seed) * 2);
+            Vec3 pos = Vec3.atCenterOf(piece.getWorldPos(3 + 2 * i, 3, 4)).add(0, Noise.hash32(i, 9, 0, seed) * 1.5, -Noise.hash32(i, 10, 0, seed) * 2);
             BlockPos bp = BlockPos.containing(pos);
             if (!chunkBB.isInside(bp) || !level.getBlockState(bp).isAir()) continue;
             var fish = EntityTypes.SILVERFISH.create(level.getLevel(), EntitySpawnReason.STRUCTURE);

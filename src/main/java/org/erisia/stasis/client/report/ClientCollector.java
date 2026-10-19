@@ -501,8 +501,7 @@ final class ClientCollector {
     // ---- 1.10 chat
 
     static String chat(Minecraft mc, boolean systemOnly) {
-        var acc = (org.erisia.stasis.mixin.client.ChatComponentAccessor) mc.gui.hud.getChat();
-        List<GuiMessage> all = acc.stasis$allMessages();
+        List<GuiMessage> all = mc.gui.hud.getChat().allMessages;
         List<String> lines = new ArrayList<>();
         // newest first: the first 50 (those we may include), written oldest first
         for (GuiMessage m : List.copyOf(all)) {

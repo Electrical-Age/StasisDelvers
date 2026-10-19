@@ -29,7 +29,7 @@ public final class StasisClient {
         // a possible later geometry version (falling cells)
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, StasisPost::frame);
         // flames' light in chunk meshes (smooth lighting) depends on where they are
-        org.erisia.stasis.Flames.clientResolver = g -> g instanceof org.erisia.stasis.mixin.client.RenderSectionRegionAccessor r ? r.stasis$level() : null;
+        org.erisia.stasis.Flames.clientResolver = g -> g instanceof net.minecraft.client.renderer.chunk.RenderSectionRegion r ? r.level : null;
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Pre.class, FrozenEntities::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, RiftHum::tick);

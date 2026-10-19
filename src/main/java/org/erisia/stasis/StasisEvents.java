@@ -136,7 +136,7 @@ public final class StasisEvents {
             e.setCanPickup(net.minecraft.util.TriState.FALSE);
             return;
         }
-        int delay = ((org.erisia.stasis.mixin.ItemEntityAccessor) item).stasis$pickupDelay();
+        int delay = item.pickupDelay;
         if (delay == 32767) return;   // never pickable
         // the delay still applies, counted in level time from when the item appeared (else a Q-dropped item jumps
         // straight back into the hand)

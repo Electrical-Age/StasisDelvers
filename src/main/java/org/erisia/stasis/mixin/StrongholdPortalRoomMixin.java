@@ -28,11 +28,11 @@ public abstract class StrongholdPortalRoomMixin {
                                  BoundingBox chunkBB, ChunkPos chunkPos, BlockPos referencePos, CallbackInfo ci) {
         ServerLevel sl = level.getLevel();
         if (!StasisConfig.endPortalRifts || !Stasis.stops(sl)) return;
-        StructurePieceInvoker piece = (StructurePieceInvoker) this;
+        net.minecraft.world.level.levelgen.structure.StructurePiece piece = (net.minecraft.world.level.levelgen.structure.StructurePiece) (Object) this;
         // the frame ring (x 3..7, z 8..12 at y 3) and the portal inside it
         for (int x = 3; x <= 7; x++)
             for (int z = 8; z <= 12; z++) {
-                BlockPos p = piece.stasis$worldPos(x, 3, z).immutable();
+                BlockPos p = piece.getWorldPos(x, 3, z).immutable();
                 if (!chunkBB.isInside(p)) continue;
                 var st = level.getBlockState(p);
                 if (st.is(Blocks.END_PORTAL_FRAME) || st.is(Blocks.END_PORTAL)) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
@@ -41,6 +41,6 @@ public abstract class StrongholdPortalRoomMixin {
         org.erisia.stasis.GateRoom.shatter(level, piece, chunkBB);
         org.erisia.stasis.NewChunkGrace.exempt(sl, chunkPos.pack());
         // recorded from whichever of the room's chunks comes first (Gates dedupes)
-        Gates.portalRoom(sl, piece.stasis$worldPos(5, 4, 10).immutable());
+        Gates.portalRoom(sl, piece.getWorldPos(5, 4, 10).immutable());
     }
 }

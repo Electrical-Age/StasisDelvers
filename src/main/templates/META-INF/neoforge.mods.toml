@@ -9,6 +9,10 @@ description='''
 Time stands still outside fields kept running by Electrical Age power.
 '''
 
+# access transformers (instead of accessor mixins)
+[[accessTransformers]]
+file="META-INF/accesstransformer.cfg"
+
 [[mixins]]
 config="${mod_id}.mixins.json"
 

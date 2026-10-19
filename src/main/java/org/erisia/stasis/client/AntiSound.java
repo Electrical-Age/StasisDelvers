@@ -8,8 +8,6 @@ import net.minecraft.sounds.SoundSource;
 import org.erisia.stasis.ClientFields;
 import org.erisia.stasis.Field;
 import org.erisia.stasis.StasisNet;
-import org.erisia.stasis.mixin.client.ChannelAccessor;
-import org.erisia.stasis.mixin.client.SoundManagerAccessor;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.EXTEfx;
 
@@ -113,7 +111,7 @@ public final class AntiSound {
         float h = hf;
         boolean clear = h >= 0.995;
         appliedHf = clear ? 1 : h;
-        if (!(((SoundManagerAccessor) mc.getSoundManager()).stasis$engine() instanceof Engine e)) return;
+        if (!(mc.getSoundManager().soundEngine instanceof Engine e)) return;
         for (var en : e.stasis$channels().entrySet()) {
             if (!affects(en.getKey().getSource())) continue;
             en.getValue().execute(ch -> {
@@ -123,7 +121,7 @@ public final class AntiSound {
                         EXTEfx.alFilteri(filter, EXTEfx.AL_FILTER_TYPE, EXTEfx.AL_FILTER_LOWPASS);
                     }
                     if (filter < 0) return;
-                    int src = ((ChannelAccessor) ch).stasis$source();
+                    int src = ch.source;
                     if (clear) AL10.alSourcei(src, EXTEfx.AL_DIRECT_FILTER, EXTEfx.AL_FILTER_NULL);
                     else {
                         EXTEfx.alFilterf(filter, EXTEfx.AL_LOWPASS_GAIN, 1.0F);

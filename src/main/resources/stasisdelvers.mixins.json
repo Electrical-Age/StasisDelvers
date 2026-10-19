@@ -10,11 +10,7 @@
     "BlockStateBaseMixin",
     "LivingEntityMixin",
     "ServerPlayerGameModeMixin",
-    "ItemEntityAccessor",
-    "StructurePieceInvoker",
     "StrongholdPortalRoomMixin",
-    "DisplayInvoker",
-    "BlockDisplayInvoker",
     "StructureTemplateMixin",
     "SpawnUseMixin",
     "SpawnUseGameModeMixin",
@@ -25,7 +21,6 @@
   ],
   "client": [
     "client.GameRendererMixin",
-    "client.RenderSectionRegionAccessor",
     "client.ClientLevelMixin",
     "client.ClientClockManagerMixin",
     "client.ClientClockInstanceMixin",
@@ -33,12 +28,9 @@
     "client.ParticleGroupMixin",
     "client.SectionCompilerMixin",
     "client.FluidRendererMixin",
-    "client.SoundManagerAccessor",
-    "client.ChannelAccessor",
     "client.SoundEngineMixin",
     "client.WeatherEffectRendererMixin",
-    "client.EntityRendererAgeMixin",
-    "client.ChatComponentAccessor"
+    "client.EntityRendererAgeMixin"
   ],
   "injectors": {
     "defaultRequire": 1
