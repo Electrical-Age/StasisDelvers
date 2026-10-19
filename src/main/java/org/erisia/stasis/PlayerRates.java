@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.TickRateManager;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.HashMap;
@@ -15,8 +16,8 @@ import java.util.UUID;
 /**
  * Players in a slow field run slow (unless they wear a whole time suit: Baughn 2026-10-17): their client is sent the field's tick rate (vanilla's ticking-state packet, 20 x
  * rate), so movement, animations, mining and eating all slow down together on their screen, and the server counts the
- * player's own countdowns (mining progress, item use, attack cooldown) only in the ticks that rate runs in (mixins
- * ServerPlayerGameModeMixin, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
+ * player's own countdowns (mining progress, item use, attack cooldown) only in the ticks that rate runs in (miningClock
+ * here, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
  * 0.2.0 "client" mode.
  * <p>
  * The player's rate is Stasis.rateAt at their feet block (the whole-block rule Freezing uses). Stopped land counts as
@@ -52,6 +53,18 @@ public final class PlayerRates {
     public static boolean ticksNow(ServerPlayer p) {
         double r = rate(p);
         return r >= 1.0 || Stasis.runs(r, p.level().getGameTime());
+    }
+
+    /**
+     * Block breaking is checked against ServerPlayerGameMode.gameTicks, which ServerPlayer.tick advances first thing.
+     * In a tick the player's rate skips, take that tick back beforehand, so the destroy clock (and the crack stage it
+     * sends) counts only the ticks the player's slowed client mines in (tickzone's fix). This is EntityTickEvent.Pre at
+     * LOWEST, not PlayerTickEvent.Pre: ServerPlayer.tick runs from the level's entity tick (right after this event),
+     * while PlayerTickEvent fires later, from the connection tick; and when a frozen player's tick is cancelled
+     * (StasisEvents.entityTick) this doesn't run, so the clock never drifts.
+     */
+    static void miningClock(EntityTickEvent.Pre e) {
+        if (e.getEntity() instanceof ServerPlayer p && !ticksNow(p)) p.gameMode.gameTicks--;
     }
 
     static void tick(ServerTickEvent.Post e) {

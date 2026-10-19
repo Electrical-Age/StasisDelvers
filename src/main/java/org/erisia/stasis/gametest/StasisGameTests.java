@@ -2383,13 +2383,7 @@ public final class StasisGameTests {
 
     /** ServerPlayerGameMode's tick count (what mining progress is measured against). */
     static int gameTicks(ServerPlayer p) {
-        try {
-            var f = net.minecraft.server.level.ServerPlayerGameMode.class.getDeclaredField("gameTicks");
-            f.setAccessible(true);
-            return f.getInt(p.gameMode);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        return p.gameMode.gameTicks;
     }
 
     /** Collected checks; the test fails at the end listing every failed one. */
