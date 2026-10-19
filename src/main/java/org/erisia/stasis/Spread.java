@@ -91,7 +91,7 @@ public final class Spread {
     }
 
     /** Tests: the clock leaves the state alone while a test map is installed. */
-    private static volatile boolean testing;
+    static volatile boolean testing;
 
     static State state(Level level) {
         return level.isClientSide() ? client : server;
@@ -282,6 +282,7 @@ public final class Spread {
         StabilityCompassItem.clearCache();
         lastNanos = 0;
         testing = false;
+        SpawnMove.reset();
     }
 
     // ---- commands --------------------------------------------------------------------------------------------------
@@ -315,7 +316,7 @@ public final class Spread {
     }
 
     /** For /stasis spread status. */
-    static String status(MinecraftServer srv, ServerPlayer p) {
+    public static String status(MinecraftServer srv, ServerPlayer p) {
         Clock k = Clock.get(srv.overworld());
         State s = server;
         StringBuilder b = new StringBuilder();
@@ -326,6 +327,7 @@ public final class Spread {
             k.seconds / 3600, k.hard ? "since " + String.format(java.util.Locale.ROOT, "%.2f h", k.hardAt / 3600) : "no",
             s.complete() ? ", complete" : ""));
         if (s.map() == null) return b.append(", no map yet").toString();
+        b.append("; ").append(SpawnMove.status(k));
         if (p != null && p.level().dimension() == Level.OVERWORLD) {
             long r = SpreadMap.rank1024(s.map(), p.getBlockX(), p.getBlockZ());
             double rank = r / (double) SpreadMap.SCALE;
@@ -366,6 +368,7 @@ public final class Spread {
         server = saved;
         StasisConfig.spreading = savedMode;
         testing = false;
+        SpawnMove.testArm(false);
         SpreadSync.mapInstalled();
         Stasis.bumpVersion();
     }
@@ -377,7 +380,14 @@ public final class Spread {
         static final Codec<Clock> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.DOUBLE.optionalFieldOf("seconds", 0.0).forGetter(k -> k.seconds),
             Codec.BOOL.optionalFieldOf("hard", false).forGetter(k -> k.hard),
-            Codec.DOUBLE.optionalFieldOf("hard_at", 0.0).forGetter(k -> k.hardAt)
+            Codec.DOUBLE.optionalFieldOf("hard_at", 0.0).forGetter(k -> k.hardAt),
+            // the world spawn's one move (SpawnMove): 0 not moved, 1 moved, 2 no site found; from (old x, z) to (x, y, z)
+            Codec.INT.optionalFieldOf("spawn_move", SpawnMove.NONE).forGetter(k -> k.spawnMove),
+            Codec.INT.optionalFieldOf("spawn_old_x", 0).forGetter(k -> k.spawnOldX),
+            Codec.INT.optionalFieldOf("spawn_old_z", 0).forGetter(k -> k.spawnOldZ),
+            Codec.INT.optionalFieldOf("spawn_x", 0).forGetter(k -> k.spawnX),
+            Codec.INT.optionalFieldOf("spawn_y", 0).forGetter(k -> k.spawnY),
+            Codec.INT.optionalFieldOf("spawn_z", 0).forGetter(k -> k.spawnZ)
         ).apply(i, Clock::new));
         static final SavedDataType<Clock> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "spread_clock"), Clock::new, CODEC);
@@ -387,14 +397,38 @@ public final class Spread {
         boolean hard;
         /** Online seconds when hard mode began. */
         double hardAt;
+        /** The world spawn's move (SpawnMove; once only, Baughn 2026-10-19). */
+        int spawnMove, spawnOldX, spawnOldZ, spawnX, spawnY, spawnZ;
 
         public Clock() {
         }
 
-        private Clock(double seconds, boolean hard, double hardAt) {
+        private Clock(double seconds, boolean hard, double hardAt, int spawnMove, int spawnOldX, int spawnOldZ, int spawnX, int spawnY, int spawnZ) {
             this.seconds = seconds;
             this.hard = hard;
             this.hardAt = hardAt;
+            this.spawnMove = spawnMove;
+            this.spawnOldX = spawnOldX;
+            this.spawnOldZ = spawnOldZ;
+            this.spawnX = spawnX;
+            this.spawnY = spawnY;
+            this.spawnZ = spawnZ;
+        }
+
+        /** GameTests: the spawn move's state, to put back afterwards ({spawnMove, oldX, oldZ, x, y, z}). */
+        public static int[] testSpawnMove(MinecraftServer srv, int[] set) {
+            Clock k = get(srv.overworld());
+            int[] was = {k.spawnMove, k.spawnOldX, k.spawnOldZ, k.spawnX, k.spawnY, k.spawnZ};
+            if (set != null) {
+                k.spawnMove = set[0];
+                k.spawnOldX = set[1];
+                k.spawnOldZ = set[2];
+                k.spawnX = set[3];
+                k.spawnY = set[4];
+                k.spawnZ = set[5];
+                k.setDirty();
+            }
+            return was;
         }
 
         static Clock get(ServerLevel overworld) {

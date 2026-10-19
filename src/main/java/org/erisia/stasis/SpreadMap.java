@@ -295,4 +295,26 @@ public final class SpreadMap implements SpreadRanks {
         }
         return out;
     }
+    /**
+     * Every cell whose rank is at least minRank, nearest first (by the distance from block (x, z) to the cell centre,
+     * ties by the lower cell index): the spawn move's candidates (SpawnMove; Baughn 2026-10-19). Returned as cell
+     * indices into {@link #ranks} (i + k * n); the centre of index c is ((cellX0 + c % n) * CELL + HALF,
+     * (cellZ0 + c / n) * CELL + HALF). The first is the cell nearestAtLeast finds.
+     */
+    public static int[] cellsAtLeast(SpreadMap m, int x, int z, int minRank) {
+        int t = 0;
+        for (int r : m.ranks) if (r >= minRank) t++;
+        long[] keys = new long[t];
+        t = 0;
+        for (int c = 0; c < m.ranks.length; c++) {
+            if (m.ranks[c] < minRank) continue;
+            long dx = (long) (m.cellX0 + c % m.n) * CELL + HALF - x, dz = (long) (m.cellZ0 + c / m.n) * CELL + HALF - z;
+            // the squared distance (< 2^40 for any map within the 30 km limit, and blocks within 2^19 of it) above the index
+            keys[t++] = (dx * dx + dz * dz) << 23 | c;
+        }
+        java.util.Arrays.sort(keys);
+        int[] out = new int[t];
+        for (int j = 0; j < t; j++) out[j] = (int) (keys[j] & 0x7FFFFF);
+        return out;
+    }
 }

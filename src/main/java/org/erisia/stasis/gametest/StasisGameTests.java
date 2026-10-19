@@ -2230,6 +2230,50 @@ public final class StasisGameTests {
                     org.erisia.stasis.SpreadSync.tilesSent(p) + " vs " + want.getAsInt());
             };
         }, false, true));
+        // spreading mode's spawn move (Baughn 2026-10-19, SpawnMove): once the stillness reaches the world spawn's column,
+        // the world spawn moves to the nearest place of stability >= 90 % that runs, on solid dry ground; once only, so a
+        // second crossing (over the new spawn) leaves it where it is
+        CASES.put("spread_spawn_moves_once", new Spec(160, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            var savedSpawn = level.getRespawnData();
+            c.cleanup.add(() -> level.setRespawnData(savedSpawn));
+            int[] savedMove = org.erisia.stasis.Spread.Clock.testSpawnMove(server, new int[6]);
+            c.cleanup.add(() -> org.erisia.stasis.Spread.Clock.testSpawnMove(server, savedMove));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            level.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(net.minecraft.world.level.Level.OVERWORLD, at, 0f, 0f));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(31, at.getX(), at.getZ(), 250);
+            long sr = m.rank1024(at.getX(), at.getZ());
+            int pPast = (int) (sr / org.erisia.stasis.SpreadMap.SCALE) + 1;   // the least P that stills spawn's column
+            int min = Math.max((int) Math.ceil(org.erisia.stasis.StabilityCompassItem.TARGET * m.count), pPast + 1);
+            org.erisia.stasis.Spread.testInstall(m, pPast - 1);
+            org.erisia.stasis.SpawnMove.testArm(true);
+            BlockPos[] moved = new BlockPos[1];
+            h.runAfterDelay(5, () -> {
+                c.check("while spawn's column runs, spawn stays", level.getRespawnData().pos().equals(at), level.getRespawnData().pos().toShortString());
+                org.erisia.stasis.Spread.testInstall(m, pPast);
+            });
+            h.runAfterDelay(110, () -> {
+                BlockPos np = level.getRespawnData().pos();
+                moved[0] = np;
+                c.check("the stilled spawn moved", !np.equals(at), np.toShortString());
+                c.check("to stability >= 90 % and above P", m.rank1024(np.getX(), np.getZ()) >= (long) min * org.erisia.stasis.SpreadMap.SCALE,
+                    "rank " + m.rank1024(np.getX(), np.getZ()) / org.erisia.stasis.SpreadMap.SCALE + " of " + m.count + ", min " + min);
+                c.check("a running column", Stasis.spreadRuns(level, np.getX(), np.getZ()));
+                var ground = level.getBlockState(np.below());
+                c.check("on solid dry ground with room above", !ground.isAir() && ground.getFluidState().isEmpty() && level.getBlockState(np).isAir()
+                    && level.getBlockState(np.above()).isAir(), ground + " / " + level.getBlockState(np));
+                // the stillness over the new spawn too: it stays (once only)
+                org.erisia.stasis.Spread.testInstall(m, (int) (m.rank1024(np.getX(), np.getZ()) / org.erisia.stasis.SpreadMap.SCALE) + 1);
+            });
+            return () -> {
+                c.check("the second crossing doesn't move it again", moved[0] != null && level.getRespawnData().pos().equals(moved[0]),
+                    level.getRespawnData().pos().toShortString());
+                c.check("status says it moved", org.erisia.stasis.Spread.status(server, null).contains("spawn moved once"),
+                    org.erisia.stasis.Spread.status(server, null));
+            };
+        }, false, true));
         // the stability compass (Baughn 2026-10-19): in spreading mode it points at the nearest cell of stability >= 90 %
         // (rank >= 0.9 N); in stopped mode it spins
         CASES.put("stability_compass_target", new Spec(1, (h, c) -> () -> {

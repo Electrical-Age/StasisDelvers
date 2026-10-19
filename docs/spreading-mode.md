@@ -18,6 +18,11 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   (or the spawn area) holds it, on both sides: `rateAt` and `rateAtSteady` are 0 there (block ticks, entities, EA
   nodes stop), at the threshold Freezing uses (`Deeps.at > Deeps.THRESHOLD` = 0.5). `rateAtLand` (flame light,
   meshing, map overlays) ignores them. Static deeps' outer zones don't stop running land; their rifts do.
+- The world spawn moves once (Baughn 2026-10-19, Discord 1561784319549374485): when the stillness reaches the
+  world spawn's column, it moves to the nearest still-viable place, and never again (if the new spawn stills too, in
+  hard mode, it stays). Players with their own bed or anchor keep it (`Freezing.respawnPosition`'s rules); players
+  respawning at world spawn go to the new one, and the spawn area (`spawnRadius`) moves with it. Online players read
+  "The world's spawn has moved to the highlands at X, Z: the old spawn has stilled."
 - Players in such a deep: pending Baughn's answer, `Freezing.SPREAD_DEEP_HOLDS` (true) gives an unsuited player the
   Delver hold (no statue, released when the deep passes, at most 2400 ticks, no suit messages); false gives the
   normal freeze to a statue. Suited players drain at the deep rate (x2) as in stilled land.
@@ -40,6 +45,8 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   - Sort keys are S exactly (float bits made sortable), then the cell index: deterministic, no ties.
   - Cells outside the radius are -1 (stilled from the start).
   - `nearestAtLeast(map, x, z, minRank, rings)`: the nearest cell centre at or above a rank, ring by ring (the compass).
+  - `cellsAtLeast(map, x, z, minRank)`: every cell at or above a rank, nearest first (ties by index): the spawn move's
+    candidates.
   - `rank1024(SpreadRanks, x, z)`: **the** lookup, bilinear between cell centres (32i+16) in integer arithmetic.
     A column is stilled iff it is below `P * SCALE` (`stilled`). `chunkMin1024`/`chunkMax1024` are exact.
   - `stilledSplit`: `stilled` in 32-bit integers (high and low 16 bits of r - P), the shader's arithmetic.
@@ -76,7 +83,25 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
   night, and no field clock skip, on running land), `AntiSound` (no failing-field sag there). Weather, particles,
   sounds, frozen entities and flames go through `rateAt` and so follow the client's tiles. A field's shield still
   keeps rain out on running land (`underShield` is the dome's shape, not a time test).
-- `StasisCommands`: `/stasis spread status | set <coverage> | hardmode` (op).
+- `SpawnMove.java` (server thread, a `ServerTickEvent.Post` after `Spread.tick`): the world spawn's one move.
+  - Trigger: active, a map, `Clock.spawnMove` still 0, the respawn dimension the overworld, and the spawn's column
+    stilled at P with a rank of at least 0 (a spawn outside the map, stilled from the start, never moves).
+  - Candidates: `cellsAtLeast` from the old spawn with minRank = max(ceil(0.9 N), P + 1) (the compass's 90 %, and
+    above P so they still run), fixed when the search starts. Each cell tries 7 positions in the one chunk at its
+    centre (32i + 16 is a chunk's first column): (0, 0), (8, 8), (8, 0), (0, 8), (12, 4), (4, 12), (15, 15).
+  - A position first passes the generator's noise without loading anything: its own rank1024 >= minRank x SCALE,
+    `WORLD_SURFACE_WG` = `OCEAN_FLOOR_WG` (dry), and the noise biome not `#is_ocean`, `#is_deep_ocean`, `#is_river`
+    (ice counts as surface in both heightmaps). Then its chunk is loaded (generated if need be) and checked: y = the
+    `MOTION_BLOCKING_NO_LEAVES` height, the block below solid (`SpawnCottage.solidGround`) and not leaves, logs or ice,
+    no fluid and no collision at y and y + 1, `StaticDeeps.zone` 0 at y - 1..y + 1 (no rift, no deep's outer zone),
+    the biome there not at sea, and `Stasis.spreadRuns`.
+  - Budget: 16 cells and 2 chunk loads a tick, resuming at the same position; progress logged every 5 s. The cursor
+    is memory only (a restart searches again). Found: `setRespawnData` (the vanilla default-spawn packet goes out),
+    the move saved, logged, and broadcast in chat. None found: state 2 (no site), logged, not searched again.
+  - In test mode (`Spread.testInstall`) it runs only while a test arms it (`testArm`): other spread tests install
+    small maps on which the real spawn is outside (stilled), and must not move it. `testReset` disarms it.
+- `StasisCommands`: `/stasis spread status | set <coverage> | hardmode` (op). Status ends with the spawn move's
+  state: not moved, searching (cells tried), moved (from, to), or no site found.
 - `StabilityCompassItem.java` (`stasisdelvers:stability_compass`): points at the nearest place of temporal stability
   (rank / N, the coverage at which it stills) >= 90 %; past 90 % (hard mode) at rank >= P, so never into stilled land.
   The server searches (`nearestAtLeast`, cached per player until the player's cell or the threshold changes, asked
@@ -89,7 +114,8 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
 - Overworld SavedData `stasisdelvers:spread_map` (`algorithm`, `spawn_x`, `spawn_z`, `radius`, `ranks` int array),
   written once. A saved map is never rebuilt, whatever its algorithm: a world made with v1 keeps its v1 map (logged at
   load). A missing `algorithm` reads as 1 (DFU drops fields equal to their default, so v1 saves lack it). Delete
-  `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`).
+  `spread_map.dat` to rebuild with the current algorithm (the front then moves under existing bases); `stasisdelvers:spread_clock` (`seconds`, `hard`, `hard_at`, and the spawn move: `spawn_move` 0 not moved / 1
+  moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -108,7 +134,8 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
 - `SpreadMapTest`: ranks are a permutation of 0..N-1 (any split); build is deterministic; the ranks from the split up
   follow S and every low cell is at most as stable as the least high one; below the split, BFS from spawn's cell
   reaches every running low cell, and block by block (the bilinear) every running low cell's centre column; the compass
-  search equals brute force; chunk extremes are exact; coverage formula, monotone, capped tick.
+  search equals brute force; `cellsAtLeastAreOrdered` (the spawn move's candidates are exactly the cells >= minRank,
+  by distance then index, the first at nearestAtLeast's distance); chunk extremes are exact; coverage formula, monotone, capped tick.
   `coherenceReport` logs, at 20/50/80/90/95 %, the running cells' components, those of >= 100 cells (~320 x 320
   blocks) and their share, the largest, and the shore share (running cells next to stilled land); it dumps the lab
   seed's map to `build/spread-lab-v2.ranks` for `tools/spread-render.py` (renders: `notes/spread-renders/v2-*.png`).
@@ -117,11 +144,15 @@ drifting deeps over running land (1b); front warnings, the stronghold desk and h
 - `SpreadTilesTest`: tile lookup = map lookup on random maps (through the codec), uncovered cells run,
   `stilledSplit` = the exact sum at every offset and at P on each boundary. `NetCodecTest`: the three payloads.
 - GameTests (isolated): `spread_rates` (at P = N/3, below the split); `stability_compass_target` (the target is the
-  nearest cell >= 90 %, it spins in stopped mode); `stability_compass_first_join` (one compass, nothing else, not again); `spread_deep_stops_running_land` (rate 0 and no block tick in a drifting
+  nearest cell >= 90 %, it spins in stopped mode); `spread_spawn_moves_once` (spawn stays while its column runs;
+  once P passes its rank it moves to a running column of rank >= max(0.9 N, P + 1) on dry solid ground with air above;
+  P past the new spawn's rank leaves it there; status says so); `stability_compass_first_join` (one compass, nothing else, not again); `spread_deep_stops_running_land` (rate 0 and no block tick in a drifting
   deep over running land, the land's rate 1, a field holds it off, an unsuited player is held, not a statue);
   `spread_tiles_follow_player` (the server's tile list follows the player).
 
 ## Gotchas
+- The spawn move is once only (Baughn): a spawn that stills again stays, and a `/setworldspawn` after the move is
+  never moved. A `/setworldspawn` into stilled land within the map before the move triggers it at once.
 - A running column's rift still stops (Baughn). Below the split a corridor could pass a rift's column; rifts still early
   (S dips there), and they are 3D, so there is usually a way round, but nothing guarantees it.
 - Above the split (default 50 %) running regions can be cut off from spawn and from each other, on purpose.

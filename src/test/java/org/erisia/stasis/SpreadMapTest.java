@@ -205,6 +205,42 @@ class SpreadMapTest {
     }
 
     /**
+     * The spawn move's candidates (SpawnMove; Baughn 2026-10-19): exactly the cells at or above minRank, nearest the old
+     * spawn first (ties by index), the first being the compass's nearestAtLeast.
+     */
+    @Property(tries = 100)
+    void cellsAtLeastAreOrdered(@ForAll @IntRange(min = 1, max = 0xFFFFFE) int seed, @ForAll @IntRange(min = -500, max = 500) int x,
+                                @ForAll @IntRange(min = -500, max = 500) int z, @ForAll @DoubleRange(min = 0, max = 1.05) double share) {
+        SpreadMap m = map(seed, 10, -20, 500);
+        int min = (int) Math.ceil(share * m.count);
+        int[] cs = SpreadMap.cellsAtLeast(m, x, z, min);
+        int brute = 0;
+        for (int r : m.ranks) if (r >= min) brute++;
+        assertEquals(brute, cs.length);
+        long last = -1;
+        int lastC = -1;
+        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        for (int c : cs) {
+            assertTrue(m.ranks[c] >= min, "rank " + m.ranks[c] + " < " + min);
+            assertTrue(seen.add(c), "cell twice");
+            long dx = (m.cellX0 + c % m.n) * (long) SpreadMap.CELL + SpreadMap.HALF - x, dz = (m.cellZ0 + c / m.n) * (long) SpreadMap.CELL + SpreadMap.HALF - z;
+            long d = dx * dx + dz * dz;
+            assertTrue(d > last || d == last && c > lastC, "out of order");
+            last = d;
+            lastC = c;
+        }
+        int[] t = SpreadMap.nearestAtLeast(m, x, z, min, m.n);
+        if (cs.length == 0) assertEquals(null, t);
+        else {
+            assertTrue(t != null);
+            int c = cs[0];
+            long dx = t[0] - x, dz = t[1] - z;
+            long fx = (m.cellX0 + c % m.n) * (long) SpreadMap.CELL + SpreadMap.HALF - x, fz = (m.cellZ0 + c / m.n) * (long) SpreadMap.CELL + SpreadMap.HALF - z;
+            assertEquals(dx * dx + dz * dz, fx * fx + fz * fz);
+        }
+    }
+
+    /**
      * Not an assertion, a report (Baughn 2026-10-19: coherent running regions for bases): at a few coverages, the running
      * cells' 4-connected components: how many, how many big (>= BIG cells, ~ 320 x 320 blocks), the share of running
      * land in big ones, the largest. Also writes the lab world's map (deep seed 3201319, spawn 0 0, 8 km) as raw ranks
