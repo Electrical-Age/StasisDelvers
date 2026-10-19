@@ -216,7 +216,7 @@ public final class Freezing {
         var box = p.getBoundingBox();
         for (StaticDeeps.Deep d : StaticDeeps.near((float) p.getX(), (float) p.getY(), (float) p.getZ(), 12, seed)) {
             float[] c = StaticDeeps.core(d);
-            float w = StaticDeeps.eyeHalfWidth(d);
+            float w = StaticDeeps.eyeHalfWidth(StaticDeeps.effectiveRadius(seed, d));   // (a lanced rift's eye shrinks with it)
             if (box.intersects(c[0] - w, c[1] - w * 0.7, c[2] - w, c[0] + w, c[1] + w * 0.7, c[2] + w)) return true;
         }
         return false;

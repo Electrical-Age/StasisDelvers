@@ -55,12 +55,16 @@ public final class StasisNet {
         }
     }
 
-    /** The level's gate rifts (Gates) and lance return rifts (Lance): their deep seed and centres (packed block positions). */
-    public record GateRifts(int seed, List<Long> centres, List<Long> returns) implements CustomPacketPayload {
+    /**
+     * The level's gate rifts (Gates) and lance return rifts (Lance): their deep seed and centres (packed block positions);
+     * and the lanced rifts' breach steps (Lance.packStep: id << 4 | step, for steps above 0), so zones and the shader shrink.
+     */
+    public record GateRifts(int seed, List<Long> centres, List<Long> returns, List<Integer> steps) implements CustomPacketPayload {
         public static final Type<GateRifts> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "gate_rifts"));
         public static final StreamCodec<RegistryFriendlyByteBuf, GateRifts> CODEC = StreamCodec.composite(
             ByteBufCodecs.INT, GateRifts::seed, ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::centres,
-            ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::returns, GateRifts::new);
+            ByteBufCodecs.VAR_LONG.apply(ByteBufCodecs.list()), GateRifts::returns, ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()),
+            GateRifts::steps, GateRifts::new);
 
         @Override
         public Type<GateRifts> type() {
@@ -357,6 +361,10 @@ public final class StasisNet {
     }
 
     /** Clients draw bolts through this (set by the client; the server never calls it). */
+    /** Client: the lanced rifts' strengths as they came (seed, id -> share; StasisClient re-meshes the ones that changed). */
+    public static volatile java.util.function.BiConsumer<Integer, java.util.Map<Integer, Float>> riftStrengths = (s, m) -> {
+    };
+
     public static volatile java.util.function.Consumer<Bolt> boltSink = b -> {
     };
 
@@ -372,7 +380,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("14");   // 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar("15");   // 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -409,6 +417,9 @@ public final class StasisNet {
             r.playToClient(GateRifts.TYPE, GateRifts.CODEC, (p, ctx) -> {
                 StaticDeeps.setGates(p.seed(), p.centres());
                 StaticDeeps.setReturns(p.seed(), p.returns());
+                var strengths = Lance.strengths(p.steps());
+                StaticDeeps.setStrengths(p.seed(), strengths);
+                riftStrengths.accept(p.seed(), strengths);
             });
             r.playToClient(StormOverride.TYPE, StormOverride.CODEC, (p, ctx) ->
                 Storms.clientOverride = p.active() ? new double[]{p.start(), p.end(), p.folded()} : null);
@@ -454,7 +465,8 @@ public final class StasisNet {
 
     static void sendGates(ServerPlayer player) {
         send(player, stormPacket(player.level()));
-        send(player, new GateRifts(FieldData.get(player.level()).deepSeed(), Gates.list(player.level()), Lance.returns(player.level())));
+        send(player, new GateRifts(FieldData.get(player.level()).deepSeed(), Gates.list(player.level()), Lance.returns(player.level()),
+            Lance.steps(player.level())));
     }
 
     public static void sendFields(ServerLevel level) {

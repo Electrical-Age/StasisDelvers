@@ -58,7 +58,7 @@ public final class Stasis {
     }
 
     /** A change that index() doesn't hold (the spread's progress, Spread): readers of version() re-ask. */
-    static synchronized void bumpVersion() {
+    public static synchronized void bumpVersion() {
         version++;
     }
 

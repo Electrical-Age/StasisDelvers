@@ -34,6 +34,7 @@ import org.erisia.stasis.SpreadRanks;
 import org.erisia.stasis.SpreadTiles;
 import org.erisia.stasis.Stasis;
 import org.erisia.stasis.StasisDelvers;
+import org.erisia.stasis.StaticDeeps;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
 import org.slf4j.Logger;
 
@@ -297,6 +298,29 @@ public final class FrozenSprites {
         PENDING.addAll(Field.changedShapes(old, now));
     }
 
+    /** The lanced rifts' strengths last seen (seed -> id -> share), and the rifts whose step changed since the last flush. */
+    private static final java.util.Map<Integer, java.util.Map<Integer, Float>> RIFT_STRENGTHS = new java.util.HashMap<>();
+    private static final List<StaticDeeps.Deep> PENDING_RIFTS = new ArrayList<>();
+
+    /**
+     * StasisNet.riftStrengths (main thread): a lance stepped a rift's radius (Lance). Rifts stop time even over running
+     * spread land (rateAtLand), so the sections round the ones that changed are re-meshed; once per step, not per frame.
+     */
+    static void riftStrengths(int seed, java.util.Map<Integer, Float> now) {
+        java.util.Map<Integer, Float> old = RIFT_STRENGTHS.getOrDefault(seed, java.util.Map.of());
+        java.util.Set<Integer> changed = new java.util.HashSet<>();
+        for (var e : now.entrySet()) if (!e.getValue().equals(old.get(e.getKey()))) changed.add(e.getKey());
+        for (Integer id : old.keySet()) if (!now.containsKey(id)) changed.add(id);
+        RIFT_STRENGTHS.put(seed, new java.util.HashMap<>(now));
+        if (changed.isEmpty()) return;
+        Stasis.bumpVersion();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        // the rifts are near the player (their level's), so look them up round the camera
+        for (StaticDeeps.Deep d : StaticDeeps.near((float) mc.player.getX(), (float) mc.player.getY(), (float) mc.player.getZ(), 1024, seed))
+            if (changed.contains(d.id())) PENDING_RIFTS.add(d);
+    }
+
     /** P moved over [movedLo, movedHi) (rank1024 units; empty while movedLo > movedHi), and tiles that arrived. */
     private static long movedLo = Long.MAX_VALUE, movedHi = Long.MIN_VALUE;
     private static final it.unimi.dsi.fastutil.longs.LongOpenHashSet ARRIVED = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
@@ -318,10 +342,12 @@ public final class FrozenSprites {
     static void tick(Minecraft mc) {
         ticks++;
         boolean spread = movedLo <= movedHi || !ARRIVED.isEmpty();
-        if (PENDING.isEmpty() && !spread) return;
+        if (PENDING.isEmpty() && PENDING_RIFTS.isEmpty() && !spread) return;
         ClientLevel level = mc.level;
         if (level == null) {
             PENDING.clear();
+            PENDING_RIFTS.clear();
+            RIFT_STRENGTHS.clear();
             clearSpread();
             return;
         }
@@ -340,8 +366,17 @@ public final class FrozenSprites {
                 }
                 if (y0 <= y1) level.setSectionRangeDirty(x0, y0, z0, x1, y1, z1);
             }
+            for (StaticDeeps.Deep d : PENDING_RIFTS) {
+                // (the warped, roughened body stays within ~1.4 r + 28 of its centre: StaticDeeps.sectionMayHave)
+                float reach = d.radius() * 1.4f + 28;
+                int x0 = (int) Math.floor(d.x() - reach) >> 4, x1 = (int) Math.floor(d.x() + reach) >> 4;
+                int z0 = (int) Math.floor(d.z() - reach) >> 4, z1 = (int) Math.floor(d.z() + reach) >> 4;
+                int y0 = Math.max(minY, (int) Math.floor(d.y() - reach) >> 4), y1 = Math.min(maxY, (int) Math.floor(d.y() + reach) >> 4);
+                if (y0 <= y1) level.setSectionRangeDirty(x0, y0, z0, x1, y1, z1);
+            }
         }
         PENDING.clear();
+        PENDING_RIFTS.clear();
     }
 
     private static void clearSpread() {

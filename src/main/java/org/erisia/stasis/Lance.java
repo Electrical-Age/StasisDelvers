@@ -91,24 +91,66 @@ public final class Lance {
 
     // ---- saved state
 
-    /** A rift with a lance gate: its geometry (so it can be found again from anywhere) and whether it is open. */
-    public record Gate(int id, float x, float y, float z, float r, boolean open) {
+    /** No lance (Gate.lance). */
+    public static final long NO_LANCE = Long.MIN_VALUE;
+
+    /**
+     * A rift with a lance gate: its geometry (so it can be found again from anywhere), whether it is open (latched), and
+     * the breach (L2): `step` 0..{@link #STEPS} (the rift's strength {@link #strength}), `progress` 0..1 within the step
+     * (up while breaching, down while relaxing), `grace` ticks without power so far, the lance core bound to it
+     * (`lance`, a packed block position, or {@link #NO_LANCE}) and when its last lance was dismantled (game time; -1:
+     * none ever was, as for gates opened by the test command, which then stay as set).
+     */
+    public record Gate(int id, float x, float y, float z, float r, boolean open, int step, float progress, int grace, long lance,
+                       long dismantled) {
         static final Codec<Gate> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.INT.fieldOf("id").forGetter(Gate::id),
             Codec.FLOAT.fieldOf("x").forGetter(Gate::x),
             Codec.FLOAT.fieldOf("y").forGetter(Gate::y),
             Codec.FLOAT.fieldOf("z").forGetter(Gate::z),
             Codec.FLOAT.fieldOf("r").forGetter(Gate::r),
-            Codec.BOOL.optionalFieldOf("open", false).forGetter(Gate::open)
-        ).apply(i, Gate::new));
+            Codec.BOOL.optionalFieldOf("open", false).forGetter(Gate::open),
+            // (L1 saves have no step: an open gate there is at the floor, not snapped back to the whole rift)
+            Codec.INT.optionalFieldOf("step").forGetter(g -> java.util.Optional.of(g.step())),
+            Codec.FLOAT.optionalFieldOf("progress", 0f).forGetter(Gate::progress),
+            Codec.INT.optionalFieldOf("grace", 0).forGetter(Gate::grace),
+            Codec.LONG.optionalFieldOf("lance", NO_LANCE).forGetter(Gate::lance),
+            Codec.LONG.optionalFieldOf("dismantled", -1L).forGetter(Gate::dismantled)
+        ).apply(i, (id, x, y, z, r, open, step, progress, grace, lance, dis) ->
+            new Gate(id, x, y, z, r, open, step.orElse(open ? STEPS : 0), progress, grace, lance, dis)));
 
         public StaticDeeps.Deep deep() {
             return new StaticDeeps.Deep(x, y, z, r, id);
         }
 
         static Gate of(StaticDeeps.Deep d, boolean open) {
-            return new Gate(d.id(), d.x(), d.y(), d.z(), d.radius(), open);
+            return new Gate(d.id(), d.x(), d.y(), d.z(), d.radius(), open, open ? STEPS : 0, 0, 0, NO_LANCE, -1);
         }
+
+        public boolean hasLance() {
+            return lance != NO_LANCE;
+        }
+
+        /** The rift's share of its radius now (quantised by step). */
+        public float strength() {
+            return Lance.strength(step);
+        }
+
+        Gate withBreach(boolean open, int step, float progress, int grace) {
+            return new Gate(id, x, y, z, r, open, step, progress, grace, lance, dismantled);
+        }
+
+        Gate withLance(long lance, long dismantled) {
+            return new Gate(id, x, y, z, r, open, step, progress, grace, lance, dismantled);
+        }
+    }
+
+    /** The breach's quantised steps from the whole rift to the floor ({@link #OPEN_SCALE}). */
+    public static final int STEPS = 8;
+
+    /** A rift's share of its radius at a breach step: 1 at 0, OPEN_SCALE at STEPS, evenly between. */
+    public static float strength(int step) {
+        return 1f - (1f - OPEN_SCALE) * Math.max(0, Math.min(STEPS, step)) / STEPS;
     }
 
     /** SavedData stasisdelvers:lance_gates, in the rift's level. */
@@ -137,15 +179,20 @@ public final class Lance {
     }
 
     /** An arrival pad and its return rift (centre block), made once per destination; home: the gate it was made for. */
-    public record Arrival(String key, long foot, long ret, String homeDim, int homeId, boolean central) {
+    public record Arrival(String key, long foot, long ret, String homeDim, int homeId, boolean central, boolean dormant) {
         static final Codec<Arrival> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.fieldOf("key").forGetter(Arrival::key),
             Codec.LONG.fieldOf("foot").forGetter(Arrival::foot),
             Codec.LONG.fieldOf("ret").forGetter(Arrival::ret),
             Codec.STRING.fieldOf("home_dim").forGetter(Arrival::homeDim),
             Codec.INT.fieldOf("home_id").forGetter(Arrival::homeId),
-            Codec.BOOL.optionalFieldOf("central", false).forGetter(Arrival::central)
+            Codec.BOOL.optionalFieldOf("central", false).forGetter(Arrival::central),
+            Codec.BOOL.optionalFieldOf("dormant", false).forGetter(Arrival::dormant)
         ).apply(i, Arrival::new));
+
+        Arrival withDormant(boolean d) {
+            return new Arrival(key, foot, ret, homeDim, homeId, central, d);
+        }
 
         public BlockPos footPos() {
             return BlockPos.of(foot);
@@ -186,19 +233,46 @@ public final class Lance {
 
         /** The arrival whose return rift has this deep id, or null. */
         Arrival byReturn(int id) {
-            for (Arrival a : arrivals.values()) if (StaticDeeps.returnRift(a.retPos()).id() == id) return a;
+            for (Arrival a : arrivals.values()) if (!a.dormant() && StaticDeeps.returnRift(a.retPos()).id() == id) return a;
             return null;
         }
     }
 
-    /** The level's return rift centres (packed block positions), for StaticDeeps and the GateRifts payload. */
+    /** The level's return rift centres (packed block positions), for StaticDeeps and the GateRifts payload; not the
+     *  dormant ones (their home lance is gone: {@link #dormancy}). */
     public static List<Long> returns(ServerLevel level) {
-        return ArrivalData.get(level).arrivals.values().stream().map(Arrival::ret).toList();
+        return ArrivalData.get(level).arrivals.values().stream().filter(a -> !a.dormant()).map(Arrival::ret).toList();
     }
 
-    /** The level's return rifts into StaticDeeps (level load, and when one is made). */
+    /** The level's lanced rifts' strengths for the GateRifts payload: id << 4 | step, for each gate past step 0. */
+    public static List<Integer> steps(ServerLevel level) {
+        List<Integer> out = new ArrayList<>();
+        for (Gate g : GateData.get(level).gates.values()) if (g.step() > 0) out.add(packStep(g.id(), g.step()));
+        return out;
+    }
+
+    public static int packStep(int id, int step) {
+        return (id & 0xFFFFFF) << 4 | (step & 0xF);
+    }
+
+    /** Unpack GateRifts' steps into strengths by id (both sides set StaticDeeps from this). */
+    public static Map<Integer, Float> strengths(List<Integer> packed) {
+        Map<Integer, Float> m = new HashMap<>();
+        for (int v : packed) m.put(v >>> 4, strength(v & 0xF));
+        return m;
+    }
+
+    /** The level's return rifts and its lanced rifts' strengths into StaticDeeps (level load, and on every change). */
     static void publish(ServerLevel level) {
-        StaticDeeps.setReturns(FieldData.get(level).deepSeed(), returns(level));
+        int seed = FieldData.get(level).deepSeed();
+        StaticDeeps.setReturns(seed, returns(level));
+        if (!StaticDeeps.setStrengths(seed, strengths(steps(level))).isEmpty()) Stasis.bumpVersion();
+    }
+
+    /** publish, and tell the level's players (the GateRifts payload). */
+    static void publishAndSend(ServerLevel level) {
+        publish(level);
+        for (ServerPlayer pl : level.players()) StasisNet.sendGates(pl);
     }
 
     // ---- gate state
@@ -208,12 +282,18 @@ public final class Lance {
         return !StaticDeeps.isReturn(d) && !(d.radius() == StaticDeeps.END_RIFT_RADIUS && StaticDeeps.isGate(d));
     }
 
-    /** Open or close the gate on rift d (in level). Returns the gate as it is now. */
+    /**
+     * Open or close the gate on rift d (in level) at once (the test command, tests): latched at the floor, or whole. Its
+     * lance stays bound; a gate with no lance never had one counts as held by the command (it doesn't relax).
+     */
     public static Gate setOpen(ServerLevel level, StaticDeeps.Deep d, boolean open) {
         GateData gd = GateData.get(level);
+        Gate old = gd.gate(d.id());
         Gate g = Gate.of(d, open);
+        if (old != null) g = g.withLance(old.lance(), -1);
         gd.gates.put(d.id(), g);
         gd.setDirty();
+        publishAndSend(level);
         StasisDelvers.LOG.info("Lance gate on rift {} in {} {}", d.id(), level.dimension().identifier(), open ? "opened" : "closed");
         return g;
     }
@@ -225,11 +305,12 @@ public final class Lance {
     }
 
     /**
-     * The rift's effective radius: an open gate holds it at {@link #OPEN_SCALE} (L1: state only; L2 steps it down during
-     * the breach and makes zones and visuals follow).
+     * The rift's effective radius: the breach steps it down to {@link #OPEN_SCALE}, where the gate latches (StaticDeeps
+     * holds the same for zones; clients get it in GateRifts).
      */
     public static float effectiveRadius(ServerLevel level, StaticDeeps.Deep d) {
-        return isOpen(level, d.id()) ? d.radius() * OPEN_SCALE : d.radius();
+        Gate g = GateData.get(level).gate(d.id());
+        return g == null ? d.radius() : d.radius() * g.strength();
     }
 
     /** The rift nearest to pos (its core), or the one with this id within ~4 km or with a gate here; null if none. */
@@ -428,6 +509,12 @@ public final class Lance {
         ArrivalData ad = ArrivalData.get(dest);
         String key = key(dest, k, g, homeDim);
         Arrival a = ad.arrivals.get(key);
+        if (a != null && a.dormant()) {   // its home has a gate again: the return rift wakes
+            a = a.withDormant(false);
+            ad.arrivals.put(key, a);
+            ad.setDirty();
+            publishAndSend(dest);
+        }
         if (a != null) {
             BlockPos f = a.footPos();
             for (BlockPos q : new BlockPos[]{f, f.above()}) if (!dest.getBlockState(q).isAir()) dest.setBlock(q, Blocks.AIR.defaultBlockState(), 3);
@@ -437,8 +524,7 @@ public final class Lance {
         a = build(dest, s, homeDim, g.id());
         ad.arrivals.put(key, a);
         ad.setDirty();
-        publish(dest);
-        for (ServerPlayer pl : dest.players()) StasisNet.sendGates(pl);
+        publishAndSend(dest);
         StasisDelvers.LOG.info("Lance arrival {} made in {} at {} (return rift at {})", key, dimId(dest), a.footPos().toShortString(),
             a.retPos().toShortString());
         return a;
@@ -465,7 +551,7 @@ public final class Lance {
             }
         }
         BlockPos ret = f.relative(d, RETURN_ALONG).above();
-        return new Arrival(s.key(), f.asLong(), ret.asLong(), homeDim, homeId, s.central());
+        return new Arrival(s.key(), f.asLong(), ret.asLong(), homeDim, homeId, s.central(), false);
     }
 
     /** The pad's blocks at base's height: along d from one behind to one past the return rift, 3 wide (row by row). */
@@ -622,8 +708,8 @@ public final class Lance {
     }
 
     /**
-     * Freezing: is this player (in a rift's zone) spared the rift's statue? In a return rift's body (the door home), in an
-     * open gate's disc, or in an open gate's rift outside the part it is held to (L1: the 25 % is server state only).
+     * Freezing: is this player (in a rift's zone) spared the rift's statue? In a return rift's body (the door home), or in
+     * an open gate's disc. (Outside the part a lance holds the rift to, StaticDeeps.zone already says outer zone.)
      */
     public static boolean spares(ServerLevel level, ServerPlayer p) {
         int seed = FieldData.get(level).deepSeed();
@@ -643,7 +729,6 @@ public final class Lance {
             if (g == null || !g.open()) continue;
             float[] c = StaticDeeps.core(d);
             if (Math.pow(x - c[0], 2) + Math.pow(z - c[2], 2) <= (REACH + 1) * (REACH + 1) && Math.abs(y - c[1]) <= 2.5) return true;
-            if (StaticDeeps.shape(d, p.getBlockX() + 0.5f, p.getBlockY() + 0.5f, p.getBlockZ() + 0.5f) > StaticDeeps.RIFT * OPEN_SCALE) return true;
         }
         return false;
     }

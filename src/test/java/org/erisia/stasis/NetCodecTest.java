@@ -76,9 +76,18 @@ class NetCodecTest {
     }
 
     @Property(tries = 200)
-    void gateRiftsRoundTrip(@ForAll int seed, @ForAll @Size(max = 20) List<Long> centres, @ForAll @Size(max = 20) List<Long> returns) {
-        var p = new StasisNet.GateRifts(seed, centres, returns);
+    void gateRiftsRoundTrip(@ForAll int seed, @ForAll @Size(max = 20) List<Long> centres, @ForAll @Size(max = 20) List<Long> returns,
+                            @ForAll @Size(max = 20) List<Integer> steps) {
+        var p = new StasisNet.GateRifts(seed, centres, returns, steps);
         assertEquals(p, trip(StasisNet.GateRifts.CODEC, p));
+    }
+
+    /** The lanced rifts' steps survive packing (24-bit ids, steps 0..8) and unpack to the strengths both sides use. */
+    @Property(tries = 200)
+    void lanceStepsPack(@ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 0xFFFFFF) int id,
+                        @ForAll @net.jqwik.api.constraints.IntRange(min = 1, max = 8) int step) {
+        var m = Lance.strengths(List.of(Lance.packStep(id, step)));
+        assertEquals(java.util.Map.of(id, Lance.strength(step)), m);
     }
 
     @Property(tries = 200)

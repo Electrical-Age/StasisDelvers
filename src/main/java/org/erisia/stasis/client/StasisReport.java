@@ -236,6 +236,7 @@ public final class StasisReport {
             x.addProperty("y", d.y());
             x.addProperty("z", d.z());
             x.addProperty("radius", d.radius());
+            x.addProperty("strength", StaticDeeps.strength(seed, d));   // (a lance's breach: < 1)
             x.addProperty("id", d.id());
             float[] core = StaticDeeps.core(d);
             if (core != null) {
@@ -424,6 +425,7 @@ public final class StasisReport {
         for (int i = 0; i < ns; i++) {
             JsonArray a = new JsonArray();
             for (int j = 0; j < 5; j++) a.add(d[220 + 5 * i + j]);
+            if (i < 4) a.add(d[240 + i]);   // its strength (Lance)
             statics.add(a);
         }
         o.add("static_deep_blocks", statics);

@@ -24,7 +24,7 @@
 // floor(camera) (x, z) and spacing, 1 unused; [2048 + 64i ..] drifting deep i's ground grid (8 x 8 surface y -
 // floor(camera y), row = z); [3584 + 64i ..] static deep i's (corner centre - (1.3 r + 10), spacing 2 (1.3 r + 10) / 7);
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
-// shape id;
+// shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
@@ -182,7 +182,7 @@ float staticShape(int i, vec3 w, vec3 camI) {
     vec3 dv = w + wp * vec3(16.0, 10.0, 16.0) * min(1.0, R * R / 576.0) - c;   // (StaticDeeps.shape: less warp for gate rifts)
     dv.y *= 1.4;
     float rough = 1.0 + 0.3 * (fbm32(w / 9.0, id ^ 0x77) - 0.5) * 2.0;
-    return length(dv) / (R * rough);
+    return length(dv) / (R * rough * data(240 + i));   // (a lanced rift: the warp stays the whole rift's, the core put)
 }
 
 // Drifting deeps (Deeps): [DEEP_BASE + DEEP_STRIDE * i ..], i < MAX_DEEPS (StasisPost has the same constants)
@@ -425,7 +425,8 @@ void findDeeps(vec3 o, vec3 dir, float tEnd, vec3 camI) {
         float R = data(o5 + 3), E = R * STATIC_REACH + STATIC_REACH_ADD;
         vec2 span;
         if (!sphereSpan(c, E, data(168 + 2 * i) - DEEP_BELOW, data(169 + 2 * i) + MIST_ABOVE, o, dir, span) || span.x > tEnd) continue;
-        hits[hitCount] = Hit(1, i, c, R, 1.0, vec3(c.x - E, c.z - E, 2.0 * E / float(GG - 1)), int(data(o5 + 4)));
+        // (the mist's envelope follows a lance's breach, R x strength; E stays: the ground grid is laid out for the whole rift)
+        hits[hitCount] = Hit(1, i, c, R * data(240 + i), 1.0, vec3(c.x - E, c.z - E, 2.0 * E / float(GG - 1)), int(data(o5 + 4)));
         hitSpan[hitCount] = span;
         if (++hitCount == MAX_HITS) return;
     }
@@ -1124,7 +1125,7 @@ void main() {
         float strainAll = data(1596), strainHere = 0.0;
         for (int i = 0; i < nsd && i < 4; i++) {
             vec3 cc = vec3(data(204 + 3 * i), data(205 + 3 * i), data(206 + 3 * i));
-            float sR = data(223 + 5 * i);
+            float sR = data(223 + 5 * i) * data(240 + i);
             vec3 q = depth > 0.0 ? p : camFrac + dir * 200.0;
             strainHere = max(strainHere, 1.0 - smoothstep(sR * 0.5, sR * 2.2 + 16.0, length(q - cc)));
         }
@@ -1190,7 +1191,7 @@ void main() {
                 float yd = data(200 + i);
                 int dest = int(floor((yd + 5.0) / 10.0));
                 float f = yd - 10.0 * float(dest);
-                float W = clamp(0.6 + data(223 + 5 * i) * 0.018, 0.75, 1.8);
+                float W = clamp(0.6 + data(223 + 5 * i) * data(240 + i) * 0.018, 0.75, 1.8);   // (StaticDeeps.eyeHalfWidth)
                 vec3 nrm = vec3(sin(f), 0.0, cos(f)), rt = vec3(cos(f), 0.0, -sin(f));
                 float dn = dot(dirE, nrm);
                 if (abs(dn) < 1e-3) continue;

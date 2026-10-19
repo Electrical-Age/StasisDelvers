@@ -80,6 +80,48 @@ public final class StaticDeeps {
         SECTIONS.clear();
     }
 
+    // ---- lanced rifts' strength (Lance: a breach steps a rift's effective radius down; docs/lance.md)
+
+    /** Packed (seed, id) -> the share of its radius a rift has now (< 1 only for rifts a lance holds; else absent). */
+    private static volatile java.util.Map<Long, Float> strengths = java.util.Map.of();
+
+    static long strengthKey(int seed, int id) {
+        return (long) seed << 32 | (id & 0xFFFFFFFFL);
+    }
+
+    /**
+     * Set the strengths of the lanced rifts of a deep seed (server: Lance.publish; client: the GateRifts packet): id ->
+     * share of the radius (absent or 1: whole). Returns the ids whose strength changed (to re-mesh them on the client).
+     */
+    public static java.util.Set<Integer> setStrengths(int seed, java.util.Map<Integer, Float> byId) {
+        java.util.Map<Long, Float> now = new java.util.HashMap<>();
+        java.util.Set<Integer> changed = new java.util.HashSet<>();
+        for (var e : strengths.entrySet()) {
+            if ((int) (e.getKey() >> 32) != seed) now.put(e.getKey(), e.getValue());
+            else if (byId.getOrDefault((int) (long) e.getKey(), 1f) != (float) e.getValue()) changed.add((int) (long) e.getKey());
+        }
+        for (var e : byId.entrySet()) {
+            if (e.getValue() >= 1f) continue;
+            Float old = strengths.get(strengthKey(seed, e.getKey()));
+            if (old == null || old.floatValue() != e.getValue()) changed.add(e.getKey());
+            now.put(strengthKey(seed, e.getKey()), e.getValue());
+        }
+        strengths = java.util.Map.copyOf(now);
+        return changed;
+    }
+
+    /** The share of its radius rift d (of this deep seed) has now: 1 unless a lance holds it smaller (Lance). */
+    public static float strength(int seed, Deep d) {
+        if (strengths.isEmpty()) return 1f;
+        Float s = strengths.get(strengthKey(seed, d.id()));
+        return s == null ? 1f : s;
+    }
+
+    /** d's radius as it is now (Lance's breach shrinks it; zones, freezing and the shader follow). */
+    public static float effectiveRadius(int seed, Deep d) {
+        return d.radius() * strength(seed, d);
+    }
+
     /** Is d a lance's return rift? */
     public static boolean isReturn(Deep d) {
         return d.radius() == RETURN_RADIUS && returnIds.contains(d.id());
@@ -130,6 +172,7 @@ public final class StaticDeeps {
         endRiftIds = java.util.Set.of();
         RETURNS.clear();
         returnIds = java.util.Set.of();
+        strengths = java.util.Map.of();
         SECTIONS.clear();
     }
 
@@ -187,9 +230,9 @@ public final class StaticDeeps {
         return new float[]{x, y, z};
     }
 
-    /** The eye's half-width at d's core (stasis.fsh: W); its touch reaches that far. */
-    public static float eyeHalfWidth(Deep d) {
-        return Math.max(0.75f, Math.min(1.8f, 0.6f + d.radius() * 0.018f));
+    /** The eye's half-width at d's core (stasis.fsh: W) for a radius (the effective one); its touch reaches that far. */
+    public static float eyeHalfWidth(float radius) {
+        return Math.max(0.75f, Math.min(1.8f, 0.6f + radius * 0.018f));
     }
 
     /**
@@ -221,7 +264,8 @@ public final class StaticDeeps {
         for (Deep d : near(x, y, z, 100, seed)) {
             float dx = x - d.x(), dy = y - d.y(), dz = z - d.z();
             if (dx * dx + dy * dy + dz * dz > (d.radius() + 20) * (d.radius() + 20)) continue;
-            float s = shape(d, x, y, z);
+            // a lanced rift shrinks round its eye (shape / strength: the warped core stays put; worldgen reads shape)
+            float s = shape(d, x, y, z) / strength(seed, d);
             if (s <= RIFT) return 2;
             if (s <= 1) best = 1;
         }

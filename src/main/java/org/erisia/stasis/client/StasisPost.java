@@ -259,6 +259,8 @@ public final class StasisPost {
                 d[o + 2] = (float) (sd.z() - fz);
                 d[o + 3] = sd.radius();
                 d[o + 4] = sd.id() & 0xFFFFFF;
+                // its strength (Lance: a breach steps the radius down; 1 unless lanced): the shader shrinks the body, mist and eye
+                d[240 + ns - 1] = org.erisia.stasis.StaticDeeps.strength(ClientFields.deepSeed(), sd);
                 // the inhale before a puff (0..1 over its last 4 s): the rift's mist draws in and darkens
                 double inh = org.erisia.stasis.Deeps.nextPuffIn(sd, wclock, ClientFields.deepSeed());
                 d[1597 + ns - 1] = inh < 4 ? (float) Math.pow(1 - inh / 4, 2) : 0;
@@ -290,7 +292,7 @@ public final class StasisPost {
         for (int i = 0; i < ns; i++) {
             float cx = d[204 + 3 * i] + (float) fx, cy = d[205 + 3 * i] + (float) fy, cz = d[206 + 3 * i] + (float) fz;
             double dist = Math.sqrt(Math.pow(cx - cam.x, 2) + Math.pow(cy - cam.y, 2) + Math.pow(cz - cam.z, 2));
-            float R = d[223 + 5 * i];
+            float R = d[223 + 5 * i] * d[240 + i];
             strain = (float) Math.max(strain, 1 - dist / (R * 2.5 + 20));
             org.joml.Vector4f v = new org.joml.Vector4f((float) (cx - cam.x), (float) (cy - cam.y), (float) (cz - cam.z), 1f);
             fwd0.transform(v);
