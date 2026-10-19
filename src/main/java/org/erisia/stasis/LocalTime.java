@@ -120,6 +120,10 @@ public final class LocalTime {
          */
         public static double time(Level level, double x, double y, double z, float partial, double global) {
             double outside = DEFAULT_TOD;
+            // land the spreading stillness hasn't reached runs at rate 1, fields or not: the world's clock; a drifting
+            // deep over it stops it (Baughn 2026-10-19), unless a field holds the deep off
+            if (Stasis.spreadRuns(level, (int) Math.floor(x), (int) Math.floor(z)))
+                return Stasis.isRunning(level, BlockPos.containing(x, y, z)) ? global : outside;
             double best = 0, inside = outside;
             for (Field f : ClientFields.fields()) {
                 double[] c = FIELDS.get(f.id());

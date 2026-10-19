@@ -75,9 +75,10 @@ public final class AntiSound {
         double s = 0;
         if (mc.player != null && mc.level != null) {
             var p = ears(mc);
-            for (Field f : ClientFields.fields()) {
-                if (f.containsPoint(p.x, p.y, p.z)) s = Math.max(s, f.failing());
-            }
+            // (a failing field on running spread land holds nothing back: time runs there anyway)
+            if (!org.erisia.stasis.Stasis.spreadRuns(mc.level, (int) Math.floor(p.x), (int) Math.floor(p.z)))
+                for (Field f : ClientFields.fields())
+                    if (f.containsPoint(p.x, p.y, p.z)) s = Math.max(s, f.failing());
         }
         strain += (s - strain) * Math.min(1, dt / 0.6);
         double t = (now - crackAt) / 1e9;

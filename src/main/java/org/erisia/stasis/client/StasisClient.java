@@ -106,6 +106,10 @@ public final class StasisClient {
             e.register(java.util.List.of(net.minecraft.client.color.block.BlockTintSources.water()), org.erisia.stasis.StasisRegistry.STILLED_WATER_BLOCK.get()));
         modBus.addListener(net.neoforged.neoforge.client.event.TextureAtlasStitchedEvent.class, FrozenSprites::stitched);
         org.erisia.stasis.ClientFields.onChange = FrozenSprites::fieldsChanged;
+        // spreading mode: re-mesh and relight only where P or a new rank tile changed the answer; forget it all on leaving
+        org.erisia.stasis.Spread.clientListener = FrozenSprites.SPREAD;
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class,
+            e -> org.erisia.stasis.Spread.clientClear());
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> FrozenSprites.tick(net.minecraft.client.Minecraft.getInstance()));
         org.erisia.stasis.TowerClientHooks.onUpdate = be -> {
             TowerRenderer.updated(be);

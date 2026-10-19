@@ -28,6 +28,10 @@ import net.neoforged.neoforge.client.event.RegisterSpriteSourcesEvent;
 import net.neoforged.neoforge.client.event.TextureAtlasStitchedEvent;
 import org.erisia.stasis.Field;
 import org.erisia.stasis.FrozenTextures;
+import org.erisia.stasis.Spread;
+import org.erisia.stasis.SpreadMap;
+import org.erisia.stasis.SpreadRanks;
+import org.erisia.stasis.SpreadTiles;
 import org.erisia.stasis.Stasis;
 import org.erisia.stasis.StasisDelvers;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
@@ -48,7 +52,9 @@ import java.util.Optional;
  * <li><b>Meshing:</b> chunk meshing (SectionCompilerMixin, FluidRendererMixin; worker threads) draws a block whose
  * whole block is stopped (rateAtLand 0: eddies and deeps drifting by mustn't re-mesh) with the still copies.</li>
  * <li><b>Re-meshing:</b> when the fields change shape, the sections they cover (before and after) are re-meshed, at
- * most once a second (a collapse changes the field every 5 ticks).</li>
+ * most once a second (a collapse changes the field every 5 ticks). In spreading mode, when P moves (about once a
+ * second), only the loaded chunks whose [chunkMin1024, chunkMax1024] it crossed, and when a rank tile arrives, the
+ * loaded chunks under it that aren't wholly running; their flames are relit too.</li>
  * </ul>
  */
 public final class FrozenSprites {
@@ -291,16 +297,37 @@ public final class FrozenSprites {
         PENDING.addAll(Field.changedShapes(old, now));
     }
 
+    /** P moved over [movedLo, movedHi) (rank1024 units; empty while movedLo > movedHi), and tiles that arrived. */
+    private static long movedLo = Long.MAX_VALUE, movedHi = Long.MIN_VALUE;
+    private static final it.unimi.dsi.fastutil.longs.LongOpenHashSet ARRIVED = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+
+    /** Spread.clientListener (main thread: the payload handlers). */
+    static final Spread.ClientListener SPREAD = new Spread.ClientListener() {
+        @Override
+        public void moved(long lo1024, long hi1024) {
+            movedLo = Math.min(movedLo, lo1024);
+            movedHi = Math.max(movedHi, hi1024);
+        }
+
+        @Override
+        public void tile(int tx, int tz) {
+            ARRIVED.add(SpreadTiles.key(tx, tz));
+        }
+    };
+
     static void tick(Minecraft mc) {
         ticks++;
-        if (PENDING.isEmpty()) return;
+        boolean spread = movedLo <= movedHi || !ARRIVED.isEmpty();
+        if (PENDING.isEmpty() && !spread) return;
         ClientLevel level = mc.level;
         if (level == null) {
             PENDING.clear();
+            clearSpread();
             return;
         }
         if (ticks - lastFlush < FLUSH_TICKS) return;
         lastFlush = ticks;
+        if (spread) spreadMoved(mc, level);
         if (Stasis.stops(level) && !frozen.isEmpty()) {
             int minY = level.getMinSectionY(), maxY = level.getMaxSectionY();
             for (Field f : PENDING) {
@@ -315,5 +342,48 @@ public final class FrozenSprites {
             }
         }
         PENDING.clear();
+    }
+
+    private static void clearSpread() {
+        movedLo = Long.MAX_VALUE;
+        movedHi = Long.MIN_VALUE;
+        ARRIVED.clear();
+    }
+
+    /**
+     * Re-mesh and relight the loaded chunks whose answer the spread changed: P crossed their [chunkMin1024,
+     * chunkMax1024] (exact: a chunk lies in one bilinear patch per axis), or a tile arrived over them and they aren't
+     * wholly running (before it they read MISSING: running).
+     */
+    static void spreadMoved(Minecraft mc, ClientLevel level) {
+        long lo = movedLo, hi = movedHi;
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet arrived = new it.unimi.dsi.fastutil.longs.LongOpenHashSet(ARRIVED);
+        clearSpread();
+        Spread.State s = Spread.client;
+        SpreadRanks m = s.map();
+        if (m == null || mc.player == null || !Spread.active(level) || !Stasis.stops(level)) return;
+        long p1024 = (long) s.p() * SpreadMap.SCALE;
+        int r = mc.options.getEffectiveRenderDistance() + 1;
+        int pcx = mc.player.getBlockX() >> 4, pcz = mc.player.getBlockZ() >> 4;
+        int minY = level.getMinSectionY(), maxY = level.getMaxSectionY();
+        boolean mesh = !frozen.isEmpty();
+        int n = 0;
+        for (int cx = pcx - r; cx <= pcx + r; cx++)
+            for (int cz = pcz - r; cz <= pcz + r; cz++) {
+                if (level.getChunkSource().getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false) == null) continue;
+                long min = SpreadMap.chunkMin1024(m, cx, cz);
+                boolean changed = lo <= hi && min < hi && SpreadMap.chunkMax1024(m, cx, cz) >= lo;
+                if (!changed && !arrived.isEmpty() && min < p1024) {
+                    // the tiles whose cells this chunk's columns read (cells floor((x - 16) / 32) and the next)
+                    int[] tx = SpreadTiles.tilesFor(cx << 4, (cx << 4) + 15), tz = SpreadTiles.tilesFor(cz << 4, (cz << 4) + 15);
+                    for (int i = tx[0]; i <= tx[1] && !changed; i++)
+                        for (int k = tz[0]; k <= tz[1] && !changed; k++) changed = arrived.contains(SpreadTiles.key(i, k));
+                }
+                if (!changed) continue;
+                if (mesh) level.setSectionRangeDirty(cx, minY, cz, cx, maxY, cz);
+                org.erisia.stasis.Flames.relightChunk(level, cx, cz, null);
+                n++;
+            }
+        if (n > 0) LOG.debug("Spread: re-meshed {} chunks (P {})", n, s.p());
     }
 }

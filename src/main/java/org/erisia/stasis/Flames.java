@@ -274,7 +274,7 @@ public final class Flames {
     }
 
     /** checkBlock every flame in a loaded chunk (within the y range {min, max} if given). */
-    static int relightChunk(Level level, int cx, int cz, int[] ys) {
+    public static int relightChunk(Level level, int cx, int cz, int[] ys) {
         LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
         if (chunk == null) return 0;
         LevelChunkSection[] sections = chunk.getSections();

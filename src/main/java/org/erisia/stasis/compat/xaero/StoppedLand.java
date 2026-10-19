@@ -7,7 +7,10 @@ import net.minecraft.world.level.Level;
 import org.erisia.stasis.ClientFields;
 import org.erisia.stasis.Stasis;
 
-/** Shared logic of the Xaero map highlighters (λ-Nero): which chunks are stopped land, and their tint. */
+/**
+ * Shared logic of the Xaero map highlighters (λ-Nero): which chunks are stopped land, and their tint. The land's rate
+ * (Stasis.rateAtLand): drifting deeps passing over running spread land are weather, not land, and would flicker.
+ */
 final class StoppedLand {
     private StoppedLand() {
     }
@@ -25,7 +28,7 @@ final class StoppedLand {
         Level l = level(dim);
         if (l == null) return false;
         BlockPos centre = new BlockPos((chunkX << 4) + 8, l.getSeaLevel(), (chunkZ << 4) + 8);
-        return !Stasis.isRunning(l, centre.getX(), centre.getY(), centre.getZ());
+        return Stasis.rateAtLand(l, centre.getX(), centre.getY(), centre.getZ()) <= 0;
     }
 
     /** At a block column (at the player's height, else sea level). */
@@ -34,15 +37,20 @@ final class StoppedLand {
         if (l == null) return false;
         var p = Minecraft.getInstance().player;
         int y = p != null ? p.getBlockY() : l.getSeaLevel();
-        return !Stasis.isRunning(l, x, y, z);
+        return Stasis.rateAtLand(l, x, y, z) <= 0;
     }
 
     static boolean anyStopped(ResourceKey<Level> dim) {
         return level(dim) != null;
     }
 
-    /** Changes when the fields change (the world map caches region highlights by this). */
+    /**
+     * Changes when the fields change (the world map caches region highlights by this), and in spreading mode when P has
+     * moved by a two-thousandth of the map (~1.4 min at 48 h: P itself moves every second) or rank tiles came or went.
+     */
     static int fieldsHash() {
-        return ClientFields.fields().hashCode();
+        var s = org.erisia.stasis.Spread.client;
+        int spread = s.map() == null ? 0 : 31 * (s.p() / Math.max(1, s.count() / 2000)) + org.erisia.stasis.Spread.clientTiles.generation();
+        return ClientFields.fields().hashCode() * 31 + spread;
     }
 }

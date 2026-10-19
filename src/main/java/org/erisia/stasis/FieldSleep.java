@@ -46,6 +46,12 @@ public final class FieldSleep {
         var p = e.getProblem();
         if (p != null && !isNightProblem(p)) return;   // (too far, obstructed, ...: vanilla's word stands)
         var pos = e.getPos();
+        // land the spreading stillness hasn't reached runs on the world's clock, fields or not: vanilla's night, unless a
+        // drifting deep stops it there
+        if (Stasis.spreadRuns(level, pos.getX(), pos.getZ())) {
+            if (!Stasis.isRunning(level, pos)) e.setProblem(STOPPED);
+            return;
+        }
         Field f = fieldAt(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
         if (f == null) {
             if (!Stasis.isRunning(level, pos)) e.setProblem(STOPPED);
@@ -58,6 +64,7 @@ public final class FieldSleep {
     static void canContinue(CanContinueSleepingEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer sp) || !(sp.level() instanceof ServerLevel level) || !Stasis.stops(level)) return;
         if (e.getProblem() != null && e.getProblem() != Player.BedSleepingProblem.OTHER_PROBLEM) return;   // (no bed: wake)
+        if (Stasis.spreadRuns(level, sp.getBlockX(), sp.getBlockZ())) return;   // (running spread land: vanilla's night)
         Field f = fieldAt(level, sp.getX(), sp.getY(), sp.getZ());
         if (f != null) e.setContinueSleeping(LocalTime.night(LocalTime.fieldClock(level, f)));
     }
@@ -66,6 +73,8 @@ public final class FieldSleep {
     static void tick(LevelTickEvent.Pre e) {
         if (!(e.getLevel() instanceof ServerLevel level) || !Stasis.stops(level)) return;
         for (Field f : FieldData.get(level).fields()) {
+            // a field on running spread land keeps the world's clock: the world's own sleep wakes its sleepers
+            if (Stasis.spreadRuns(level, (int) Math.floor(f.x()), (int) Math.floor(f.z()))) continue;
             List<ServerPlayer> in = new ArrayList<>();
             boolean all = true;
             for (ServerPlayer sp : level.players()) {
