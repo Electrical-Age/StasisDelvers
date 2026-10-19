@@ -1,9 +1,6 @@
 package org.erisia.stasis.client;
 
-import java.util.Map;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SoundInstance;
-import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.sounds.SoundSource;
 import org.erisia.stasis.ClientFields;
 import org.erisia.stasis.Field;
@@ -20,11 +17,6 @@ import org.lwjgl.openal.EXTEfx;
  */
 public final class AntiSound {
     private AntiSound() {}
-
-    /** Implemented by SoundEngineMixin. */
-    public interface Engine {
-        Map<SoundInstance, ChannelAccess.ChannelHandle> stasis$channels();
-    }
 
     static final double CUT = 0.17, LOWS = 0.45, HIGHS = 1.1;   // seconds: silence, then lows and highs back
 
@@ -111,8 +103,7 @@ public final class AntiSound {
         float h = hf;
         boolean clear = h >= 0.995;
         appliedHf = clear ? 1 : h;
-        if (!(mc.getSoundManager().soundEngine instanceof Engine e)) return;
-        for (var en : e.stasis$channels().entrySet()) {
+        for (var en : mc.getSoundManager().soundEngine.instanceToChannel.entrySet()) {
             if (!affects(en.getKey().getSource())) continue;
             en.getValue().execute(ch -> {
                 try {
