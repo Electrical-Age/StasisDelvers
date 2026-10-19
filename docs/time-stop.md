@@ -4,11 +4,15 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 
 ## Classes
 - `Stasis.java`: the rule. It answers "how fast does time run at this block?"
-  - `rateAt(level, x, y, z)` with eddies; `rateAtSteady` without them (for flame light, EA nodes and towers).
-    `spawnsHere` ignores the new-chunk grace.
-  - Order inside `rateAt(level,x,y,z,eddies,grace)`:
+  - `rateAt(level, x, y, z)` with eddies; `rateAtSteady` without them (EA nodes, towers, Freezing's eddy test);
+    `rateAtLand` without eddies and without drifting deeps over running spread land (flame light, chunk meshing,
+    Xaero: caches nobody refreshes as weather passes; safe off the main thread). `spawnsHere` ignores the
+    new-chunk grace. In stopped mode `rateAtLand` = `rateAtSteady`.
+  - Order inside `rateAt(level,x,y,z,eddies,grace,deeps)`:
     1. Not a stopped dimension (`stops`; in spreading mode the Nether and the End until complete): 1.
-       Spreading mode, overworld: a column the stillness hasn't reached: 1 (0 in a rift). See spreading-mode.md.
+       Spreading mode, overworld: a column the stillness hasn't reached (`spreadRuns`): 1; 0 in a rift, and 0 in a
+       drifting deep (`Deeps.stopsRunningLand`, server main thread or client) unless a field or the spawn area
+       holds the block. See spreading-mode.md.
     2. Spawn area or new-chunk grace: 1.
     3. No field in the chunk column: 0.
     4. Otherwise the fastest field with `containsBlock`, skipping eddy pockets.
@@ -17,7 +21,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
     `indexLocked` (synchronized), dropped by `invalidate`, and versioned by `version()`. The client index
     (`clientIndex`) is read without the lock.
   - Tick gate: `milli`, `runs(rate, gameTime)`, `dueTick`, `ticksNow`, `mayRunInColumn`.
-  - `sectionState`: STOPPED / RUNNING / MIXED for a 16³ section (chunk meshing and the GameTests use it).
+  - `sectionState`: STOPPED / RUNNING / MIXED for a 16³ section by `rateAtLand` (chunk meshing and the GameTests
+    use it).
   - `exemptBlockEntity`: tower master, End gateway, EA `LightBlockEntity`.
   - `nearTower` (the `TOWER_YARD` of 6 blocks); `isFrozen(Entity)` (never players, never `#stasisdelvers:unbound`).
 - `Field.java`: immutable record (id, centre, radius, failing, collapse, column, rate, seed, formedAt, amber,
@@ -96,7 +101,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 - `dueTick` lands on the delay-th running tick, and equals vanilla `now + delay` at rate 1.
   Guarded by `TickGateTest`.
 - Spawn area and new-chunk grace are checked before fields and rifts. A rift beats any field.
-- Anything that must not churn as eddies drift past uses `rateAtSteady`: EA nodes, flame light, towers.
+- Anything that must not churn as eddies drift past uses `rateAtSteady`: EA nodes, towers. Flame light and
+  meshing use `rateAtLand`, which also ignores drifting deeps over running spread land.
 - "Which field am I in?" has four answers, deliberately different:
   - `rateAt`: the fastest field that holds the whole block
   - `FieldSleep.fieldAt`: the first field holding the point

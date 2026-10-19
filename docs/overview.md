@@ -57,7 +57,8 @@ Javadocs often cite them as `notes/...`.
 
 ## Cross-cutting facts
 - **One rule:** `Stasis.rateAt` gives the rate in [0, 1]. Stopped means rate 0. Nearly every gameplay
-  hook asks it, or `rateAtSteady`, which ignores eddies.
+  hook asks it, or `rateAtSteady`, which ignores eddies, or `rateAtLand` (meshing, flame light), which also
+  ignores drifting deeps over running spread land.
 - **Both sides compute the world.** The server sends the fields, the deep seed, gate rifts and the storm
   override. The client recomputes everything else (deeps, rifts, storms, pockets, strata) from the seed, the
   synced config and game time. Java code mirrored in GLSL must stay mirrored: `Noise` against `stasis.fsh`,

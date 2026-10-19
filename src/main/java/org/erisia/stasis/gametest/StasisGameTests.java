@@ -2199,6 +2199,36 @@ public final class StasisGameTests {
                 "alive " + p.isAlive() + ", " + Freezing.describe(p));
             remove(h, p);
         }, false, true));
+        // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
+        // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
+        // the server's list of what it sent is what a client would hold)
+        CASES.put("spread_tiles_follow_player", new Spec(40, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos spawn = h.absolutePos(new BlockPos(3, 1, 4));
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(11, spawn.getX(), spawn.getZ(), 3000);
+            org.erisia.stasis.Spread.testInstall(m, m.count / 3);
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            int range = org.erisia.stasis.SpreadSync.range(level.getServer());
+            java.util.function.IntSupplier want = () -> {
+                int[] tx = org.erisia.stasis.SpreadTiles.tilesFor(p.getBlockX() - range, p.getBlockX() + range);
+                int[] tz = org.erisia.stasis.SpreadTiles.tilesFor(p.getBlockZ() - range, p.getBlockZ() + range);
+                return (tx[1] - tx[0] + 1) * (tz[1] - tz[0] + 1);
+            };
+            int[] seen = new int[3];
+            h.runAfterDelay(15, () -> {
+                seen[0] = org.erisia.stasis.SpreadSync.tilesSent(p);
+                seen[1] = want.getAsInt();
+                // (setPos: the server's tile choice reads the position; no chunk loading needed out there)
+                p.setPos(p.getX() + 3000, p.getY(), p.getZ());
+            });
+            return () -> {
+                c.check("every tile round the player was sent", seen[0] == seen[1], seen[0] + " of " + seen[1]);
+                c.check("after a long move only the new place's tiles are held", org.erisia.stasis.SpreadSync.tilesSent(p) == want.getAsInt(),
+                    org.erisia.stasis.SpreadSync.tilesSent(p) + " vs " + want.getAsInt());
+            };
+        }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range
         CASES.put("rate_command", new Spec(1, (h, c) -> () -> {
             ServerLevel level = h.getLevel();

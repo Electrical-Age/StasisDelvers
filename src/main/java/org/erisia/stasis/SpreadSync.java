@@ -25,7 +25,7 @@ public final class SpreadSync {
     }
 
     /** The blocks round a player whose columns the client must answer: the view distance plus a chunk and a margin. */
-    static int range(MinecraftServer srv) {
+    public static int range(MinecraftServer srv) {
         return (srv.getPlayerList().getViewDistance() + 1) * 16 + 32;
     }
 
@@ -135,7 +135,7 @@ public final class SpreadSync {
     }
 
     /** For tests and /stasis spread status: the tiles the server believes this player has. */
-    static int tilesSent(ServerPlayer p) {
+    public static int tilesSent(ServerPlayer p) {
         Tracked t = PLAYERS.get(p.getUUID());
         return t == null ? 0 : t.sent.size();
     }

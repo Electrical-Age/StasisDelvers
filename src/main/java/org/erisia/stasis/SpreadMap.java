@@ -32,9 +32,9 @@ import java.util.List;
  * With the grid aligned to multiples of 32 and centres at 32i + 16, every chunk lies in one bilinear patch per axis, so
  * a chunk's least and greatest rank are exactly those at its four corner columns ({@link #chunkMin1024}).
  * <p>
- * CLIENT MIRROR: the client step must answer exactly like {@link #rank1024(SpreadRanks, int, int)} (integer arithmetic,
- * so both sides agree on every column: stopped-water collision); it gets cells through a {@link SpreadRanks} of its own
- * (rank tiles sent by the server) and the shader mirrors the same bilinear.
+ * CLIENT MIRROR: the client answers through the same {@link #rank1024(SpreadRanks, int, int)} (integer arithmetic, so
+ * both sides agree on every column: stopped-water collision) from a {@link SpreadTiles} (the rank tiles the server
+ * sends), and stasis.fsh computes {@link #stilledSplit}, the same test in 32-bit integers.
  */
 public final class SpreadMap implements SpreadRanks {
     /** Cell size in blocks; cell (i, k) covers x 32i..32i+31, z 32k..32k+31 (global, independent of spawn). */
@@ -90,7 +90,7 @@ public final class SpreadMap implements SpreadRanks {
     }
 
     /**
-     * THE lookup (both sides; the client step mirrors it): the continuous rank at block column (x, z), times SCALE,
+     * THE lookup (both sides: the client reads its SpreadTiles through it): the continuous rank at block column (x, z), times SCALE,
      * bilinear between the four nearest cell centres (block 32i + 16). The column is stilled at progress P iff this is
      * below P * SCALE. Exact integer arithmetic.
      */

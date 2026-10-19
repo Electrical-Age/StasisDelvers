@@ -5,10 +5,11 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 (`RegisterPayloadHandlersEvent`).
 
 ## Protocol version
-- `e.registrar("10")`. Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+- `e.registrar("11")`. Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
   are then refused at login instead of failing mid-game.
   - 9 added `dig_stilled`.
   - 10 removed the unused `chunk_clocks`.
+  - 11 added `spread_state`, `spread_tile`, `spread_forget` (spreading mode's client sync).
 - The report channels sit under `r.optional()`, so a peer without them still connects; the bug report then
   says `no_channel`.
 - `send(player, payload)` checks `connection.hasChannel(payload)`. Vanilla clients and GameTest mock players
@@ -24,6 +25,9 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 | `FieldClocks(map id → double[])` | `field_clocks` | `LocalTime.tick` every 40 ticks | `LocalTime.Client.fieldClocks` |
 | `Gutters(map pos → light)` | `gutters` | `Flames` (on watch and on change) | `Flames.clientGutters` |
 | `Bolt(from, to, seed)` | `bolt` | `TowerBlockEntity.bolt/boltOut/freeze` | `boltSink` → `client/BoltRenderer` + `client/AntiSound` |
+| `SpreadState(reset, map, count, p, hard, complete)` | `spread_state` | `SpreadSync.tick`: to every player when the state changes (P at most once a second, `STATE_EVERY`; completion, hard mode and P going back at once), and with `reset` on login, respawn, dimension change and a new map | `Spread.clientState` (resets drop the tiles; a P change tells `FrozenSprites` what to re-mesh) |
+| `SpreadTile(tx, tz, ranks)` | `spread_tile` | `SpreadSync.tiles`: the overworld player's tiles out to `range` (view distance + 1 chunk + 32 blocks), nearest first, 4 a tick | `Spread.clientTile` → `Spread.clientTiles` |
+| `SpreadForget(keys)` | `spread_forget` | `SpreadSync.tiles`: tiles more than one tile beyond the needed ones | `Spread.clientForget` |
 | `ConsoleState(pos, v, text)` | `console_state` | the console handlers below | `consoleSink` → `client/ConsoleScreen` |
 | `ReportState(nonce, json)` | `report_state` (optional) | the `ReportQuery` handler | `reportSink` → `client/report/BugReport.reply` |
 
@@ -49,17 +53,26 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 - `ConsoleState.text` uses the default string limit.
 - `Fields` sends every field of the level each time. That is fine for tens of fields; the shader only draws
   13 (client-rendering.md).
+- `SpreadTile` is always 1024 ranks (`SpreadTiles.TILE_CELLS`; encoding another size throws). Each is `rank + 1` as a
+  VarInt (1-3 bytes for maps up to 30 km: ~3 KB a tile), or one value for a uniform tile (all -1 beyond the map's
+  radius: a few bytes). A login sends 1-9 tiles depending on the view distance.
 
 ## Tests
 - `src/test/java/org/erisia/stasis/NetCodecTest.java`: a round trip for every payload codec
   (`fieldsRoundTrip`, `gateRiftsRoundTrip`, `stormOverrideRoundTrips`, `consolePayloadsRoundTrip`,
   `digStilledRoundTrips`, `reportPayloadsRoundTrip`, `reportStateOverTheCapThrows`, `freezeRoundTrips`,
-  `clockMapsRoundTrip`, `boltRoundTrips`).
+  `clockMapsRoundTrip`, `boltRoundTrips`, `spreadStateRoundTrips`, `spreadTileRoundTrips`, `spreadTileIsSmall`,
+  `spreadTileRefusesAWrongSize`, `spreadForgetRoundTrips`).
+  - `SpreadTilesTest.clientLookupIsTheServers`: tiles cut from a map, through the codec, answer like the map.
+- GameTest `spread_tiles_follow_player`: the server's list of a (mock) player's tiles follows the player.
   - `sentFieldsAgreeOnBlocks`: a field after the wire codec gives the same `containsBlock` answers.
 - GameTest `tower_console_access` calls `StasisNet.consoleTower` directly. The serverbound handlers
   themselves have no test.
 
 ## Gotchas
+- The server's per-player tile list (`SpreadSync.Tracked.sent`) must stay the client's: tiles are only dropped by
+  `SpreadForget` (never by the client on its own), and every reset (login, respawn, dimension change, a new map)
+  clears both. A mock player's list fills though it gets nothing; that's what the GameTest reads.
 - `FIELD` (the wire codec for `Field`) is separate from `Field.CODEC` (the save codec). A new `Field`
   component needs both, plus a protocol bump. `NetCodecTest` catches a missing wire field only if its
   generator varies it.
