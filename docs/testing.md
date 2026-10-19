@@ -12,7 +12,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 - `stasis-build.sh test`: unit and property tests of the mod only.
 - `stasis-build.sh :towergen:test`, and `./gradlew :towergen:slowTest [-Dtowergen.random=N -Dtowergen.seed=S]`.
 - `stasis-build.sh runGameTestServer`: every GameTest, headless. It exits non-zero if a required test fails.
-  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 120 at HEAD).
+  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 122 at HEAD).
 - One GameTest by hand: `./gradlew runServer` (or `runClient`), then `/test run stasisdelvers:<name>`.
   `neoforge.enabledGameTestNamespaces` is set for every run config.
 
@@ -47,7 +47,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 ## 3. GameTests (`src/main/java/org/erisia/stasis/gametest/StasisGameTests.java`)
 - Registration: a static `CASES` map (name → `Spec(ticks, body, field, isolated)`), registered through a
   `TEST_FUNCTION` `DeferredRegister` and `RegisterGameTestsEvent` in `register(modBus)`.
-  - 118 `CASES.put` calls, two of them in loops: 120 tests.
+  - 120 `CASES.put` calls, two of them in loops: 122 tests.
   - Each test gets the structure `stasisdelvers:floor_16x6x8` (`src/main/resources/data/stasisdelvers/structure/floor_16x6x8.nbt`,
     made by `script/gen_test_structures.py`) and `maxTicks = ticks + 40`.
   - `isolated` tests (towers, big fields) get their own environment `alone_<name>`, so they run in a batch
@@ -62,7 +62,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
   - `--tests stasisdelvers:*`, because EA's own GameTests can't run in stopped time
 - Test hooks in production code: `Spread.testInstall`/`testReset`/`testClock`/`testClockRestore`/`testServerState`/`testSecondsUntilStill`,
   `HardMode.testReset`/`testFlashed`, `HardRifts.testQueued`/`testReload`/`testChunks`, `PendingGates.testRoom`/`testReload`/`testForget`, `Gates.testForget`/`gateForTest`/`testRegister`, `Lance.testCooldown`/`testForget`/`testPad`/`testSpeed`, `LanceBlockEntity.testSupplyW`/`testSpeed`/`testStorm`/`testTick`, `HardMode.evictsOnLogin`, `Freezing.inGrace`, `EndBarrier.check`, `StasisConfig.spreadHoursForTests`, `FrontWarnings.check`/`describe`, `SpawnMove.testArm`, `Spread.Clock.testSpawnMove`, `TowerStructure.syncBuild`, `Pockets.TEST`/`TEST_STRATA`, `Storms.TEST`,
-  `Deeps.testDeeps`, `Crystals.FACE_SHARE`, `FieldData.testDeepSeed`, `NewChunkGrace.testsStarted`, and
+  `Deeps.testDeeps`, `DeepFeature.oreForTest`, `Crystals.FACE_SHARE`, `FieldData.testDeepSeed`, `NewChunkGrace.testsStarted`, and
   `TowerBlockEntity.test*`.
   - `StasisDelvers` registers the GameTests unconditionally, so they and these hooks ship in the
     production jar.

@@ -34,6 +34,28 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
 - `Strata.java`: four shapes (`Shape`: SADDLE, STAIRCASE, SPLASH, PODS), weighted by config `strataShapes`
   (`setWeights`). `shapeOf`, `bounds`, `at(deep, x, y, z)` returns the strata class. SADDLE roots are cached
   (`roots`).
+- Rift ores (Baughn; λ-Nero asked for ore in riftstone): `DeepFeature.ore` turns 0.6 % of the shattered shell (in
+  `carve`) and of the strata rock (in `strata`) into ore (config `riftOres`, `riftOreRate`; new chunks only). It draws
+  over the sources in `c:ores_in_ground/stone` and `/deepslate` (the pack's ores included; diamond and emerald at 0.15,
+  gold, lapis and redstone at 0.5), then places each source's **riftstone ore** (`RiftOres.variantOf`), or the source
+  itself when it has none.
+  - `RiftOres.java` registers one riftstone ore per material from `RiftOreTable.java` (generated): coal, copper, iron,
+    gold, redstone, lapis, diamond, emerald, tin (EnergizedPower), silver (Occultism), sal ammoniac (Theurgy). Each
+    stands in for its stone and deepslate source: hardness 3/3 like every stone source, the sources' XP (redstone is a
+    `RedStoneOreBlock`, so it lights up when touched).
+  - Loot (`data/stasisdelvers/loot_table/blocks/riftstone_<m>_ore.json`): silk touch gives the riftstone ore, anything
+    else runs the stone source's loot table (Fortune included). A pack mod's table loads only with that mod
+    (`neoforge:mod_loaded`): a reference to a missing loot table stops the server.
+  - Tags (block and item): the sources' own (`c:ores/<m>`, `minecraft:<m>_ores`, `c:ore_rates/*`, `needs_*_tool`),
+    `mineable/pickaxe` and `c:ores_in_ground/riftstone`; never `c:ores_in_ground/stone|deepslate`, or the scatter would
+    draw them as sources. Vanilla ores smelt per item, so their smelting and blasting recipes are copied; tin and
+    silver smelt by `c:ores/<m>`, and EA's macerator uses tags. Not covered: Theurgy's liquefaction of coal ore (per
+    item).
+  - `tools/ores/gen_riftstone_ores.py` regenerates all of it (textures: the stone ore's pixels off stone's grey levels,
+    over `riftstone.png`; models, blockstates, items, names, loot tables, tags, recipes, `RiftOreTable.java`) from the
+    vanilla client jar, NeoForge and the pack's mods (default `/srv/minecraft-lab/spawn/alt-server/mods`). Rerun it
+    when the pack gains an ore in those tags; it stops on a material it has no XP entry for. `--preview PNG` writes a
+    contact sheet.
 - `TimeScars.java`: water and lava falls stopped mid-fall, hanging gravel, arrow volleys; `cropAge` for
   `StructureTemplateMixin`. Chunks with scars get no new-chunk grace.
 - `Ruins.java`: vanilla structure pieces (village houses, shipwrecks, fossils) stamped 1-2 per rift into the
@@ -84,6 +106,8 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
   pure functions and the same chunk-local rule (each chunk only its own columns, any order). Ruined cottages: `ruined_cottage_core`, `ruined_cottage_templates`.
 - End sites (registration only): `end_sites_replace_cities`.
 - Crystals in worldgen: `rift_crystal_grades`.
+- Rift ores: `riftstone_ore_drops` (drops, silk touch, Fortune, tags, hardness against the vanilla sources),
+  `riftstone_ore_scatter` (the draw, and a test rift's shell, give riftstone ores only).
 
 ## Gotchas
 - Some config keys look worldgen-only but are also read at runtime. Changing them mid-world desyncs the game
