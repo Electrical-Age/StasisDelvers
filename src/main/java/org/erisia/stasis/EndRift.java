@@ -264,6 +264,7 @@ public final class EndRift {
         }
         for (ServerPlayer p : end.players())
             p.sendOverlayMessage(Component.literal("The island shudders: that crystal was holding part of it together.").withStyle(ChatFormatting.DARK_PURPLE));
+        Spread.refresh(end.getServer());   // the End event begins (the clients' fog)
         return true;
     }
 

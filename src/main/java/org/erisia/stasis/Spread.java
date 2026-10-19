@@ -38,10 +38,13 @@ public final class Spread {
     /**
      * One side's view: the map (null until built or received), the progress, hard mode, complete; endStill: the End
      * follows the base rules (stopped) since hard mode's End event teleported everyone out (HardMode); stormOrigin: the
-     * storm schedule's origin (game seconds at the hard-mode instant; NaN before hard mode: no storms; Storms.origin).
+     * storm schedule's origin (game seconds at the hard-mode instant; NaN before hard mode: no storms; Storms.origin);
+     * endEvent: the End is breaking up, from the first pillar's stage until the flash (HardMode.endEventOn: the client
+     * pushes the End's fog out so the show can be seen, AdventurAgent).
      */
-    public record State(SpreadRanks map, int count, int p, boolean hard, boolean complete, boolean endStill, double stormOrigin) {
-        static final State EMPTY = new State(null, 0, 0, false, false, false, Double.NaN);
+    public record State(SpreadRanks map, int count, int p, boolean hard, boolean complete, boolean endStill, boolean endEvent,
+                        double stormOrigin) {
+        static final State EMPTY = new State(null, 0, 0, false, false, false, false, Double.NaN);
     }
 
     /** The server's state (the overworld of the running server). */
@@ -64,10 +67,11 @@ public final class Spread {
 
     // ---- the client (StasisNet handlers, main thread)
 
-    static void clientState(boolean reset, boolean hasMap, int count, int p, boolean hard, boolean complete, boolean endStill, double stormOrigin) {
+    static void clientState(boolean reset, boolean hasMap, int count, int p, boolean hard, boolean complete, boolean endStill, boolean endEvent,
+                            double stormOrigin) {
         State old = client;
         if (reset || !hasMap) clientTiles.clear();
-        client = new State(hasMap ? clientTiles : null, count, p, hard, complete, endStill, stormOrigin);
+        client = new State(hasMap ? clientTiles : null, count, p, hard, complete, endStill, endEvent, stormOrigin);
         // answers cached per section (FrozenSprites) re-ask; chunk meshes and flame light are redone where P moved
         Stasis.bumpVersion();
         ClientListener l = clientListener;
@@ -233,7 +237,8 @@ public final class Spread {
         }
         double origin = k.hard ? k.hardGame : Double.NaN;
         boolean endStill = k.hard && !HardMode.holdsEndOpen();
-        if (p == s.p() && complete == s.complete() && k.hard == s.hard() && endStill == s.endStill()
+        boolean endEvent = !endStill && (k.hard ? HardMode.holdsEndOpen() : srv.getLevel(Level.END) instanceof ServerLevel end0 && EndRift.begun(end0));
+        if (p == s.p() && complete == s.complete() && k.hard == s.hard() && endStill == s.endStill() && endEvent == s.endEvent()
             && Double.compare(origin, s.stormOrigin()) == 0) return;
         // completion stops the Nether and the End, and the End event's end the End: players there who were safe get the
         // usual grace (as a field going)
@@ -244,12 +249,12 @@ public final class Spread {
         // the front passing over a player who stood in running land: the same grace as a field going (Baughn: leeway,
         // AdventurAgent check 6: a player 2.5 blocks inside stilled land dies in ~5 s without it)
         List<ServerPlayer> overrun = p > s.p() && !safe.containsKey(ow) ? Freezing.running(ow) : null;
-        server = new State(s.map(), s.count(), p, k.hard, complete, endStill, origin);
+        server = new State(s.map(), s.count(), p, k.hard, complete, endStill, endEvent, origin);
         // nothing on the server caches a P-dependent answer (the field index is fields only, StaticDeeps' section cache
         // is geometry, and Stasis.version is read by client chunk meshing only), so no version bump here: a global bump
         // every second would only make clients re-ask. The clients hear of P at most once a second (SpreadSync) and
         // re-mesh just the chunks whose [chunkMin1024, chunkMax1024] it crossed.
-        SpreadSync.stateChanged(complete != s.complete() || k.hard != s.hard() || p < s.p() || endStill != s.endStill()
+        SpreadSync.stateChanged(complete != s.complete() || k.hard != s.hard() || p < s.p() || endStill != s.endStill() || endEvent != s.endEvent()
             || Double.compare(origin, s.stormOrigin()) != 0);
         // flame light is cached in the light engine: relight the loaded chunks the front just crossed (chunks loaded
         // later relight on load, Flames.chunkLoad)
@@ -328,7 +333,7 @@ public final class Spread {
     }
 
     private static void install(ServerLevel ow, SpreadMap m) {
-        server = new State(m, m.count, 0, false, false, false, Double.NaN);
+        server = new State(m, m.count, 0, false, false, false, false, Double.NaN);
         SpreadSync.mapInstalled();
         lastNanos = 0;
         update(ow, Clock.get(ow));
@@ -393,6 +398,11 @@ public final class Spread {
         return server.hard();
     }
 
+    /** Is the End event on, as the server's state last said (the clients' fog; GameTests)? */
+    public static boolean endEventNow() {
+        return server.endEvent();
+    }
+
     /** Has hard mode begun (server; the saved clock, also while a test map is installed)? */
     public static boolean hard(MinecraftServer srv) {
         return Clock.get(srv.overworld()).hard;
@@ -438,7 +448,7 @@ public final class Spread {
         }
         testing = true;
         StasisConfig.spreading = true;
-        server = new State(m, m.count, p, false, false, false, Double.NaN);
+        server = new State(m, m.count, p, false, false, false, false, Double.NaN);
         SpreadSync.mapInstalled();
         Stasis.bumpVersion();
     }

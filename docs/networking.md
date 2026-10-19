@@ -5,7 +5,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 (`RegisterPayloadHandlersEvent`).
 
 ## Protocol version
-- `e.registrar("12")`. Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+- `e.registrar("13")`. Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
   are then refused at login instead of failing mid-game.
   - 9 added `dig_stilled`.
   - 10 removed the unused `chunk_clocks`.
@@ -26,7 +26,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 | `FieldClocks(map id → double[])` | `field_clocks` | `LocalTime.tick` every 40 ticks | `LocalTime.Client.fieldClocks` |
 | `Gutters(map pos → light)` | `gutters` | `Flames` (on watch and on change) | `Flames.clientGutters` |
 | `Bolt(from, to, seed)` | `bolt` | `TowerBlockEntity.bolt/boltOut/freeze` | `boltSink` → `client/BoltRenderer` + `client/AntiSound` |
-| `SpreadState(reset, map, count, p, hard, complete, endStill, stormOrigin)` | `spread_state` | `SpreadSync.tick`: to every player when the state changes (P at most once a second, `STATE_EVERY`; completion, hard mode, the End stilling, the storms' origin and P going back at once), and with `reset` on login, respawn, dimension change and a new map | `Spread.clientState` (resets drop the tiles; a P change tells `FrozenSprites` what to re-mesh; `stormOrigin` feeds `Storms.clientOrigin`) |
+| `SpreadState(reset, map, count, p, hard, complete, endStill, endEvent, stormOrigin)` | `spread_state` | `SpreadSync.tick`: to every player when the state changes (P at most once a second, `STATE_EVERY`; completion, hard mode, the End stilling, the End event, the storms' origin and P going back at once), and with `reset` on login, respawn, dimension change and a new map | `Spread.clientState` (resets drop the tiles; a P change tells `FrozenSprites` what to re-mesh; `stormOrigin` feeds `Storms.clientOrigin`; `endEvent` drives `client/EndEventFog`) |
 | `SpreadTile(tx, tz, ranks)` | `spread_tile` | `SpreadSync.tiles`: the overworld player's tiles out to `range` (view distance + 1 chunk + 32 blocks), nearest first, 4 a tick | `Spread.clientTile` → `Spread.clientTiles` |
 | `SpreadForget(keys)` | `spread_forget` | `SpreadSync.tiles`: tiles more than one tile beyond the needed ones | `Spread.clientForget` |
 | `ConsoleState(pos, v, text)` | `console_state` | the console handlers below | `consoleSink` → `client/ConsoleScreen` |

@@ -145,11 +145,11 @@ class NetCodecTest {
     @Property(tries = 200)
     void spreadStateRoundTrips(@ForAll boolean reset, @ForAll boolean map, @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int count,
                                @ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 30_000_000) int p, @ForAll boolean hard, @ForAll boolean complete,
-                               @ForAll boolean endStill, @ForAll double stormOrigin) {
-        var s = new StasisNet.SpreadState(reset, map, count, p, hard, complete, endStill, stormOrigin);
+                               @ForAll boolean endStill, @ForAll boolean endEvent, @ForAll double stormOrigin) {
+        var s = new StasisNet.SpreadState(reset, map, count, p, hard, complete, endStill, endEvent, stormOrigin);
         assertEquals(s, trip(StasisNet.SpreadState.CODEC, s));
         // before hard mode: no origin (NaN) comes back as NaN
-        var none = new StasisNet.SpreadState(reset, map, count, p, false, complete, false, Double.NaN);
+        var none = new StasisNet.SpreadState(reset, map, count, p, false, complete, false, endEvent, Double.NaN);
         assertTrue(Double.isNaN(trip(StasisNet.SpreadState.CODEC, none).stormOrigin()));
     }
 

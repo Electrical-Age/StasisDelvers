@@ -76,11 +76,11 @@ public final class StasisNet {
      * moves (at most once a second) and on those occasions.
      */
     public record SpreadState(boolean reset, boolean map, int count, int p, boolean hard, boolean complete, boolean endStill,
-                              double stormOrigin) implements CustomPacketPayload {
+                              boolean endEvent, double stormOrigin) implements CustomPacketPayload {
         public static final Type<SpreadState> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "spread_state"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SpreadState> CODEC = StreamCodec.of(
             (buf, s) -> {
-                buf.writeByte((s.reset() ? 1 : 0) | (s.map() ? 2 : 0) | (s.hard() ? 4 : 0) | (s.complete() ? 8 : 0) | (s.endStill() ? 16 : 0));
+                buf.writeByte((s.reset() ? 1 : 0) | (s.map() ? 2 : 0) | (s.hard() ? 4 : 0) | (s.complete() ? 8 : 0) | (s.endStill() ? 16 : 0) | (s.endEvent() ? 32 : 0));
                 buf.writeVarInt(s.count());
                 buf.writeVarInt(s.p());
                 buf.writeDouble(s.stormOrigin());
@@ -88,7 +88,7 @@ public final class StasisNet {
             buf -> {
                 int f = buf.readByte();
                 return new SpreadState((f & 1) != 0, (f & 2) != 0, buf.readVarInt(), buf.readVarInt(), (f & 4) != 0, (f & 8) != 0, (f & 16) != 0,
-                    buf.readDouble());
+                    (f & 32) != 0, buf.readDouble());
             });
 
         @Override
@@ -371,7 +371,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("12");   // 12: spread_state carries the End's stillness and the storms' origin (hard mode)
+            var r = e.registrar("13");   // 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -412,7 +412,7 @@ public final class StasisNet {
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
             r.playToClient(SpreadState.TYPE, SpreadState.CODEC, (p, ctx) ->
-                Spread.clientState(p.reset(), p.map(), p.count(), p.p(), p.hard(), p.complete(), p.endStill(), p.stormOrigin()));
+                Spread.clientState(p.reset(), p.map(), p.count(), p.p(), p.hard(), p.complete(), p.endStill(), p.endEvent(), p.stormOrigin()));
             r.playToClient(SpreadTile.TYPE, SpreadTile.CODEC, (p, ctx) -> Spread.clientTile(p.tx(), p.tz(), p.ranks()));
             r.playToClient(SpreadForget.TYPE, SpreadForget.CODEC, (p, ctx) -> Spread.clientForget(p.tiles()));
             // optional per channel: a peer without the bug-report channels (same network version) still connects

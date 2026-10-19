@@ -240,7 +240,8 @@ islands. `EndRiftPlan.java` (pure) and `EndRift.java` (the server side).
   the finale) until the flash. Meanwhile a survival or adventure player below the End's floor (y < 0, long before
   void damage) is rescued (`HardMode.voidRescue`, `PlayerTickEvent.Post`): put on the core island's top by the fountain
   (`heart`: the first solid column 6-30 blocks out, or the arrival platform), slow falling for 5 s, "The island gives
-  way; you're thrown back to its heart." (AdventurAgent: a player in a crumbling sector fell and died.)
+  way; you're thrown back to its heart." (AdventurAgent: a player in a crumbling sector fell and died.) Clients see
+  the fog pushed out meanwhile (`State.endEvent`, below).
 - After hard mode a pillar's crystal no longer starts a stage (the finale has them all). `/stasis spread endstage` too.
 - Restart: the jobs come back from `end_rift` (pillars broken, parts lifted and placed, and per part the chunks done),
   so a part resumes from its next chunk; a chunk redone after a crash changes nothing (only the island's own blocks go,
@@ -356,7 +357,10 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
 - Drifting deeps are computed on both sides from the deep seed and game time (as in stopped mode); the client's game
   time can be a tick or so off, so at a moving deep's edge the two may disagree for a moment.
 - `SpreadState` carries `endStill` and `stormOrigin` (protocol 12), so the client's End stops with the server's and its
-  tau and storms (`Storms.clientOrigin`) match.
+  tau and storms (`Storms.clientOrigin`) match, and `endEvent` (protocol 13; `EndRift.crystalBroken` refreshes it).
+- During the End event `client/EndEventFog` (`ViewportEvent.RenderFog`, atmospheric fog in the End only) eases the
+  fog's start and end out to the render distance's over 2 s, and back after the flash (AdventurAgent: the fog hid the
+  show past ~40 blocks). **AdventurAgent to check by eye.**
 - Re-meshing: `FrozenSprites.spreadMoved` (at most once a second) re-meshes and relights the loaded chunks whose
   [`chunkMin1024`, `chunkMax1024`] the new P crossed, and those a new tile covers that aren't wholly running. Near a
   player that is a handful of chunks a minute.

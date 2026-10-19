@@ -2693,7 +2693,8 @@ public final class StasisGameTests {
             p.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(40.5, -5, 30.5), Vec3.ZERO, 0, 0,
                 net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
             c.check("before any stage: no rescue", !org.erisia.stasis.HardMode.voidRescue(p) && p.getY() < 0, String.valueOf(p.getY()));
-            c.check("a stage begins the End event", org.erisia.stasis.EndRift.crystalBroken(end, 1) && org.erisia.stasis.HardMode.endEventOn(server));
+            c.check("a stage begins the End event, told to the clients", org.erisia.stasis.EndRift.crystalBroken(end, 1)
+                && org.erisia.stasis.HardMode.endEventOn(server) && org.erisia.stasis.Spread.endEventNow());
             p.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
             c.check("creative: no rescue", !org.erisia.stasis.HardMode.voidRescue(p));
             p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);

@@ -32,6 +32,9 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Pre.class, FrozenEntities::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, RiftHum::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, EndBarrierFx::tick);   // spreading mode's End wall
+        // the End event: the End's fog pushed out so the island's breaking up can be seen (AdventurAgent)
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, EndEventFog::tick);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ViewportEvent.RenderFog.class, EndEventFog::fog);
         // the End rift (EndRift): in the End after hard mode its static core stands where the island was
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> {
             var lvl = net.minecraft.client.Minecraft.getInstance().level;
