@@ -169,7 +169,6 @@ public record DeepFeature() implements Feature {
         return changed;
     }
 
-    /** Rock the strata may replace: overworld stone, dirt, gravel (never fluids, bedrock, the rift's own shell or air). */
     /**
      * How messy a sky rift is, 0..1 (Baughn liked the first version's floating slabs, broken towers and long frozen
      * columns: "reintroduce the bug, intentionally"). Config skyMessyChance of sky rifts get some, interpolated:
@@ -198,6 +197,7 @@ public record DeepFeature() implements Feature {
         return 0.56f + 0.2f * (float) Math.max(0, Math.min(1, (dist - 0.8) / 0.9)) + 0.25f * Math.max(0, 1 - (aboveGround - 6) / 14f);
     }
 
+    /** Rock the strata may replace: overworld stone, dirt, gravel (never fluids, bedrock, the rift's own shell or air). */
     static boolean replaceable(BlockState st) {
         return st.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || st.is(net.minecraft.tags.BlockTags.DIRT) || st.is(Blocks.GRAVEL)
             || st.is(Blocks.SAND) || st.is(Blocks.CLAY) || st.is(Blocks.CALCITE) || st.is(Blocks.SMOOTH_BASALT)

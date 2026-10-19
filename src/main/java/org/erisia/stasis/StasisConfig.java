@@ -71,7 +71,7 @@ public final class StasisConfig {
         TOWER_STORE_C = b.comment("Tower store E = c * r^2 J. Default (Baughn 2026-10-14: a quarter of the old 1225, so the "
             + "doubled radius keeps the old energy): a full store runs an r 48 field for about 20 minutes.")
             .defineInRange("towerStoreC", 306.25, 1.0, 1e9);
-        TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 4 * (segments + 2)).")
+        TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 8 * (segments + 2)).")
             .defineInRange("towerMaxSegments", 30, 0, 254);
         TOWER_BOOM_STRETCH = b.comment("How far a tower's booms stretch its field towards their side: that side reaches",
                 "r * (1 + k * the longest boom's share of its allowed length). Baughn 2026-10-18: 0.5 (a full-length boom: 1.5 r).")

@@ -13,7 +13,7 @@ import org.erisia.stasis.StasisNet;
  * The tower console (CONSOLE-PLAN.md C; Baughn: part of the bottom core block's look later, no separate block): the
  * field's state, charge, power, the radii, and the controls. The target radius goes from the tower's own size to
  * +25% of the preferred range, ruinously expensive above it. OVERRIDE turns the automatic safety off (no shrinking
- * below 60% charge): arm it, then confirm within 5 s.
+ * below 60% charge): arm it, then confirm within 8 s.
  */
 public final class ConsoleScreen extends Screen {
     final BlockPos pos;

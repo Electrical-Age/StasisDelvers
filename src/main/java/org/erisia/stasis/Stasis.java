@@ -268,7 +268,8 @@ public final class Stasis {
     }
 
     /**
-     * Block entities that tick even in stopped land: tower bases (or no tower could ever start). EA's energy exporters
+     * Block entities that tick even in stopped land: tower bases (or no tower could ever start), End gateways and EA's
+     * light blocks (both time out in their tick; see below). EA's energy exporters
      * near a tower used to be here too, as their FE push into the tower ran in their block-entity tick; it runs in EA's
      * simulation now, which NodeFreezer keeps going near towers (NodeFreezer.infrastructure).
      */
@@ -282,7 +283,7 @@ public final class Stasis {
         return be instanceof mods.eln.sixnode.lampsocket.LightBlockEntity;
     }
 
-    /** How far from a tower core (its 3x3x2 blocks) EA infrastructure keeps running in stopped land (Baughn: 6). */
+    /** How far from a tower core (its 2 blocks) EA infrastructure keeps running in stopped land (Baughn: 6). */
     public static final int TOWER_YARD = 6;
 
     /**

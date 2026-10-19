@@ -129,8 +129,8 @@ public final class StasisNet {
         }
     }
 
-    /** The console's readout: v = {state, stored J, max J, in W, draw W, weather factor, preferred, min, max, target,
-     *  radius now, goal, override (0/1), target set by signal (0/1)}; text = the structure line. */
+    /** The console's readout: v = the values TowerBlockEntity.CONSOLE_NAMES names (20: state, store, power, radii,
+     *  switches, and for the asker locked / feeding / kJ fed); text = the structure line. */
     public record ConsoleState(net.minecraft.core.BlockPos pos, List<Double> v, String text) implements CustomPacketPayload {
         public static final Type<ConsoleState> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_state"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleState> CODEC = StreamCodec.composite(
@@ -327,7 +327,7 @@ public final class StasisNet {
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
-            // optional (per channel, same version): clients and servers from before bug reports still connect
+            // optional per channel: a peer without the bug-report channels (same network version) still connects
             var opt = r.optional();
             opt.playToServer(ReportQuery.TYPE, ReportQuery.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) {

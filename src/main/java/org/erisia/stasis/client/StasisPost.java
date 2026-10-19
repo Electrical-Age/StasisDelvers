@@ -32,11 +32,11 @@ public final class StasisPost {
     static DynamicTexture texture;
     /** Data texture size: 1024 x 4 (GL 3.3 only promises 1024-wide textures). */
     static final int WIDTH = 1024, ROWS = 4, SLOTS = WIDTH * ROWS;
-    /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     /** Field i's shield (amber, dropout, side): 4 slots from SHIELD_BASE + 4i. */
     static final int SHIELD_BASE = 1700;
     /** Field i's reach east, south, west, north as multiples of its radius (Field.Stretch): 4 slots from STRETCH_BASE + 4i. */
     static final int STRETCH_BASE = 1752;
+    /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
     /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
     static final int G = 8, GROUND_BASE = 2048, STATIC_GROUND_BASE = GROUND_BASE + G * G * MAX_DEEPS;

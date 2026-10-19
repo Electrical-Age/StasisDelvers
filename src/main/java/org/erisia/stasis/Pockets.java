@@ -6,7 +6,7 @@ import net.minecraft.world.level.Level;
  * Strata weather (rift stage 2, notes/rifts/STAGE2-PLAN.md): the strata under each rift is split into pockets,
  * world-aligned 12-block cubes, each with its own weather: a stochastic process (Baughn) made of epochs of 10-30
  * minutes, each with its own random number of rift spells (0-2, each after a 20 s violet warning), their lengths and
- * places, and its clear spells. Long-run shares: clear 25%, rift ~15%, mist the rest. Players can't learn a timetable. Both sides compute it from the deep seed and Deeps.time.
+ * places, and its clear spells. Long-run shares: clear 25%, rift ~15%, mist the rest. Players can't learn a timetable. Both sides compute it from the deep seed and Deeps.realTime (storms don't speed it up).
  * <p>
  * Where it applies: the strata mask, 4-block cells that touch the strata (Strata.at is a cavity or vent at one of the
  * cell's 8 corners on the 4-block lattice). Rules and visuals use the same mask, so what you see is what hits you.
@@ -68,7 +68,7 @@ public final class Pockets {
         return new Epoch(c1, c2, start, end);
     }
 
-    /** The weather of pocket (px, py, pz) of the strata of deep id at time t (s, Deeps.time). */
+    /** The weather of pocket (px, py, pz) of the strata of deep id at time t (s, Deeps.realTime). */
     public static Weather weather(int id, int px, int py, int pz, double t) {
         int P = period(id, px, py, pz);
         double s = t + phase(id, px, py, pz, P);

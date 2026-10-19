@@ -428,8 +428,8 @@ Library load 0.45 s. Mesh 0.1-3.5 ms. Python's whole pass took 0.27-0.31 s at H1
   tapers into a solid chord; hubs of braces sit inside laced legs (2026-10-17: in the member colour, no longer dark); hubs read as a dark band in colKnuckle on solid
   legs (`hubMemberColour` / colKnuckle tune it); ground hubs reach h below ground.
 - Meshes are heavy: H64max is ~110k triangles (lacing dominates). LOD (skip lacing at distance) is needed in the mod.
-- The library is 7.8 MB gz in the jar. `LibraryBin` (TGLB1, lossless, 2.0 MB gz, reads in 20 ms) exists for towerweb;
-  the mod could load it too (`LibraryBin.read`), but it doesn't yet.
+- The library ships in the jar as `LibraryBin` (TGLB1, lossless, 2.0 MB gz, reads in 20 ms; the JSON one was 7.8 MB
+  gz); the mod and towerweb both load it (`Library.shared` -> `LibraryBin.read`).
 - The interactive window was tested only under Xvfb + Mesa llvmpipe (renders, `--snap` hook); mouse, keys and the
   file-reload loop need a desktop (saya).
 

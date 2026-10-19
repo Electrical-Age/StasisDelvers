@@ -554,10 +554,6 @@ public class TowerBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    /**
-     * A lightning bolt (visual only, Baughn: it hits the tower, not players): from a random point of the upper shield
-     * to the top of the mast, with a crackle.
-     */
     /** Testing: /stasis tower charge|bolt. */
     public void testCharge(double share) {
         store.setShare(share);

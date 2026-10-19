@@ -5,8 +5,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * The Delver suit: cheap, no armour at all, keeps its wearer moving in stopped land on battery power. A full set
- * (four pieces) is needed. Charged in Electrical Age's battery chargers like any EA electrical item.
+ * The Delver suit: cheap, no armour at all, keeps its wearer moving in stopped land on battery power. A chest piece
+ * is enough in the plain Grey; in mist, deeps and near rifts each missing piece makes it worse (Suits). Charged in Electrical Age's battery chargers like any EA electrical item.
  */
 public class DelverSuitItem extends Item implements IItemEnergyBattery, TimeSuit {
     private final double chargePower, draw;

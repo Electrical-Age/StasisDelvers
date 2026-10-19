@@ -14,7 +14,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Block entities tick only in the game ticks their block's rate runs in (never where time is stopped): every ticking
- * block entity asks LevelChunk.isTicking(pos) first. Exempt ones (tower bases) always tick.
+ * block entity asks LevelChunk.isTicking(pos) first. Exempt ones (Stasis.exemptBlockEntity: tower bases, End gateways,
+ * EA's light blocks) always tick.
  */
 @Mixin(LevelChunk.class)
 public abstract class LevelChunkMixin {

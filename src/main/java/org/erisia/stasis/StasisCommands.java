@@ -36,11 +36,11 @@ final class StasisCommands {
 
     static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("stasis").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-            // a whole 3x3x2 tower core with its bottom centre at pos (setblock would place a single cell)
+            // a whole two-block tower core with its bottom block at pos (setblock would place a single cell)
             .then(Commands.literal("core").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
                 BlockPos p = BlockPosArgument.getLoadedBlockPos(c, "pos");
                 if (!TowerBlock.placeCore(c.getSource().getLevel(), p)) {
-                    c.getSource().sendFailure(Component.literal("No room for a 3x3x2 core at " + p.toShortString()));
+                    c.getSource().sendFailure(Component.literal("No room for a tower core at " + p.toShortString()));
                     return 0;
                 }
                 c.getSource().sendSuccess(() -> Component.literal("Tower core at " + p.toShortString() + "; the mast starts at "
