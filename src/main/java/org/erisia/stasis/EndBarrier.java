@@ -62,6 +62,8 @@ public final class EndBarrier {
         if (p.isPassenger()) p.stopRiding();
         p.teleportTo(back.x, back.y, back.z);
         p.setDeltaMovement(Vec3.ZERO);
+        // (the client keeps its own momentum otherwise, and would run into the wall again and again)
+        p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
         p.resetFallDistance();
         long now = level.getGameTime();
         Long last = TOLD.get(p.getUUID());
