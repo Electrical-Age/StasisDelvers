@@ -412,8 +412,11 @@ Baughn's decision 6: "Carve the full rift. It's intended as a cataclysm." `HardR
 - `spread_hard_mode_entry` (two players in the test End beyond 192 blocks of the centre, so its dragon fight stays
   asleep): the entry point enters once; P doesn't jump and status names the instant's coverage; the storms' origin is
   the instant, tau = t before it and storms are scheduled after it; the End runs until the flash; a death in the End
-  before it is a teleport home with the advancement; at the flash the other is sent home with it and the End stills;
-  then the End can't be entered. `spread_end_barrier`: past the wall with no ground on record, put just inside on the
+  before it is a teleport home with the advancement; until the flash damage is turned away (`shields`; `/kill` isn't),
+  not after; at the flash the other is sent home with it and the End stills, a dragon spawned before the entry is gone
+  with no XP orbs and the fight (if the test End has one) is over; then the End can't be entered.
+  `end_event_void_rescue`: no rescue before any stage; a stage sets the End event (and the synced flag); a creative
+  player isn't rescued; a survival one below the floor lands on solid ground by the fountain with slow falling. `spread_end_barrier`: past the wall with no ground on record, put just inside on the
   ground; after standing inside, put back there; creative passes; no wall in the stopped mode.
   `spread_end_barrier_stops`: a mock player walking and sprinting into the wall (`move`) ends at it, never past it, is
   never put back; pressing along it slides round; outside, no further out; creative passes. The mixin's suppression
