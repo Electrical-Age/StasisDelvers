@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.TickRateManager;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.HashMap;
@@ -17,7 +18,7 @@ import java.util.UUID;
  * Players in a slow field run slow (unless they wear a whole time suit: Baughn 2026-10-17): their client is sent the field's tick rate (vanilla's ticking-state packet, 20 x
  * rate), so movement, animations, mining and eating all slow down together on their screen, and the server counts the
  * player's own countdowns (mining progress, item use, attack cooldown) only in the ticks that rate runs in (miningClock
- * here, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
+ * and attackClock here, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
  * 0.2.0 "client" mode.
  * <p>
  * The player's rate is Stasis.rateAt at their feet block (the whole-block rule Freezing uses). Stopped land counts as
@@ -65,6 +66,11 @@ public final class PlayerRates {
      */
     static void miningClock(EntityTickEvent.Pre e) {
         if (e.getEntity() instanceof ServerPlayer p && !ticksNow(p)) p.gameMode.gameTicks--;
+    }
+
+    /** Player.tick adds one to the attack cooldown after this event: no net tick in a skipped one. */
+    static void attackClock(PlayerTickEvent.Pre e) {
+        if (e.getEntity() instanceof ServerPlayer p && !ticksNow(p)) p.attackStrengthTicker--;
     }
 
     static void tick(ServerTickEvent.Post e) {
