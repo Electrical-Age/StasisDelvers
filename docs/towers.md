@@ -68,6 +68,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
   state is not OFF. It releases chunks no longer needed.
 - NeoForge saves forced chunks. The controller's validation callback (`loaded`) reads them back into `FORCED`
   at level load, so a tower that shrinks or stops after a restart releases what it forced before.
+  Towers force with natural spawning on (the last `forceChunk` flag) and release the same kind. `loaded` adopts
+  only that kind and drops any plain ticket under the controller, which `update` could never release.
 - `Tickets.clear()` runs on `ServerStoppedEvent`, because singleplayer worlds share the JVM.
 
 ## Persistent state

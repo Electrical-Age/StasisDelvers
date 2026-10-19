@@ -34,13 +34,16 @@ final class Tickets {
         e.register(CONTROLLER);
     }
 
-    /** Level load, before the saved tickets come back into force: remember who forced what. */
+    /**
+     * Level load, before the saved tickets come back into force: remember who forced what. Towers force only with
+     * natural spawning on (update), and update releases that kind only, so a plain ticket under our controller (none
+     * should exist) is dropped here rather than adopted: update could never release it and it would stay forced.
+     */
     private static void loaded(ServerLevel level, TicketHelper tickets) {
         Map<BlockPos, LongSet> m = new HashMap<>();
         tickets.getBlockTickets().forEach((pos, t) -> {
-            LongSet s = new LongOpenHashSet(t.normal());
-            s.addAll(t.naturalSpawning());
-            m.put(pos.immutable(), s);
+            for (long c : t.normal()) tickets.removeTicket(pos, c, false);
+            if (!t.naturalSpawning().isEmpty()) m.put(pos.immutable(), new LongOpenHashSet(t.naturalSpawning()));
         });
         FORCED.put(level.dimension(), m);
     }
