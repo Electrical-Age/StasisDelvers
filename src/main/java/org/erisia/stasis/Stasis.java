@@ -22,7 +22,8 @@ import java.util.WeakHashMap;
  * stopped dimensions full speed in the spawn area, the field's rate inside fields (whole blocks; the fastest of
  * overlapping fields) and not at all elsewhere ({@link #rateAt}; stopped = rate 0). Lookups go through a per-level index of which fields touch
  * which chunk column, rebuilt when the fields change. Works on both sides: the server reads FieldData, the client the
- * fields the server sent it (ClientFields), so collisions with stopped water agree on both.
+ * fields the server sent it (ClientFields), so collisions with stopped water agree on both. In spreading mode (Spread)
+ * the overworld's columns the stillness hasn't reached yet run at rate 1 (rifts excepted) before any of that.
  */
 public final class Stasis {
     private Stasis() {
@@ -54,6 +55,11 @@ public final class Stasis {
 
     public static int version() {
         return version;
+    }
+
+    /** A change that index() doesn't hold (the spread's progress, Spread): readers of version() re-ask. */
+    static synchronized void bumpVersion() {
+        version++;
     }
 
     public static synchronized void invalidate(Level level) {
@@ -101,9 +107,12 @@ public final class Stasis {
         return idx;
     }
 
-    /** Is time stopped anywhere in this level (enabled, and the dimension is a stopped one)? */
+    /**
+     * Is time stopped anywhere in this level (enabled, and the dimension is a stopped one)? In spreading mode the Nether
+     * and the End run until the spread is complete (Spread.holdsOff; Baughn 2026-10-19).
+     */
     public static boolean stops(Level level) {
-        return StasisConfig.enabled && StasisConfig.stopped.contains(level.dimension());
+        return StasisConfig.enabled && StasisConfig.stopped.contains(level.dimension()) && !Spread.holdsOff(level);
     }
 
     private static boolean inSpawn(Level level, int cx, int cz) {
@@ -156,6 +165,9 @@ public final class Stasis {
 
     static double rateAt(Level level, int x, int y, int z, boolean eddies, boolean grace) {
         if (!stops(level)) return 1.0;
+        // spreading mode: a column the stillness hasn't reached runs at full rate, fields or not; rifts stop as ever.
+        // Stilled columns go on to the base rules below. (CLIENT STEP: the client answers this from its rank tiles.)
+        if (Spread.active(level) && Spread.runs(level, x, z)) return StaticDeeps.inRift(level, x, y, z) ? 0.0 : 1.0;
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz) || grace && NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
@@ -182,6 +194,18 @@ public final class Stasis {
      */
     public static int sectionState(Level level, int sx, int sy, int sz) {
         if (!stops(level)) return SECTION_RUNNING;
+        // spreading mode: every column running -> RUNNING unless a rift may cut it; some running -> at least MIXED
+        int spread = Spread.active(level) ? Spread.chunk(level, sx, sz) : 0;
+        if (spread == 1) {
+            int seed = Deeps.seed(level);
+            return seed == 0 || !StaticDeeps.sectionMayHave(seed, sx, sy, sz) ? SECTION_RUNNING : SECTION_MIXED;
+        }
+        int base = baseSectionState(level, sx, sy, sz);
+        return spread == 2 && base == SECTION_STOPPED ? SECTION_MIXED : base;
+    }
+
+    /** sectionState by the base rules (fields, spawn area, grace, rifts). */
+    private static int baseSectionState(Level level, int sx, int sy, int sz) {
         if (inSpawn(level, sx, sz) || NewChunkGrace.active(level, ChunkPos.pack(sx, sz))) return SECTION_RUNNING;
         Field[] fs = index(level).columns.get(ChunkPos.pack(sx, sz));
         if (fs == null) return SECTION_STOPPED;
@@ -264,6 +288,7 @@ public final class Stasis {
     public static boolean mayRunInColumn(Level level, long chunkKey) {
         if (!stops(level)) return true;
         int cx = ChunkPos.getX(chunkKey), cz = ChunkPos.getZ(chunkKey);
+        if (Spread.active(level) && Spread.chunk(level, cx, cz) != 0) return true;
         return inSpawn(level, cx, cz) || NewChunkGrace.active(level, chunkKey) || index(level).columns.containsKey(chunkKey);
     }
 

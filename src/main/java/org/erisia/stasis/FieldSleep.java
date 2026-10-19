@@ -82,8 +82,11 @@ public final class FieldSleep {
         }
     }
 
-    /** The world's clock never skips a night where time stops (each field sleeps on its own clock). */
+    /**
+     * The world's clock never skips a night where time stops (each field sleeps on its own clock). In spreading mode
+     * the overworld mostly runs until the spread is complete: there the world's night passes as in vanilla.
+     */
     static void noWorldSkip(SleepFinishedTimeEvent e) {
-        if (e.getLevel() instanceof ServerLevel level && Stasis.stops(level)) e.setCanceled(true);
+        if (e.getLevel() instanceof ServerLevel level && Stasis.stops(level) && !Spread.active(level)) e.setCanceled(true);
     }
 }
