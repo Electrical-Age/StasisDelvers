@@ -1,0 +1,21 @@
+{
+  "required": false,
+  "package": "org.erisia.stasis.mixin.client",
+  "plugin": "org.erisia.stasis.mixin.client.CosmeticPlugin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "GameRendererMixin",
+    "ClientLevelMixin",
+    "ClientClockManagerMixin",
+    "ClientClockInstanceMixin",
+    "ParticleGroupMixin",
+    "SectionCompilerMixin",
+    "FluidRendererMixin",
+    "SoundEngineMixin",
+    "WeatherEffectRendererMixin",
+    "EntityRendererAgeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

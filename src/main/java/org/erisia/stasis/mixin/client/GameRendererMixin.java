@@ -52,6 +52,11 @@ public abstract class GameRendererMixin {
     @Unique private boolean stasis$lateHand;
     /** True while the late pass runs (lets renderItemInHand through). */
     @Unique private boolean stasis$drawingLate;
+    /**
+     * Set once the late pass's hook has run: this mixin config is optional (a mod may have changed GameRenderer.render),
+     * and without the late pass the hand must not be skipped, or it would vanish.
+     */
+    @Unique private boolean stasis$lateHookLive;
 
     @Inject(method = "render3dHud", at = @At("HEAD"))
     private void stasis$decide(CameraRenderState cameraState, PlayerRenderState playerState, OptionsRenderState optionsState,
@@ -67,11 +72,12 @@ public abstract class GameRendererMixin {
 
     @Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
     private void stasis$skipEarly(CameraRenderState cameraState, PlayerRenderState playerState, GpuTextureView depthTextureView, CallbackInfo ci) {
-        if (stasis$lateHand && !stasis$drawingLate) ci.cancel();
+        if (stasis$lateHand && stasis$lateHookLive && !stasis$drawingLate) ci.cancel();
     }
 
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;applyPostEffects()V", shift = At.Shift.AFTER))
     private void stasis$lateHand(CallbackInfo ci) {
+        stasis$lateHookLive = true;
         if (!stasis$lateHand) return;
         stasis$lateHand = false;
         var levelState = gameRenderState.levelRenderState;

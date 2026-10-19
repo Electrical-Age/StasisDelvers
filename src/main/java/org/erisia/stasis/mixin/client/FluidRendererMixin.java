@@ -36,7 +36,7 @@ public abstract class FluidRendererMixin {
         lines.set(frozen.get() && fluidState.is(net.minecraft.tags.FluidTags.WATER) ? org.erisia.stasis.client.WaterLines.sprite(pos) : null);
     }
 
-    @WrapOperation(method = TESSELATE, require = 1, at = @At(value = "INVOKE", ordinal = 0,
+    @WrapOperation(method = TESSELATE, at = @At(value = "INVOKE", ordinal = 0,
         target = "Lnet/minecraft/client/resources/model/sprite/Material$Baked;sprite()Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;"))
     private TextureAtlasSprite stasis$waterLines(Material.Baked material, Operation<TextureAtlasSprite> original,
                                                 @Share("stasisLines") LocalRef<TextureAtlasSprite> lines) {
@@ -44,7 +44,7 @@ public abstract class FluidRendererMixin {
         return l != null ? l : original.call(material);
     }
 
-    @WrapOperation(method = TESSELATE, require = 1, allow = 5,
+    @WrapOperation(method = TESSELATE, 
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/resources/model/sprite/Material$Baked;sprite()Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;"))
     private TextureAtlasSprite stasis$frozenFluidSprite(Material.Baked material, Operation<TextureAtlasSprite> original,
                                                        @Share("stasisFrozen") LocalBooleanRef frozen) {

@@ -16,6 +16,11 @@ file="META-INF/accesstransformer.cfg"
 [[mixins]]
 config="${mod_id}.mixins.json"
 
+# optional: look-only client effects (frozen textures, still rain and particles, the local sky, the suited hand...);
+# if another mod has changed one of those spots, only that effect is lost, with a warning (CosmeticPlugin)
+[[mixins]]
+config="${mod_id}.cosmetic.mixins.json"
+
 # optional: the stopped-land overlay on Xaero's Minimap / World Map (applies only when they're installed)
 [[mixins]]
 config="${mod_id}.xaero.mixins.json"

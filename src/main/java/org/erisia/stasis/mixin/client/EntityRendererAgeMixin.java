@@ -9,7 +9,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** A frozen entity's idle animations (keyed to its age plus the frame's partial tick) stand still (FrozenEntities). */
+/**
+ * A frozen entity's idle animations (keyed to its age plus the frame's partial tick) stand still (FrozenEntities).
+ * <p>
+ * Not NeoForge's RegisterRenderStateModifiersEvent: its modifiers run after the whole extractRenderState, but some
+ * renderers derive more state from ageInTicks inside their own extractRenderState after calling super (PhantomRenderer's
+ * flapTime), so only a hook at the end of the base method freezes those too.
+ */
 @Mixin(EntityRenderer.class)
 public abstract class EntityRendererAgeMixin {
     @Inject(method = "extractRenderState(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/entity/state/EntityRenderState;F)V",

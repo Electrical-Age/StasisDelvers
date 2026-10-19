@@ -47,7 +47,7 @@ public abstract class ClientLevelMixin {
         return Stasis.isRunning(level, BlockPos.containing(x, y, z)) && !org.erisia.stasis.ClientFields.underShield(x, y, z);
     }
 
-    @com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(method = "tickWeatherEffects", require = 2, at = @At(value = "INVOKE",
+    @com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(method = "tickWeatherEffects", at = @At(value = "INVOKE",
         target = "Lnet/minecraft/client/multiplayer/ClientLevel;playLocalSound(Lnet/minecraft/core/BlockPos;Lnet/minecraft/sounds/SoundEvent;Lnet/minecraft/sounds/SoundSource;FFZ)V"))
     private void stasis$rainSound(ClientLevel level, BlockPos pos, net.minecraft.sounds.SoundEvent sound, net.minecraft.sounds.SoundSource source,
                                   float volume, float pitch, boolean delay,

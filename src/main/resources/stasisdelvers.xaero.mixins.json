@@ -2,7 +2,7 @@
   "required": false,
   "package": "org.erisia.stasis.mixin.xaero",
   "plugin": "org.erisia.stasis.mixin.xaero.XaeroPlugin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "client": [
     "MinimapSessionMixin",
     "WorldMapSessionMixin"

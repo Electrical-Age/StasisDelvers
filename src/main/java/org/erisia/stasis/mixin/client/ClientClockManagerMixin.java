@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class ClientClockManagerMixin {
     @Inject(method = "getInstance", at = @At("RETURN"))
     private void stasis$mark(Holder<WorldClock> definition, CallbackInfoReturnable<ClientClockManager.ClientClockInstance> cir) {
-        if (definition.is(WorldClocks.OVERWORLD)) ((LocalClockMark) cir.getReturnValue()).stasis$markOverworld();
+        // (instanceof: if ClientClockInstanceMixin didn't apply, this does nothing rather than fail)
+        if (definition.is(WorldClocks.OVERWORLD) && cir.getReturnValue() instanceof LocalClockMark m) m.stasis$markOverworld();
     }
 }

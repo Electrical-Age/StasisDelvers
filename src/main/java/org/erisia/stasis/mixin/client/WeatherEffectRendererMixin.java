@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.At;
 public abstract class WeatherEffectRendererMixin {
     private static final String EXTRACT = "extractRenderState(Lnet/minecraft/client/multiplayer/ClientLevel;FLnet/minecraft/world/phys/Vec3;Lnet/minecraft/client/renderer/state/level/WeatherRenderState;)V";
 
-    @WrapOperation(method = EXTRACT, require = 1, at = @At(value = "INVOKE",
+    @WrapOperation(method = EXTRACT, at = @At(value = "INVOKE",
         target = "Lnet/minecraft/client/renderer/WeatherEffectRenderer;createRainColumnInstance(Lnet/minecraft/util/RandomSource;JIIIIIF)Lnet/minecraft/client/renderer/WeatherEffectRenderer$ColumnInstance;"))
     private WeatherEffectRenderer.ColumnInstance stasis$stillRain(WeatherEffectRenderer self, RandomSource random, long ticks, int x, int bottomY,
                                                                    int topY, int z, int light, float partial,
@@ -27,7 +27,7 @@ public abstract class WeatherEffectRendererMixin {
         return original.call(self, random, still ? 0L : ticks, x, bottomY, topY, z, light, still ? 0f : partial);
     }
 
-    @WrapOperation(method = EXTRACT, require = 1, at = @At(value = "INVOKE",
+    @WrapOperation(method = EXTRACT, at = @At(value = "INVOKE",
         target = "Lnet/minecraft/client/renderer/WeatherEffectRenderer;createSnowColumnInstance(Lnet/minecraft/util/RandomSource;JIIIIIF)Lnet/minecraft/client/renderer/WeatherEffectRenderer$ColumnInstance;"))
     private WeatherEffectRenderer.ColumnInstance stasis$stillSnow(WeatherEffectRenderer self, RandomSource random, long ticks, int x, int bottomY,
                                                                    int topY, int z, int light, float partial,
