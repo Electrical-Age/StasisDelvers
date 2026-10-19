@@ -24,7 +24,9 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   8. At `freezeTicks` (default 100) it calls `freeze`, which makes a `Statue`.
 - Grace: `grace(PlayerEvent)` (login, respawn, dimension change; `graceTicks`, default 200; login grace in
   stopped land at most once per 30 min, `LOGIN_GRACE_EVERY`), `graceIfStopped`
-  (when a field shrinks or goes), `LOGIN_GRACE`. `respawnPosition`: an unprotected player whose bed is in stopped
+  (when a field shrinks or goes, on the action bar; when the spreading front passes over, in chat, since the grace
+  countdown takes the bar), `LOGIN_GRACE`. In running spread land `FrontWarnings` has the action bar before the
+  front arrives (spreading-mode.md); Freezing's messages win wherever time doesn't run. `respawnPosition`: an unprotected player whose bed is in stopped
   land respawns at world spawn if time runs there (no death loop).
 - `Statue.java`: an entity holding the inventory and XP. Unhurtable, never despawns. The owner (or a creative
   player) right-clicks to get everything back. Rendered by `client/StatueRenderer.java`.

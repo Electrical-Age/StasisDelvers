@@ -58,7 +58,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
   - `stasisdelvers.noSpawnArea=true`: no spawn area, and `Deeps.seed` is 0 unless a test sets
     `Deeps.testDeeps`
   - `--tests stasisdelvers:*`, because EA's own GameTests can't run in stopped time
-- Test hooks in production code: `Spread.testInstall`/`testReset`, `SpawnMove.testArm`, `Spread.Clock.testSpawnMove`, `TowerStructure.syncBuild`, `Pockets.TEST`/`TEST_STRATA`, `Storms.TEST`,
+- Test hooks in production code: `Spread.testInstall`/`testReset`/`testClock`/`testSecondsUntilStill`, `FrontWarnings.check`/`describe`, `SpawnMove.testArm`, `Spread.Clock.testSpawnMove`, `TowerStructure.syncBuild`, `Pockets.TEST`/`TEST_STRATA`, `Storms.TEST`,
   `Deeps.testDeeps`, `Crystals.FACE_SHARE`, `FieldData.testDeepSeed`, `NewChunkGrace.testsStarted`, and
   `TowerBlockEntity.test*`.
   - `StasisDelvers` registers the GameTests unconditionally, so they and these hooks ship in the

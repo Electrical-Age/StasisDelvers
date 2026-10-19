@@ -2,8 +2,8 @@
 
 Paths are relative to `src/main/java/org/erisia/stasis/`. Design: `notes/timestop/spread-DESIGN.md` (with Argon's
 review and Baughn's decisions of 2026-10-19). Step 1 is in: the server core (1a) and the client sync, shader and
-drifting deeps over running land (1b); step 2 (the stronghold library desk, portal rooms recorded) too. Front
-warnings and hard mode's effects come later.
+drifting deeps over running land (1b); step 2 (the stronghold library desk, portal rooms recorded) and step 3 (front
+warnings) too. Hard mode's effects come later.
 
 ## What it is
 - Config `mode = "spreading"` (default `"stopped"`, the base mod). The world starts running; the stillness spreads
@@ -106,6 +106,25 @@ warnings and hard mode's effects come later.
     the move saved, logged, and broadcast in chat. None found: state 2 (no site), logged, not searched again.
   - In test mode (`Spread.testInstall`) it runs only while a test arms it (`testArm`): other spread tests install
     small maps on which the real spawn is outside (stilled), and must not move it. `testReset` disarms it.
+- `FrontWarnings.java` (server, `ServerTickEvent.Post`, every 20 ticks): front warnings on the action bar.
+  - The estimate: `Spread.secondsUntilStill(r1024, n, t, hard, tHard, hours, hardHours, cap)`, the online seconds until
+    the player's column stills (Argon: time until this column stills, not distance to the front, so a dead-end cave
+    whose mouth stills first is warned by its own column). The column stills at P = k = r1024 / SCALE + 1, coverage
+    k / N, read back through the coverage formula. 0 once stilled; infinite above the cap before hard mode (P stands
+    still at the 80 % plateau, so nothing is warned there); hard mode moves P again and the warnings come back.
+    Columns in [P, cap N) when hard mode begins early jump straight to stilled (coverage jumps to the cap): those get
+    only the grace message. `/stasis spread status` uses the same estimate.
+  - Who: overworld players in running spread land, not creative or spectator, where time runs now (`Stasis.isRunning`:
+    in stilled land, a rift, a drifting deep or an eddy Freezing's messages own the action bar), and not inside a field
+    or the spawn area (`Stasis.heldOff`: the spot keeps running when the column stills).
+  - What: unsuited players once per threshold crossed: 10, 5, 2, 1 min ("The stillness reaches this spot in about N
+    minutes", gold; several crossed at once say only the lowest), then a countdown each second under 30 s ("... in N s",
+    red). Players with a working suit (`Suits.protectsWithoutDraw`) get one note at 30 s ("... your suit will take
+    over"). A mark is forgotten when the estimate rises 1.5x past it (moving to higher ground), so a later approach
+    warns again; and on leaving the overworld, logging out or the column stilling.
+  - No client cue near the front (yet): the shader already draws stilled land grey.
+- The overrun message ("The stillness has reached you: ...", `Spread.update` through `Freezing.graceIfStopped(..., true)`)
+  goes to chat: on the action bar the grace countdown overwrote it at once. A field's loss keeps the action bar.
 - `StasisCommands`: `/stasis spread status | set <coverage> | hardmode` (op). Status ends with the spawn move's
   state: not moved, searching (cells tried), moved (from, to), or no site found.
 - `StabilityCompassItem.java` (`stasisdelvers:stability_compass`): points at the nearest place of temporal stability
@@ -156,7 +175,9 @@ warnings and hard mode's effects come later.
   follow S and every low cell is at most as stable as the least high one; below the split, BFS from spawn's cell
   reaches every running low cell, and block by block (the bilinear) every running low cell's centre column; the compass
   search equals brute force; `cellsAtLeastAreOrdered` (the spawn move's candidates are exactly the cells >= minRank,
-  by distance then index, the first at nearestAtLeast's distance); chunk extremes are exact; coverage formula, monotone, capped tick.
+  by distance then index, the first at nearestAtLeast's distance); chunk extremes are exact; coverage formula, monotone, capped tick; `secondsUntilStillMatchesTheClock` (after the
+  estimate the column is stilled, a moment before it isn't; infinite above the cap before hard mode, finite in it; 0
+  once stilled) and `secondsUntilStillAtThePlateau` (worked numbers).
   `coherenceReport` logs, at 20/50/80/90/95 %, the running cells' components, those of >= 100 cells (~320 x 320
   blocks) and their share, the largest, and the shore share (running cells next to stilled land); it dumps the lab
   seed's map to `build/spread-lab-v2.ranks` for `tools/spread-render.py` (renders: `notes/spread-renders/v2-*.png`).
@@ -169,7 +190,9 @@ warnings and hard mode's effects come later.
   once P passes its rank it moves to a running column of rank >= max(0.9 N, P + 1) on dry solid ground with air above;
   P past the new spawn's rank leaves it there; status says so); `stability_compass_first_join` (one compass, nothing else, not again); `spread_deep_stops_running_land` (rate 0 and no block tick in a drifting
   deep over running land, the land's rate 1, a field holds it off, an unsuited player is held, not a statue);
-  `spread_tiles_follow_player` (the server's tile list follows the player); `spread_stronghold_rooms` (vanilla
+  `spread_front_warnings` (the clock set so P is just below the player's column: nothing at 20 min, "about 5 minutes"
+  at 250 s once, "about 2 minutes" at 100 s, the countdown each second under 30 s, the marks forgotten on moving back,
+  nothing in a field, nothing once stilled); `spread_tiles_follow_player` (the server's tile list follows the player); `spread_stronghold_rooms` (vanilla
   library and portal room pieces built chunk by chunk, each straddling four chunks: no desk in stopped mode, one desk
   per library in spreading mode, in rock and in a cave; the portal room keeps its 12 frames, and its portal when all
   12 eyes rolled, gets no shards, and is recorded once with its whole box although generated twice over).

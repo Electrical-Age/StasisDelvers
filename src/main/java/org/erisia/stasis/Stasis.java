@@ -202,8 +202,11 @@ public final class Stasis {
         return rate;
     }
 
-    /** Does a field or the spawn area hold the block against a drifting deep (as fields do in stopped land)? */
-    private static boolean heldOff(Level level, int x, int y, int z) {
+    /**
+     * Does a field or the spawn area hold the block against a drifting deep (as fields do in stopped land)? Also
+     * FrontWarnings: a player standing where it holds keeps running when the column stills, so gets no warning.
+     */
+    static boolean heldOff(Level level, int x, int y, int z) {
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz)) return true;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));

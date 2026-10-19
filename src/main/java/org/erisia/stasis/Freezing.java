@@ -264,12 +264,19 @@ public final class Freezing {
     }
 
     static void graceIfStopped(ServerLevel level, java.util.List<ServerPlayer> wereSafe, String message) {
+        graceIfStopped(level, wereSafe, message, false);
+    }
+
+    /** chat: send the message to chat, not the action bar (where the grace countdown would overwrite it at once). */
+    static void graceIfStopped(ServerLevel level, java.util.List<ServerPlayer> wereSafe, String message, boolean chat) {
         for (ServerPlayer p : wereSafe) {
             if (p.isRemoved() || Stasis.isRunning(level, p.blockPosition())) continue;
             State s = state(p);
             s.ticks = 0;
             s.graceUntil = Math.max(s.graceUntil, level.getGameTime() + StasisConfig.graceTicks);
-            p.sendOverlayMessage(net.minecraft.network.chat.Component.literal(message));
+            var m = net.minecraft.network.chat.Component.literal(message);
+            if (chat) p.sendSystemMessage(m.withStyle(net.minecraft.ChatFormatting.GOLD));
+            else p.sendOverlayMessage(m);
         }
     }
 

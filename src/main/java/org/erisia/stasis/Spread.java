@@ -145,6 +145,33 @@ public final class Spread {
         return cap + (1 - cap) * Math.min(1, Math.max(0, t - tHard) / (hardHours * 3600));
     }
 
+    /**
+     * The online seconds, from online time t, until the column of rank r1024 stills (front warnings, /stasis spread
+     * status; Argon: the time until this column stills, not the distance to the front, so a dead-end cave whose mouth
+     * stills first is still warned by its own column). The column stills at the first P with r1024 < P * SCALE, so
+     * P = k = r1024 / SCALE + 1, coverage k / n. 0 if it is stilled already; +Infinity if the coverage it needs lies
+     * above the cap and hard mode hasn't begun (P stands still at the cap: nothing more stills).
+     */
+    static double secondsUntilStill(long r1024, int n, double t, boolean hard, double tHard, double hours, double hardHours, double cap) {
+        long k = Math.floorDiv(r1024, SpreadMap.SCALE) + 1;
+        if (k <= progress(coverage(t, hard, tHard, hours, hardHours, cap), n)) return 0;
+        double cAt = k / (double) n;
+        double tAt;
+        if (cAt <= cap && !hard) tAt = cap <= 0 ? 0 : cAt / cap * hours * 3600;
+        else if (!hard) return Double.POSITIVE_INFINITY;
+        else tAt = tHard + (cap >= 1 ? 0 : Math.max(0, cAt - cap) / (1 - cap) * hardHours * 3600);
+        return Math.max(0, tAt - t);
+    }
+
+    /** secondsUntilStill for column (x, z) of the server's map now, or NaN without a map. */
+    static double secondsUntilStill(MinecraftServer srv, int x, int z) {
+        State s = server;
+        if (s.map() == null) return Double.NaN;
+        Clock k = Clock.get(srv.overworld());
+        return secondsUntilStill(SpreadMap.rank1024(s.map(), x, z), s.count(), k.seconds, k.hard, k.hardAt,
+            StasisConfig.spreadHours, StasisConfig.hardSpreadHours, StasisConfig.spreadCap);
+    }
+
     /** P for coverage c of n cells. */
     static int progress(double c, int n) {
         return (int) Math.min(n, Math.floor(c * n));
@@ -205,7 +232,8 @@ public final class Spread {
             SpreadRanks m = s.map();
             relightNearPlayers(srv, ow, (cx, cz) -> SpreadMap.chunkMin1024(m, cx, cz) < hi && SpreadMap.chunkMax1024(m, cx, cz) >= lo);
         }
-        if (overrun != null) Freezing.graceIfStopped(ow, overrun, "The stillness has reached you: time stops here. Get back to running land!");
+        // (in chat: the grace countdown takes the action bar at once and would hide it)
+        if (overrun != null) Freezing.graceIfStopped(ow, overrun, "The stillness has reached you: time stops here. Get back to running land!", true);
         if (complete != s.complete()) {
             for (ServerLevel l : srv.getAllLevels()) Stasis.invalidate(l);
             for (ServerLevel l : srv.getAllLevels()) if (l.dimension() != Level.OVERWORLD) relightNearPlayers(srv, l, (cx, cz) -> true);
@@ -333,13 +361,10 @@ public final class Spread {
             double rank = r / (double) SpreadMap.SCALE;
             b.append(String.format(java.util.Locale.ROOT, "; here: rank %.1f, %s", rank, r < (long) s.p() * SpreadMap.SCALE ? "stilled" : "running"));
             if (r >= (long) s.p() * SpreadMap.SCALE) {
-                // the coverage at which this column stills, and the online time that takes at the current pace
-                double cAt = Math.ceil(rank) / s.count();
-                double cap = StasisConfig.spreadCap;
-                double tAt = !k.hard && cAt <= cap ? cAt / cap * StasisConfig.spreadHours * 3600
-                    : k.hard ? k.hardAt + (cAt - cap) / Math.max(1e-9, 1 - cap) * StasisConfig.hardSpreadHours * 3600 : Double.NaN;
-                if (Double.isNaN(tAt)) b.append(" (stills only after hard mode)");
-                else b.append(String.format(java.util.Locale.ROOT, " (stills in ~%.2f online h)", Math.max(0, tAt - k.seconds) / 3600));
+                // the online time until this column stills at the current pace (FrontWarnings' estimate)
+                double left = secondsUntilStill(srv, p.getBlockX(), p.getBlockZ());
+                if (Double.isInfinite(left)) b.append(" (stills only after hard mode)");
+                else b.append(String.format(java.util.Locale.ROOT, " (stills in ~%.2f online h)", left / 3600));
             }
         }
         return b.toString();
@@ -371,6 +396,23 @@ public final class Spread {
         SpawnMove.testArm(false);
         SpreadSync.mapInstalled();
         Stasis.bumpVersion();
+    }
+
+    /** GameTests: set the online clock (and move P to match it on the installed map); returns {seconds, hard, hardAt} as it was. */
+    public static double[] testClock(MinecraftServer srv, double seconds, boolean hard, double hardAt) {
+        Clock k = Clock.get(srv.overworld());
+        double[] was = {k.seconds, k.hard ? 1 : 0, k.hardAt};
+        k.seconds = seconds;
+        k.hard = hard;
+        k.hardAt = hardAt;
+        k.setDirty();
+        update(srv.overworld(), k);
+        return was;
+    }
+
+    /** GameTests: the online seconds until column (x, z) stills (NaN without a map). */
+    public static double testSecondsUntilStill(MinecraftServer srv, int x, int z) {
+        return secondsUntilStill(srv, x, z);
     }
 
     // ---- saved data ------------------------------------------------------------------------------------------------

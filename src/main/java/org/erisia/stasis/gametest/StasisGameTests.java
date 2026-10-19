@@ -2200,6 +2200,61 @@ public final class StasisGameTests {
                 "alive " + p.isAlive() + ", " + Freezing.describe(p));
             remove(h, p);
         }, false, true));
+        // spreading mode's front warnings (FrontWarnings; Baughn, spread-DESIGN.md step 3): a player in running land
+        // hears on the action bar how long until the stillness reaches this column (Argon: the time until it stills, not
+        // the distance), once per threshold crossed, then a countdown under 30 s; nothing inside a field, nothing once
+        // stilled (Freezing's messages then). The clock is set so P sits just below the player's column's rank.
+        CASES.put("spread_front_warnings", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            var server = level.getServer();
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            var savedSpawn = level.getRespawnData();
+            c.cleanup.add(() -> level.setRespawnData(savedSpawn));
+            // the spawn area keeps its land running when stilled, so it gets no warnings: put spawn far away
+            level.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(net.minecraft.world.level.Level.OVERWORLD,
+                at.offset(100_000, 0, 100_000), 0f, 0f));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, at.getX(), at.getZ(), 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            double[] was = org.erisia.stasis.Spread.testClock(server, 0, false, 0);
+            c.cleanup.add(0, () -> org.erisia.stasis.Spread.testClock(server, was[0], was[1] != 0, was[2]));
+            double tAt = org.erisia.stasis.Spread.testSecondsUntilStill(server, at.getX(), at.getZ());
+            boolean hard = Double.isInfinite(tAt);
+            if (hard) {   // above the cap: only hard mode stills it
+                org.erisia.stasis.Spread.testClock(server, 0, true, 0);
+                tAt = org.erisia.stasis.Spread.testSecondsUntilStill(server, at.getX(), at.getZ());
+            }
+            if (!(tAt > 1200)) {
+                c.check("the column stills later than 20 min in", false, "" + tAt);
+                return;
+            }
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            double t = tAt;
+            java.util.function.DoubleFunction<String> before = left -> {
+                org.erisia.stasis.Spread.testClock(server, t - left, hard, 0);
+                org.erisia.stasis.FrontWarnings.check(p);
+                return org.erisia.stasis.FrontWarnings.describe(p);
+            };
+            c.check("the player's spot runs", Stasis.spreadRuns(level, p.getBlockX(), p.getBlockZ()) && Stasis.isRunning(level, p.blockPosition()));
+            c.check("20 min out: nothing", before.apply(1200).equals("none"), before.apply(1200));
+            c.check("250 s out: about 5 minutes", before.apply(250).equals("sent 1: The stillness reaches this spot in about 5 minutes"), org.erisia.stasis.FrontWarnings.describe(p));
+            c.check("again: no repeat", before.apply(240).startsWith("sent 1:"), org.erisia.stasis.FrontWarnings.describe(p));
+            c.check("100 s out: about 2 minutes", before.apply(100).equals("sent 2: The stillness reaches this spot in about 2 minutes"), org.erisia.stasis.FrontWarnings.describe(p));
+            c.check("20 s out: the countdown", before.apply(20).equals("sent 3: The stillness reaches this spot in 20 s"), org.erisia.stasis.FrontWarnings.describe(p));
+            c.check("each second", before.apply(19).equals("sent 4: The stillness reaches this spot in 19 s"), org.erisia.stasis.FrontWarnings.describe(p));
+            // back to safer ground (here: the clock back) forgets the marks, so a later approach warns again
+            before.apply(1000);
+            c.check("approaching again warns again", before.apply(250).equals("sent 5: The stillness reaches this spot in about 5 minutes"), org.erisia.stasis.FrontWarnings.describe(p));
+            // a field holds the spot: it keeps running, so no warning
+            Field f = FieldData.get(level).add(level, p.getX(), p.getY() + 1, p.getZ(), 3.0, false, 0.6);
+            c.cleanup.add(0, () -> FieldData.get(level).remove(level, f.id()));
+            c.check("inside a field: no countdown", before.apply(20).startsWith("sent 5:"), org.erisia.stasis.FrontWarnings.describe(p));
+            FieldData.get(level).remove(level, f.id());
+            // stilled: Freezing's messages own the action bar
+            c.check("once stilled: nothing (Freezing's turn)", before.apply(-5).equals("none") && !Stasis.spreadRuns(level, p.getBlockX(), p.getBlockZ()),
+                org.erisia.stasis.FrontWarnings.describe(p));
+        }, false, true));
         // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
         // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
         // the server's list of what it sent is what a client would hold)
