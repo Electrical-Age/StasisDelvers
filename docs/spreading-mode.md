@@ -185,6 +185,20 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
 - A restart during the event: hard mode stays, the event is gone, the End is stilled at once. Step 5 will need to
   persist its build progress.
 
+## The End's wall (λ-Nero)
+- `EndBarrier`: a vertical cylinder of radius `endBarrierRadius` (default 140) round 0, 0, on while `endBarrier` (default
+  true) in spreading mode, before and after hard mode (`EndBarrier.active`: the hook for step 5). Creative and spectator
+  players pass.
+- Server (`PlayerTickEvent.Post`, `check`): a player past it (walking, flying, a pearl, a boat) is put back where they
+  last stood on the ground at least a block inside, or, with none on record, on the surface 4 blocks inside the wall
+  towards them, or on the obsidian arrival platform (100, 50, 0) if that column is void. "A wall of stilled time holds
+  you to the island" on the action bar.
+- Every way in lands inside: the End portal's arrival platform is at 100 blocks, and no End gateway ever appears in
+  this mode (the mixin), so no player or pearl goes through one. The outer islands' return gateways are out of reach.
+- Client: `client/EndBarrierFx`, particles on the cylinder within 20 blocks of it (pale dust over its face, black dust
+  lines every 4 blocks round and 6 up). The field shield's look is in the post shader, which is off in a running End,
+  so this is a modest stand-in: **AdventurAgent to check it by eye**.
+
 ## Persistent state
 - Overworld SavedData `stasisdelvers:spread_map` (`algorithm`, `spawn_x`, `spawn_z`, `radius`, `ranks` int array),
   written once. A saved map is never rebuilt, whatever its algorithm: a world made with v1 keeps its v1 map (logged at
@@ -193,7 +207,7 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
   the cap), `hard_game` (game seconds at the instant: the storms' origin, -1 unknown), and the spawn move: `spawn_move` 0 not moved / 1
   moved / 2 no site, `spawn_old_x`, `spawn_old_z`, `spawn_x`, `spawn_y`, `spawn_z`; all default 0 for older saves).
 - SavedData `stasisdelvers:pending_gates`: a list of `{box: [minX, minY, minZ, maxX, maxY, maxZ], centre}`.
-- Memory only: the End event (`HardMode`).
+- Memory only: the End event (`HardMode`), the wall's last ground positions (`EndBarrier`).
 
 ## Client / server split
 - The client answers every column within its tiles exactly as the server (the same `rank1024` on the same integers),
@@ -241,7 +255,8 @@ stronghold rewrite) and 5 (the island's explosion and the end-stone rift).
   asleep): the entry point enters once; P doesn't jump and status names the instant's coverage; the storms' origin is
   the instant, tau = t before it and storms are scheduled after it; the End runs until the flash; a death in the End
   before it is a teleport home with the advancement; at the flash the other is sent home with it and the End stills;
-  then the End can't be entered. The mixin's suppression
+  then the End can't be entered. `spread_end_barrier`: past the wall with no ground on record, put just inside on the
+  ground; after standing inside, put back there; creative passes; no wall in the stopped mode. The mixin's suppression
   of the portal, gateway and egg needs a real dragon fight: not tested (by eye in the lab).
 - Eyes of Ender: nothing here changes where strongholds are placed or `#eye_of_ender_located`; the portal room's
   blocks are vanilla's. The GameTest world has no strongholds, so this is not tested in a real one.

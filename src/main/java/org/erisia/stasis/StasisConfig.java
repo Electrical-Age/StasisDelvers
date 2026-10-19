@@ -55,6 +55,8 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue SPREAD_CAP;
     static final ModConfigSpec.IntValue SPREAD_RADIUS;
     static final ModConfigSpec.DoubleValue SPREAD_CONNECTED_UNTIL;
+    static final ModConfigSpec.BooleanValue END_BARRIER;
+    static final ModConfigSpec.IntValue END_BARRIER_RADIUS;
     static final ModConfigSpec.DoubleValue HARD_MODE_TELEPORT_SECONDS;
 
     static {
@@ -144,6 +146,10 @@ public final class StasisConfig {
                 "high ground may stand as running islands); above it the stillness rises like water over the map's stability",
                 "terrain and leaves high regions running on their own (Baughn 2026-10-19). Only read when a world's map is built.")
             .defineInRange("spreadConnectedUntil", SpreadMap.CONNECTED_UNTIL, 0.0, 1.0);
+        END_BARRIER = b.comment("Spreading mode: a wall of stilled time round the End's main island keeps players on it (Nero: no outer",
+                "End). Players are put back inside, as at a world border; creative and spectator players pass.").define("endBarrier", true);
+        END_BARRIER_RADIUS = b.comment("Spreading mode: the End wall's radius in blocks round 0, 0 (about the main island's edge).")
+            .defineInRange("endBarrierRadius", 140, 32, 4000);
         HARD_MODE_TELEPORT_SECONDS = b.comment("Spreading mode: seconds from the dragon's death (hard mode) to the flash that sends everyone in",
                 "the End to their respawn point; the island's explosion plays meanwhile.").defineInRange("hardModeTeleportSeconds", 6.0, 0.0, 30.0);
         SPEC = b.build();
@@ -183,6 +189,8 @@ public final class StasisConfig {
     static volatile double spreadHours = 48, hardSpreadHours = 48, spreadCap = 0.8;
     static volatile int spreadRadius = 8000;
     static volatile double spreadConnectedUntil = SpreadMap.CONNECTED_UNTIL;
+    static volatile boolean endBarrier = true;
+    static volatile int endBarrierRadius = 140;
     static volatile double hardModeTeleportSeconds = 6;
 
     /** The game test server sets this: its spawn lies among the test structures, which must start out stopped. */
@@ -243,6 +251,8 @@ public final class StasisConfig {
         m.put("spreadCap", spreadCap);
         m.put("spreadRadius", spreadRadius);
         m.put("spreadConnectedUntil", spreadConnectedUntil);
+        m.put("endBarrier", endBarrier);
+        m.put("endBarrierRadius", endBarrierRadius);
         m.put("hardModeTeleportSeconds", hardModeTeleportSeconds);
         return m;
     }
@@ -292,6 +302,8 @@ public final class StasisConfig {
         spreadCap = SPREAD_CAP.get();
         spreadRadius = SPREAD_RADIUS.get();
         spreadConnectedUntil = SPREAD_CONNECTED_UNTIL.get();
+        endBarrier = END_BARRIER.get();
+        endBarrierRadius = END_BARRIER_RADIUS.get();
         hardModeTeleportSeconds = HARD_MODE_TELEPORT_SECONDS.get();
     }
 }

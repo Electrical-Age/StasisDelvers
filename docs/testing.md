@@ -45,7 +45,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 ## 3. GameTests (`src/main/java/org/erisia/stasis/gametest/StasisGameTests.java`)
 - Registration: a static `CASES` map (name → `Spec(ticks, body, field, isolated)`), registered through a
   `TEST_FUNCTION` `DeferredRegister` and `RegisterGameTestsEvent` in `register(modBus)`.
-  - 105 `CASES.put` calls, two of them in loops: 107 tests.
+  - 106 `CASES.put` calls, two of them in loops: 108 tests.
   - Each test gets the structure `stasisdelvers:floor_16x6x8` (`src/main/resources/data/stasisdelvers/structure/floor_16x6x8.nbt`,
     made by `script/gen_test_structures.py`) and `maxTicks = ticks + 40`.
   - `isolated` tests (towers, big fields) get their own environment `alone_<name>`, so they run in a batch
@@ -59,7 +59,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
     `Deeps.testDeeps`
   - `--tests stasisdelvers:*`, because EA's own GameTests can't run in stopped time
 - Test hooks in production code: `Spread.testInstall`/`testReset`/`testClock`/`testClockRestore`/`testServerState`/`testSecondsUntilStill`,
-  `HardMode.testReset`/`testFlashed`, `StasisConfig.spreadHoursForTests`, `FrontWarnings.check`/`describe`, `SpawnMove.testArm`, `Spread.Clock.testSpawnMove`, `TowerStructure.syncBuild`, `Pockets.TEST`/`TEST_STRATA`, `Storms.TEST`,
+  `HardMode.testReset`/`testFlashed`, `EndBarrier.check`, `StasisConfig.spreadHoursForTests`, `FrontWarnings.check`/`describe`, `SpawnMove.testArm`, `Spread.Clock.testSpawnMove`, `TowerStructure.syncBuild`, `Pockets.TEST`/`TEST_STRATA`, `Storms.TEST`,
   `Deeps.testDeeps`, `Crystals.FACE_SHARE`, `FieldData.testDeepSeed`, `NewChunkGrace.testsStarted`, and
   `TowerBlockEntity.test*`.
   - `StasisDelvers` registers the GameTests unconditionally, so they and these hooks ship in the
@@ -90,7 +90,7 @@ These are deliberately soft, so a pass proves less than it seems:
 - Most `StasisCommands` (only `field add` and `field rate`, through `rate_command`).
 - `Tickets` across a restart, `TowerSignalNode`, `FieldSleep`, `MapDeskBlock`, `RiftBarometerBlock`,
   `RiftCompassItem`.
-- Client rendering and the cosmetic mixins (checked by eye).
+- Client rendering and the cosmetic mixins (checked by eye), the End wall's particles (`EndBarrierFx`).
 - `EnderDragonFightMixin` (no exit portal, gateway or egg after a real dragon kill; no respawn): needs a dragon fight
   with its own dragon, so it is checked in the lab.
 - There is no CI. Run `build` and `runGameTestServer` before pushing.

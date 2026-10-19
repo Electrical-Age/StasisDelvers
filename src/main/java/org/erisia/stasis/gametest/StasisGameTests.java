@@ -2331,6 +2331,44 @@ public final class StasisGameTests {
                 c.check("after hard mode the End can't be entered", blocked[0]);
             };
         }, false, true));
+        // spreading mode's End wall (EndBarrier; λ-Nero): a survival player past endBarrierRadius is put back where they
+        // last stood on the ground inside (or just inside the wall without one); creative players pass; in the stopped mode
+        // there is no wall. The check is driven directly (a mock player gets no tick events), within one tick and beyond
+        // 192 blocks of the centre where possible, so the test End's dragon fight doesn't wake.
+        CASES.put("spread_end_barrier", new Spec(1, (h, c) -> () -> {
+            var server = h.getLevel().getServer();
+            ServerLevel end = server.getLevel(net.minecraft.world.level.Level.END);
+            if (end == null) {
+                c.check("the test server has the End", false);
+                return;
+            }
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(7, 0, 0, 200);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            int r = org.erisia.stasis.EndBarrier.radius();
+            p.teleport(new net.minecraft.world.level.portal.TeleportTransition(end, new Vec3(r + 100.5, 4, 0.5), Vec3.ZERO, 0, 0,
+                net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+            c.check("in the End, outside the wall", p.level() == end && Math.hypot(p.getX(), p.getZ()) > r);
+            boolean pushed = org.erisia.stasis.EndBarrier.check(p);
+            double d = Math.hypot(p.getX(), p.getZ());
+            c.check("no ground on record: put just inside the wall, on the ground", pushed && d <= r && d > r - 10 && p.getY() >= 4, d + " y " + p.getY());
+            // standing on the ground inside: that's where a later crossing goes back to
+            p.teleportTo(r - 20.5, 4, 0.5);
+            p.setOnGround(true);
+            c.check("inside: left alone", !org.erisia.stasis.EndBarrier.check(p) && Math.abs(p.getX() - (r - 20.5)) < 1e-6);
+            p.setOnGround(false);
+            p.teleportTo(r + 3.5, 30, 0.5);   // (a pearl, flying, a jump off the edge)
+            c.check("past the wall: back where they last stood", org.erisia.stasis.EndBarrier.check(p)
+                && Math.abs(p.getX() - (r - 20.5)) < 1e-6 && Math.abs(p.getY() - 4) < 1e-6, p.position().toString());
+            p.setGameMode(net.minecraft.world.level.GameType.CREATIVE);
+            p.teleportTo(r + 100.5, 4, 0.5);
+            c.check("creative players pass", !org.erisia.stasis.EndBarrier.check(p) && p.getX() > r);
+            p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+            org.erisia.stasis.Spread.testReset();
+            c.check("the stopped mode has no wall", !org.erisia.stasis.EndBarrier.active(end) && !org.erisia.stasis.EndBarrier.check(p) && p.getX() > r);
+        }, false, true));
         // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
         // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
         // the server's list of what it sent is what a client would hold)
