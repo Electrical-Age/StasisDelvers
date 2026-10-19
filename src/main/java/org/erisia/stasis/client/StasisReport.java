@@ -103,6 +103,22 @@ public final class StasisReport {
             o.add("spawn_area", a);
         }
         o.addProperty("index_version", Stasis.version());
+        o.addProperty("running_here_land", Stasis.isRunningLand(level, bp));
+        // spreading mode: the client's view (Spread.client) and the rank under the player as the client reads it
+        var sp = org.erisia.stasis.Spread.client;
+        if (org.erisia.stasis.StasisConfig.spreading()) {
+            JsonObject so = new JsonObject();
+            so.addProperty("active", org.erisia.stasis.Spread.active(level));
+            so.addProperty("has_map", sp.map() != null);
+            so.addProperty("count", sp.count());
+            so.addProperty("p", sp.p());
+            so.addProperty("hard", sp.hard());
+            so.addProperty("complete", sp.complete());
+            so.addProperty("tiles", org.erisia.stasis.Spread.clientTiles.size());
+            if (sp.map() != null) so.addProperty("rank1024_here", org.erisia.stasis.SpreadMap.rank1024(sp.map(), bp.getX(), bp.getZ()));
+            so.addProperty("runs_here", Stasis.spreadRuns(level, bp.getX(), bp.getZ()));
+            o.add("spread", so);
+        }
         o.addProperty("tickrate", level.tickRateManager().tickrate());
         o.addProperty("freeze_progress", StasisNet.clientFreeze);
         o.addProperty("strain", StasisPost.lastStrain);
@@ -353,9 +369,10 @@ public final class StasisReport {
 
     static final int[][] HEADLINE = {
         {16, 6, 0}, {22, 1, 1}, {23, 1, 2}, {24, 1, 3}, {25, 4, 4}, {29, 2, 5}, {31, 1, 6}, {216, 1, 7}, {218, 1, 8},
-        {1312, 8, 9}, {1596, 1, 10}, {256, 1, 11}, {200, 8, 12}, {184, 4, 13}, {188, 8, 14}};
+        {1312, 8, 9}, {1596, 1, 10}, {256, 1, 11}, {200, 8, 12}, {184, 4, 13}, {188, 8, 14}, {196, 4, 15}};
     static final String[] HEADLINE_NAMES = {"camera", "stops", "freeze", "count", "spawn_area", "clocks", "drifting_deeps",
-        "view_distance", "static_deeps", "storm", "strain", "bolts", "eyes", "strata_mask", "pocket_periods"};
+        "view_distance", "static_deeps", "storm", "strain", "bolts", "eyes", "strata_mask", "pocket_periods",
+        "spread_on_p_window"};
 
     static JsonObject postData() {
         JsonObject o = new JsonObject();

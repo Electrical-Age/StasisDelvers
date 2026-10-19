@@ -9,7 +9,10 @@
 // min > max); [29] time (s); [30] eddy time (s, Eddies.time); [31] drifting deep count; [168 + 2i, 169 + 2i] static
 // deep i's lowest and highest ground - floor(camera y); [176..182] the mist's clocks (mistWind ..); [184..186] the strata
 // mask's corner - floor(camera); [187] strata mask valid (0/1); [188..191] the weather clock mod each pocket epoch
-// length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196..199] unused; [200..203] static deep
+// length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196] spreading mode decides the
+// columns here (0/1: Spread.active), [197] its progress P (exact), [198, 199] the first cell (x, z, global cell
+// indices) of the rank window in SpreadSampler (64 x 64 cells, one rank per texel as int bits in r..a, MISSING =
+// 2147483647 where no tile came: runs); [200..203] static deep
 // i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
 // static deep i's eye centre (the warped core) - floor(camera); [1580 + 4i] its NDC x, y, distance, in front (0/1);
 // [1596] strain on reality (0..1, nearness to a core); [1597 + i] static deep i's inhale before a puff (0..1); [216] render distance (blocks); [1312] storm
@@ -44,6 +47,7 @@ uniform sampler2D MistSampler;
 #ifdef FULL_PASS
 uniform sampler2D MistBufSampler;
 uniform sampler2D StrataBufSampler;
+uniform sampler2D SpreadSampler;
 #endif
 #ifdef STRATA_PASS
 uniform sampler2D StrataSampler;
@@ -962,6 +966,45 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
     return vec4(col, 0.0);
 }
 
+// ---- spreading mode (Spread, docs/spreading-mode.md): the server's rule per block column, in exact integers
+
+const int SPREAD_WINDOW = 64, SPREAD_MISSING = 2147483647;
+
+// The rank of global cell c (SpreadTiles.rank): the window's texel, MISSING outside it
+int spreadRank(ivec2 c) {
+    ivec2 t = c - ivec2(int(data(198)), int(data(199)));
+    if (any(lessThan(t, ivec2(0))) || any(greaterThanEqual(t, ivec2(SPREAD_WINDOW)))) return SPREAD_MISSING;
+    uvec4 b = uvec4(round(texelFetch(SpreadSampler, t, 0) * 255.0));
+    // (the sign bit by hand: an int built from a uint over 2^31 is not portable)
+    int v = int(b.r | (b.g << 8) | (b.b << 16) | ((b.a & 127u) << 24));
+    return b.a >= 128u ? v - 2147483647 - 1 : v;
+}
+
+// SpreadMap.stilled through SpreadMap.stilledSplit (rank x 1024 overflows 32 bits on big maps): the bilinear between
+// the cell centres 32i + 16 with integer weights summing to 1024; stilled iff sum w (r - P) < 0, each r - P split
+// into high and low 16 bits. SpreadTilesTest checks the Java twin against the exact sum.
+bool spreadStilled(ivec2 blk, int p) {
+    ivec2 f = blk - 16;
+    ivec2 c = f >> 5;                  // floorDiv by 32 (arithmetic shift)
+    int a = f.x - c.x * 32, b = f.y - c.y * 32;
+    int w00 = (32 - a) * (32 - b), w10 = a * (32 - b), w01 = (32 - a) * b, w11 = a * b;
+    int d00 = spreadRank(c) - p, d10 = spreadRank(c + ivec2(1, 0)) - p, d01 = spreadRank(c + ivec2(0, 1)) - p, d11 = spreadRank(c + ivec2(1, 1)) - p;
+    int hi = w00 * (d00 >> 16) + w10 * (d10 >> 16) + w01 * (d01 >> 16) + w11 * (d11 >> 16);
+    int lo = w00 * (d00 & 0xFFFF) + w10 * (d10 & 0xFFFF) + w01 * (d01 & 0xFFFF) + w11 * (d11 & 0xFFFF);
+    return hi + (lo >> 16) < 0;
+}
+
+// Does drifting deep dp stop block blk (- floor(camera)) of running spread land? Deeps.intensity at the block's
+// centre (the same ragged edge) above Deeps.THRESHOLD, within the height band surface - 6 .. surface + 64 (the
+// surface from the deep's ground grid here: Deeps.inBand reads the column's own; close, not exact)
+bool deepStops(Deep dp, vec3 blk, vec3 camI, float yb) {
+    vec2 bc = blk.xz + 0.5;
+    vec3 wc = vec3(bc.x, 0.0, bc.y) + camI;
+    float dist = length(bc - dp.c) + 3.0 * (value32(vec3(wc.x / 7.0, 0.5, wc.z / 7.0), dp.id) - 0.5) * 2.0;
+    float h = smoothstep(0.0, 4.0, dp.R - dist) * min(1.0, dp.st * 1.5);
+    return dp.st > 0.0 && h > 0.5 && blk.y >= floor(yb) - 6.0 && blk.y <= floor(yb) + 64.0;
+}
+
 // strata weather colours: the mist a little darker than the deeps' (underground), the warning violet
 const vec3 STRATA_MIST = vec3(0.42, 0.40, 0.50), STRATA_VIOLET = vec3(0.62, 0.22, 0.95);
 
@@ -1030,6 +1073,14 @@ void main() {
             }
             run = max(run, inside);
         }
+        // spreading mode: land the stillness hasn't reached runs, whatever the fields (Stasis.rateAt), except where a
+        // drifting deep stops it (below). The block column as the server sees it; the sky takes the camera's.
+        float spreadRun = 0.0;
+        if (data(196) > 0.5) {
+            ivec2 blk = ivec2(camInt.xz) + ivec2(floor(p.xz));
+            spreadRun = spreadStilled(blk, int(data(197))) ? 0.0 : 1.0;
+        }
+        bool deepStop = false;
         float l = dot(c, vec3(0.299, 0.587, 0.114));
         // drifting deeps along the view ray, up to the scene or as far as terrain renders (cylindrical: rd sqrt 2)
         float rd = max(data(216), 32.0);
@@ -1049,7 +1100,11 @@ void main() {
                 vec3 q = depth > 0.0 ? p : camFrac;
                 dp.yb = groundAt(GROUND_BASE + 64 * hits[i].idx, hits[i].g, q.xz);
                 deep = max(deep, deepShape(dp, q, camInt));
+                // over running spread land a drifting deep stops time (Baughn 2026-10-19), unless a field holds it off
+                if (spreadRun > 0.0 && !deepStop) deepStop = deepStops(dp, floor(q), camInt, dp.yb);
             }
+        // the spread's running land joins the fields' (a field or the spawn area holds a deep off: run stays theirs)
+        run = max(run, deepStop ? 0.0 : spreadRun);
         deep *= (1.0 - run) * viewFade(rel, rd);
         int nsd = int(data(218));
         float riftHere = 0.0, fringe = 0.0;

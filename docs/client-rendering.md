@@ -26,7 +26,11 @@ through hooks set in `StasisClient`.
 - `FrozenSprites.java` (+ common `FrozenTextures.java`): a sprite source (`assets/minecraft/atlases/blocks.json`)
   adds the first frame of every animated block texture as `stasisdelvers:frozen/<ns>/<path>`.
   - Chunk meshing swaps in those sprites in stopped land (`SectionCompilerMixin`, `FluidRendererMixin`).
-  - `fieldsChanged` re-meshes the sections whose state changed.
+  - `fieldsChanged` re-meshes the sections whose state changed. In spreading mode `spreadMoved` re-meshes (and relights
+    flames in) only the loaded chunks whose [`chunkMin1024`, `chunkMax1024`] the new P crossed, or that a newly
+    arrived rank tile covers and aren't wholly running; at most once a second (`FLUSH_TICKS`).
+  - Meshing and flame light read `Stasis.rateAtLand` (no eddies, no drifting deeps): nothing re-meshes or relights as
+    weather drifts by, and it never reads a heightmap off the main thread.
 - `WaterLines.java`: streaks on frozen pre-crash water pointing at the nearest rift core (meshing only).
 - `FrozenEntities.java`: holds entities still on the client in stopped land (players excepted).
 - `AntiSound.java`: lightning silences other sounds, and failing fields low-pass them (via the AT on
@@ -34,7 +38,8 @@ through hooks set in `StasisClient`.
 - `RiftHum.java`, `LocalClock.java` (+ `LocalClockMark.java`, `ClientClock*Mixin`: the sky shows local time),
   `SuitGauge.java`, `SuitArm.java`, `StatueRenderer.java`, `ConsoleScreen.java`.
 - `compat/xaero/` (`StoppedLand`, `MinimapHighlighter`, `WorldMapHighlighter`): the stopped-land overlay on
-  Xaero's maps (mixins in `mixin/xaero/`).
+  Xaero's maps (mixins in `mixin/xaero/`). It reads `rateAtLand`; the world map's region hash changes with the
+  fields, with P every 1/2000 of the map, and with the rank tiles.
 
 ## Post chain (`post_effect/stasis.json`), in order
 1. `stasisdelvers:post/stasis_mist` → target `mist` (800x450): deep mist, low resolution.
@@ -43,7 +48,8 @@ through hooks set in `StasisClient`.
    freeze warning, shield hexes, eye, storm glow, bolts.
 4. `minecraft:post/blit` → `minecraft:main`.
 - Inputs: `minecraft:main` colour and depth, `stasisdelvers:fielddata` (1024x4 float, `textures/effect/fielddata.png`
-  registered as a `DynamicTexture`), `stasisdelvers:mistnoise` (`textures/effect/mistnoise.png`).
+  registered as a `DynamicTexture`), `stasisdelvers:mistnoise` (`textures/effect/mistnoise.png`), and for the full
+  pass only `stasisdelvers:spreadranks` (64x64, `SpreadSampler`, see "Spreading mode" below).
 - `stasis_mist.fsh` and `stasis_strata.fsh` **don't exist in the source tree**: `processResources` in
   `build.gradle` generates them from `shaders/post/stasis.fsh` by adding `#define MIST_PASS` or `STRATA_PASS`
   after `#version`. One file, three passes (`FULL_PASS` otherwise).
@@ -56,6 +62,7 @@ through hooks set in `StasisClient`.
     count, spawn area, clocks, drifting-deep count
   - 32 + 10i: field i (centre, radius, collapse, failing, column, seed, age, remnant time)
   - 168-219: static deeps' ground range, mist clocks, strata mask, pocket clocks, eyes (`ns` ≤ 4), render distance
+  - 196-199: spreading mode: on (1 while `Spread.active`), P, the rank window's first cell x, z
   - 220 + 5i: static deep i
   - 256-259 + 260 + 5i: bolts
   - 1024 + 12i: drifting deep i (`DEEP_BASE`, `DEEP_STRIDE`, `MAX_DEEPS` = 24)
@@ -70,7 +77,25 @@ through hooks set in `StasisClient`.
   moving slot blocks.
 - `DEEP_BASE`/`DEEP_STRIDE`/`MAX_DEEPS`/`GROUND_BASE` are duplicated in `stasis.fsh` (`const int ...`, and
   `STATIC_GROUND = 2048 + 64 * MAX_DEEPS`). Change both sides together.
-- `StasisReport` decodes the texture for bug reports (`raw_format`). Keep it in step too.
+- `StasisReport` decodes the texture for bug reports (`raw_format`; slots 196-199 as `spread_on_p_window`, and the
+  client's spread state under `basics.spread`). Keep it in step too.
+
+## Spreading mode in the shader (docs/spreading-mode.md)
+- `StasisPost.spreadFrame` uploads a 64x64-cell rank window (`SPREAD_WINDOW`, 2048 blocks square) from the client's
+  `SpreadTiles`, one rank per texel as int bits (`setPixelABGR`, decoded like the data slots; MISSING =
+  `Integer.MAX_VALUE` where no tile came). Re-centred when the camera is 12 cells off centre, refilled when the
+  tiles change (`SpreadTiles.generation`). Slot 196 is 0 outside spreading mode, off the overworld and once complete.
+- `stasis.fsh spreadStilled` is `SpreadMap.stilledSplit`: the same bilinear in exact 32-bit integers (rank × 1024
+  overflows an int for maps over ~2M cells). `SpreadTilesTest` checks the Java twin against the exact sum at every
+  offset and boundary; the GLSL is the same arithmetic line by line, so per block column the shader's answer is the
+  server's. The sky (depth 0) takes the camera's column.
+- `run` (colour kept) = max(the fields and spawn area, spread-running land unless a drifting deep stops it).
+  `deepStops` mirrors `Deeps.intensity` at the block centre (same ragged-edge noise, `> Deeps.THRESHOLD`); its height
+  band uses the deep's ground grid instead of the column's heightmap, so the band's ends can differ by a block or two.
+  The deep, static-zone and strain greys multiply by `1 - run` as before, so they show over running land only where it
+  is stopped (a drifting deep), matching `rateAt`. The edge is per block, as the server's rule (no soft border).
+- Known gaps: a collapsing field on running land holds a deep off in `rateAt` (any field containing the block) but
+  only its uncollapsed part does in the shader; a scene point whose deep is past `MAX_HITS` along the ray misses it.
 
 ## Invariants
 - Reversed-Z depth: the shaders reconstruct world positions accordingly (`stasis.fsh`, `flashlight.fsh`).
@@ -79,8 +104,8 @@ through hooks set in `StasisClient`.
   (otherwise the hand would vanish).
 - The shader mirrors Java: `Noise` (hash32/vnoise32/fbm32), `Field.collapseScore`, `Pockets` periods, the
   deep shapes. A change on one side needs the other.
-- Frozen textures depend on `Stasis.sectionState` and `rateAt` from mesh worker threads, which read the
-  lock-free `clientIndex` and `StaticDeeps.sectionMayHave`.
+- Frozen textures depend on `Stasis.sectionState` and `rateAtLand` from mesh worker threads, which read the
+  lock-free `clientIndex`, `StaticDeeps.sectionMayHave` and the client's `SpreadTiles` (a `ConcurrentHashMap`).
 
 ## Tests
 - `frozen_texture_math` (the `FrozenTextures` pure parts), `tower_shield_shows_drain`, `stretched_field_shape`.

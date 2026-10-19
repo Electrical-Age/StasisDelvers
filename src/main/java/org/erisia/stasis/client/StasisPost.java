@@ -56,10 +56,26 @@ public final class StasisPost {
     /** A drifting deep's ground lattice spacing: G - 1 steps cover radius + 6 (at most ~54) on both sides plus a step of slack. */
     static final double MOVING_STEP = 19;
 
+    /**
+     * Spreading mode: the rank window, SPREAD_WINDOW x SPREAD_WINDOW cells of the client's rank tiles round the camera
+     * (one rank per texel, int bits in rgba; stasis.fsh spreadRank), its first cell in slots 198, 199, P in 197.
+     */
+    static final Identifier SPREAD = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/spreadranks.png");
+    static final int SPREAD_WINDOW = 64;
+    /** Re-centred once the camera is this many cells off the window's centre (64 cells = 2048 blocks; terrain <= 512 + a cell). */
+    static final int SPREAD_RECENTRE = 12;
+    static DynamicTexture spreadTexture;
+    /** The window's first cell, and what it was filled from (refilled when the tiles or the map change). */
+    static int spreadX0 = Integer.MIN_VALUE, spreadZ0;
+    static int spreadGeneration = -1;
+    static Object spreadMap;
+
     /** On the render thread (texture creation asserts it): the first frame. */
     static void init() {
         texture = new DynamicTexture(() -> "stasisdelvers field data", WIDTH, ROWS, true);
         Minecraft.getInstance().getTextureManager().register(DATA, texture);
+        spreadTexture = new DynamicTexture(() -> "stasisdelvers spread ranks", SPREAD_WINDOW, SPREAD_WINDOW, true);
+        Minecraft.getInstance().getTextureManager().register(SPREAD, spreadTexture);
         StrataMask.init();
     }
 
@@ -312,6 +328,7 @@ public final class StasisPost {
                         d[1320 + j * 16 + i] = (float) (surface(mc, gx + i * 16, gz + j * 16, cam.y - 10) - fy);
             }
         }
+        spreadFrame(mc, d, cam.x, cam.z);
         int[] periods = {600, 900, 1200, 1800};
         for (int i = 0; i < 4; i++) {
             d[188 + i] = (float) (clock - Math.floor(clock / periods[i]) * periods[i]);
@@ -326,6 +343,44 @@ public final class StasisPost {
         if (img == null) return;
         for (int i = 0; i < SLOTS; i++) img.setPixelABGR(i % WIDTH, i / WIDTH, Float.floatToRawIntBits(d[i]));
         texture.upload();
+    }
+
+    /**
+     * Spreading mode's slots (196 on/off, 197 P, 198-199 the window's first cell) and the rank window: re-centred when
+     * the camera wanders SPREAD_RECENTRE cells off, refilled when tiles come or go. Off (196 = 0): the base rules, as
+     * when the spread is complete or the dimension isn't the overworld. No map yet: on, with every cell MISSING (runs).
+     */
+    static void spreadFrame(Minecraft mc, float[] d, double camX, double camZ) {
+        if (!org.erisia.stasis.Spread.active(mc.level) || !Stasis.stops(mc.level) || spreadTexture == null) {
+            d[196] = 0;
+            return;
+        }
+        var s = org.erisia.stasis.Spread.client;
+        int ccx = Math.floorDiv((int) Math.floor(camX) - 16, org.erisia.stasis.SpreadMap.CELL);
+        int ccz = Math.floorDiv((int) Math.floor(camZ) - 16, org.erisia.stasis.SpreadMap.CELL);
+        int half = SPREAD_WINDOW / 2;
+        boolean moved = spreadX0 == Integer.MIN_VALUE || Math.abs(ccx - (spreadX0 + half)) > SPREAD_RECENTRE
+            || Math.abs(ccz - (spreadZ0 + half)) > SPREAD_RECENTRE;
+        int gen = org.erisia.stasis.Spread.clientTiles.generation();
+        if (moved || gen != spreadGeneration || s.map() != spreadMap) {
+            if (moved) {
+                spreadX0 = ccx - half;
+                spreadZ0 = ccz - half;
+            }
+            spreadGeneration = gen;
+            spreadMap = s.map();
+            var img = spreadTexture.getPixels();
+            if (img != null) {
+                for (int k = 0; k < SPREAD_WINDOW; k++)
+                    for (int i = 0; i < SPREAD_WINDOW; i++)
+                        img.setPixelABGR(i, k, s.map() == null ? org.erisia.stasis.SpreadTiles.MISSING : s.map().rank(spreadX0 + i, spreadZ0 + k));
+                spreadTexture.upload();
+            }
+        }
+        d[196] = 1;
+        d[197] = s.p();
+        d[198] = spreadX0;
+        d[199] = spreadZ0;
     }
 
     /** Per eye (static deep id): its facing (rad) and when it may move next (weather clock, s). */
