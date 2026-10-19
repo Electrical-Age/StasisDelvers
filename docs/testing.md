@@ -68,6 +68,8 @@ debugging:
 - `ruined_cottage_templates` (23d07eb: far test chunk didn't tick)
 - `eddies_stop_mobs`, `flames_*`, `tower_collapses_when_empty` (a15602d)
 - `rift_crystals_grow` (5907f24: cross-chunk keys)
+- `time_resumes` (new_chunk_grace's chunk grace reached its sand when the grid put both in one chunk;
+  new_chunk_grace is isolated now)
 
 These are deliberately soft, so a pass proves less than it seems:
 - `rate_perf` only logs a timing.

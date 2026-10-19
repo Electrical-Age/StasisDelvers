@@ -132,7 +132,9 @@ public final class StasisGameTests {
             };
         }));
         // Baughn: a newly generated chunk runs a few seconds before it stops (mobs generated on top of each other
-        // walk apart): sand in its grace falls; once the grace is over, new sand hangs
+        // walk apart): sand in its grace falls; once the grace is over, new sand hangs. Isolated: the grace is for a
+        // whole chunk column, and the test grid (rows 15 apart) can put a neighbour's blocks in the same chunk (in
+        // 1 run of 16, time_resumes' sand fell in this grace)
         CASES.put("new_chunk_grace", new Spec(60, (h, c) -> {
             ServerLevel level = h.getLevel();
             BlockPos a = new BlockPos(12, 3, 4), b = new BlockPos(13, 3, 4);
@@ -145,7 +147,7 @@ public final class StasisGameTests {
                     h.getBlockState(a).toString());
                 c.check("after the grace it stopped: new sand hangs", h.getBlockState(b).is(Blocks.SAND));
             };
-        }, false));
+        }, false, true));
         // scheduled fluid ticks
         CASES.put("water_flows_only_inside", new Spec(30, (h, c) -> {
             h.setBlock(new BlockPos(3, 1, 4), Blocks.WATER);
