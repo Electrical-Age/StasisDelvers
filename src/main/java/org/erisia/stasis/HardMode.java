@@ -10,7 +10,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.end.EnderDragonFight;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
 
@@ -196,10 +198,44 @@ public final class HardMode {
                     n++;
                 }
                 StasisDelvers.LOG.info("Hard mode's flash: {} player(s) sent out of the End", n);
-                if (end != null) EndRift.flash(end);
+                if (end != null) {
+                    EndRift.flash(end);
+                    endFight(end);
+                }
                 Spread.refresh(srv);   // the End stills now
             }
         } else if (t >= END_WINDOW) event = null;
+    }
+
+    /**
+     * At the flash the dragon fight ends as a kill would end it (AdventurAgent: after /stasis spread hardmode the dragon
+     * was still alive): every dragon in the End is discarded (no death animation, so no drops and no flood of XP), and
+     * the fight is marked killed with its boss bar gone, as EnderDragonFightMixin does for a real kill. Otherwise the
+     * fight would look for its dragon and spawn a new one. A dragon in a chunk not loaded now is dropped when it loads
+     * (dragonJoin).
+     */
+    static void endFight(ServerLevel end) {
+        int n = 0;
+        for (EnderDragon d : end.getEntities(net.minecraft.world.entity.EntityTypes.ENDER_DRAGON, x -> true)) {
+            d.discard();
+            n++;
+        }
+        EnderDragonFight f = end.getDragonFight();
+        if (f != null && !f.dragonKilled) {
+            f.dragonEvent.setProgress(0.0F);
+            f.dragonEvent.setVisible(false);
+            f.dragonEvent.removeAllPlayers();
+            f.dragonKilled = true;
+            f.hasPreviouslyKilledDragon = true;
+            f.setDirty();
+        }
+        if (n > 0) StasisDelvers.LOG.info("Hard mode's flash: {} dragon(s) still alive removed", n);
+    }
+
+    /** EntityJoinLevelEvent: after the flash no dragon comes back into the End (one saved in a chunk loading later). */
+    static void dragonJoin(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e) {
+        if (e.getEntity() instanceof EnderDragon && e.getLevel().dimension() == Level.END && e.getLevel() instanceof ServerLevel end
+            && StasisConfig.spreading && Spread.hard(end.getServer()) && !holdsEndOpen()) e.setCanceled(true);
     }
 
     /** The stand-in for step 5's animation: explosions over the island growing denser, white flashes at the end. */

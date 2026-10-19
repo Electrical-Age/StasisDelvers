@@ -169,6 +169,10 @@ rewrite) and 5 (the island's breaking up into the End rift, as the crystals fall
     respawn rule: a bed or anchor in stopped land sends an unprotected player to world spawn), gets the advancement
     `stasisdelvers:breaking_it` "Good job breaking it, hero" (hidden, a challenge under "Free the End", end crystal
     icon, impossible trigger granted in code), and the short grace of a dimension change (`Freezing.grace`).
+  - Also at the flash (`HardMode.endFight`) a dragon still alive (`/stasis spread hardmode`; AdventurAgent) is
+    discarded (no death animation: no drops, no XP) and the fight is ended as a kill ends it (`dragonKilled`,
+    `hasPreviouslyKilledDragon`, boss bar hidden and emptied; the AT opens those fields), or it would look for its dragon
+    and spawn a new one. A dragon saved in a chunk not loaded then is dropped when it loads (`dragonJoin`).
   - Only at the flash does the End still (`State.endStill`, synced): stopped at the kill, its players would be statues
     (5 s) before the flash. `Spread.update` then invalidates and relights the End.
   - For 30 s after the kill (`END_WINDOW`) a player dying in the End is sent home the same way instead

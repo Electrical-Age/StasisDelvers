@@ -14,7 +14,8 @@ The background audit (written before the cleanup, with 36 mixins) is
 - `src/main/resources/META-INF/accesstransformer.cfg` replaced the 8 accessor and invoker mixins and backs
   the event-based replacements. Each line has a comment saying who uses it.
   - Server: `ItemEntity.pickupDelay`, `StructurePiece.getWorldPos`, `Display.setTransformation`,
-    `Display$BlockDisplay.get/setBlockState`, `ServerPlayerGameMode.gameTicks`, `LivingEntity.attackStrengthTicker`.
+    `Display$BlockDisplay.get/setBlockState`, `ServerPlayerGameMode.gameTicks`, `LivingEntity.attackStrengthTicker`,
+    `EnderDragonFight.dragonEvent/dragonKilled/hasPreviouslyKilledDragon` (`HardMode.endFight`).
   - Client: `RenderSectionRegion.level`, `SoundManager.soundEngine`, `Channel.source`,
     `SoundEngine.instanceToChannel`, `ChatComponent.allMessages`, `Particle` fields.
 - Moved to events in the cleanup:
