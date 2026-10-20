@@ -163,7 +163,7 @@ public class RiftPuppeteer extends RiftFauna {
      * of specks from the cloud into the host.
      */
     void clientCloud() {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 12; i++) {
             double dx = (random.nextDouble() - 0.5) * 2.4, dz = (random.nextDouble() - 0.5) * 2.4, dy = random.nextDouble() * 0.8;
             if (dx * dx + dz * dz > 1.44) continue;
             int kind = random.nextInt(10);
@@ -174,7 +174,7 @@ public class RiftPuppeteer extends RiftFauna {
         Entity host = pourId >= 0 ? level().getEntity(pourId) : null;
         if (host != null) {
             Vec3 a = position().add(0, 0.4, 0), b = host.position().add(0, host.getBbHeight() * 0.6, 0);
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < 16; i++) {   // (AdventurAgent: 6 a tick made no visible column)
                 double f = random.nextDouble();
                 Vec3 q = a.lerp(b, f);
                 level().addParticle(staticDust(random.nextInt(3)), q.x + (random.nextDouble() - 0.5) * 0.3, q.y + (random.nextDouble() - 0.5) * 0.3,

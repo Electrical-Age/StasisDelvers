@@ -2421,7 +2421,7 @@ public final class StasisGameTests {
         }, true, true));
         // a host moves in stutter bursts towards the nearest survival player, frozen between; hits on it go to the grip,
         // and at 0 the static bursts out and the host freezes again, unhurt
-        CASES.put("possessed_mob_stutters_and_lets_go", new Spec(120, (h, c) -> {
+        CASES.put("possessed_mob_stutters_and_lets_go", new Spec(140, (h, c) -> {
             ServerLevel level = h.getLevel();
             AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
             org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
@@ -2430,6 +2430,7 @@ public final class StasisGameTests {
             ServerPlayer p = survivalPlayer(h, new Vec3(10.5, 1.0, 1.5), false);   // (in grace: no statue during the test)
             double d0 = Math.sqrt(pig.distanceToSqr(p));
             int[] ran = {0, 0};
+            float[] hp0 = {0};
             h.runAtTickTime(2, () -> org.erisia.stasis.Possession.start(level, pig));
             h.onEachTick(() -> {
                 if (!org.erisia.stasis.Possession.possessed(pig)) return;
@@ -2441,9 +2442,12 @@ public final class StasisGameTests {
                 c.check("it came closer", d1 < d0 - 1.5, String.format("%.1f -> %.1f", d0, d1));
                 double share = ran[0] / (double) Math.max(1, ran[1]);
                 c.check("it ran in bursts, frozen most of the time", share > 0.05 && share < 0.6, String.format("ran %d of %d ticks", ran[0], ran[1]));
-                float hp = pig.getHealth();
-                for (int i = 0; i < 3; i++) pig.hurtServer(level, level.damageSources().generic(), 3f);
-                c.check("hits went to the grip: the pig is unhurt", pig.getHealth() == hp, pig.getHealth() + " of " + hp);
+                hp0[0] = pig.getHealth();
+            });
+            // three fist-sized hits, a swing apart (one swing counts once), break the grip of 6
+            for (int t : new int[]{100, 110, 120}) h.runAtTickTime(t, () -> pig.hurtServer(level, level.damageSources().generic(), 1f));
+            h.runAtTickTime(122, () -> {
+                c.check("hits went to the grip: the pig is unhurt", pig.getHealth() == hp0[0], pig.getHealth() + " of " + hp0[0]);
                 c.check("the grip broke: it let go", !org.erisia.stasis.Possession.possessed(pig));
                 c.check("the static burst out", !level.getEntitiesOfClass(org.erisia.stasis.RiftPuppeteer.class, pig.getBoundingBox().inflate(3)).isEmpty());
             });

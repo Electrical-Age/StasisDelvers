@@ -35,8 +35,8 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 - `Possession.java`: the host (memory only; `POSSESSED` attachment synced, not saved). Its goals' flags are all switched
   off; it runs in **bursts** of 2-8 ticks with 5-40 frozen between (/(1 + dread)), `Stasis.isFrozen` false only in a burst
   (so the FROZEN sync and the client's stillness follow); each burst paths it at the nearest survival player within 32
-  (speed 1.3 x (1 + dread)). It hits for 3 at reach, every 30 ticks. The fauna wall applies (put back where it last stood
-  stopped). Damage to the host goes to the grip (8) instead; at 0 the static bursts out (a Puppeteer) and the host freezes
+  (speed 1.3 x (1 + dread)). It hits for 3 at reach, every 30 ticks, without knockback. The fauna wall applies (put back where it last stood
+  stopped). Damage to the host goes to the grip (6) instead, each swing at least 2 and once per 8 ticks (3 fist hits); at 0 the static bursts out (a Puppeteer) and the host freezes
   where it is, unhurt. No prey for 400 ticks: it pours out; no dread for FADE_TICKS: it dissolves.
   - Client (`client/PossessedLook`): purple eyes (two full-bright quads at eye height, on the head's front by its yaw;
     `RenderLivingEvent.Post`, render data from `RegisterRenderStateModifiersEvent`) and a static haze (EntityTickEvent.Pre at

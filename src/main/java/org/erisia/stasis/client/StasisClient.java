@@ -26,8 +26,6 @@ public final class StasisClient {
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.RIFT_PUPPETEER.get(),
             net.minecraft.client.renderer.entity.NoopRenderer::new));
-        modBus.addListener(PossessedLook::modifiers);
-        NeoForge.EVENT_BUS.addListener(PossessedLook::eyes);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, PossessedLook::haze);
         // (Static has no model: it draws itself as particles, RiftStatic.clientStatic)
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.RIFT_STATIC.get(),

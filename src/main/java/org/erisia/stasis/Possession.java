@@ -28,7 +28,9 @@ public final class Possession {
     private Possession() {
     }
 
-    public static final float GRIP = 8;
+    /** The grip, in hits worth at least {@link #HIT_WORTH} each (AdventurAgent: fists did 1 a hit, and 7 hits didn't free
+     *  the cow when the grip was 8 damage). */
+    public static final float GRIP = 6, HIT_WORTH = 2;
     static final int LOST_TICKS = 400;
     static final double SENSE = 32;
     static final float HIT = 3;
@@ -37,6 +39,7 @@ public final class Possession {
         float grip = GRIP;
         long burstUntil, nextBurst;   // game times: running while now < burstUntil
         int lostTicks, calmTicks, hitCooldown;
+        long lastHurt = -100;
         BlockPos lastStopped;
         float dread;
     }
@@ -145,7 +148,10 @@ public final class Possession {
         }
         if (prey != null && now < h.burstUntil && h.hitCooldown == 0
             && host.distanceToSqr(prey) < Math.pow(1.4 + host.getBbWidth() / 2, 2)) {
+            var v = prey.getDeltaMovement();
             prey.hurtServer(level, level.damageSources().mobAttack(host), HIT);
+            prey.setDeltaMovement(v);   // (no knockback: AdventurAgent was knocked off a ledge, "doomed to fall by Cow")
+            prey.needsSync = true;
             h.hitCooldown = 30;
         }
     }
@@ -155,8 +161,10 @@ public final class Possession {
         if (!(e.getEntity() instanceof Mob host) || !(host.level() instanceof ServerLevel level)) return;
         Hold h = HOSTS.get(host);
         if (h == null) return;
-        h.grip -= e.getAmount();
         e.setCanceled(true);
+        if (level.getGameTime() - h.lastHurt < 8) return;   // (one swing, one hit)
+        h.lastHurt = level.getGameTime();
+        h.grip -= Math.max(HIT_WORTH, e.getAmount());
         level.playSound(null, host.blockPosition(), net.minecraft.sounds.SoundEvents.SCULK_CLICKING_STOP, net.minecraft.sounds.SoundSource.HOSTILE, 1f, 0.6f);
         if (h.grip <= 0) release(level, host, true);
     }
