@@ -42,6 +42,8 @@ public final class FaunaSpawner {
     private static final Map<UUID, State> STATES = new ConcurrentHashMap<>();
     /** GameTests: spawn rolls ignore the cooldowns and use this chance factor when set (NaN: off). */
     public static volatile double testChance = Double.NaN;
+    /** GameTests: where spawn tries land (the test floor; the land 16-48 blocks out may be void there). */
+    public static volatile java.util.function.Function<ServerPlayer, BlockPos> testSpot = null;
 
     static State state(ServerPlayer p) {
         return STATES.computeIfAbsent(p.getUUID(), k -> new State());
@@ -73,7 +75,7 @@ public final class FaunaSpawner {
         double chance = test ? testChance : StasisConfig.faunaChance;
         int made = 0;
         for (int i = 0; i < TRIES && made < room; i++) {
-            BlockPos spot = spot(level, p);
+            BlockPos spot = testSpot != null ? testSpot.apply(p) : spot(level, p);
             if (spot == null) continue;
             float dread = Dread.at(level, spot.getX(), spot.getY(), spot.getZ());
             if (dread <= 0 || level.getRandom().nextDouble() >= chance * dread) continue;

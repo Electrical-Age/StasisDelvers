@@ -121,6 +121,9 @@ public final class Freezing {
         // missing suit pieces (a chest piece is enough in the plain Grey: λ-Nero, Baughn): in a deep each one adds to the
         // drain and lets the freeze creep in a quarter faster
         int missing = deep && !p.isCreative() && !p.isSpectator() ? Math.min(3, Suits.missing(p)) : 0;
+        // Static (rift fauna) feeds on suit charge: each one within reach adds the suit's own draw again (at most 3); a rift
+        // capacitor takes the surcharge like the weather's. Only in stopped land: a field is safety (λ-Nero)
+        int statics = stopped && !p.isCreative() && !p.isSpectator() ? RiftStatic.feeding(level, p) : 0;
         if (zone == 2 && !grace && !p.isCreative() && !p.isSpectator()) {
             // a rift: nothing protects, a statue in about 3 s (Baughn). No messages for deeps, rifts or eddies: fear of
             // the unknown is part of the theme (Baughn)
@@ -131,7 +134,7 @@ public final class Freezing {
         } else if (held) {
             s.ticks = StasisConfig.freezeTicks - 1;
             suited = true;
-        } else if (stopped && !grace && !(suited = isProtected(p, (zone == 1 ? 3 : deep ? 2 : 1) * (1 + missing), true))) {
+        } else if (stopped && !grace && !(suited = isProtected(p, (zone == 1 ? 3 : deep ? 2 : 1) * (1 + missing) * (1 + statics), true))) {
             s.ticks = eddy ? Math.min(s.ticks + 1, StasisConfig.freezeTicks - 1) : s.ticks + 1;
             // a drifting deep over running spread land holds an unsuited player instead (the switch above)
             if (spreadDeep && SPREAD_DEEP_HOLDS && s.ticks >= StasisConfig.freezeTicks - 1) {

@@ -17,7 +17,9 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
     the other direction).
   - Speed x (1 + dread), so at most 2x (λ-Nero). Updated every 10 ticks.
   - Dread 0 at and around it for `FADE_TICKS` (200) and it dissolves (static particles, no drop).
-- `RiftStatic.java`: Static, the suit drainer (F2 adds the drain). No model: `NoopRenderer`, and the client draws a knot
+- `RiftStatic.java`: Static, the suit drainer. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
+  `Freezing.tick` multiplies the suit's draw factor by 1 + that, in stopped land only (a field is safety), so a rift
+  capacitor takes the surcharge like the weather's. It never hits. Sounds: sculk clicking (a Geiger-ish crackle). No model: `NoopRenderer`, and the client draws a knot
   of static pixels (`DustParticleOptions` black / white / violet; in stopped land they hang and fade, `ParticleGroupMixin`).
 - `FaunaSpawner.java`: its own spawn pass (vanilla vetoes natural spawns in stopped land, and its caps are per category).
   - Every 40 ticks per player in a stopping dimension, at most once per roll (45-90 s): 4 spots 16-48 blocks out,
@@ -34,6 +36,7 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 `stoppedLandEndermen` (time-stop.md).
 
 ## Tests
-`fauna_dread`, `fauna_field_is_a_wall`, `fauna_failing_field_lets_in`, `fauna_field_grows_over_them`,
-`fauna_fades_without_dread`, `fauna_spawner_caps` (isolated), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
+`fauna_dread`, `fauna_failing_field_lets_in`, `fauna_field_grows_over_them`,
+`fauna_fades_without_dread`, `fauna_spawner_caps` (isolated; `FaunaSpawner.testSpot` puts the tries on the test floor),
+`static_drains_suits`, `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
 Dread in tests comes from `Pockets.TEST` / `Storms.TEST` boxes (the test deep seed is 0).

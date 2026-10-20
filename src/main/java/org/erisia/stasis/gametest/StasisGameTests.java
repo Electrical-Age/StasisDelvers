@@ -2304,7 +2304,7 @@ public final class StasisGameTests {
                 f.discard();
                 remove(h, p);
             };
-        }));
+        }, true, true));   // (isolated: a player freezing in a neighbouring test dissolves fauna within 48 blocks)
         // a failing field lets them in (λ-Nero)
         CASES.put("fauna_failing_field_lets_in", new Spec(30, (h, c) -> {
             ServerLevel level = h.getLevel();
@@ -2348,9 +2348,16 @@ public final class StasisGameTests {
             AABB mist = new AABB(o, o).inflate(60, 20, 60);
             org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.RIFT, 1f, 100000));
             org.erisia.stasis.FaunaSpawner.testChance = 1.0;
-            c.cleanup.add(() -> { org.erisia.stasis.Pockets.TEST.remove(mist); org.erisia.stasis.FaunaSpawner.testChance = Double.NaN; });
+            org.erisia.stasis.FaunaSpawner.testSpot = pl -> h.absolutePos(new BlockPos(10 + pl.getRandom().nextInt(6), 1, 1 + pl.getRandom().nextInt(6)));
+            c.cleanup.add(() -> {
+                org.erisia.stasis.Pockets.TEST.remove(mist);
+                org.erisia.stasis.FaunaSpawner.testChance = Double.NaN;
+                org.erisia.stasis.FaunaSpawner.testSpot = null;
+            });
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {
+                // (fauna left from earlier tests nearby would count against the cap)
+                level.getEntitiesOfClass(org.erisia.stasis.RiftFauna.class, new AABB(p.blockPosition()).inflate(64)).forEach(Entity::discard);
                 int made = 0;
                 for (int i = 0; i < 20; i++) made += org.erisia.stasis.FaunaSpawner.step(level, p, level.getGameTime());
                 var near = level.getEntitiesOfClass(org.erisia.stasis.RiftFauna.class, new AABB(p.blockPosition()).inflate(64));
@@ -2372,6 +2379,27 @@ public final class StasisGameTests {
                 double pr = org.erisia.stasis.TowerBlockEntity.faunaPressureForTests(level, def);
                 c.check("two by the shield: +1.0", Math.abs(pr - 1.0) < 1e-9, "" + pr);
                 a.discard(); b.discard(); far.discard();
+            };
+        }));
+        // Static feeds on suits: one within 4 blocks doubles the draw (F2); a player out of its reach draws the plain rate
+        CASES.put("static_drains_suits", new Spec(60, (h, c) -> {
+            ServerPlayer a = survivalPlayer(h, new Vec3(10.5, 1.0, 1.5), true), b = survivalPlayer(h, new Vec3(15.5, 1.0, 6.5), true);
+            for (ServerPlayer p : new ServerPlayer[]{a, b})
+                wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                    org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(12, 1, 1)));
+            java.util.function.ToDoubleFunction<ServerPlayer> used = p -> {
+                var st = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
+                return org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(st)
+                    - ((org.erisia.stasis.DelverSuitItem) st.getItem()).getEnergy(st);
+            };
+            return () -> {
+                double ua = used.applyAsDouble(a), ub = used.applyAsDouble(b);
+                c.check("both suits drew", ua > 0 && ub > 0, String.format("%.1f / %.1f J", ua, ub));
+                c.check("next to Static: about twice the draw", ua / ub > 1.6 && ua / ub < 2.4, String.format("%.1f / %.1f J = %.2f", ua, ub, ua / ub));
+                f.discard();
+                remove(h, a);
+                remove(h, b);
             };
         }));
         // a player freezing sends the fauna near them away (no camping statues)

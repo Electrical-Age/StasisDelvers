@@ -15,7 +15,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
      land stops it (`Stasis.rateAt`); while Baughn hasn't decided, `SPREAD_DEEP_HOLDS` (true) gives an unsuited
      player caught there the same hold, without suit messages (`quietHold`); false gives the normal freeze.
   4. Otherwise `isProtected(p, factor, capacitors)` decides. The drain factor is 3 in the outer zone and 2 in
-     deeps and mist, times (1 + missing pieces). Unprotected: +1 per tick (capped below a statue in an eddy).
+     deeps and mist, times (1 + missing pieces), times (1 + Static feeding on the suit: `RiftStatic.feeding`, fauna.md). Unprotected: +1 per tick (capped below a statue in an eddy).
   5. Suited but in deep weather with a Delver suit or missing pieces: the freeze "creeps" at 0.25 per missing
      piece; `Capacitors.absorb` can take it.
   6. Out of danger, the freeze recovers 3 per tick.

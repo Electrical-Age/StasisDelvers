@@ -14,7 +14,8 @@ import net.minecraft.world.level.Level;
 
 /**
  * Static: a small, dense knot of static that drifts towards suited players and feeds on their charge (Baughn: smaller and
- * denser than the Puppeteer; that's how you tell them apart). F1: it moves and keeps the fauna rules; the drain is F2.
+ * denser than the Puppeteer; that's how you tell them apart): within {@link #REACH} blocks each one adds the suit's own draw
+ * again ({@link Freezing}), so a rift capacitor takes it like the weather's surcharge.
  * No model: the client draws it as a knot of static pixels ({@link #clientStatic}).
  */
 public class RiftStatic extends RiftFauna {
@@ -36,7 +37,36 @@ public class RiftStatic extends RiftFauna {
         targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, false));
     }
 
-    /** It doesn't hit: it drains (F2). */
+    /** Reach of the drain, in blocks. */
+    public static final double REACH = 4;
+
+    /** How many Static feed on this player's suit now (within REACH, at most 3; Freezing multiplies the draw by 1 + this). */
+    public static int feeding(net.minecraft.server.level.ServerLevel level, Player p) {
+        int n = level.getEntitiesOfClass(RiftStatic.class, p.getBoundingBox().inflate(REACH), s -> s.isAlive() && s.distanceToSqr(p) <= REACH * REACH).size();
+        return Math.min(3, n);
+    }
+
+    @Override
+    protected net.minecraft.sounds.SoundEvent getAmbientSound() {
+        return net.minecraft.sounds.SoundEvents.SCULK_CLICKING;   // (a Geiger-ish crackle)
+    }
+
+    @Override
+    public int getAmbientSoundInterval() {
+        return 40;
+    }
+
+    @Override
+    protected net.minecraft.sounds.SoundEvent getHurtSound(net.minecraft.world.damagesource.DamageSource source) {
+        return net.minecraft.sounds.SoundEvents.SCULK_CLICKING_STOP;
+    }
+
+    @Override
+    protected net.minecraft.sounds.SoundEvent getDeathSound() {
+        return net.minecraft.sounds.SoundEvents.SCULK_CLICKING_STOP;
+    }
+
+    /** It doesn't hit: it feeds on the suit from up to REACH away (Freezing). */
     @Override
     public boolean doHurtTarget(net.minecraft.server.level.ServerLevel level, net.minecraft.world.entity.Entity target) {
         return false;
