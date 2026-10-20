@@ -290,7 +290,7 @@ public final class StasisGameTests {
                 if (statues.size() == 1) {
                     Statue s = statues.get(0);
                     c.check("the statue holds the diamonds", s.items().stream().anyMatch(i -> i.is(Items.DIAMOND) && i.getCount() == 7), s.items().toString());
-                    c.check("the statue holds the experience", s.xp() == 50, "xp " + s.xp());
+                    c.check("the statue holds vanilla's share of the experience (level 4: 28)", s.xp() == 28, "xp " + s.xp());
                     c.check("the statue belongs to the player", s.owner().equals(p.getUUID()));
                     s.crumble(h.getLevel());
                     var drops = h.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(2));
@@ -301,13 +301,14 @@ public final class StasisGameTests {
             };
         }));
         // remains (Baughn: he died in running land and turned into items): any death leaves a statue holding the drops and
-        // all the experience, no items or orbs on the ground; where time runs it falls and lies down
+        // vanilla's share of the experience, no items or orbs on the ground; where time runs it falls and lies down
         CASES.put("remains_where_time_runs", new Spec(40, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 3.0, 4.5), true);
             p.getInventory().add(new ItemStack(Items.DIAMOND, 5));
             p.giveExperiencePoints(80);
-            p.connection.markClientLoaded();   // (else a fresh mock player is invulnerable)
-            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+            p.giveExperienceLevels(3);   // (levels as /xp add gives them count too: AdventurAgent)
+            int points = org.erisia.stasis.Statue.points(p);
+            kill(h, p);
             AABB box = new AABB(h.absolutePos(new BlockPos(3, 1, 4))).inflate(3);
             return () -> {
                 var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
@@ -318,7 +319,7 @@ public final class StasisGameTests {
                 if (statues.size() == 1) {
                     Statue s = statues.get(0);
                     c.check("it holds the diamonds", s.items().stream().anyMatch(i -> i.is(Items.DIAMOND) && i.getCount() == 5), s.items().toString());
-                    c.check("it holds all the experience", s.xp() == 80, "xp " + s.xp());
+                    c.check("it holds vanilla's share of the experience (level x 7, at most 100)", s.xp() == points && points > 0, "xp " + s.xp() + ", expected " + points);
                     c.check("it belongs to the player", s.owner().equals(p.getUUID()));
                     c.check("it lies down", s.fallen());
                     c.check("it fell to the floor", s.onGround() && s.getY() < h.absoluteVec(new Vec3(3.5, 2.0, 4.5)).y, String.format("y %.2f", s.getY()));
@@ -332,12 +333,12 @@ public final class StasisGameTests {
         CASES.put("remains_in_stopped_land_fall_when_time_runs", new Spec(60, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 3.0, 4.5), true);
             p.getInventory().add(new ItemStack(Items.EMERALD, 3));
-            p.connection.markClientLoaded();   // (else a fresh mock player is invulnerable)
-            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+            kill(h, p);
             AABB box = new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(3);
             double y0 = h.absoluteVec(new Vec3(12.5, 3.0, 4.5)).y;
             h.runAtTickTime(20, () -> {
                 var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
+                c.check("the player died", !p.isAlive(), "health " + p.getHealth() + " loaded " + p.connection.hasClientLoaded());
                 c.check("one statue", statues.size() == 1, statues.toString());
                 if (statues.size() == 1) {
                     Statue s = statues.get(0);
@@ -358,7 +359,34 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
-        // keepInventory: nothing drops, so no remains
+        // remains lying on a block fall when it's taken away (AdventurAgent: they floated where a pillar had been)
+        CASES.put("remains_fall_when_support_goes", new Spec(50, (h, c) -> {
+            h.setBlock(new BlockPos(3, 2, 4), Blocks.STONE);
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 3.0, 4.5), true);
+            p.getInventory().add(new ItemStack(Items.DIAMOND, 1));
+            kill(h, p);
+            AABB box = new AABB(h.absolutePos(new BlockPos(3, 1, 4))).inflate(3);
+            double top = h.absoluteVec(new Vec3(3.5, 3.0, 4.5)).y;
+            h.runAtTickTime(15, () -> {
+                var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
+                c.check("the player died", !p.isAlive(), "health " + p.getHealth() + " loaded " + p.connection.hasClientLoaded());
+                c.check("one statue", statues.size() == 1, statues.toString());
+                if (statues.size() == 1)
+                    c.check("it lies on the block", statues.get(0).fallen() && Math.abs(statues.get(0).getY() - top) < 0.01,
+                        String.format("y %.2f", statues.get(0).getY()));
+                h.setBlock(new BlockPos(3, 2, 4), Blocks.AIR);
+            });
+            return () -> {
+                var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
+                if (statues.size() == 1) {
+                    c.check("the block gone, it fell to the floor", statues.get(0).getY() < top - 0.9, String.format("y %.2f", statues.get(0).getY()));
+                    statues.get(0).discard();
+                }
+                remove(h, p);
+            };
+        }));
+        // keepInventory: nothing drops, so no remains. Isolated: the game rule is world-wide, and the other remains_* tests
+        // in its batch found no drops
         CASES.put("remains_not_with_keep_inventory", new Spec(10, (h, c) -> {
             var rules = h.getLevel().getGameRules();
             var key = net.minecraft.world.level.gamerules.GameRules.KEEP_INVENTORY;
@@ -368,8 +396,7 @@ public final class StasisGameTests {
             ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
             p.getInventory().add(new ItemStack(Items.DIAMOND, 2));
             p.giveExperiencePoints(30);
-            p.connection.markClientLoaded();   // (else a fresh mock player is invulnerable)
-            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+            kill(h, p);
             AABB box = new AABB(h.absolutePos(new BlockPos(3, 1, 4))).inflate(3);
             return () -> {
                 c.check("the player died", !p.isAlive());
@@ -377,7 +404,7 @@ public final class StasisGameTests {
                 c.check("the player kept the diamonds", p.getInventory().countItem(Items.DIAMOND) == 2);
                 remove(h, p);
             };
-        }));
+        }, true, true));
         CASES.put("player_safe_inside", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
             return () -> {
@@ -4021,6 +4048,20 @@ public final class StasisGameTests {
     static boolean hasBreakingIt(ServerPlayer p) {
         var a = p.level().getServer().getAdvancements().get(org.erisia.stasis.HardMode.ADVANCEMENT);
         return a != null && p.getAdvancements().getOrStartProgress(a).isDone();
+    }
+
+    /**
+     * Kill a mock player (not a freeze), now and on each tick until it's dead: a fresh one is invulnerable until its
+     * client "loaded".
+     */
+    static void kill(GameTestHelper h, ServerPlayer p) {
+        Runnable blow = () -> {
+            if (!p.isAlive() || p.isRemoved()) return;
+            p.connection.markClientLoaded();
+            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+        };
+        blow.run();
+        h.onEachTick(blow);
     }
 
     static void remove(GameTestHelper h, ServerPlayer p) {

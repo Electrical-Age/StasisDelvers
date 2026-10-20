@@ -68,11 +68,16 @@ public class Statue extends Entity {
             ItemStack st = inv.removeItemNoUpdate(i);
             if (!st.isEmpty()) s.items.add(st);
         }
-        s.xp = player.totalExperience;
+        s.xp = points(player);
         player.totalExperience = 0;
         player.experienceLevel = 0;
         player.experienceProgress = 0;
         return s;
+    }
+
+    /** What a player's death gives back in experience: as much as vanilla drops (Baughn), level x 7, at most 100. */
+    public static int points(Player p) {
+        return Math.min(p.experienceLevel * 7, 100);
     }
 
     /** The remains of a death that wasn't a freeze: the drops are added by {@link Remains#drops}. */
@@ -100,16 +105,16 @@ public class Statue extends Entity {
     }
 
     /**
-     * Runs only where time runs (StasisEvents cancels frozen ticks, on both sides): lie down, and fall. Both sides move it,
-     * so the client's fall is smooth; the server's position wins.
+     * Runs only where time runs (StasisEvents cancels frozen ticks): lie down, and fall, also when what it lay on is taken
+     * away. Only the server moves it (a client of its own fell where the server's statue lay still, then snapped back:
+     * AdventurAgent); the 4-tick position updates make the fall smooth enough.
      */
     @Override
     public void tick() {
         super.tick();
-        if (!level().isClientSide()) setFallen(true);
-        if (!fallen()) return;
+        if (level().isClientSide()) return;
+        setFallen(true);
         Vec3 v = getDeltaMovement();
-        if (onGround() && v.lengthSqr() < 1e-6) return;
         v = new Vec3(v.x * 0.5, isInWater() ? Math.max(v.y - 0.01, -0.1) : v.y - 0.04, v.z * 0.5);
         move(net.minecraft.world.entity.MoverType.SELF, v);
         setDeltaMovement(onGround() ? Vec3.ZERO : v.scale(0.98));
@@ -137,7 +142,7 @@ public class Statue extends Entity {
 
     @Override
     public net.minecraft.world.entity.EntityDimensions getDimensions(net.minecraft.world.entity.Pose pose) {
-        return fallen() ? net.minecraft.world.entity.EntityDimensions.fixed(1.0f, 0.5f) : super.getDimensions(pose);
+        return fallen() ? net.minecraft.world.entity.EntityDimensions.fixed(1.6f, 0.5f) : super.getDimensions(pose);
     }
 
     @Override

@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *       LOWEST, after everyone else has added theirs.</li>
  *   <li>A freeze already made its statue ({@link Freezing#freeze}, {@link #FREEZING}); what the death still drops
  *       (accessory slots) joins it.</li>
- *   <li>Experience: all of it, as a freeze keeps it (not vanilla's level x 7 capped at 100); no orbs.</li>
+ *   <li>Experience: as much as vanilla would drop (Baughn), level x 7, at most 100 ({@link Statue#points}); no orbs.</li>
  *   <li>keepInventory: nothing drops, so no statue.</li>
  *   <li>The owner hears where it is when they respawn.</li>
  * </ul>
@@ -33,8 +33,8 @@ public final class Remains {
 
     /** The statue a freeze is making for this player, while its death runs (server thread). */
     static final Map<UUID, Statue> FREEZING = new ConcurrentHashMap<>();
-    /** Where each player's latest remains were left (memory only), told at respawn. */
-    private static final Map<UUID, String> WHERE = new ConcurrentHashMap<>();
+    /** Each player's latest remains (memory only): where they lie is told at respawn, after any fall. */
+    private static final Map<UUID, Statue> WHERE = new ConcurrentHashMap<>();
 
     static boolean keeps(ServerLevel level) {
         return level.getGameRules().get(net.minecraft.world.level.gamerules.GameRules.KEEP_INVENTORY);
@@ -50,7 +50,7 @@ public final class Remains {
         ServerLevel level = p.level();
         Statue statue = FREEZING.get(p.getUUID());
         boolean fresh = statue == null;
-        int xp = keeps(level) ? 0 : p.totalExperience;
+        int xp = keeps(level) ? 0 : Statue.points(p);
         if (fresh && e.getDrops().isEmpty() && xp <= 0) return;
         if (fresh) {
             statue = Statue.remains(level, p, xp);
@@ -68,13 +68,14 @@ public final class Remains {
             StasisDelvers.LOG.info("{} died at {}: remains with {} stacks, {} xp", p.getName().getString(),
                 statue.blockPosition().toShortString(), statue.items().size(), statue.xp());
         }
-        WHERE.put(p.getUUID(), String.format("Your remains lie at %d %d %d (%s).", statue.getBlockX(), statue.getBlockY(),
-            statue.getBlockZ(), level.dimension().identifier()));
+        WHERE.put(p.getUUID(), statue);
     }
 
     static void respawn(PlayerEvent.PlayerRespawnEvent e) {
         if (e.isEndConquered() || !(e.getEntity() instanceof ServerPlayer p)) return;
-        String where = WHERE.remove(p.getUUID());
-        if (where != null) p.sendSystemMessage(Component.literal(where));
+        Statue s = WHERE.remove(p.getUUID());
+        if (s != null && (s.getRemovalReason() == null || !s.getRemovalReason().shouldDestroy()))   // (unloaded: its last place)
+            p.sendSystemMessage(Component.literal(String.format("Your remains lie at %d %d %d (%s).", s.getBlockX(), s.getBlockY(),
+                s.getBlockZ(), s.level().dimension().identifier())));
     }
 }

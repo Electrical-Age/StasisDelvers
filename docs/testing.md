@@ -12,7 +12,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 - `stasis-build.sh test`: unit and property tests of the mod only.
 - `stasis-build.sh :towergen:test`, and `./gradlew :towergen:slowTest [-Dtowergen.random=N -Dtowergen.seed=S]`.
 - `stasis-build.sh runGameTestServer`: every GameTest, headless. It exits non-zero if a required test fails.
-  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 126 at HEAD).
+  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 127 at HEAD).
 - One GameTest by hand: `./gradlew runServer` (or `runClient`), then `/test run stasisdelvers:<name>`.
   `neoforge.enabledGameTestNamespaces` is set for every run config.
 
@@ -47,7 +47,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 ## 3. GameTests (`src/main/java/org/erisia/stasis/gametest/StasisGameTests.java`)
 - Registration: a static `CASES` map (name → `Spec(ticks, body, field, isolated)`), registered through a
   `TEST_FUNCTION` `DeferredRegister` and `RegisterGameTestsEvent` in `register(modBus)`.
-  - 124 `CASES.put` calls, two of them in loops: 126 tests.
+  - 125 `CASES.put` calls, two of them in loops: 127 tests.
   - Each test gets the structure `stasisdelvers:floor_16x6x8` (`src/main/resources/data/stasisdelvers/structure/floor_16x6x8.nbt`,
     made by `script/gen_test_structures.py`) and `maxTicks = ticks + 40`.
   - `isolated` tests (towers, big fields) get their own environment `alone_<name>`, so they run in a batch
@@ -76,6 +76,9 @@ debugging:
 - `eddies_stop_mobs`, `flames_*`, `tower_collapses_when_empty` (a15602d)
 - `rift_crystals_grow` (5907f24: cross-chunk keys)
 - `eddies_in_a_weak_field` (once over its 60 % pocket share, 3568 of 5457, when test positions moved; passed on rerun)
+- `remains_*` (2026-10-20: ran beside `remains_not_with_keep_inventory`, whose world-wide keepInventory left them no drops;
+  that test is isolated now)
+- `spread_hard_mode_entry` (once, 2026-10-20: "the flash removes a dragon still alive": removed false; passed on 4 reruns)
 - `time_resumes` (new_chunk_grace's chunk grace reached its sand when the grid put both in one chunk;
   new_chunk_grace is isolated now)
 - `spread_hard_mode_gate_rooms` (once, 2026-10-19: 29 of 30 chunks shattered, the last "loaded, no entities ticking";

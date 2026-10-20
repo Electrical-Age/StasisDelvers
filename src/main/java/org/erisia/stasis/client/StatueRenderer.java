@@ -74,8 +74,9 @@ public class StatueRenderer extends EntityRenderer<Statue, StatueRenderer.State>
         poseStack.pushPose();
         poseStack.rotate(Axis.YP.rotationDegrees(180.0F - state.bodyRot));
         if (state.fallen) {
-            // remains: on its back, as a sleeping player lies (LivingEntityRenderer's sleep rotations), raised off the ground
-            poseStack.translate(0.0F, 0.26F, 0.0F);
+            // remains: on its back, as a sleeping player lies (LivingEntityRenderer's sleep rotations), raised off the ground,
+            // and centred on the entity so the (square) hitbox covers it (AdventurAgent: only the feet were clickable)
+            poseStack.translate(0.9F, 0.26F, 0.0F);
             poseStack.rotate(Axis.ZP.rotationDegrees(90.0F));
             poseStack.rotate(Axis.YP.rotationDegrees(270.0F));
         }
