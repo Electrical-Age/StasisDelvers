@@ -27,10 +27,15 @@ public final class PossessedLook {
         // out in front of the body, about a box width ahead; AdventurAgent saw a cow's eyes mid-body at 0.55 w)
         double w = le.getBbWidth();
         double ahead = w < 0.8 ? Math.max(0.3, w * 0.55) : w * 0.95, apart = Math.max(0.09, w * 0.17);
-        double y = pos.y + le.getEyeHeight();
+        // the head's pitch too (λ-Nero: let them look up and down, not just level): the face turns about the head's
+        // centre, behind the eyes (a humanoid's head is ~0.25 deep; a quadruped's, ~0.3), so looking down lowers the eyes
+        float pitchDeg = still ? le.getXRot() : net.minecraft.util.Mth.lerp(partial, le.xRotO, le.getXRot());
+        double pitch = Math.toRadians(pitchDeg), back = w < 0.8 ? 0.25 : 0.3;
+        double pivot = ahead - back, fwd = pivot + back * Math.cos(pitch), down = back * Math.sin(pitch);
+        double y = pos.y + le.getEyeHeight() - down;
         return new double[][]{
-            {pos.x + fx * ahead - rx * apart, y, pos.z + fz * ahead - rz * apart},
-            {pos.x + fx * ahead + rx * apart, y, pos.z + fz * ahead + rz * apart}};
+            {pos.x + fx * fwd - rx * apart, y, pos.z + fz * fwd - rz * apart},
+            {pos.x + fx * fwd + rx * apart, y, pos.z + fz * fwd + rz * apart}};
     }
 
     /** Static round a host, also while it stands frozen between bursts (so this runs before FrozenEntities cancels). */
