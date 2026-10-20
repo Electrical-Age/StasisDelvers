@@ -56,7 +56,7 @@ Javadocs often cite them as `notes/...`.
 - [fauna.md](fauna.md): rift fauna: `Dread`, `RiftFauna` (the field wall, speed, fading), `RiftStatic`, `FaunaSpawner`.
 - [client-rendering.md](client-rendering.md): post chain, data-texture slots, frozen textures, tower meshes.
 - [networking.md](networking.md): `StasisNet` payloads, protocol version.
-- [mixins.md](mixins.md): the 27 mixins, the required and cosmetic configs, `CosmeticPlugin`.
+- [mixins.md](mixins.md): the 28 mixins, the required and cosmetic configs, `CosmeticPlugin`.
 - [bug-reports.md](bug-reports.md): the F7 pipeline, `Redactor`, `ReportResponder`.
 - [testing.md](testing.md): unit, property and GameTests, the known flaky ones, how to run them.
 

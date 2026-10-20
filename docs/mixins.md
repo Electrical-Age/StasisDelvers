@@ -62,6 +62,7 @@ mods) has rewritten a target, only that effect is lost.
 | `SoundEngineMixin` | `SoundEngine.calculatePitch` (RETURN) | Pitch sag in a failing field |
 | `WeatherEffectRendererMixin` | `extractRenderState` (rain and snow column instances) | Hanging rain and snow; shields keep weather out |
 | `EntityRendererAgeMixin` | `EntityRenderer.extractRenderState` (TAIL) | Frozen idle animations. Not `RegisterRenderStateModifiersEvent`: it runs after subclasses derive state from `ageInTicks` (`PhantomRenderer` flapTime) |
+| `LivingEntityRendererFrozenMixin` | `LivingEntityRenderer.extractRenderState` (TAIL) | A frozen living entity drawn at its exact pose: body and head yaw, pitch and walk phase without the partial-tick blend (its cancelled client tick leaves the last-tick values stale, so a Puppeteer's host stopping mid-stride flickered: Baughn). Same reason as above for not using the modifier event |
 
 - `mixin/client/CosmeticPlugin.java` (`IMixinConfigPlugin`) runs before any game class loads (ASM, Mixin and
   SLF4J only).

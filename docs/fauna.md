@@ -37,7 +37,7 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
   (so the FROZEN sync and the client's stillness follow); each burst paths it at the nearest survival player within 32
   (speed 1.3 x (1 + dread)). It hits for 3 at reach, every 30 ticks, without knockback. The fauna wall applies (put back where it last stood
   stopped). Damage to the host goes to the grip (6) instead, each swing at least 2 and once per 8 ticks (3 fist hits); at 0 the static bursts out (a Puppeteer) and the host freezes
-  where it is, unhurt. No prey for 400 ticks: it pours out; no dread for FADE_TICKS: it dissolves.
+  where it is, unhurt; no Puppeteer takes that host again for 1200 ticks; /kill and the void go through. No prey for 400 ticks: it pours out; no dread for FADE_TICKS: it dissolves.
   - Client (`client/PossessedLook`): purple eyes (two full-bright quads at eye height, on the head's front by its yaw;
     `RenderLivingEvent.Post`, render data from `RegisterRenderStateModifiersEvent`) and a static haze (EntityTickEvent.Pre at
     HIGHEST, before FrozenEntities cancels the frozen host's client tick).

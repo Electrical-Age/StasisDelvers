@@ -46,6 +46,9 @@ public final class Possession {
 
     /** Server thread only. Weak: a host removed for any reason just drops out. */
     private static final Map<Mob, Hold> HOSTS = new WeakHashMap<>();
+    /** Hosts just let go: game time until which no Puppeteer takes them again (AdventurAgent: it poured straight back in). */
+    private static final Map<Mob, Long> RESTING = new WeakHashMap<>();
+    static final int REST_TICKS = 1200;
 
     public static boolean possessed(Entity e) {
         return e instanceof Mob m && HOSTS.containsKey(m);
@@ -61,6 +64,7 @@ public final class Possession {
     /** Can a Puppeteer take this one: a frozen mob, not fauna, not a boss, not already taken. */
     static boolean canHost(Entity e) {
         return e instanceof Mob m && m.isAlive() && !(m instanceof RiftFauna) && !HOSTS.containsKey(m) && Stasis.isFrozen(m)
+            && m.level().getGameTime() >= RESTING.getOrDefault(m, Long.MIN_VALUE)
             && !(m instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon) && !(m instanceof net.minecraft.world.entity.boss.wither.WitherBoss);
     }
 
@@ -80,6 +84,7 @@ public final class Possession {
     /** Let go of the host: it freezes where it is. {@code burst}: the static bursts out as a Puppeteer; else it's gone. */
     public static void release(ServerLevel level, Mob host, boolean burst) {
         if (HOSTS.remove(host) == null) return;
+        RESTING.put(host, level.getGameTime() + REST_TICKS);
         for (Goal.Flag f : Goal.Flag.values()) {
             host.goalSelector.enableControlFlag(f);
             host.targetSelector.enableControlFlag(f);
@@ -161,6 +166,11 @@ public final class Possession {
         if (!(e.getEntity() instanceof Mob host) || !(host.level() instanceof ServerLevel level)) return;
         Hold h = HOSTS.get(host);
         if (h == null) return;
+        // /kill and the void go through (AdventurAgent: a host survived /kill); the Puppeteer goes with it
+        if (e.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            release(level, host, false);
+            return;
+        }
         e.setCanceled(true);
         if (level.getGameTime() - h.lastHurt < 8) return;   // (one swing, one hit)
         h.lastHurt = level.getGameTime();

@@ -13,7 +13,8 @@
     "FluidRendererMixin",
     "SoundEngineMixin",
     "WeatherEffectRendererMixin",
-    "EntityRendererAgeMixin"
+    "EntityRendererAgeMixin",
+    "LivingEntityRendererFrozenMixin"
   ],
   "injectors": {
     "defaultRequire": 0

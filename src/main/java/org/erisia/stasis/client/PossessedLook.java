@@ -29,7 +29,10 @@ public final class PossessedLook {
                 en.getZ() + (r.nextDouble() - 0.5) * en.getBbWidth() * 1.3, 0, 0, 0);
         float yaw = (float) Math.toRadians(le.getYHeadRot());
         double fx = -Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
-        double ahead = Math.max(0.3, en.getBbWidth() * 0.55), apart = Math.max(0.09, en.getBbWidth() * 0.17);
+        // (a narrow one, a humanoid: the face is just in front of the box's middle; a wide one, a quadruped: the head sticks
+        // out in front of the body, about a box width ahead; AdventurAgent saw a cow's eyes mid-body at 0.55 w)
+        double w = en.getBbWidth();
+        double ahead = w < 0.8 ? Math.max(0.3, w * 0.55) : w * 0.95, apart = Math.max(0.09, w * 0.17);
         double y = en.getY() + en.getEyeHeight();
         for (int side = -1; side <= 1; side += 2)
             en.level().addParticle(net.minecraft.core.particles.ParticleTypes.REVERSE_PORTAL, en.getX() + fx * ahead + rx * apart * side, y,

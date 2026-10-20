@@ -32,17 +32,18 @@ public class CosmeticPlugin implements IMixinConfigPlugin {
     private static final Set<String> WARNED = ConcurrentHashMap.newKeySet();
 
     /** What each mixin does, for the warning. */
-    private static final Map<String, String> EFFECT = Map.of(
-        "SectionCompilerMixin", "still block textures in stopped land",
-        "FluidRendererMixin", "still water/lava textures and water lines in stopped land",
-        "WeatherEffectRendererMixin", "rain and snow hanging still in stopped land, and kept out by field shields",
-        "ParticleGroupMixin", "particles holding still in stopped land",
-        "ClientLevelMixin", "no block ambience, drips or rain sound in stopped land",
-        "ClientClockManagerMixin", "the local sky time (frozen in stopped land, the field's in a field)",
-        "ClientClockInstanceMixin", "the local sky time (frozen in stopped land, the field's in a field)",
-        "GameRendererMixin", "the suited hand drawn in colour in stopped land",
-        "SoundEngineMixin", "the pitch sag of a failing field",
-        "EntityRendererAgeMixin", "frozen entities' idle animations standing still");
+    private static final Map<String, String> EFFECT = Map.ofEntries(
+        Map.entry("SectionCompilerMixin", "still block textures in stopped land"),
+        Map.entry("FluidRendererMixin", "still water/lava textures and water lines in stopped land"),
+        Map.entry("WeatherEffectRendererMixin", "rain and snow hanging still in stopped land, and kept out by field shields"),
+        Map.entry("ParticleGroupMixin", "particles holding still in stopped land"),
+        Map.entry("ClientLevelMixin", "no block ambience, drips or rain sound in stopped land"),
+        Map.entry("ClientClockManagerMixin", "the local sky time (frozen in stopped land, the field's in a field)"),
+        Map.entry("ClientClockInstanceMixin", "the local sky time (frozen in stopped land, the field's in a field)"),
+        Map.entry("GameRendererMixin", "the suited hand drawn in colour in stopped land"),
+        Map.entry("SoundEngineMixin", "the pitch sag of a failing field"),
+        Map.entry("EntityRendererAgeMixin", "frozen entities' idle animations standing still"),
+        Map.entry("LivingEntityRendererFrozenMixin", "frozen living entities drawn at their frozen pose (no flicker)"));
 
     /** Injector annotations (Mixin and MixinExtras) whose handler the target class must end up calling. */
     private static final Set<String> INJECTORS = Set.of(
