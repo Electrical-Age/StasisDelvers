@@ -390,8 +390,17 @@ public record DeepFeature() implements Feature {
     private static volatile java.util.List<BlockState> ORES;
     private static volatile float[] ORE_CUM;
 
+    /** Vein cells: each holds at most one vein, centred in its middle half, reaching at most half a cell into its neighbours. */
+    static final int VEIN_CELL = 7;
+
+    /**
+     * Ore at a block, in veins (Baughn: veins, and 6-8 times as much as the old scatter of single blocks): every
+     * VEIN_CELL cube may hold a vein, a short capsule along a random direction with its material drawn by weight; rare
+     * ores make smaller veins. A vein fills ~3/4 of its capsule. The cells hold veins with the chance that makes ore
+     * riftOreShare of the rock on average. Deterministic per block, so any order of writing gives the same veins.
+     */
     static BlockState ore(int x, int y, int z, int seed) {
-        if (!StasisConfig.riftOres || Noise.hash32(x, y, z, seed) >= StasisConfig.riftOreRate) return null;
+        if (!StasisConfig.riftOres || StasisConfig.riftOreShare <= 0) return null;
         java.util.List<BlockState> ores = ORES;
         if (ores == null || ores.isEmpty()) {   // (empty: resolved before the tags were bound; try again)
             java.util.List<BlockState> l = new java.util.ArrayList<>();
@@ -412,9 +421,50 @@ public record DeepFeature() implements Feature {
         }
         if (ores.isEmpty()) return null;
         float[] cum = ORE_CUM;
-        float u = Noise.hash32(x, y, z, seed ^ 0x0F) * cum[cum.length - 1];
-        for (int i = 0; i < cum.length; i++) if (u < cum[i]) return ores.get(i);
-        return ores.get(ores.size() - 1);
+        int cx = Math.floorDiv(x, VEIN_CELL), cy = Math.floorDiv(y, VEIN_CELL), cz = Math.floorDiv(z, VEIN_CELL);
+        // the nearer neighbour on each axis (a vein reaches at most half a cell out of its own)
+        int nx = Math.floorMod(x, VEIN_CELL) * 2 < VEIN_CELL ? -1 : 1, ny = Math.floorMod(y, VEIN_CELL) * 2 < VEIN_CELL ? -1 : 1,
+            nz = Math.floorMod(z, VEIN_CELL) * 2 < VEIN_CELL ? -1 : 1;
+        for (int i = 0; i < 8; i++) {
+            int gx = cx + ((i & 1) != 0 ? nx : 0), gy = cy + ((i & 2) != 0 ? ny : 0), gz = cz + ((i & 4) != 0 ? nz : 0);
+            float u = Noise.hash32(gx, gy, gz, seed ^ 0x0F) * cum[cum.length - 1];
+            int m = 0;
+            while (m < cum.length - 1 && u >= cum[m]) m++;
+            float weight = cum[m] - (m == 0 ? 0 : cum[m - 1]);
+            // rare ores (weight < 1) make smaller veins: radius 1-1.6, length 1-4 blocks for the common ones (~10-35 blocks)
+            float r = (1f + 0.6f * Noise.hash32(gx, gy, gz, seed ^ 0x51)) * (0.7f + 0.3f * weight);
+            float len = (1f + 3f * Noise.hash32(gx, gy, gz, seed ^ 0x52)) * weight;
+            if (Noise.hash32(gx, gy, gz, seed ^ 0x53) >= veinChance(r, len)) continue;
+            float px = (gx + 0.25f + 0.5f * Noise.hash32(gx, gy, gz, seed ^ 0x54)) * VEIN_CELL,
+                py = (gy + 0.25f + 0.5f * Noise.hash32(gx, gy, gz, seed ^ 0x55)) * VEIN_CELL,
+                pz = (gz + 0.25f + 0.5f * Noise.hash32(gx, gy, gz, seed ^ 0x56)) * VEIN_CELL;
+            float dx = Noise.hash32(gx, gy, gz, seed ^ 0x57) - 0.5f, dy = (Noise.hash32(gx, gy, gz, seed ^ 0x58) - 0.5f) * 0.6f,
+                dz = Noise.hash32(gx, gy, gz, seed ^ 0x59) - 0.5f;
+            float dl = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-6f;
+            dx /= dl;
+            dy /= dl;
+            dz /= dl;
+            // distance from the block's centre to the segment centre +- len/2 along (dx, dy, dz)
+            float qx = x + 0.5f - px, qy = y + 0.5f - py, qz = z + 0.5f - pz;
+            float along = Math.max(-len / 2, Math.min(len / 2, qx * dx + qy * dy + qz * dz));
+            float ex = qx - along * dx, ey = qy - along * dy, ez = qz - along * dz;
+            if (ex * ex + ey * ey + ez * ez > r * r) continue;
+            if (Noise.hash32(x, y, z, seed ^ 0x5B) >= VEIN_FILL) continue;
+            return ores.get(m);
+        }
+        return null;
+    }
+
+    static final float VEIN_FILL = 0.75f;
+
+    /** Small veins (chance capped at 1) and a capsule's few blocks centred outside it fall short of its volume: measured
+     *  0.0336 for 0.042 (riftstone_ore_scatter), so this much more. */
+    static final double VEIN_MAKEUP = 1.25;
+
+    /** The chance a cell holds a vein of this size, for riftOreShare of the rock on average (capped at 1). */
+    static float veinChance(float r, float len) {
+        double vol = Math.PI * r * r * len + 4.0 / 3 * Math.PI * r * r * r;
+        return (float) Math.min(1.0, VEIN_MAKEUP * StasisConfig.riftOreShare * VEIN_CELL * VEIN_CELL * VEIN_CELL / (vol * VEIN_FILL));
     }
 
     public static BlockState oreForTest(int x, int y, int z, int seed) {

@@ -33,7 +33,7 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue GUTTER_MAX_TICKS;
     static final ModConfigSpec.ConfigValue<List<? extends String>> STRATA_SHAPES;
     static final ModConfigSpec.BooleanValue RIFT_ORES;
-    static final ModConfigSpec.DoubleValue RIFT_ORE_RATE;
+    static final ModConfigSpec.DoubleValue RIFT_ORE_SHARE;
     static final ModConfigSpec.IntValue CRYSTAL_STAGE_SECONDS;
     static final ModConfigSpec.ConfigValue<List<? extends String>> RIFT_DESTINATIONS;
     static final ModConfigSpec.ConfigValue<List<? extends String>> RIFT_SCATTER;
@@ -106,7 +106,8 @@ public final class StasisConfig {
                 "rift picks one from its id. Worldgen only: changes reach newly generated chunks.")
             .defineListAllowEmpty("strataShapes", List.of("saddle:1", "staircase:1", "splash:1", "pods:1"), () -> "saddle:1", o -> o instanceof String);
         RIFT_ORES = b.comment("Ores in rift walls and strata, from the overworld ore tags, at any depth (Baughn).").define("riftOres", true);
-        RIFT_ORE_RATE = b.comment("Share of rift wall and strata rock that becomes ore.").defineInRange("riftOreRate", 0.006, 0.0, 0.2);
+        RIFT_ORE_SHARE = b.comment("Share of rift wall and strata rock that becomes ore, in veins (Baughn: 6-8 times the old 0.006 scatter).")
+            .defineInRange("riftOreShare", 0.042, 0.0, 0.2);
         CRYSTAL_STAGE_SECONDS = b.comment("Seconds of strata weather (mist, violet or rift, outside fields) per rift crystal growth stage:",
                 "small after one, cluster after four. A pocket is in weather 75% of the time.")
             .defineInRange("crystalStageSeconds", 1200, 10, 86400);
@@ -204,7 +205,7 @@ public final class StasisConfig {
     static volatile int gutterMinTicks = 100;
     static volatile int gutterMaxTicks = 600;
     static volatile boolean riftOres = true;
-    static volatile double riftOreRate = 0.006;
+    static volatile double riftOreShare = 0.042;
     public static volatile int crystalStageSeconds = 1200;
     static volatile double riftScatterRate = 0.05;
     public static volatile boolean endPortalRifts = true;
@@ -286,7 +287,7 @@ public final class StasisConfig {
         m.put("gutterMinTicks", gutterMinTicks);
         m.put("gutterMaxTicks", gutterMaxTicks);
         m.put("riftOres", riftOres);
-        m.put("riftOreRate", riftOreRate);
+        m.put("riftOreShare", riftOreShare);
         m.put("crystalStageSeconds", crystalStageSeconds);
         m.put("riftScatterRate", riftScatterRate);
         m.put("endPortalRifts", endPortalRifts);
@@ -342,7 +343,7 @@ public final class StasisConfig {
         gutterMaxTicks = GUTTER_MAX_TICKS.get();
         Strata.setWeights(STRATA_SHAPES.get());
         riftOres = RIFT_ORES.get();
-        riftOreRate = RIFT_ORE_RATE.get();
+        riftOreShare = RIFT_ORE_SHARE.get();
         crystalStageSeconds = CRYSTAL_STAGE_SECONDS.get();
         Gates.configure(RIFT_DESTINATIONS.get(), RIFT_SCATTER.get());
         riftScatterRate = RIFT_SCATTER_RATE.get();

@@ -1746,6 +1746,23 @@ public final class StasisGameTests {
                 if (!riftOres.contains(o.getBlock())) other++;
             }
             c.check("the draw gives riftstone ores only", n > 400 && other == 0, n + " ores, " + other + " not riftstone");
+            // veins (Baughn: veins, 6-8 times the old 0.6 %): about riftOreShare of the rock, and most ore blocks touch
+            // another of the same ore
+            int touching = 0, inner = 0;
+            for (int x = 1; x < 96; x++)
+                for (int y = 1; y < 60; y++)
+                    for (int z = 1; z < 32; z++) {
+                        var o = org.erisia.stasis.DeepFeature.oreForTest(x, y, z, 0x5A0);
+                        if (o == null) continue;
+                        inner++;
+                        boolean t = false;
+                        for (var dir : net.minecraft.core.Direction.values())
+                            t |= org.erisia.stasis.DeepFeature.oreForTest(x + dir.getStepX(), y + dir.getStepY(), z + dir.getStepZ(), 0x5A0) == o;
+                        if (t) touching++;
+                    }
+            double share = n / 200000.0;
+            c.check("rift ore is ~4 % of the rock, in veins", share > 0.03 && share < 0.055 && touching > 0.8 * inner,
+                String.format("%.4f of the rock, %d of %d ore blocks touch their own kind", share, touching, inner));
             int cx = 40000, cz = 40000, cy = 100;
             var d = new org.erisia.stasis.StaticDeeps.Deep(cx + 8.5f, cy + 0.5f, cz + 8.5f, 30, 0x2B0E5);
             level.getChunk(cx >> 4, cz >> 4);

@@ -34,8 +34,10 @@ For the runtime side of deeps (weather, rifts, storms), see rifts-storms.md.
 - `Strata.java`: four shapes (`Shape`: SADDLE, STAIRCASE, SPLASH, PODS), weighted by config `strataShapes`
   (`setWeights`). `shapeOf`, `bounds`, `at(deep, x, y, z)` returns the strata class. SADDLE roots are cached
   (`roots`).
-- Rift ores (Baughn; λ-Nero asked for ore in riftstone): `DeepFeature.ore` turns 0.6 % of the shattered shell (in
-  `carve`) and of the strata rock (in `strata`) into ore (config `riftOres`, `riftOreRate`; new chunks only). It draws
+- Rift ores (Baughn; λ-Nero asked for ore in riftstone): `DeepFeature.ore` turns ~4 % of the shattered shell (in
+  `carve`) and of the strata rock (in `strata`) into ore, in veins (Baughn, 2026-10-20: veins, 6-8 times the old 0.6 %
+  scatter of single blocks; config `riftOres`, `riftOreShare`; new chunks only). Each 7-block cell may hold one vein, a
+  capsule of radius 1-1.6 and length 1-4 along a random direction, ~3/4 filled; rare ores make smaller veins. It draws
   over the sources in `c:ores_in_ground/stone` and `/deepslate` (the pack's ores included; diamond and emerald at 0.15,
   gold, lapis and redstone at 0.5), then places each source's **riftstone ore** (`RiftOres.variantOf`), or the source
   itself when it has none.
