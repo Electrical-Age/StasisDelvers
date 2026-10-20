@@ -21,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
  * while it is watched: while any player looks at it, it can't move (the vanilla enderman is angered by a stare; this one
  * is held by it). Unwatched it teleports towards the nearest survival player in short jumps, leaving an afterimage; next
  * to them it doesn't hurt, it displaces: the player is thrown 6-12 blocks off (preferring the weather's side) and the
- * Askew is gone in a teleport. Rare: the spawner makes one only in strong dread.
+ * Askew is gone, leaving its afterimage. Rare: the spawner makes one only in strong dread.
  */
 public class RiftAskew extends RiftFauna {
     static final double SENSE = 32, REACH = 2.2;
@@ -76,7 +76,8 @@ public class RiftAskew extends RiftFauna {
             return;
         }
         if (--jumpIn > 0) return;
-        jumpIn = (int) ((15 + random.nextInt(16)) / (1 + dread()));
+        // (AdventurAgent: at 15-30 / (1 + dread) ticks it jumped every 0.2-0.8 s and was on them in 3-5 s)
+        jumpIn = (int) ((25 + random.nextInt(26)) / (1 + 0.5 * dread()));
         double dist = Math.sqrt(distanceToSqr(prey));
         double step = Math.min(dist - 1.2, 3 + random.nextDouble() * 3);
         if (step < 0.5) return;
@@ -102,10 +103,21 @@ public class RiftAskew extends RiftFauna {
         return false;
     }
 
-    /** A column of dark specks where it stood (they hang in stopped land, so the afterimage stays a moment). */
+    /** Its silhouette in dark specks where it stood: legs, body, arms, head (in stopped land they hang a moment). */
     void afterimage(ServerLevel level) {
-        for (int i = 0; i < 18; i++)
-            level.sendParticles(staticDust(i % 2 == 0 ? 0 : 2), getX(), getY() + random.nextDouble() * getBbHeight(), getZ(), 1, 0.15, 0.1, 0.15, 0);
+        double yaw = Math.toRadians(getYRot()), rx = Math.cos(yaw), rz = Math.sin(yaw);
+        // {side offset, from y, to y}: two legs, the body, two arms, the head
+        double[][] parts = {{-0.12, 0, 1.3}, {0.12, 0, 1.3}, {0, 1.3, 2.3}, {-0.32, 1.1, 2.3}, {0.32, 1.1, 2.3}, {0, 2.35, 2.85}};
+        for (double[] pt : parts)
+            for (double y = pt[1]; y < pt[2]; y += 0.12)
+                level.sendParticles(staticDust(random.nextInt(4) == 0 ? 2 : 0), getX() + rx * pt[0], getY() + y, getZ() + rz * pt[0], 1,
+                    pt[0] == 0 ? 0.08 : 0.03, 0.02, pt[0] == 0 ? 0.08 : 0.03, 0);
+    }
+
+    /** A teleport is a cut (AdventurAgent: the client slid it over five frames, like a vanilla enderman). */
+    @Override
+    protected net.minecraft.world.entity.InterpolationHandler createInterpolationHandler() {
+        return net.minecraft.world.entity.InterpolationHandler.NO_OP;
     }
 
     /**
@@ -134,7 +146,9 @@ public class RiftAskew extends RiftFauna {
         level.playSound(null, p.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1f, 0.4f);
         p.teleportTo(level, best.x, best.y, best.z, java.util.Set.of(), p.getYRot(), p.getXRot(), false);
         level.playSound(null, p.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1f, 0.4f);
-        jumpTo(level, position().add((random.nextDouble() - 0.5) * 16, 0, (random.nextDouble() - 0.5) * 16));
+        // gone: it came back and threw them again every 8-10 s (AdventurAgent), which was more annoying than eerie
+        afterimage(level);
+        discard();
     }
 
     @Override
