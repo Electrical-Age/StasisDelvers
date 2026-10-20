@@ -26,6 +26,9 @@ import net.minecraft.world.phys.Vec3;
 public class RiftPuppeteer extends RiftFauna {
     static final double SEEK = 16;
     static final int POUR_TICKS = 30;
+    /** It pours from this far (AdventurAgent: from 2.5 it sometimes couldn't creep close enough on rough ground and sat
+     *  3.7 blocks from a cow for 80 s). */
+    static final double POUR_REACH = 4.5;
     /** The host it's pouring into (entity id; -1: none), for the client's stream. */
     static final EntityDataAccessor<Integer> POURING = SynchedEntityData.defineId(RiftPuppeteer.class, EntityDataSerializers.INT);
 
@@ -75,7 +78,7 @@ public class RiftPuppeteer extends RiftFauna {
         int pourId = entityData.get(POURING);
         if (pourId >= 0) {
             Entity host = level.getEntity(pourId);
-            if (!Possession.canHost(host) || host.distanceToSqr(this) > 9) {
+            if (!Possession.canHost(host) || host.distanceToSqr(this) > POUR_REACH * POUR_REACH + 4) {
                 entityData.set(POURING, -1);
                 pour = 0;
                 return;
@@ -90,7 +93,7 @@ public class RiftPuppeteer extends RiftFauna {
         moveIn = 6 + random.nextInt(6);
         Mob host = nearestHost(level);
         if (host != null) {
-            if (host.distanceToSqr(this) < 2.5 * 2.5) {
+            if (host.distanceToSqr(this) < POUR_REACH * POUR_REACH) {
                 entityData.set(POURING, host.getId());
                 pour = 0;
                 return;

@@ -29,7 +29,7 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
   of static pixels (`DustParticleOptions` black / white / violet; in stopped land they hang and fade, `ParticleGroupMixin`).
 - `RiftPuppeteer.java`: the Puppeteer. A low, wide cloud (draws ~2.4 x 0.8; hitbox 1.4 x 0.6), sparser and darker than
   Static, lower clicks (Baughn: that's how you tell them apart). It creeps in 0.8-block low blinks to the nearest frozen
-  mob within 16 blocks (`Possession.canHost`: a frozen `Mob`, not fauna, not a boss, not taken), pours into it over 30 ticks
+  mob within 16 blocks (`Possession.canHost`: a frozen `Mob`, not fauna, not a boss, not taken), pours into it from up to 4.5 blocks over 30 ticks
   (synced `POURING` = host id; the client draws a column of specks), and is gone into it. With no host it drifts after
   players, keeping 8 blocks off. Burst out of a host, it's stunned for 60 ticks.
 - `Possession.java`: the host (memory only; `POSSESSED` attachment synced, not saved). Its goals' flags are all switched
