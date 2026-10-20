@@ -41,6 +41,7 @@ public final class Possession {
         long burstUntil, nextBurst;   // game times: running while now < burstUntil
         int lostTicks, calmTicks, hitCooldown;
         long lastHurt = -100;
+        double pace = 1;
         BlockPos lastStopped;
         float dread;
     }
@@ -162,10 +163,13 @@ public final class Possession {
             h.nextBurst = h.burstUntil + hold;
             if (prey != null) {
                 // fast while it moves, so on average it keeps the mob's own pace (Baughn: too slow to be scary)
-                host.getNavigation().moveTo(prey, Math.min(burstPace(run, hold), 8.0));
+                h.pace = Math.min(burstPace(run, hold), 8.0);
+                host.getNavigation().moveTo(prey, h.pace);
                 host.getLookControl().setLookAt(prey, 60f, 60f);
             }
         }
+        // (a fast burst finishes its path in a tick or two: keep it going for the whole burst)
+        if (prey != null && now < h.burstUntil && host.getNavigation().isDone()) host.getNavigation().moveTo(prey, h.pace);
         if (prey != null && now < h.burstUntil && h.hitCooldown == 0
             && host.distanceToSqr(prey) < Math.pow(1.4 + host.getBbWidth() / 2, 2)) {
             var v = prey.getDeltaMovement();

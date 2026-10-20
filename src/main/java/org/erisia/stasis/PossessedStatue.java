@@ -80,6 +80,7 @@ public class PossessedStatue extends PathfinderMob {
     private int stuckTicks, lostTicks, hitCooldown;
     private double bestDist = Double.MAX_VALUE;
     private long ticketChunk = Long.MIN_VALUE;
+    private double pace = 1;
 
     public PossessedStatue(EntityType<? extends PossessedStatue> type, Level level) {
         super(type, level);
@@ -429,10 +430,12 @@ public class PossessedStatue extends PathfinderMob {
             long hold = (long) ((5 + r.nextInt(36)) / speed);
             burstUntil = now + run;
             nextBurst = burstUntil + hold;
-            getNavigation().moveTo(o, Math.min(Possession.burstPace(run, hold), 8.0));   // (on average a walking pace: Baughn)
+            pace = Math.min(Possession.burstPace(run, hold), 8.0);   // (on average a walking pace: Baughn)
+            getNavigation().moveTo(o, pace);
             getLookControl().setLookAt(o, 60f, 60f);
         }
         if (now < burstUntil) {
+            if (getNavigation().isDone()) getNavigation().moveTo(o, pace);   // (keep going for the whole burst)
             // stuck (5 s of burst time without a block of movement, owner further than 3): the cheat blink (λ-Nero)
             if (progressAt == null || position().distanceToSqr(progressAt) > 1) {
                 progressAt = position();

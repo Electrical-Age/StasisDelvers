@@ -1062,6 +1062,8 @@ public final class StasisGameTests {
         }, false, true));
         // a locked tower (the spawn tower) keeps its settings; anyone can feed a tower from their suit (a jump-start)
         CASES.put("tower_lock_and_feed", new Spec(200, (h, c) -> {
+            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225);   // (the values it was written for)
+            c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             ServerPlayer p = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), false);
             wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
@@ -1876,6 +1878,8 @@ public final class StasisGameTests {
         // weather (Baughn): a deep over a field raises the tower's draw (+50% at full drifting overlap); the overlap
         // measure sees a deep at its centre and nothing far from any
         CASES.put("tower_weather_raises_draw", new Spec(45, (h, c) -> {
+            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225);   // (the values it was written for)
+            c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
                 t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.9 * 4 / 3), tx);

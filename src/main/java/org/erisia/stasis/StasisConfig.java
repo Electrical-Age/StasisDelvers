@@ -244,6 +244,17 @@ public final class StasisConfig {
         return spreading;
     }
 
+    /**
+     * GameTests: set the tower constants (towerDrawK, towerStoreC) and return the old ones. Two tower tests were written
+     * against the dev run's config (10, 1225) and failed with the defaults (1.77, 306.25); they pin them now.
+     */
+    public static double[] testTowerConstants(double drawK, double storeC) {
+        double[] old = {towerDrawK, towerStoreC};
+        towerDrawK = drawK;
+        towerStoreC = storeC;
+        return old;
+    }
+
     /** stoppedLandEndermen (GameTests). */
     public static int stoppedLandEndermenForTests() {
         return stoppedUnboundCap;
