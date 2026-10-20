@@ -127,6 +127,7 @@ public final class FaunaSpawner {
     static void froze(ServerLevel level, ServerPlayer p) {
         for (RiftFauna f : level.getEntitiesOfClass(RiftFauna.class, new AABB(p.blockPosition()).inflate(48)))
             f.dissolve(level);
+        Possession.releaseNear(level, p.position(), 48);
         state(p).quietUntil = level.getGameTime() + minutes(level, StasisConfig.faunaQuietMinutes);
     }
 

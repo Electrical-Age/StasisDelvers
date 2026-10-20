@@ -36,7 +36,8 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
   off; it runs in **bursts** of 2-8 ticks with 5-40 frozen between (/(1 + dread)), `Stasis.isFrozen` false only in a burst
   (so the FROZEN sync and the client's stillness follow); each burst paths it at the nearest survival player within 32
   (speed 1.3 x (1 + dread)). It hits for 3 at reach, every 30 ticks, without knockback. The fauna wall applies (put back where it last stood
-  stopped). Damage to the host goes to the grip (6) instead, each swing at least 2 and once per 8 ticks (3 fist hits); at 0 the static bursts out (a Puppeteer) and the host freezes
+  stopped; if a field grew over that too, half the time out to a stopped spot, else the Puppeteer goes). A player freezing
+  within 48 blocks sends hosts' Puppeteers away too (`releaseNear`). Hosts count in a tower's fauna pressure. Damage to the host goes to the grip (6) instead, each swing at least 2 and once per 8 ticks (3 fist hits); at 0 the static bursts out (a Puppeteer) and the host freezes
   where it is, unhurt; no Puppeteer takes that host again for 1200 ticks; /kill and the void go through. No prey for 400 ticks: it pours out; no dread for FADE_TICKS: it dissolves.
   - Client (`client/PossessedLook`): purple eyes (two full-bright quads at eye height, on the head's front by its yaw;
     `RenderLivingEvent.Post`, render data from `RegisterRenderStateModifiersEvent`) and a static haze (EntityTickEvent.Pre at
@@ -63,5 +64,5 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 `fauna_dread`, `fauna_failing_field_lets_in`, `fauna_field_grows_over_them`,
 `fauna_fades_without_dread`, `fauna_spawner_caps` (isolated; `FaunaSpawner.testSpot` puts the tries on the test floor),
 `static_drains_suits`, `puppeteer_pours_into_a_frozen_mob`, `possessed_mob_stutters_and_lets_go`,
-`possessed_mob_keeps_out_of_fields` (all three isolated), `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
+`possessed_mob_keeps_out_of_fields`, `possessed_mob_field_grows_over_it`, `possessed_mob_leaves_a_fresh_statue` (all isolated), `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
 Dread in tests comes from `Pockets.TEST` / `Storms.TEST` boxes (the test deep seed is 0).

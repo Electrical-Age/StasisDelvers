@@ -116,7 +116,7 @@ public abstract class RiftFauna extends Monster {
     }
 
     /** The nearest stopped spot within 12 blocks, searched outward in 8 directions, standable. */
-    private BlockPos escape(ServerLevel level, BlockPos from) {
+    static BlockPos escape(ServerLevel level, BlockPos from) {
         for (int r = 2; r <= 12; r++)
             for (int a = 0; a < 8; a++) {
                 double ang = a * Math.PI / 4;

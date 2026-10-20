@@ -63,7 +63,8 @@ public class TowerBlockEntity extends BlockEntity {
         double reach = f.radius() + 4;
         var box = new net.minecraft.world.phys.AABB(f.x() - reach, f.y() - reach, f.z() - reach, f.x() + reach, f.y() + reach, f.z() + reach);
         int n = 0;
-        for (RiftFauna e : level.getEntitiesOfClass(RiftFauna.class, box)) {
+        for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, box,
+                x -> x instanceof RiftFauna || x.getData(StasisRegistry.POSSESSED.get()))) {   // (hosts press too)
             double d = Math.sqrt(e.distanceToSqr(f.x(), f.y(), f.z()));
             if (d <= reach && !f.containsPoint(e.getX(), e.getY(), e.getZ())) n++;
         }

@@ -123,7 +123,18 @@ public final class Possession {
         // the wall
         if (RiftFauna.inStopped(level, host.blockPosition())) h.lastStopped = host.blockPosition();
         else {
-            host.setPos(h.lastStopped.getX() + 0.5, h.lastStopped.getY(), h.lastStopped.getZ() + 0.5);
+            BlockPos back = h.lastStopped;
+            if (!RiftFauna.inStopped(level, back)) {
+                // a field grew over it, where it last stood too: as fauna, half the time out, else the Puppeteer goes
+                // (advisor: a host left in running land ticked every tick and chased the player inside the field)
+                back = level.getRandom().nextBoolean() ? RiftFauna.escape(level, host.blockPosition()) : null;
+                if (back == null) {
+                    release(level, host, false);
+                    return;
+                }
+                h.lastStopped = back;
+            }
+            host.setPos(back.getX() + 0.5, back.getY(), back.getZ() + 0.5);
             host.getNavigation().stop();
             host.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         }
@@ -177,6 +188,12 @@ public final class Possession {
         h.grip -= Math.max(HIT_WORTH, e.getAmount());
         level.playSound(null, host.blockPosition(), net.minecraft.sounds.SoundEvents.SCULK_CLICKING_STOP, net.minecraft.sounds.SoundSource.HOSTILE, 1f, 0.6f);
         if (h.grip <= 0) release(level, host, true);
+    }
+
+    /** A player froze near these hosts: the Puppeteers leave (no camping a fresh statue; FaunaSpawner.froze). */
+    static void releaseNear(ServerLevel level, net.minecraft.world.phys.Vec3 at, double r) {
+        for (Mob host : java.util.List.copyOf(HOSTS.keySet()))
+            if (host.level() == level && host.distanceToSqr(at) < r * r) release(level, host, false);
     }
 
     /** GameTests: how many hosts are held. */

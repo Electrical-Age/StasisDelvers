@@ -2475,6 +2475,40 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }, true, true));
+        // a field growing over a host: out, or the Puppeteer goes; never left chasing inside running land (advisor)
+        CASES.put("possessed_mob_field_grows_over_it", new Spec(40, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            var pig = (net.minecraft.world.entity.Mob) h.spawn(EntityTypes.PIG, new Vec3(10.5, 1.0, 4.5));
+            h.runAtTickTime(2, () -> org.erisia.stasis.Possession.start(level, pig));
+            h.runAtTickTime(10, () -> field(h, c, new Vec3(3.5, 2.5, 4.5), 9.5, 1.0));
+            return () -> {
+                boolean held = org.erisia.stasis.Possession.possessed(pig);
+                c.check("possessed only where time is stopped", !held || !Stasis.isRunning(level, pig.blockPosition()),
+                    (held ? "held" : "let go") + " at " + pig.blockPosition().toShortString());
+                org.erisia.stasis.Possession.release(level, pig, false);
+                pig.discard();
+            };
+        }, true, true));
+        // a player freezing sends possessed mobs' Puppeteers away too
+        CASES.put("possessed_mob_leaves_a_fresh_statue", new Spec(130, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            var pig = (net.minecraft.world.entity.Mob) h.spawn(EntityTypes.PIG, new Vec3(15.5, 1.0, 1.5));
+            h.runAtTickTime(2, () -> org.erisia.stasis.Possession.start(level, pig));
+            return () -> {
+                c.check("the player froze", !p.isAlive());
+                c.check("the pig was let go", !org.erisia.stasis.Possession.possessed(pig));
+                pig.discard();
+                level.getEntitiesOfClass(Statue.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(4)).forEach(Entity::discard);
+                remove(h, p);
+            };
+        }, true, true));
         // a player freezing sends the fauna near them away (no camping statues)
         CASES.put("fauna_leave_a_fresh_statue", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
