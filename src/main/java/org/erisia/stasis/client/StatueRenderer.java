@@ -29,6 +29,7 @@ import java.util.function.Supplier;
 public class StatueRenderer extends EntityRenderer<Statue, StatueRenderer.State> {
     public static class State extends HumanoidRenderState {
         Identifier skin = DefaultPlayerSkin.getDefaultTexture();
+        boolean fallen;
     }
 
     private final HumanoidModel<HumanoidRenderState> model;
@@ -65,12 +66,19 @@ public class StatueRenderer extends EntityRenderer<Statue, StatueRenderer.State>
         state.bodyRot = statue.getYRot();
         state.yRot = 0;
         state.skin = skin(statue);
+        state.fallen = statue.fallen();
     }
 
     @Override
     public void submit(State state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera) {
         poseStack.pushPose();
         poseStack.rotate(Axis.YP.rotationDegrees(180.0F - state.bodyRot));
+        if (state.fallen) {
+            // remains: on its back, as a sleeping player lies (LivingEntityRenderer's sleep rotations), raised off the ground
+            poseStack.translate(0.0F, 0.26F, 0.0F);
+            poseStack.rotate(Axis.ZP.rotationDegrees(90.0F));
+            poseStack.rotate(Axis.YP.rotationDegrees(270.0F));
+        }
         poseStack.scale(-1.0F, -1.0F, 1.0F);
         poseStack.translate(0.0F, -1.501F, 0.0F);
         collector.submitModel(model, state, poseStack, state.skin, state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);

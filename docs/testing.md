@@ -12,7 +12,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 - `stasis-build.sh test`: unit and property tests of the mod only.
 - `stasis-build.sh :towergen:test`, and `./gradlew :towergen:slowTest [-Dtowergen.random=N -Dtowergen.seed=S]`.
 - `stasis-build.sh runGameTestServer`: every GameTest, headless. It exits non-zero if a required test fails.
-  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 123 at HEAD).
+  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 126 at HEAD).
 - One GameTest by hand: `./gradlew runServer` (or `runClient`), then `/test run stasisdelvers:<name>`.
   `neoforge.enabledGameTestNamespaces` is set for every run config.
 
@@ -47,7 +47,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 ## 3. GameTests (`src/main/java/org/erisia/stasis/gametest/StasisGameTests.java`)
 - Registration: a static `CASES` map (name → `Spec(ticks, body, field, isolated)`), registered through a
   `TEST_FUNCTION` `DeferredRegister` and `RegisterGameTestsEvent` in `register(modBus)`.
-  - 121 `CASES.put` calls, two of them in loops: 123 tests.
+  - 124 `CASES.put` calls, two of them in loops: 126 tests.
   - Each test gets the structure `stasisdelvers:floor_16x6x8` (`src/main/resources/data/stasisdelvers/structure/floor_16x6x8.nbt`,
     made by `script/gen_test_structures.py`) and `maxTicks = ticks + 40`.
   - `isolated` tests (towers, big fields) get their own environment `alone_<name>`, so they run in a batch
@@ -80,6 +80,8 @@ debugging:
   new_chunk_grace is isolated now)
 - `spread_hard_mode_gate_rooms` (once, 2026-10-19: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
   passed on rerun; not looked into)
+- `lance_breach_hold_relax` (once, 2026-10-20: "the rift's body shrank: the probe is outer zone now"; passed on the
+  next two runs; not looked into)
 
 These are deliberately soft, so a pass proves less than it seems:
 - `rate_perf` only logs a timing.

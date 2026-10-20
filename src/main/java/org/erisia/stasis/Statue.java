@@ -28,6 +28,10 @@ import java.util.UUID;
  * What's left of a player frozen in time: holds their inventory and experience where they stood (or hung, mid-fall).
  * It can't be hurt, pushed or blown up and never despawns. Its owner (or a creative-mode player) right-clicks it to
  * get everything back; the statue then crumbles.
+ * <p>
+ * Remains (Baughn: "reimplement Corpse"): any player death leaves one ({@link Remains}). Where time runs it falls and
+ * lies down ({@link #fallen()}, once its first running tick comes), and stays lying if time stops again. It never
+ * falls out of the world, never goes through a portal and never burns.
  */
 public class Statue extends Entity {
     /** Synced for the client's model: whose skin to show. */
@@ -35,6 +39,9 @@ public class Statue extends Entity {
         SynchedEntityData.defineId(Statue.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
     static final net.minecraft.network.syncher.EntityDataAccessor<String> OWNER_NAME =
         SynchedEntityData.defineId(Statue.class, net.minecraft.network.syncher.EntityDataSerializers.STRING);
+    /** Lying down: time ran where it stood (or it was left where time runs). */
+    static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> FALLEN =
+        SynchedEntityData.defineId(Statue.class, net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
 
     private UUID owner = UUID.randomUUID();
     private String ownerName = "";
@@ -68,6 +75,77 @@ public class Statue extends Entity {
         return s;
     }
 
+    /** The remains of a death that wasn't a freeze: the drops are added by {@link Remains#drops}. */
+    static Statue remains(ServerLevel level, Player player, int xp) {
+        Statue s = new Statue(StasisRegistry.STATUE.get(), level);
+        double y = Math.max(player.getY(), level.getMinY() + 1);   // (a death in the void: kept at the floor of the world)
+        s.snapTo(player.getX(), y, player.getZ(), player.getYRot(), 0f);
+        s.owner = player.getUUID();
+        s.ownerName = player.getName().getString();
+        s.setCustomName(Component.literal(s.ownerName));
+        s.setCustomNameVisible(true);
+        s.syncOwner();
+        s.xp = Math.max(xp, 0);
+        return s;
+    }
+
+    public boolean fallen() {
+        return entityData.get(FALLEN);
+    }
+
+    void setFallen(boolean f) {
+        if (f == fallen()) return;
+        entityData.set(FALLEN, f);
+        refreshDimensions();
+    }
+
+    /**
+     * Runs only where time runs (StasisEvents cancels frozen ticks, on both sides): lie down, and fall. Both sides move it,
+     * so the client's fall is smooth; the server's position wins.
+     */
+    @Override
+    public void tick() {
+        super.tick();
+        if (!level().isClientSide()) setFallen(true);
+        if (!fallen()) return;
+        Vec3 v = getDeltaMovement();
+        if (onGround() && v.lengthSqr() < 1e-6) return;
+        v = new Vec3(v.x * 0.5, isInWater() ? Math.max(v.y - 0.01, -0.1) : v.y - 0.04, v.z * 0.5);
+        move(net.minecraft.world.entity.MoverType.SELF, v);
+        setDeltaMovement(onGround() ? Vec3.ZERO : v.scale(0.98));
+        keepInWorld();
+    }
+
+    /** Never below the floor of the world (vanilla would discard it there, items and all). */
+    private void keepInWorld() {
+        double floor = level().getMinY() + 1;
+        if (getY() < floor) {
+            setPos(getX(), floor, getZ());
+            setDeltaMovement(Vec3.ZERO);
+        }
+    }
+
+    @Override
+    protected void onBelowWorld() {
+        keepInWorld();
+    }
+
+    @Override
+    public boolean canUsePortal(boolean ignorePassenger) {
+        return false;
+    }
+
+    @Override
+    public net.minecraft.world.entity.EntityDimensions getDimensions(net.minecraft.world.entity.Pose pose) {
+        return fallen() ? net.minecraft.world.entity.EntityDimensions.fixed(1.0f, 0.5f) : super.getDimensions(pose);
+    }
+
+    @Override
+    public void onSyncedDataUpdated(net.minecraft.network.syncher.EntityDataAccessor<?> accessor) {
+        super.onSyncedDataUpdated(accessor);
+        if (FALLEN.equals(accessor)) refreshDimensions();
+    }
+
     public UUID owner() {
         return owner;
     }
@@ -84,6 +162,7 @@ public class Statue extends Entity {
     protected void defineSynchedData(SynchedEntityData.Builder b) {
         b.define(OWNER_ID, "");
         b.define(OWNER_NAME, "");
+        b.define(FALLEN, false);
     }
 
     private void syncOwner() {
@@ -169,6 +248,7 @@ public class Statue extends Entity {
         items = NonNullList.create();
         list.ifPresent(items::addAll);
         xp = in.getIntOr("xp", 0);
+        setFallen(in.getBooleanOr("fallen", false));
         syncOwner();
     }
 
@@ -178,5 +258,6 @@ public class Statue extends Entity {
         out.putString("owner_name", ownerName);
         out.store("items", ItemStack.CODEC.listOf(), List.copyOf(items));
         out.putInt("xp", xp);
+        out.putBoolean("fallen", fallen());
     }
 }

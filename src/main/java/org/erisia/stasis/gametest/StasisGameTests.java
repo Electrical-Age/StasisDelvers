@@ -300,6 +300,84 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // remains (Baughn: he died in running land and turned into items): any death leaves a statue holding the drops and
+        // all the experience, no items or orbs on the ground; where time runs it falls and lies down
+        CASES.put("remains_where_time_runs", new Spec(40, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 3.0, 4.5), true);
+            p.getInventory().add(new ItemStack(Items.DIAMOND, 5));
+            p.giveExperiencePoints(80);
+            p.connection.markClientLoaded();   // (else a fresh mock player is invulnerable)
+            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+            AABB box = new AABB(h.absolutePos(new BlockPos(3, 1, 4))).inflate(3);
+            return () -> {
+                var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
+                c.check("the player died", !p.isAlive());
+                c.check("one statue (remains)", statues.size() == 1, statues.toString());
+                c.check("no items on the ground", h.getLevel().getEntitiesOfClass(ItemEntity.class, box).isEmpty());
+                c.check("no experience orbs", h.getLevel().getEntitiesOfClass(net.minecraft.world.entity.ExperienceOrb.class, box).isEmpty());
+                if (statues.size() == 1) {
+                    Statue s = statues.get(0);
+                    c.check("it holds the diamonds", s.items().stream().anyMatch(i -> i.is(Items.DIAMOND) && i.getCount() == 5), s.items().toString());
+                    c.check("it holds all the experience", s.xp() == 80, "xp " + s.xp());
+                    c.check("it belongs to the player", s.owner().equals(p.getUUID()));
+                    c.check("it lies down", s.fallen());
+                    c.check("it fell to the floor", s.onGround() && s.getY() < h.absoluteVec(new Vec3(3.5, 2.0, 4.5)).y, String.format("y %.2f", s.getY()));
+                    s.discard();
+                }
+                remove(h, p);
+            };
+        }));
+        // in stopped land the remains stand frozen where the player died (mid-air too); a field that comes over them later
+        // lets them fall
+        CASES.put("remains_in_stopped_land_fall_when_time_runs", new Spec(60, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 3.0, 4.5), true);
+            p.getInventory().add(new ItemStack(Items.EMERALD, 3));
+            p.connection.markClientLoaded();   // (else a fresh mock player is invulnerable)
+            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+            AABB box = new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(3);
+            double y0 = h.absoluteVec(new Vec3(12.5, 3.0, 4.5)).y;
+            h.runAtTickTime(20, () -> {
+                var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
+                c.check("one statue", statues.size() == 1, statues.toString());
+                if (statues.size() == 1) {
+                    Statue s = statues.get(0);
+                    c.check("stopped: it stands", !s.fallen());
+                    c.check("stopped: it hangs where the player died", Math.abs(s.getY() - y0) < 1e-6, String.format("y %.2f", s.getY()));
+                }
+                field(h, c, new Vec3(12.5, 2.5, 4.5), 3.5, 1.0);
+            });
+            return () -> {
+                var statues = h.getLevel().getEntitiesOfClass(Statue.class, box);
+                if (statues.size() == 1) {
+                    Statue s = statues.get(0);
+                    c.check("in the field: it lies down", s.fallen());
+                    c.check("in the field: it fell", s.getY() < y0 - 1.0, String.format("y %.2f", s.getY()));
+                    c.check("it still holds the emeralds", s.items().stream().anyMatch(i -> i.is(Items.EMERALD) && i.getCount() == 3), s.items().toString());
+                    s.discard();
+                }
+                remove(h, p);
+            };
+        }));
+        // keepInventory: nothing drops, so no remains
+        CASES.put("remains_not_with_keep_inventory", new Spec(10, (h, c) -> {
+            var rules = h.getLevel().getGameRules();
+            var key = net.minecraft.world.level.gamerules.GameRules.KEEP_INVENTORY;
+            boolean was = rules.get(key);
+            rules.set(key, true, h.getLevel().getServer());
+            c.cleanup.add(() -> rules.set(key, was, h.getLevel().getServer()));
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            p.getInventory().add(new ItemStack(Items.DIAMOND, 2));
+            p.giveExperiencePoints(30);
+            p.connection.markClientLoaded();   // (else a fresh mock player is invulnerable)
+            p.hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), Float.MAX_VALUE);
+            AABB box = new AABB(h.absolutePos(new BlockPos(3, 1, 4))).inflate(3);
+            return () -> {
+                c.check("the player died", !p.isAlive());
+                c.check("no statue", h.getLevel().getEntitiesOfClass(Statue.class, box).isEmpty());
+                c.check("the player kept the diamonds", p.getInventory().countItem(Items.DIAMOND) == 2);
+                remove(h, p);
+            };
+        }));
         CASES.put("player_safe_inside", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
             return () -> {

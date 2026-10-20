@@ -209,7 +209,7 @@ public final class StasisRegistry {
 
     public static final DeferredHolder<EntityType<?>, EntityType<Statue>> STATUE = ENTITY_TYPES.register("statue",
         () -> EntityType.Builder.<Statue>of(Statue::new, MobCategory.MISC).sized(0.6f, 1.8f).clientTrackingRange(10)
-            .updateInterval(20).fireImmune().noSummon()
+            .updateInterval(4).fireImmune().noSummon()   // (4: remains fall where time runs)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "statue"))));
 
     /** Frozen in time (data/stasisdelvers/damage_type/frozen_in_time.json); bypasses armour, totems and resistance. */

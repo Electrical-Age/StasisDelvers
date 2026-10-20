@@ -29,6 +29,9 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::entityTick);
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::finalizeSpawn);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::drops);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::experience);
+        NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, Remains::respawn);
         NeoForge.EVENT_BUS.addListener(StasisEvents::keepFriendlyInside);
         NeoForge.EVENT_BUS.addListener(FieldSleep::canSleep);
         NeoForge.EVENT_BUS.addListener(FieldSleep::canContinue);

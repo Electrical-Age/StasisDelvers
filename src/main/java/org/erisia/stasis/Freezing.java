@@ -233,7 +233,12 @@ public final class Freezing {
         if (speed != null) speed.removeModifier(SLOW);
         StasisDelvers.LOG.info("{} froze in time at {} ({} stacks, {} xp in the statue)", p.getName().getString(),
             p.blockPosition().toShortString(), statue.items().size(), statue.xp());
-        p.hurtServer(level, source, Float.MAX_VALUE);
+        Remains.FREEZING.put(p.getUUID(), statue);   // (what the death still drops, accessory slots, joins this statue)
+        try {
+            p.hurtServer(level, source, Float.MAX_VALUE);
+        } finally {
+            Remains.FREEZING.remove(p.getUUID());
+        }
     }
 
     /** Players sent to world spawn instead of a respawn point in stopped land (told so once they're back). */

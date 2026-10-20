@@ -30,6 +30,14 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   land respawns at world spawn if time runs there (no death loop).
 - `Statue.java`: an entity holding the inventory and XP. Unhurtable, never despawns. The owner (or a creative
   player) right-clicks to get everything back. Rendered by `client/StatueRenderer.java`.
+- `Remains.java`: every player death leaves a `Statue` (Baughn: he died in running land and turned into items).
+  `LivingDropsEvent` at LOWEST puts the drops (Curios and other mods' additions too) into it and clears them;
+  `LivingExperienceDropEvent` drops no orbs, the statue takes all the experience. A freeze's statue is registered in
+  `FREEZING` while the death runs, so what the death still drops joins it. keepInventory: no remains. The owner gets the
+  coordinates at respawn (memory only).
+  - Statues **fall** where time runs (`Statue.tick` runs only there: `fallen`, synced and saved), lie on their back
+    (`StatueRenderer`), and stay lying if time stops again. Never below the world floor (`onBelowWorld`), no portals,
+    fire-immune.
 - `Suits.java`:
   - `problem` (why a suit doesn't protect), `share` (each worn piece carries 4/worn of the draw), `missing`
   - `tick` (once a second): tops up the pieces from carried batteries by water-filling; the stasis suit
@@ -79,6 +87,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   an open lance gate's disc and the part of its rift outside the 25 % it is held to, and a return rift's body
   (`Lance.spares`: the outer zone's rules there; lance.md). `Lance.step` runs first in `Freezing.tick`, so stepping into
   a disc is a trip, not the eye's statue.
+- Remains: `remains_where_time_runs` (items and all experience in the statue, nothing on the ground, it lies on the
+  floor), `remains_in_stopped_land_fall_when_time_runs`, `remains_not_with_keep_inventory`.
 - The starter suit is given once per player, across deaths: `starter_suit_once`. In spreading mode there is no suit:
   one stability compass instead (`StarterKit.COMPASS_TAG`), `stability_compass_first_join`.
 - Crafting keeps the charge: `suit_craft_keeps_charge`. Capacitors: `capacitor_takes_mist`.
