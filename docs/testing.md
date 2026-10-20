@@ -87,7 +87,7 @@ debugging:
 - `spread_rates` (once, 2026-10-20: "spawn column runs", "a slow field in running land: still 1: 0.3"; passed on 2 reruns)
 - `time_resumes` (new_chunk_grace's chunk grace reached its sand when the grid put both in one chunk;
   new_chunk_grace is isolated now)
-- `spread_hard_mode_gate_rooms` (once, 2026-10-19: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
+- `spread_hard_mode_gate_rooms` (2026-10-20: about 1 run in 3; waits up to 1200 ticks now, 1 in 20; was: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
   passed on rerun; not looked into)
 - Lance tests, fixed 2026-10-20 (they had flaked since the remains work; the bisect pointed at chance, not remains):
   `lance_breach_hold_relax` picked a probe whose shape could lie past the breached quarter (now 0.095..0.24, six

@@ -3646,7 +3646,7 @@ public final class StasisGameTests {
         // with their blocks (the node removed, the chest's items not dropped); a running player the new rift stops gets
         // the grace; each chunk is written once, also after the progress was saved and read back and the chunks loaded
         // again. A room generated after the instant gets stopped mode's room at worldgen and isn't recorded.
-        CASES.put("spread_hard_mode_gate_rooms", new Spec(500, (h, c) -> {
+        CASES.put("spread_hard_mode_gate_rooms", new Spec(1300, (h, c) -> {
             ServerLevel level = h.getLevel();
             var server = level.getServer();
             BlockPos base = h.absolutePos(new BlockPos(0, 24, 0));
@@ -3743,7 +3743,8 @@ public final class StasisGameTests {
             boolean[] sentinelKept = new boolean[1];
             BlockPos sentinel = ea.above(2);
             // (the test server ticks unthrottled, and a chunk near the room waits for its entities to load from disk:
-            // look each tick until every chunk is done, for at most 420 ticks)
+            // look each tick until every chunk is done, for at most 1200 ticks: unthrottled, 420 ticks were sometimes too few
+            // real seconds for one chunk's entities to load, "loaded no entities ticking")
             boolean[] phase2 = new boolean[1];
             Runnable second = () -> {
                 var r = org.erisia.stasis.PendingGates.testRoom(level, centre);
@@ -3787,8 +3788,8 @@ public final class StasisGameTests {
                 c.check("after the instant a new room is shattered at worldgen", count(level, b2, Blocks.END_PORTAL_FRAME) == 0
                     && org.erisia.stasis.PendingGates.testRoom(level, centre2[0]) == null);
             };
-            for (int t = 1; t <= 420; t++) {
-                boolean last = t == 420;
+            for (int t = 1; t <= 1200; t++) {
+                boolean last = t == 1200;
                 h.runAfterDelay(t, () -> {
                     if (phase2[0]) return;
                     var r = org.erisia.stasis.PendingGates.testRoom(level, centre);
@@ -3797,7 +3798,7 @@ public final class StasisGameTests {
                     second.run();
                 });
             }
-            h.runAfterDelay(480, () -> sentinelKept[0] = level.getBlockState(sentinel).is(Blocks.GLASS));
+            h.runAfterDelay(1260, () -> sentinelKept[0] = level.getBlockState(sentinel).is(Blocks.GLASS));
             return () -> {
                 c.check("each chunk written once (the block put in the hollow stayed)", sentinelKept[0]);
                 c.check("the new room's gate rift is registered", centre2[0] != null && org.erisia.stasis.Gates.list(level).contains(centre2[0].asLong()));
