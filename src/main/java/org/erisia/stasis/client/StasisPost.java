@@ -286,21 +286,26 @@ public final class StasisPost {
                 d[204 + 3 * (ns - 1)] = (float) (core[0] - fx);
                 d[205 + 3 * (ns - 1)] = (float) (core[1] - fy);
                 d[206 + 3 * (ns - 1)] = (float) (core[2] - fz);
-                double best = Double.MAX_VALUE, want = 0;
+                double best = Double.MAX_VALUE, want = 0, wantPitch = 0;
                 for (var pl : mc.level.players()) {
                     double dx = pl.getX() - core[0], dz = pl.getZ() - core[2], dd = dx * dx + dz * dz + Math.pow(pl.getEyeY() - core[1], 2);
                     if (dd < best) {
                         best = dd;
                         want = Math.atan2(dx, dz);
+                        wantPitch = Math.atan2(pl.getEyeY() - core[1], Math.sqrt(dx * dx + dz * dz));
                     }
                 }
                 // a lance pouring power into it: the eye fixes on the boom's tip (LANCE-v2 point 2)
                 for (var l : org.erisia.stasis.LanceBlockEntity.CLIENT.values())
                     if (l.beam() && l.boundId() == sd.id() && l.tip() != null && l.getLevel() == mc.level) {
-                        want = Math.atan2(l.tip().getX() + 0.5 - core[0], l.tip().getZ() + 0.5 - core[2]);
+                        double tx = l.tip().getX() + 0.5 - core[0], tz = l.tip().getZ() + 0.5 - core[2];
+                        want = Math.atan2(tx, tz);
+                        wantPitch = Math.atan2(l.tip().getY() + 0.5 - core[1], Math.sqrt(tx * tx + tz * tz));
                         break;
                     }
-                double yaw = saccade(sd.id(), want, clock);
+                double yaw = saccade(EYES, sd.id(), want, clock);
+                // and up or down (λ-Nero: not held level), within 60 degrees, twitching with the same clock
+                d[1808 + ns - 1] = (float) saccade(EYE_PITCHES, sd.id(), Math.max(-1.05, Math.min(1.05, wantPitch)), clock);
                 String dest = org.erisia.stasis.Gates.destination(sd);
                 int destCode = dest.equals("minecraft:the_end") ? 0 : dest.equals("minecraft:the_nether") ? 1 : 2;
                 d[200 + ns - 1] = (float) (yaw + 10 * destCode);
@@ -441,11 +446,11 @@ public final class StasisPost {
     }
 
     /** Per eye (static deep id): its facing (rad) and when it may move next (weather clock, s). */
-    static final java.util.Map<Integer, double[]> EYES = new java.util.HashMap<>();
+    static final java.util.Map<Integer, double[]> EYES = new java.util.HashMap<>(), EYE_PITCHES = new java.util.HashMap<>();
 
-    /** The eye's facing: held for 0.5-1.5 s, then a quick twitch towards the wanted facing (over ~0.12 s). */
-    static double saccade(int id, double want, double clock) {
-        double[] e = EYES.computeIfAbsent(id, k -> new double[]{want, clock, want, clock});
+    /** The eye's facing (or pitch): held for 0.5-1.5 s, then a quick twitch towards the wanted angle (over ~0.12 s). */
+    static double saccade(java.util.Map<Integer, double[]> eyes, int id, double want, double clock) {
+        double[] e = eyes.computeIfAbsent(id, k -> new double[]{want, clock, want, clock});
         // e: {from, twitch start, to, next decision}
         if (clock >= e[3]) {
             double cur = facing(e, clock);
@@ -457,7 +462,7 @@ public final class StasisPost {
             }
             e[3] = clock + 0.5 + Math.abs(Math.sin(clock * 12.9898 + id)) * 1.0;
         }
-        if (EYES.size() > 64) EYES.clear();
+        if (eyes.size() > 64) eyes.clear();
         return Math.atan2(Math.sin(facing(e, clock)), Math.cos(facing(e, clock)));
     }
 

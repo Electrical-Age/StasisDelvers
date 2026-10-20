@@ -14,7 +14,7 @@
 // indices) of the rank window in SpreadSampler (64 x 64 cells, one rank per texel as int bits in r..a, MISSING =
 // 2147483647 where no tile came: runs); [200..203] static deep
 // i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
-// static deep i's eye centre (the warped core) - floor(camera); [1580 + 4i] its NDC x, y, distance, in front (0/1);
+// static deep i's eye centre (the warped core) - floor(camera); [1808 + i] its pitch (radians, up +); [1580 + 4i] its NDC x, y, distance, in front (0/1);
 // [1596] strain on reality (0..1, nearness to a core); [1597 + i] static deep i's inhale before a puff (0..1); [216] render distance (blocks); [1312] storm
 // intensity; [1313] storm warning 0..1; [1314] wind angle; [1315, 1316] the storm field's noise coordinates at
 // floor(camera) (x, z); [1317, 1318] its mist and rift thresholds; [1319] its noise seed; [1320 + 16j + i] the ground
@@ -1194,13 +1194,16 @@ void main() {
                 int dest = int(floor((yd + 5.0) / 10.0));
                 float f = yd - 10.0 * float(dest);
                 float W = clamp(0.6 + data(223 + 5 * i) * data(240 + i) * 0.018, 0.75, 1.8);   // (StaticDeeps.eyeHalfWidth)
-                vec3 nrm = vec3(sin(f), 0.0, cos(f)), rt = vec3(cos(f), 0.0, -sin(f));
+                // tilted up or down by its pitch (λ-Nero): rt stays level
+                float pe = data(1808 + i);
+                vec3 nrm = vec3(sin(f) * cos(pe), sin(pe), cos(f) * cos(pe)), rt = vec3(cos(f), 0.0, -sin(f));
+                vec3 upE = vec3(-sin(f) * sin(pe), cos(pe), -cos(f) * sin(pe));
                 float dn = dot(dirE, nrm);
                 if (abs(dn) < 1e-3) continue;
                 float th = dot(ec, nrm) / dn;
                 if (th <= 0.0 || th > tEndE) continue;
                 vec3 hp = dirE * th - ec;
-                vec2 ex = vec2(dot(hp, rt), hp.y);
+                vec2 ex = vec2(dot(hp, rt), dot(hp, upE));
                 if (abs(ex.x) > W * 2.6 || abs(ex.y) > W * 2.6) continue;
                 ex = (floor(ex * 16.0) + 0.5) / 16.0;      // Minecraft's texel grid
                 vec4 ep = eyePattern(ex, eyeTime, int(data(224 + 5 * i)), W, dirE, dest);
