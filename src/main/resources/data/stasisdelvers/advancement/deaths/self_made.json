@@ -1,0 +1,27 @@
+{
+  "parent": "stasisdelvers:deaths/root",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "minecraft:armor_stand"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.deaths.self_made.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.deaths.self_made.description"
+    },
+    "announce_to_chat": true,
+    "hidden": true,
+    "frame": "challenge"
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

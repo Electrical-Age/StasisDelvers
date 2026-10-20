@@ -1,0 +1,27 @@
+{
+  "parent": "stasisdelvers:deaths/root",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "minecraft:string"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.deaths.puppet_show.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.deaths.puppet_show.description"
+    },
+    "announce_to_chat": true,
+    "hidden": true,
+    "frame": "challenge"
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

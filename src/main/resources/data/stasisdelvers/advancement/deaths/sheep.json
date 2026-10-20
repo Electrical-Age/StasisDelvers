@@ -1,0 +1,27 @@
+{
+  "parent": "stasisdelvers:deaths/root",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "minecraft:white_wool"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.deaths.sheep.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.deaths.sheep.description"
+    },
+    "announce_to_chat": true,
+    "hidden": true,
+    "frame": "challenge"
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

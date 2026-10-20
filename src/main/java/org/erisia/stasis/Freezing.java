@@ -236,6 +236,7 @@ public final class Freezing {
         if (speed != null) speed.removeModifier(SLOW);
         StasisDelvers.LOG.info("{} froze in time at {} ({} stacks, {} xp in the statue)", p.getName().getString(),
             p.blockPosition().toShortString(), statue.items().size(), statue.xp());
+        DeathAdvancements.freezing(level, p);   // (before the Static near it go)
         FaunaSpawner.froze(level, p);   // (the fauna near a fresh statue go: no camping it)
         Remains.FREEZING.put(p.getUUID(), statue);   // (what the death still drops, accessory slots, joins this statue)
         try {

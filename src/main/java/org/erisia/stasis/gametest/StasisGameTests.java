@@ -2702,6 +2702,40 @@ public final class StasisGameTests {
             };
         }, true, true));
 
+        // deaths to fauna are hidden advancements (Baughn): a possessed pig is still a pig; your own statue; frozen with Static on you
+        CASES.put("fauna_death_advancements", new Spec(130, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer a = survivalPlayer(h, new Vec3(10.5, 1.0, 1.5), false), b = survivalPlayer(h, new Vec3(10.5, 1.0, 6.5), false),
+                d = survivalPlayer(h, new Vec3(14.5, 1.0, 4.5), true);
+            var pig = (net.minecraft.world.entity.Mob) h.spawn(EntityTypes.PIG, new Vec3(12.5, 1.0, 1.5));
+            Statue s = gearStatue(h, b.getUUID(), "owner", new Vec3(13.5, 1.0, 6.5));
+            var st = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(15, 1, 3)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
+            h.runAtTickTime(2, () -> {
+                org.erisia.stasis.Possession.start(level, pig);
+                var ps = org.erisia.stasis.PossessedStatue.take(level, s);
+                a.connection.markClientLoaded();
+                b.connection.markClientLoaded();
+                a.hurtServer(level, level.damageSources().mobAttack(pig), 1000f);
+                if (ps != null) b.hurtServer(level, level.damageSources().mobAttack(ps), 1000f);
+            });
+            java.util.function.BiFunction<ServerPlayer, String, Boolean> has = (p, k) -> {
+                var adv = level.getServer().getAdvancements().get(net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "deaths/" + k));
+                return adv != null && p.getAdvancements().getOrStartProgress(adv).isDone();
+            };
+            return () -> {
+                c.check("killed by a possessed pig: Just a Pig", has.apply(a, "pig"));
+                c.check("killed by your own statue: Self Made", has.apply(b, "self_made"));
+                c.check("frozen with Static on you: Low Battery", !d.isAlive() && has.apply(d, "low_battery"), "alive " + d.isAlive());
+                c.check("nothing else", !has.apply(a, "cow") && !has.apply(a, "self_made"));
+                org.erisia.stasis.Possession.release(level, pig, false);
+                pig.discard();
+                st.discard();
+                clearGear(h, b.getUUID());
+                level.getEntitiesOfClass(Statue.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(8)).forEach(Entity::discard);
+                for (ServerPlayer p : new ServerPlayer[]{a, b, d}) remove(h, p);
+            };
+        }, true, true));
         // a player freezing sends the fauna near them away (no camping statues)
         CASES.put("fauna_leave_a_fresh_statue", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);

@@ -73,6 +73,11 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 - `TowerBlockEntity.faunaPressure`: fauna within 4 blocks outside a field add 0.5 each (at most 2) to `weatherFactor`,
   computed every 20 ticks with the weather (λ-Nero: they raise the draw like a storm, and can make it fail).
 
+- `DeathAdvancements.java`: deaths to fauna as hidden advancements (Baughn: sarcastic, snappy, fitting the death message;
+  a possessed cow is still a cow): `data/stasisdelvers/advancement/deaths/` (root "Stopped Time"; Just a Cow / Pig / Sheep
+  / Chicken, Puppet Show for other hosts, Self Made for your own statue, Low Battery for freezing with Static feeding on
+  you). `impossible` triggers, awarded from code (`LivingDeathEvent`; `Freezing.freeze` before the fauna go).
+
 ## Config (synced)
 `fauna`, `faunaChance`, `faunaPerPlayer`, `faunaPerPlayerStorm`, `faunaQuietMinutes`, `faunaStormQuietMinutes`;
 `stoppedLandEndermen` (time-stop.md).
@@ -84,6 +89,6 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 `possessed_mob_keeps_out_of_fields`, `possessed_mob_field_grows_over_it`, `possessed_mob_leaves_a_fresh_statue`,
 `possessed_statue_taken`, `possessed_statue_damage_and_death`, `possessed_statue_owner_leaves`,
 `possessed_statue_owner_dies_home|hunt`, `possessed_statue_field_grows_over_it`, `possessed_statue_save_load`,
-`possessed_statue_climbs_out`, `possessed_statue_keeps_out_of_fields` (all isolated; every possessed-statue test ends
+`possessed_statue_climbs_out`, `possessed_statue_keeps_out_of_fields`, `fauna_death_advancements` (all isolated; every possessed-statue test ends
 with `gearAccountedFor`: exactly one holder of the owner's gear, every item and the xp), `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
 Dread in tests comes from `Pockets.TEST` / `Storms.TEST` boxes (the test deep seed is 0).

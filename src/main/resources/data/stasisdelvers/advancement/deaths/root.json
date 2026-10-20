@@ -1,0 +1,26 @@
+{
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:tick"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:rift_shard"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.deaths.root.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.deaths.root.description"
+    },
+    "announce_to_chat": false,
+    "background": "minecraft:gui/advancements/backgrounds/stone",
+    "show_toast": false
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

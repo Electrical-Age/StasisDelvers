@@ -1,0 +1,27 @@
+{
+  "parent": "stasisdelvers:deaths/root",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "minecraft:redstone"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.deaths.low_battery.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.deaths.low_battery.description"
+    },
+    "announce_to_chat": true,
+    "hidden": true,
+    "frame": "challenge"
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}
