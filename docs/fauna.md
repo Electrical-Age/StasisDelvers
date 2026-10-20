@@ -20,8 +20,8 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 - `RiftStatic.java`: Static, the suit drainer. It **blinks**: every 16-30 ticks a step of 1.5-2.5 blocks (x (1 + dread);
   about 2.6 blocks/s at dread 0.5, so a walking player can outpace it) towards the nearest survival player within 24 blocks, onto a free spot in stopped land, hovering 0.6 over
   ground within 3 blocks below; idle, a 1.5-block blink every 40-100 ticks. No gravity, no pathfinding (walking it stuck in
-  riftstone pits, flying it drifted off: AdventurAgent). No client interpolation (`InterpolationHandler.NO_OP`): a blink
-  is a cut. Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
+  riftstone pits, flying it drifted off: AdventurAgent). A blink is a cut or a slide, a coin flip per blink on each client
+  (Baughn likes both): its client interpolation handler skips the stepped slide half the time. Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
   plus full-bright end-rod glints for rift darkness (AdventurAgent: sparse grey specks were invisible, violet washes out
   in the grey); clicks every ~12 ticks. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
   `Freezing.tick` multiplies the suit's draw factor by 1 + that, in stopped land only (a field is safety), so a rift

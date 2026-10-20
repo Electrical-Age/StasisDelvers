@@ -88,7 +88,9 @@ public class RiftStatic extends RiftFauna {
             t = settle(level, t);
             BlockPos at = BlockPos.containing(t);
             AABB box = getDimensions(getPose()).makeBoundingBox(t);
-            if (!inStopped(level, at) || !inStopped(level, BlockPos.containing(t.x, t.y + 0.7, t.z)) || !level.noCollision(this, box)) continue;
+            BlockPos top = BlockPos.containing(t.x, t.y + 0.7, t.z);
+            if (!inStopped(level, at) || !inStopped(level, top) || !level.noCollision(this, box) || solid(level, at) || solid(level, top)
+                || level.getBlockCollisions(null, box).iterator().hasNext()) continue;   // (AdventurAgent: it landed inside the ground under ledges)
             setPos(t.x, t.y, t.z);
             if (random.nextInt(3) == 0) playAmbientSound();
             return true;
@@ -96,22 +98,70 @@ public class RiftStatic extends RiftFauna {
         return false;
     }
 
+    private static boolean solid(ServerLevel level, BlockPos p) {
+        return !level.getBlockState(p).getCollisionShape(level, p, net.minecraft.world.phys.shapes.CollisionContext.empty()).isEmpty();
+    }
+
     /** Drop to HOVER over ground within 3 blocks below; with no ground that near (a pit's edge, the open air), stay at height. */
     private static Vec3 settle(ServerLevel level, Vec3 t) {
         BlockPos p = BlockPos.containing(t);
+        if (solid(level, p)) return t;   // (inside a block: blink() rejects it)
         for (int dy = 0; dy <= 3; dy++) {
             BlockPos below = p.below(dy + 1);
-            if (!level.getBlockState(below).getCollisionShape(level, below).isEmpty())
+            if (solid(level, below))
                 return new Vec3(t.x, below.getY() + 1 + HOVER * 0.5, t.z);
         }
         return t;
     }
 
-    /** A blink is a cut, not a slide (AdventurAgent: the client's interpolation made a lunge that sank into the ground and
-     *  through pit walls). */
+    /**
+     * A blink is a cut or a slide, a coin flip each time, on each client (AdventurAgent found the slide; Baughn likes it,
+     * and the cut too: "maybe they should be able to do both?").
+     */
     @Override
     protected net.minecraft.world.entity.InterpolationHandler createInterpolationHandler() {
-        return net.minecraft.world.entity.InterpolationHandler.NO_OP;
+        var stepped = net.minecraft.world.entity.SteppedInterpolationHandler.create(this);
+        if (!level().isClientSide()) return stepped;
+        return new net.minecraft.world.entity.InterpolationHandler() {
+            @Override
+            public net.minecraft.world.entity.InterpolationTracker interpolationTracker() {
+                return stepped.interpolationTracker();
+            }
+
+            @Override
+            public net.minecraft.core.PositionAndRotation target() {
+                return stepped.target();
+            }
+
+            @Override
+            public boolean interpolateTo(net.minecraft.world.entity.PositionPath position, float yRot, float xRot, boolean hasRotation) {
+                if (position != null && random.nextBoolean()) {   // (false: the caller sets the position at once, a cut)
+                    stepped.cancel();
+                    return false;
+                }
+                return stepped.interpolateTo(position, yRot, xRot, hasRotation);
+            }
+
+            @Override
+            public void interpolate() {
+                stepped.interpolate();
+            }
+
+            @Override
+            public void applyPredictedMovement(Vec3 delta) {
+                stepped.applyPredictedMovement(delta);
+            }
+
+            @Override
+            public boolean hasActiveInterpolation() {
+                return stepped.hasActiveInterpolation();
+            }
+
+            @Override
+            public void cancel() {
+                stepped.cancel();
+            }
+        };
     }
 
     @Override
