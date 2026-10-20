@@ -130,6 +130,21 @@ public class Statue extends Entity {
         }
     }
 
+    /** Smooth between the server's 4-tick position updates (a plain Entity snaps: AdventurAgent saw a 5 Hz fall). */
+    @Override
+    protected net.minecraft.world.entity.InterpolationHandler createInterpolationHandler() {
+        return net.minecraft.world.entity.LinearInterpolationHandler.create(this, 4);
+    }
+
+    /** Where it will come to rest if it's still falling: the top of the first solid block below (water doesn't hold it). */
+    public net.minecraft.core.BlockPos restingPlace() {
+        if (onGround() || !fallen() || isRemoved()) return blockPosition();   // (unloaded: don't load its chunk to look)
+        var pos = blockPosition().mutable();
+        while (pos.getY() > level().getMinY() + 1 && level().getBlockState(pos.below()).getCollisionShape(level(), pos.below()).isEmpty())
+            pos.move(net.minecraft.core.Direction.DOWN);
+        return pos.immutable();
+    }
+
     @Override
     protected void onBelowWorld() {
         keepInWorld();

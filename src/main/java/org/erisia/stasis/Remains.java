@@ -74,8 +74,10 @@ public final class Remains {
     static void respawn(PlayerEvent.PlayerRespawnEvent e) {
         if (e.isEndConquered() || !(e.getEntity() instanceof ServerPlayer p)) return;
         Statue s = WHERE.remove(p.getUUID());
-        if (s != null && (s.getRemovalReason() == null || !s.getRemovalReason().shouldDestroy()))   // (unloaded: its last place)
-            p.sendSystemMessage(Component.literal(String.format("Your remains lie at %d %d %d (%s).", s.getBlockX(), s.getBlockY(),
-                s.getBlockZ(), s.level().dimension().identifier())));
+        if (s != null && (s.getRemovalReason() == null || !s.getRemovalReason().shouldDestroy())) {   // (unloaded: its last place)
+            var at = s.restingPlace();   // (still sinking through the sea: where it will lie)
+            p.sendSystemMessage(Component.literal(String.format("Your remains lie at %d %d %d (%s).", at.getX(), at.getY(), at.getZ(),
+                s.level().dimension().identifier())));
+        }
     }
 }
