@@ -61,9 +61,11 @@ public abstract class RiftFauna extends Monster {
         if (!(level() instanceof ServerLevel level) || isRemoved() || isDeadOrDying()) return;
         if (tickCount % 10 == 0) {
             dread = Dread.at(level, getBlockX(), getBlockY(), getBlockZ());
-            AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
-            if (speed != null)
-                speed.addOrUpdateTransientModifier(new AttributeModifier(DREAD_SPEED, Math.min(dread, 1f), AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+            for (var attr : java.util.List.of(Attributes.MOVEMENT_SPEED, Attributes.FLYING_SPEED)) {
+                AttributeInstance speed = getAttribute(attr);
+                if (speed != null)
+                    speed.addOrUpdateTransientModifier(new AttributeModifier(DREAD_SPEED, Math.min(dread, 1f), AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+            }
         }
         if (!barrier(level)) return;
         if (tickCount % 20 == 0) near = dread > 0 || nearDread(level);
@@ -166,6 +168,17 @@ public abstract class RiftFauna extends Monster {
                 return new PathFinder(this.nodeEvaluator, maxVisitedNodes);
             }
         };
+    }
+
+    /** ... for flying ones (Static). */
+    static final class StoppedOnlyFly extends net.minecraft.world.level.pathfinder.FlyNodeEvaluator {
+        @Override
+        public PathType getPathTypeOfMob(PathfindingContext context, int x, int y, int z, Mob mob) {
+            PathType t = super.getPathTypeOfMob(context, x, y, z, mob);
+            if (t != PathType.BLOCKED && mob.level() instanceof ServerLevel level && !inStopped(level, new BlockPos(x, y, z)))
+                return PathType.BLOCKED;
+            return t;
+        }
     }
 
     /** Paths through stopped land (and failing fields) only. */

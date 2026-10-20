@@ -17,8 +17,10 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
     the other direction).
   - Speed x (1 + dread), so at most 2x (λ-Nero). Updated every 10 ticks.
   - Dread 0 at and around it for `FADE_TICKS` (200) and it dissolves (static particles, no drop).
-- `RiftStatic.java`: Static, the suit drainer. Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
-  (AdventurAgent: sparse grey specks were invisible, violet washes out in the grey); clicks every ~12 ticks. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
+- `RiftStatic.java`: Static, the suit drainer. It floats (FlyingMoveControl, `StoppedOnlyFly` paths; walking it stuck in
+  riftstone pits). Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
+  plus full-bright electric sparks for rift darkness (AdventurAgent: sparse grey specks were invisible, violet washes out
+  in the grey); clicks every ~12 ticks. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
   `Freezing.tick` multiplies the suit's draw factor by 1 + that, in stopped land only (a field is safety), so a rift
   capacitor takes the surcharge like the weather's. It never hits. Sounds: sculk clicking (a Geiger-ish crackle). No model: `NoopRenderer`, and the client draws a knot
   of static pixels (`DustParticleOptions` black / white / violet; in stopped land they hang and fade, `ParticleGroupMixin`).
