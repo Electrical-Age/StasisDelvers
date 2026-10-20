@@ -17,7 +17,7 @@ import net.minecraft.world.phys.Vec3;
  * denser than the Puppeteer; that's how you tell them apart). Within {@link #REACH} blocks each one adds the suit's own draw
  * again ({@link Freezing}), so a rift capacitor takes it like the weather's surcharge.
  * <p>
- * It doesn't walk or fly: it <b>blinks</b>, a few blocks at a time, hanging still in the air between (the tendril stutter,
+ * It doesn't walk or fly: it <b>blinks</b>, 1.5-2.5 blocks (x (1 + dread)) every 16-30 ticks, hanging still in the air between (the tendril stutter,
  * Baughn: time is stopped for us, not necessarily for them). Walking it stuck in riftstone pits; flying it sank, drifted
  * off and hung high (AdventurAgent). A blink lands only on a free spot in stopped land, so the field wall holds.
  * No model: the client draws it as a knot of static pixels ({@link #clientStatic}).
@@ -64,13 +64,15 @@ public class RiftStatic extends RiftFauna {
         setDeltaMovement(Vec3.ZERO);
         if (--blinkIn > 0) return;
         Player prey = level.getNearestPlayer(getX(), getY(), getZ(), SENSE, net.minecraft.world.entity.EntitySelector.NO_CREATIVE_OR_SPECTATOR);
-        // faster with dread (blinks come sooner and reach further; at most 2x: λ-Nero)
+        // faster with dread (blinks reach further; at most 2x: λ-Nero)
         float d = dread();
-        blinkIn = (int) ((prey != null ? 10 + random.nextInt(16) : 40 + random.nextInt(60)) / (1 + d));
+        // (AdventurAgent: at 2.5-3.5 x (1 + dread) every 10-25 / (1 + dread) ticks it crossed 14 blocks in 2.4 s; now about
+        // 2.6 blocks/s at dread 0.5, so a walking player can outpace it on open ground: λ-Nero warned about fast mobs)
+        blinkIn = prey != null ? 16 + random.nextInt(15) : 40 + random.nextInt(60);
         if (prey != null) {
             double dist = Math.sqrt(distanceToSqr(prey));
             if (dist < 1.8) return;
-            double step = Math.min(dist - 1.5, (2.5 + random.nextDouble()) * (1 + d));
+            double step = Math.min(dist - 1.5, (1.5 + random.nextDouble()) * (1 + d));
             Vec3 to = prey.position().add(0, HOVER, 0).subtract(position()).normalize().scale(step);
             blink(level, position().add(to));
         } else {
@@ -103,6 +105,13 @@ public class RiftStatic extends RiftFauna {
                 return new Vec3(t.x, below.getY() + 1 + HOVER * 0.5, t.z);
         }
         return t;
+    }
+
+    /** A blink is a cut, not a slide (AdventurAgent: the client's interpolation made a lunge that sank into the ground and
+     *  through pit walls). */
+    @Override
+    protected net.minecraft.world.entity.InterpolationHandler createInterpolationHandler() {
+        return net.minecraft.world.entity.InterpolationHandler.NO_OP;
     }
 
     @Override
@@ -160,8 +169,7 @@ public class RiftStatic extends RiftFauna {
             level().addParticle(new net.minecraft.core.particles.DustParticleOptions(kind < 5 ? 0x050508 : kind < 9 ? 0xF4F4FF : 0xB060FF,
                 0.9f + random.nextFloat() * 0.6f), getX() + dx, getY() + 0.4 + dy, getZ() + dz, 0, 0, 0);
         }
-        if (random.nextInt(2) == 0)
-            level().addParticle(net.minecraft.core.particles.ParticleTypes.END_ROD, getX() + (random.nextDouble() - 0.5) * 0.6,
+        level().addParticle(net.minecraft.core.particles.ParticleTypes.END_ROD, getX() + (random.nextDouble() - 0.5) * 0.6,
                 getY() + 0.4 + (random.nextDouble() - 0.5) * 0.6, getZ() + (random.nextDouble() - 0.5) * 0.6, 0, 0, 0);
     }
 }
