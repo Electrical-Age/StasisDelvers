@@ -12,8 +12,9 @@ import net.minecraft.resources.Identifier;
 import org.erisia.stasis.RiftAskew;
 
 /**
- * The Askew: the enderman model with its joints bent the wrong way and its head turned too far (Baughn: "limbs quite
- * askew"), each one differently (its id seeds the angles), with a slow drift so it never quite settles. Purple eyes as
+ * The Askew: the enderman model with its joints bent the wrong way and its head lolled over (Baughn: "limbs quite
+ * askew"; arms above the head looked like a dance), one pose with small variations per entity (its id), and a slow
+ * drift so it never quite settles. Purple eyes as
  * an enderman's; in stopped land the post shader draws them too (PossessedLook).
  */
 public class AskewRenderer extends MobRenderer<RiftAskew, AskewRenderer.State, AskewRenderer.Model> {
@@ -28,22 +29,29 @@ public class AskewRenderer extends MobRenderer<RiftAskew, AskewRenderer.State, A
             super(root);
         }
 
+        /**
+         * One pose, with a little per-entity variation (Baughn: arms above the head read as a strange dance): arms hanging
+         * but bent back behind it, too far apart; the neck broken, the head lolled over and turned; the body twisted on
+         * its hips; one leg turned back.
+         */
         @Override
         public void setupAnim(State s) {
             super.setupAnim(s);
             java.util.Random r = new java.util.Random(s.seed * 31L + 7);
-            float t = s.ageInTicks * 0.02f, drift = (float) Math.sin(t + s.seed) * 0.08f;
-            head.yRot += (r.nextBoolean() ? 1 : -1) * (1.6f + r.nextFloat() * 0.8f);   // (turned too far: 90-130°)
-            head.zRot += (r.nextFloat() - 0.5f) * 1.2f + drift;
-            hat.yRot = head.yRot;
+            float side = r.nextBoolean() ? 1 : -1, v = 0.15f;
+            float drift = (float) Math.sin(s.ageInTicks * 0.02f + s.seed) * 0.05f;
+            head.zRot += side * (1.25f + r.nextFloat() * v) + drift;    // (lolled over, about 75 degrees)
+            head.yRot += -side * (0.9f + r.nextFloat() * v);            // (and turned away from the tilt)
             hat.zRot = head.zRot;
-            rightArm.xRot += -2.2f - r.nextFloat() * 0.8f;   // (bent back, up behind it)
-            rightArm.zRot += 0.4f + r.nextFloat() * 0.4f + drift;
-            leftArm.xRot += 0.8f + r.nextFloat() * 0.6f;
-            leftArm.zRot += -1.1f - r.nextFloat() * 0.5f - drift;
-            rightLeg.zRot += 0.25f + r.nextFloat() * 0.2f;
-            leftLeg.xRot += -0.35f - r.nextFloat() * 0.25f;
-            body.zRot += (r.nextFloat() - 0.5f) * 0.3f;
+            hat.yRot = head.yRot;
+            body.yRot += side * (0.35f + r.nextFloat() * v);            // (twisted on its hips)
+            rightArm.xRot += 0.55f + r.nextFloat() * v;                 // (both arms hanging, bent back behind it)
+            leftArm.xRot += 0.4f + r.nextFloat() * v;
+            rightArm.zRot += 0.22f + r.nextFloat() * 0.08f + drift;    // (and held a little too far out)
+            leftArm.zRot += -0.3f - r.nextFloat() * 0.08f;
+            rightArm.yRot += side * 0.6f;                               // (one turned the wrong way round)
+            (side > 0 ? leftLeg : rightLeg).xRot += 0.45f + r.nextFloat() * v;   // (one leg turned back)
+            (side > 0 ? rightLeg : leftLeg).zRot += side * 0.12f;
         }
     }
 
