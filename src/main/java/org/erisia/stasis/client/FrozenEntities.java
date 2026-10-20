@@ -26,11 +26,14 @@ public final class FrozenEntities {
         en.getInterpolation().interpolate();
     }
 
-    /** Is this client-side entity frozen: as the server says (StasisRegistry.FROZEN), else in stopped land by the
-     *  whole-block rule without eddies (they mustn't flicker)? */
+    /** Is this client-side entity frozen: never for unbound types; else as the server says (StasisRegistry.FROZEN), else
+     *  in stopped land by the whole-block rule without eddies (they mustn't flicker)? */
     public static boolean frozen(Entity en) {
         var level = Minecraft.getInstance().level;
         if (level == null || en.level() != level || en instanceof Player || !Stasis.stops(level)) return false;
+        // unbound types are never frozen; the server never sends them FROZEN (it stays at its default, false), so the
+        // guess below held endermen still on the client while the server moved them (Argon; Baughn saw them frozen)
+        if (en.typeHolder().is(Stasis.UNBOUND)) return false;
         if (en.hasData(org.erisia.stasis.StasisRegistry.FROZEN.get())) return en.getData(org.erisia.stasis.StasisRegistry.FROZEN.get());
         return !Stasis.isRunningSteady(level, en.blockPosition());
     }

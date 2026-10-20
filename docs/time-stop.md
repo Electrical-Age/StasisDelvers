@@ -25,6 +25,9 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
     use it).
   - `exemptBlockEntity`: tower master, End gateway, EA `LightBlockEntity`.
   - `nearTower` (the `TOWER_YARD` of 6 blocks); `isFrozen(Entity)` (never players, never `#stasisdelvers:unbound`).
+    Unbound types (endermen, the dragon, the warden): never frozen on the client either (`FrozenEntities`: they never get
+    a FROZEN sync, so the client mustn't guess from the block); they skip the stopped-land spawn vetoes; endermen
+    don't take or place blocks in stopped land (`StasisEvents.griefing`). Test: `enderman_spawns_and_doesnt_grief_in_stopped_land`.
 - `Field.java`: immutable record (id, centre, radius, failing, collapse, column, rate, seed, formedAt, amber,
   dropout, side, `Stretch`).
   - Geometry: `norm`, `normSpan`, `containsBlock` (the whole block must be inside: the far face on each axis),

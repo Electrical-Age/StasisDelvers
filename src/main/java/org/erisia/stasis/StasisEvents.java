@@ -64,9 +64,13 @@ public final class StasisEvents {
         en.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
     }
 
-    /** No natural spawns where time is stopped (chunk generation still places its animals). */
+    /**
+     * No natural spawns where time is stopped (chunk generation still places its animals). Unbound types (endermen) spawn
+     * by vanilla's rules: time doesn't stop for them (Baughn).
+     */
     static void spawnCheck(MobSpawnEvent.PositionCheck e) {
         if (e.getSpawnType() == EntitySpawnReason.CHUNK_GENERATION) return;
+        if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) return;
         if (e.getLevel().getLevel() instanceof ServerLevel level
             && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
             e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
@@ -82,6 +86,7 @@ public final class StasisEvents {
         if (why != EntitySpawnReason.NATURAL && why != EntitySpawnReason.PATROL && why != EntitySpawnReason.EVENT
             && why != EntitySpawnReason.REINFORCEMENT && why != EntitySpawnReason.JOCKEY && why != EntitySpawnReason.SPAWNER
             && why != EntitySpawnReason.TRIAL_SPAWNER) return;
+        if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) return;   // (as spawnCheck)
         if (e.getLevel().getLevel() instanceof ServerLevel level && Stasis.stops(level)
             && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
             e.setSpawnCancelled(true);
@@ -101,6 +106,17 @@ public final class StasisEvents {
         mob.setPos(mob.xo, mob.yo, mob.zo);
         mob.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         mob.getNavigation().stop();
+    }
+
+    /**
+     * Unbound mobs (endermen) move in stopped land but don't take or place blocks there: they'd strip towers and ruins
+     * near force-loaded chunks for as long as nobody watches (Argon; Baughn's default until he says otherwise).
+     */
+    static void griefing(net.neoforged.neoforge.event.entity.EntityMobGriefingEvent e) {
+        var en = e.getEntity();
+        if (en.typeHolder().is(Stasis.UNBOUND) && !(en instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon)
+            && en.level() instanceof ServerLevel level && Stasis.stops(level) && !Stasis.isRunning(level, en.blockPosition()))
+            e.setCanGrief(false);
     }
 
     /** Load the fields on the main thread (the light engine reads them from its own: FieldData.peek). */

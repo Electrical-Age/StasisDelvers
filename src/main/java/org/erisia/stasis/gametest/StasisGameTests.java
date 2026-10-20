@@ -2232,6 +2232,30 @@ public final class StasisGameTests {
             };
         }));
 
+        // unbound types spawn naturally in stopped land (a zombie still can't), and endermen don't take blocks there
+        CASES.put("enderman_spawns_and_doesnt_grief_in_stopped_land", new Spec(2, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            Vec3 out = h.absoluteVec(new Vec3(12.5, 1.0, 2.5)), in = h.absoluteVec(new Vec3(3.5, 1.0, 2.5));
+            var ender = EntityTypes.ENDERMAN.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+            var zombie = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+            ender.snapTo(out.x, out.y, out.z, 0, 0);
+            zombie.snapTo(out.x, out.y, out.z, 0, 0);
+            var diff = level.getCurrentDifficultyAt(BlockPos.containing(out));
+            net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(ender, level, diff, net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+            net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(zombie, level, diff, net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+            c.check("stopped land: an enderman may spawn", !ender.isSpawnCancelled());
+            c.check("stopped land: a zombie may not", zombie.isSpawnCancelled());
+            var rules = level.getGameRules();
+            boolean was = rules.get(net.minecraft.world.level.gamerules.GameRules.MOB_GRIEFING);
+            rules.set(net.minecraft.world.level.gamerules.GameRules.MOB_GRIEFING, true, level.getServer());
+            c.cleanup.add(() -> rules.set(net.minecraft.world.level.gamerules.GameRules.MOB_GRIEFING, was, level.getServer()));
+            c.check("stopped land: the enderman can't take blocks", !net.neoforged.neoforge.event.EventHooks.canEntityGrief(level, ender));
+            ender.snapTo(in.x, in.y, in.z, 0, 0);
+            c.check("in the field: it can", net.neoforged.neoforge.event.EventHooks.canEntityGrief(level, ender));
+            ender.discard();
+            zombie.discard();
+        }));
+
         // ---- field tick rates (rate = share of 20 TPS; stopped land = 0; overlapping fields: the fastest) ----
         // the gate and the scheduled-tick delay, exactly
         CASES.put("rate_math", new Spec(1, (h, c) -> () -> {
