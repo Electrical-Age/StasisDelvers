@@ -506,4 +506,5 @@ class SpreadMapTest {
         assertTrue(r >= m.rank(Math.floorDiv(x, SpreadMap.CELL), Math.floorDiv(z, SpreadMap.CELL)));
         for (int[] e : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) assertTrue(m.rank(ci + e[0], ck + e[1]) <= r);
     }
+
 }

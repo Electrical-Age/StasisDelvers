@@ -84,7 +84,9 @@ debugging:
 - `spread_hard_mode_entry` (once, 2026-10-20: "the flash removes a dragon still alive": removed false; passed on 4 reruns)
 - `lance_multiblock_binds` (once, 2026-10-20: "a boom away from the rift: unbound"; like `lance_breach_hold_relax`, a
   lance test whose geometry meets the test's random world position; passed on rerun)
-- `spread_rates` (once, 2026-10-20: "spawn column runs", "a slow field in running land: still 1: 0.3"; passed on 2 reruns)
+- `spread_rates` (fixed 2026-10-20: the spawn column is a bilinear blend of its cell, ranked only >= split - 1, and lower
+  neighbours; near a cell edge it stilled before a third. The test now picks P below the column's own value. Live, the spawn
+  area holds spawn whatever the map says)
 - `time_resumes` (new_chunk_grace's chunk grace reached its sand when the grid put both in one chunk;
   new_chunk_grace is isolated now)
 - `spread_hard_mode_gate_rooms` (2026-10-20: about 1 run in 3; waits up to 1200 ticks now, 1 in 20; was: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
