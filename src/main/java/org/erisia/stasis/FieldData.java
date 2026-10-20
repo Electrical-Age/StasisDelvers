@@ -39,15 +39,29 @@ public final class FieldData extends SavedData {
         this(1, List.of(), false, 0, java.util.Map.of());
     }
 
-    /** The level's deep seed (Deeps), 24 bits; made at first use. Clients get it with the fields. */
+    /**
+     * The level's deep seed (Deeps), 24 bits, saved; clients get it with the fields. A new level's comes from the world
+     * seed and the dimension ({@link #derive}; Baughn: a same-seed reset of Incognito put the rifts elsewhere, as the seed
+     * was drawn at random), so a world made again from its seed has its rifts where they were. Levels that already have
+     * one keep it.
+     */
     private int deepSeed;
 
     public int deepSeed() {
-        if (deepSeed == 0) {
+        if (deepSeed == 0) {   // (only without a level to derive it from: get() derives it first)
             deepSeed = 1 + new java.util.Random().nextInt(0xFFFFFE);
             setDirty();
         }
         return deepSeed;
+    }
+
+    /** The deep seed of a world seed and dimension: 1..0xFFFFFE (0 means "not loaded yet"), well mixed (SplitMix64). */
+    public static int derive(long worldSeed, String dimension) {
+        long z = worldSeed ^ (dimension.hashCode() * 0x9E3779B97F4A7C15L) ^ 0x5741534953L;   // ("stasis")
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        z ^= z >>> 31;
+        return 1 + (int) Math.floorMod(z, 0xFFFFFEL);
     }
 
     private FieldData(int nextId, List<Field> fields, boolean cottage, int deepSeed, java.util.Map<String, Double> clocks) {
@@ -74,6 +88,10 @@ public final class FieldData extends SavedData {
     /** Main thread only. */
     public static FieldData get(ServerLevel level) {
         FieldData d = level.getDataStorage().computeIfAbsent(TYPE);
+        if (d.deepSeed == 0) {
+            d.deepSeed = derive(level.getSeed(), level.dimension().identifier().toString());
+            d.setDirty();
+        }
         if (LOADED.get(level) != d) LOADED.put(level, d);
         return d;
     }

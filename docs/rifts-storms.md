@@ -98,6 +98,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 - Changing `stormEveryHours` or `stormMinutes` mid-world changes tau for all past time, so every deep jumps.
   Only override changes are guarded.
 - Seed 0 means "not loaded yet": storms off, no deeps, `DeepFeature` does nothing. Never use 0 as a real seed.
-  `FieldData.deepSeed()` draws from 1..0xFFFFFE.
+  A new level's seed comes from the world seed and dimension (`FieldData.derive`, 1..0xFFFFFE), so a same-seed world has
+  the same rifts.
 - Test hooks ship in the production jar: `Pockets.TEST`, `Pockets.TEST_STRATA`, `Storms.TEST`,
   `Deeps.testDeeps`, `Crystals.FACE_SHARE`.

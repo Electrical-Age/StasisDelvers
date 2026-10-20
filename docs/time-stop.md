@@ -85,7 +85,9 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 - Random ticks run only when `ticksNow` says so. Snow and ice skip wholly stopped columns (`tickChunk` HEAD cancel).
 
 ## Persistent state
-- `FieldData` keys: `next_id`, `fields[...]` (`Field.CODEC`), `cottage`, `deep_seed`, `clocks{id: double}`.
+- `FieldData` keys: `next_id`, `fields[...]` (`Field.CODEC`), `cottage`, `deep_seed`, `clocks{id: double}`. A new level's
+  `deep_seed` is `FieldData.derive(world seed, dimension)` (since 2026-10-20, Baughn: a same-seed reset put the rifts
+  elsewhere); levels that have one keep it. Test: `DeepSeedTest`.
 - The `FROZEN` attachment (`StasisRegistry`) is synced, not saved.
 
 ## Client / server split
