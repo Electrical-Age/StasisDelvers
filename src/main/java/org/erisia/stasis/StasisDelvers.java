@@ -34,6 +34,11 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(FaunaSpawner::logout);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Possession::tick);
         NeoForge.EVENT_BUS.addListener(Possession::hurt);
+        NeoForge.EVENT_BUS.addListener(PossessedStatue::joined);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, PossessedStatue::tick);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, PossessedStatue::sweep);
+        NeoForge.EVENT_BUS.addListener(PossessedStatue::ownerDied);
+        NeoForge.EVENT_BUS.addListener(PossessedStatue::login);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::drops);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::experience);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, Remains::respawn);

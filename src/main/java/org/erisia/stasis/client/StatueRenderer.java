@@ -46,15 +46,20 @@ public class StatueRenderer extends EntityRenderer<Statue, StatueRenderer.State>
     }
 
     static Identifier skin(Statue s) {
+        return skin(s.syncedOwnerId(), s.syncedOwnerName());
+    }
+
+    /** The skin of the player with this id (string) and name; the default skin if the id is no UUID. */
+    static Identifier skin(String ownerId, String ownerName) {
         UUID id;
         try {
-            id = UUID.fromString(s.syncedOwnerId());
+            id = UUID.fromString(ownerId);
         } catch (IllegalArgumentException e) {
             return DefaultPlayerSkin.getDefaultTexture();
         }
         var info = Minecraft.getInstance().getConnection() == null ? null : Minecraft.getInstance().getConnection().getPlayerInfo(id);
         if (info != null) return info.getSkin().body().texturePath();
-        String name = s.syncedOwnerName().isEmpty() ? "statue" : s.syncedOwnerName();
+        String name = ownerName.isEmpty() ? "statue" : ownerName;
         Supplier<PlayerSkin> lookup = SKINS.computeIfAbsent(id,
             u -> Minecraft.getInstance().getSkinManager().createLookup(new GameProfile(u, name), false));
         return lookup.get().body().texturePath();

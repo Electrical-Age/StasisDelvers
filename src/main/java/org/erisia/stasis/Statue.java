@@ -94,6 +94,29 @@ public class Statue extends Entity {
         return s;
     }
 
+    public String ownerName() {
+        return ownerName;
+    }
+
+    /**
+     * A statue again, from a possessed one (PossessedStatue.revert): exactly these items and this experience, owner and
+     * name, standing or fallen, at (x, y, z).
+     */
+    public static Statue restore(ServerLevel level, UUID owner, String name, List<ItemStack> items, int xp, double x, double y, double z,
+                          float yaw, boolean fallen) {
+        Statue s = new Statue(StasisRegistry.STATUE.get(), level);
+        s.snapTo(x, Math.max(y, level.getMinY() + 1), z, yaw, 0f);
+        s.owner = owner;
+        s.ownerName = name;
+        s.setCustomName(Component.literal(name));
+        s.setCustomNameVisible(true);
+        s.syncOwner();
+        s.items.addAll(items);
+        s.xp = Math.max(0, xp);
+        if (fallen) s.setFallen(true);
+        return s;
+    }
+
     public boolean fallen() {
         return entityData.get(FALLEN);
     }

@@ -3,6 +3,7 @@
   "entity.stasisdelvers.statue": "Statue",
   "entity.stasisdelvers.static": "Static",
   "entity.stasisdelvers.puppeteer": "Puppeteer",
+  "entity.stasisdelvers.possessed_statue": "Possessed statue",
   "stasisdelvers.statue.owner": "%1$s, frozen in time",
   "itemGroup.stasisdelvers": "Stasis Delvers",
   "item.stasisdelvers.delver_helmet": "Delver Helmet",

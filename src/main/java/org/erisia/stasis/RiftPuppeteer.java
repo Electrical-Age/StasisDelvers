@@ -78,20 +78,25 @@ public class RiftPuppeteer extends RiftFauna {
         int pourId = entityData.get(POURING);
         if (pourId >= 0) {
             Entity host = level.getEntity(pourId);
-            if (!Possession.canHost(host) || host.distanceToSqr(this) > POUR_REACH * POUR_REACH + 4) {
+            if (!takeable(host) || host.distanceToSqr(this) > POUR_REACH * POUR_REACH + 4) {
                 entityData.set(POURING, -1);
                 pour = 0;
                 return;
             }
             if (++pour >= POUR_TICKS) {
-                Possession.start(level, (Mob) host);
-                discard();
+                if (host instanceof Statue st) {
+                    if (PossessedStatue.take(level, st) != null) discard();   // (else it stays a statue: try again)
+                    else pour = 0;
+                } else {
+                    Possession.start(level, (Mob) host);
+                    discard();
+                }
             }
             return;
         }
         if (--moveIn > 0) return;
         moveIn = 6 + random.nextInt(6);
-        Mob host = nearestHost(level);
+        Entity host = nearestHost(level);
         if (host != null) {
             if (host.distanceToSqr(this) < POUR_REACH * POUR_REACH) {
                 entityData.set(POURING, host.getId());
@@ -105,10 +110,15 @@ public class RiftPuppeteer extends RiftFauna {
         if (p != null && p.distanceToSqr(this) > 8 * 8) creep(level, p.position(), 0.6);
     }
 
-    Mob nearestHost(ServerLevel level) {
-        Mob best = null;
+    /** A frozen mob, or (Baughn) a statue in stopped land. */
+    boolean takeable(Entity e) {
+        return e != null && e.getId() != spentHost && (Possession.canHost(e) || PossessedStatue.canTake(e));
+    }
+
+    Entity nearestHost(ServerLevel level) {
+        Entity best = null;
         double bd = SEEK * SEEK;
-        for (Mob m : level.getEntitiesOfClass(Mob.class, getBoundingBox().inflate(SEEK), m -> m.getId() != spentHost && Possession.canHost(m))) {
+        for (Entity m : level.getEntities(this, getBoundingBox().inflate(SEEK), this::takeable)) {
             double d = m.distanceToSqr(this);
             if (d < bd) {
                 bd = d;

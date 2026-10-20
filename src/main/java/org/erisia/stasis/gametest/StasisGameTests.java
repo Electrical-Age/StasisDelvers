@@ -2509,6 +2509,190 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }, true, true));
+        // ---- possessed statues (F4; notes/fauna/F4-DESIGN.md). Every test checks the gear (gearAccountedFor).
+        // a Puppeteer next to a statue takes it: same items (the chestplate worn, the sword not held), same xp, the statue gone
+        CASES.put("possessed_statue_taken", new Spec(70, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer o = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
+            var pup = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(11, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_PUPPETEER.get());
+            return () -> {
+                var ps = level.getEntitiesOfClass(org.erisia.stasis.PossessedStatue.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(12));
+                c.check("possessed", ps.size() == 1 && s.isRemoved() && pup.isRemoved(), ps.size() + " possessed, statue removed " + s.isRemoved());
+                if (ps.size() == 1) {
+                    var p = ps.get(0);
+                    c.check("the chestplate is worn", p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(Items.IRON_CHESTPLATE));
+                    c.check("no weapon in hand", p.getMainHandItem().isEmpty());
+                    c.check("registered, with its eyes", org.erisia.stasis.PossessedStatue.registered(p) && p.getData(org.erisia.stasis.StasisRegistry.POSSESSED.get())
+                        && org.erisia.stasis.PossessedStatue.Data.get(level).has(p.getUUID()));
+                }
+                gearAccountedFor(h, c, o.getUUID(), "possessed");
+                clearGear(h, o.getUUID());
+                remove(h, o);
+            };
+        }, true, true));
+        // only players hurt it, only in its owner's chunk (λ-Nero); killed, it lies as remains with everything; /kill too
+        CASES.put("possessed_statue_damage_and_death", new Spec(20, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer o = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
+            o.connection.markClientLoaded();
+            return () -> {
+                Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
+                var p = org.erisia.stasis.PossessedStatue.take(level, s);
+                c.check("taken", p != null);
+                if (p == null) return;
+                float hp = p.getHealth();
+                p.hurtServer(level, level.damageSources().generic(), 5f);
+                c.check("no harm from a non-player", p.getHealth() == hp, p.getHealth() + "");
+                Vec3 far = h.absoluteVec(new Vec3(12.5, 1.0, 4.5)).add(40, 0, 0);
+                o.teleportTo(far.x, far.y, far.z);
+                p.hurtServer(level, level.damageSources().playerAttack(o), 5f);
+                c.check("no harm with the owner in another chunk", p.getHealth() == hp, p.getHealth() + "");
+                o.teleportTo(p.getX(), p.getY(), p.getZ());
+                p.hurtServer(level, level.damageSources().playerAttack(o), 5f);
+                c.check("harm from a player in the owner's chunk", p.getHealth() < hp, p.getHealth() + "");
+                p.hurtServer(level, level.damageSources().playerAttack(o), 1000f);
+                c.check("killed: gone", p.isRemoved());
+                var rem = level.getEntitiesOfClass(Statue.class, p.getBoundingBox().inflate(3), x -> x.owner().equals(o.getUUID()));
+                c.check("killed: remains", rem.size() == 1 && rem.get(0).fallen());
+                c.check("its tickets and entry gone", !org.erisia.stasis.PossessedStatue.Data.get(level).has(p.getUUID()));
+                gearAccountedFor(h, c, o.getUUID(), "killed");
+                // /kill
+                Statue s2 = rem.isEmpty() ? null : rem.get(0);
+                var p2 = s2 == null ? null : org.erisia.stasis.PossessedStatue.take(level, s2);
+                if (p2 != null) {
+                    p2.kill(level);
+                    c.check("/kill: remains", p2.isRemoved());
+                    gearAccountedFor(h, c, o.getUUID(), "/kill");
+                }
+                clearGear(h, o.getUUID());
+                remove(h, o);
+            };
+        }, true, true));
+        // the owner logs out: it goes home and stands there again; the owner hears where at their next login
+        CASES.put("possessed_statue_owner_leaves", new Spec(30, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer o = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), false);
+            Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
+            BlockPos home = s.blockPosition();
+            var p = org.erisia.stasis.PossessedStatue.take(level, s);
+            h.runAtTickTime(3, () -> {
+                if (p != null) p.setPos(p.getX() - 2, p.getY(), p.getZ() + 2);
+                remove(h, o);
+            });
+            return () -> {
+                c.check("it reverted", p != null && p.isRemoved());
+                var st = level.getEntitiesOfClass(Statue.class, new AABB(home).inflate(2), x -> x.owner().equals(o.getUUID()));
+                c.check("standing at home", st.size() == 1 && !st.get(0).fallen() && st.get(0).blockPosition().equals(home),
+                    st.isEmpty() ? "none" : st.get(0).blockPosition().toShortString() + " vs " + home.toShortString());
+                c.check("a notice waits for the owner", org.erisia.stasis.PossessedStatue.Data.get(level.getServer().overworld()).noticeFor(o.getUUID()) != null);
+                gearAccountedFor(h, c, o.getUUID(), "home");
+                clearGear(h, o.getUUID());
+            };
+        }, true, true));
+        // the owner dies: the roll (forced here) sends it home, or it hunts on
+        for (boolean hunt : new boolean[]{false, true})
+            CASES.put("possessed_statue_owner_dies_" + (hunt ? "hunt" : "home"), new Spec(30, (h, c) -> {
+                ServerLevel level = h.getLevel();
+                eastDread(h, c);
+                org.erisia.stasis.PossessedStatue.testHunt = hunt;
+                c.cleanup.add(() -> org.erisia.stasis.PossessedStatue.testHunt = null);
+                ServerPlayer o = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), false);
+                Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
+                var p = org.erisia.stasis.PossessedStatue.take(level, s);
+                h.runAtTickTime(3, () -> {   // (not kill(): registering a callback inside one breaks the test's sequence)
+                    o.connection.markClientLoaded();
+                    o.hurtServer(level, level.damageSources().genericKill(), Float.MAX_VALUE);
+                });
+                return () -> {
+                    c.check(hunt ? "it hunts on" : "it went home", p != null && (hunt ? !p.isRemoved() : p.isRemoved()));
+                    gearAccountedFor(h, c, o.getUUID(), hunt ? "hunting" : "home");
+                    clearGear(h, o.getUUID());
+                    remove(h, o);
+                };
+            }, true, true));
+        // a field growing over it: out, or remains; the gear either way
+        CASES.put("possessed_statue_field_grows_over_it", new Spec(30, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer o = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), false);
+            Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(10.5, 1.0, 4.5));
+            var p = org.erisia.stasis.PossessedStatue.take(level, s);
+            h.runAtTickTime(5, () -> field(h, c, new Vec3(3.5, 2.5, 4.5), 9.5, 1.0));
+            return () -> {
+                c.check("not left in running land", p == null || p.isRemoved() || !Stasis.isRunning(level, p.blockPosition()));
+                gearAccountedFor(h, c, o.getUUID(), "field");
+                clearGear(h, o.getUUID());
+                remove(h, o);
+            };
+        }, true, true));
+        // saved and loaded: the same owner, home, items and xp; joining registers it and shows its eyes (advisor)
+        CASES.put("possessed_statue_save_load", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer o = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), false);
+            return () -> {
+                Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
+                var p = org.erisia.stasis.PossessedStatue.take(level, s);
+                c.check("taken", p != null);
+                if (p == null) return;
+                var out = net.minecraft.world.level.storage.TagValueOutput.createWithContext(net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess());
+                p.saveWithoutId(out);
+                var copy = new org.erisia.stasis.PossessedStatue(org.erisia.stasis.StasisRegistry.POSSESSED_STATUE.get(), level);
+                copy.load(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess(), out.buildResult()));
+                c.check("the same owner and home", copy.owner().equals(p.owner()) && copy.home().equals(p.home()));
+                c.check("the same items and xp", copy.allItems().size() == p.allItems().size() && copy.xp() == p.xp(),
+                    copy.allItems() + " / " + p.allItems());
+                clearGear(h, o.getUUID());
+                remove(h, o);
+            };
+        }, true, true));
+        // stuck in a pit with its owner above: it blinks out (λ-Nero's cheat teleport)
+        CASES.put("possessed_statue_climbs_out", new Spec(200, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            for (int x = 11; x <= 15; x++)
+                for (int z = 2; z <= 6; z++) h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            for (int y = 1; y <= 3; y++)
+                for (int x = 11; x <= 15; x++)
+                    for (int z = 2; z <= 6; z++)
+                        h.setBlock(new BlockPos(x, y, z), x == 13 && z == 4 ? Blocks.AIR : Blocks.STONE);
+            c.cleanup.add(() -> {
+                for (int y = 1; y <= 3; y++)
+                    for (int x = 11; x <= 15; x++)
+                        for (int z = 2; z <= 6; z++) h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+            });
+            ServerPlayer o = survivalPlayer(h, new Vec3(9.5, 1.0, 4.5), false);
+            Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
+            var p = org.erisia.stasis.PossessedStatue.take(level, s);
+            double y0 = p == null ? 0 : p.getY();
+            return () -> {
+                c.check("out of the pit", p != null && !p.isRemoved() && (p.getY() > y0 + 2 || p.distanceTo(o) < 3),
+                    p == null ? "none" : String.format("y %.1f -> %.1f, %.1f from the owner", y0, p.getY(), p.distanceTo(o)));
+                gearAccountedFor(h, c, o.getUUID(), "pit");
+                clearGear(h, o.getUUID());
+                remove(h, o);
+            };
+        }, true, true));
+        // the wall: its owner inside a field, it never steps into running land
+        CASES.put("possessed_statue_keeps_out_of_fields", new Spec(120, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer o = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(12.5, 1.0, 4.5));
+            var p = org.erisia.stasis.PossessedStatue.take(level, s);
+            return () -> {
+                c.check("still possessed, outside", p != null && !p.isRemoved() && !Stasis.isRunning(level, p.blockPosition()),
+                    p == null ? "none" : p.blockPosition().toShortString());
+                gearAccountedFor(h, c, o.getUUID(), "wall");
+                clearGear(h, o.getUUID());
+                remove(h, o);
+            };
+        }, true, true));
+
         // a player freezing sends the fauna near them away (no camping statues)
         CASES.put("fauna_leave_a_fresh_statue", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
@@ -4355,6 +4539,53 @@ public final class StasisGameTests {
         };
         blow.run();
         h.onEachTick(blow);
+    }
+
+
+    // ---- possessed statues (F4): the gear invariant (λ-Nero: the mechanic never loses a player's gear)
+
+    /** A statue of {@code owner} at a local position, holding a sword (a tool), an iron chestplate (worn when possessed),
+     *  32 cobblestone and 20 xp. */
+    static Statue gearStatue(GameTestHelper h, java.util.UUID owner, String name, Vec3 local) {
+        Vec3 a = h.absoluteVec(local);
+        var items = new java.util.ArrayList<ItemStack>(List.of(new ItemStack(Items.DIAMOND_SWORD), new ItemStack(Items.IRON_CHESTPLATE),
+            new ItemStack(Items.COBBLESTONE, 32)));
+        Statue s = Statue.restore(h.getLevel(), owner, name, items, 20, a.x, a.y, a.z, 0f, false);
+        h.getLevel().addFreshEntity(s);
+        return s;
+    }
+
+    /** The gear check: exactly one statue or possessed statue of this owner within 96 blocks, holding exactly these items
+     *  (by item, components and count; worn ones included) and this xp. */
+    static void gearAccountedFor(GameTestHelper h, Checks c, java.util.UUID owner, String when) {
+        var box = new AABB(h.absolutePos(new BlockPos(8, 1, 4))).inflate(96);
+        var statues = h.getLevel().getEntitiesOfClass(Statue.class, box, s -> s.owner().equals(owner));
+        var possessed = h.getLevel().getEntitiesOfClass(org.erisia.stasis.PossessedStatue.class, box, p -> p.owner().equals(owner) && !p.isRemoved());
+        c.check(when + ": exactly one holder of the gear", statues.size() + possessed.size() == 1, statues.size() + " statues, " + possessed.size() + " possessed");
+        if (statues.size() + possessed.size() != 1) return;
+        List<ItemStack> got = statues.isEmpty() ? possessed.get(0).allItems() : statues.get(0).items();
+        int xp = statues.isEmpty() ? possessed.get(0).xp() : statues.get(0).xp();
+        java.util.Map<String, Integer> count = new java.util.TreeMap<>();
+        for (ItemStack st : got) count.merge(st.getItem().toString() + st.getComponentsPatch(), st.getCount(), Integer::sum);
+        java.util.Map<String, Integer> want = new java.util.TreeMap<>();
+        for (ItemStack st : List.of(new ItemStack(Items.DIAMOND_SWORD), new ItemStack(Items.IRON_CHESTPLATE), new ItemStack(Items.COBBLESTONE, 32)))
+            want.merge(st.getItem().toString() + st.getComponentsPatch(), st.getCount(), Integer::sum);
+        c.check(when + ": every item, nothing more", count.equals(want), count.toString());
+        c.check(when + ": the experience", xp == 20, "xp " + xp);
+    }
+
+    /** Stopped-land dread over the test's east end (fauna and possessed statues stay). */
+    static void eastDread(GameTestHelper h, Checks c) {
+        AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+        org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+        c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+    }
+
+    /** Clean up a test's possessed statues and statues of this owner (without the gear check's complaint). */
+    static void clearGear(GameTestHelper h, java.util.UUID owner) {
+        var box = new AABB(h.absolutePos(new BlockPos(8, 1, 4))).inflate(96);
+        for (var p : h.getLevel().getEntitiesOfClass(org.erisia.stasis.PossessedStatue.class, box, p -> p.owner().equals(owner))) p.revert(false, "test end");
+        h.getLevel().getEntitiesOfClass(Statue.class, box, s -> s.owner().equals(owner)).forEach(Entity::discard);
     }
 
     static void remove(GameTestHelper h, ServerPlayer p) {

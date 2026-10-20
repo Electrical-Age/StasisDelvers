@@ -14,7 +14,8 @@ import java.util.WeakHashMap;
 /**
  * A Puppeteer inside a frozen mob (notes/fauna/PLAN.md, F3; Baughn: it pours into a mob and controls it). The host moves in
  * <b>stutter bursts</b>: it runs 2-8 ticks, then stands frozen 5-40 (shorter with dread), its own goals switched off and
- * its path set on the nearest survival player. Its eyes glow purple (λ-Nero; client: {@code PossessedEyes}) and static
+ * its path set on the nearest survival player, moving in the burst as fast as it takes to keep its own pace over the
+ * whole cycle (Baughn: stop-motion, but not slow). Its eyes glow purple (λ-Nero; client: {@code PossessedEyes}) and static
  * hangs round it. It keeps the fauna wall: never into running land unless a field there is failing.
  * <ul>
  *   <li>Damage to the host goes to the Puppeteer's grip instead ({@link #GRIP}); at 0 the static bursts out (a Puppeteer,
@@ -155,10 +156,13 @@ public final class Possession {
             // a burst: 2-8 ticks running, then 5-40 frozen (both shorter with dread; at most 2x: λ-Nero)
             var r = level.getRandom();
             float speed = 1 + Math.min(h.dread, 1f);
-            h.burstUntil = now + 2 + r.nextInt(7);
-            h.nextBurst = h.burstUntil + (long) ((5 + r.nextInt(36)) / speed);
+            int run = 2 + r.nextInt(7);
+            long hold = (long) ((5 + r.nextInt(36)) / speed);
+            h.burstUntil = now + run;
+            h.nextBurst = h.burstUntil + hold;
             if (prey != null) {
-                host.getNavigation().moveTo(prey, 1.3 * speed);
+                // fast while it moves, so on average it keeps the mob's own pace (Baughn: too slow to be scary)
+                host.getNavigation().moveTo(prey, Math.min(burstPace(run, hold), 8.0));
                 host.getLookControl().setLookAt(prey, 60f, 60f);
             }
         }
@@ -170,6 +174,11 @@ public final class Possession {
             prey.needsSync = true;
             h.hitCooldown = 30;
         }
+    }
+
+    /** Speed factor in a burst of {@code run} ticks before {@code hold} frozen ones: the whole cycle's distance in the run. */
+    static double burstPace(int run, long hold) {
+        return (run + hold) / (double) run;
     }
 
     /** Damage to a host goes to the grip; at 0 the static bursts out. */

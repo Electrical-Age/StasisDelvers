@@ -222,6 +222,12 @@ public final class StasisRegistry {
         () -> EntityType.Builder.<RiftPuppeteer>of(RiftPuppeteer::new, MobCategory.MONSTER).sized(1.4f, 0.6f).clientTrackingRange(8)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "puppeteer"))));
 
+    /** A statue a Puppeteer took (notes/fauna/F4-DESIGN.md): never loses its gear. */
+    public static final DeferredHolder<EntityType<?>, EntityType<PossessedStatue>> POSSESSED_STATUE = ENTITY_TYPES.register("possessed_statue",
+        () -> EntityType.Builder.<PossessedStatue>of(PossessedStatue::new, MobCategory.MISC).sized(0.6f, 1.8f).clientTrackingRange(10)
+            .fireImmune().noSummon()
+            .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "possessed_statue"))));
+
     /** Frozen in time (data/stasisdelvers/damage_type/frozen_in_time.json); bypasses armour, totems and resistance. */
     public static final ResourceKey<DamageType> FROZEN_IN_TIME =
         ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "frozen_in_time"));
@@ -245,6 +251,9 @@ public final class StasisRegistry {
             e.put(RIFT_STATIC.get(), RiftStatic.createAttributes().build()));
         modBus.addListener(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent.class, e ->
             e.put(RIFT_PUPPETEER.get(), RiftPuppeteer.createAttributes().build()));
+        modBus.addListener(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent.class, e ->
+            e.put(POSSESSED_STATUE.get(), PossessedStatue.createAttributes().build()));
+        modBus.addListener(PossessedStatue::registerTickets);
         FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);
         LOOT_CONDITIONS.register(modBus);
