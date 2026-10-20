@@ -107,9 +107,16 @@ public final class FaunaSpawner {
             && level.getBlockState(q.above()).getCollisionShape(level, q.above()).isEmpty();
     }
 
-    /** Spawn one fauna at a spot (F1: Static is the only kind). Public for tests. */
+    /** Spawn one fauna at a spot: a Puppeteer if a frozen mob is within its reach (a third of the time), else Static. */
     public static RiftFauna spawn(ServerLevel level, BlockPos spot) {
-        RiftStatic f = StasisRegistry.RIFT_STATIC.get().create(level, EntitySpawnReason.MOB_SUMMONED);
+        boolean host = level.getRandom().nextInt(3) == 0
+            && !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new AABB(spot).inflate(RiftPuppeteer.SEEK), Possession::canHost).isEmpty();
+        if (host) return spawn(level, spot, StasisRegistry.RIFT_PUPPETEER.get());
+        return spawn(level, spot, StasisRegistry.RIFT_STATIC.get());
+    }
+
+    public static <T extends RiftFauna> T spawn(ServerLevel level, BlockPos spot, net.minecraft.world.entity.EntityType<T> type) {
+        T f = type.create(level, EntitySpawnReason.MOB_SUMMONED);
         if (f == null) return null;
         f.snapTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, level.getRandom().nextFloat() * 360f, 0f);
         level.addFreshEntity(f);

@@ -374,10 +374,11 @@ public final class Stasis {
         return false;
     }
 
-    /** Is this entity frozen? Players never are here (they freeze into statues: T2); unbound types never are. */
+    /** Is this entity frozen? Players never are here (they freeze into statues: T2); unbound types never are; a possessed
+     *  mob only between its bursts. */
     public static boolean isFrozen(Entity e) {
         if (!(e.level() instanceof ServerLevel level) || e instanceof net.minecraft.world.entity.player.Player) return false;
-        if (!stops(level) || e.typeHolder().is(UNBOUND)) return false;
+        if (!stops(level) || e.typeHolder().is(UNBOUND) || Possession.running(e)) return false;   // (a Puppeteer's host: its bursts)
         return !isRunning(level, e.blockPosition());
     }
 }

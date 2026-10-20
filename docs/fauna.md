@@ -27,6 +27,20 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
   `Freezing.tick` multiplies the suit's draw factor by 1 + that, in stopped land only (a field is safety), so a rift
   capacitor takes the surcharge like the weather's. It never hits. Sounds: sculk clicking (a Geiger-ish crackle). No model: `NoopRenderer`, and the client draws a knot
   of static pixels (`DustParticleOptions` black / white / violet; in stopped land they hang and fade, `ParticleGroupMixin`).
+- `RiftPuppeteer.java`: the Puppeteer. A low, wide cloud (draws ~2.4 x 0.8; hitbox 1.4 x 0.6), sparser and darker than
+  Static, lower clicks (Baughn: that's how you tell them apart). It creeps in 0.8-block low blinks to the nearest frozen
+  mob within 16 blocks (`Possession.canHost`: a frozen `Mob`, not fauna, not a boss, not taken), pours into it over 30 ticks
+  (synced `POURING` = host id; the client draws a column of specks), and is gone into it. With no host it drifts after
+  players, keeping 8 blocks off. Burst out of a host, it's stunned for 60 ticks.
+- `Possession.java`: the host (memory only; `POSSESSED` attachment synced, not saved). Its goals' flags are all switched
+  off; it runs in **bursts** of 2-8 ticks with 5-40 frozen between (/(1 + dread)), `Stasis.isFrozen` false only in a burst
+  (so the FROZEN sync and the client's stillness follow); each burst paths it at the nearest survival player within 32
+  (speed 1.3 x (1 + dread)). It hits for 3 at reach, every 30 ticks. The fauna wall applies (put back where it last stood
+  stopped). Damage to the host goes to the grip (8) instead; at 0 the static bursts out (a Puppeteer) and the host freezes
+  where it is, unhurt. No prey for 400 ticks: it pours out; no dread for FADE_TICKS: it dissolves.
+  - Client (`client/PossessedLook`): purple eyes (two full-bright quads at eye height, on the head's front by its yaw;
+    `RenderLivingEvent.Post`, render data from `RegisterRenderStateModifiersEvent`) and a static haze (EntityTickEvent.Pre at
+    HIGHEST, before FrozenEntities cancels the frozen host's client tick).
 - `FaunaSpawner.java`: its own spawn pass (vanilla vetoes natural spawns in stopped land, and its caps are per category).
   - Every 40 ticks per player in a stopping dimension, at most once per roll (45-90 s): 4 standable spots 16-48 blocks
     out (from up to 32 samples), each spawns with `faunaChance` x dread. In a rift's outer zone (dread 0.5) that's about
@@ -36,6 +50,7 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
   - Caps `faunaPerPlayer` (2) within 64 blocks, `faunaPerPlayerStorm` (3).
   - After an encounter (a fauna within 8 blocks) nothing new for `faunaQuietMinutes` (12.5, ±15 %), `faunaStormQuietMinutes` (2.5)
     in a storm. `Freezing.freeze` calls `froze`: the fauna within 48 blocks dissolve and the quiet starts (no camping statues).
+  - A spawn is a Puppeteer a third of the time when a frozen mob is within 16 blocks of the spot, else Static.
   - Memory only (cooldowns); a fresh player's first roll waits 45 s. Spawn reason `MOB_SUMMONED`, outside the stopped-land veto.
 - `TowerBlockEntity.faunaPressure`: fauna within 4 blocks outside a field add 0.5 each (at most 2) to `weatherFactor`,
   computed every 20 ticks with the weather (λ-Nero: they raise the draw like a storm, and can make it fail).
@@ -47,5 +62,6 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 ## Tests
 `fauna_dread`, `fauna_failing_field_lets_in`, `fauna_field_grows_over_them`,
 `fauna_fades_without_dread`, `fauna_spawner_caps` (isolated; `FaunaSpawner.testSpot` puts the tries on the test floor),
-`static_drains_suits`, `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
+`static_drains_suits`, `puppeteer_pours_into_a_frozen_mob`, `possessed_mob_stutters_and_lets_go`,
+`possessed_mob_keeps_out_of_fields` (all three isolated), `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
 Dread in tests comes from `Pockets.TEST` / `Storms.TEST` boxes (the test deep seed is 0).

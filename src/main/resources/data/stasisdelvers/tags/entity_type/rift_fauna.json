@@ -1,5 +1,6 @@
 {
   "values": [
-    "stasisdelvers:static"
+    "stasisdelvers:static",
+    "stasisdelvers:puppeteer"
   ]
 }

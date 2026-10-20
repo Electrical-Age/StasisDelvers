@@ -2292,7 +2292,7 @@ public final class StasisGameTests {
             org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
             c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
             ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
-            var f = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(11, 1, 4)));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(11, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
             boolean[] got = {false};
             h.onEachTick(() -> {
                 if (!f.isRemoved() && Stasis.isRunning(level, f.blockPosition())) got[0] = true;
@@ -2312,7 +2312,7 @@ public final class StasisGameTests {
             Field def = fd.fields().stream().filter(x -> x.containsBlock(h.absolutePos(new BlockPos(3, 1, 4)).getX(), h.absolutePos(new BlockPos(3, 1, 4)).getY(),
                 h.absolutePos(new BlockPos(3, 1, 4)).getZ())).findFirst().orElseThrow();
             fd.update(level, def.id(), x -> x.withFailing(0.8));
-            var f = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(3, 1, 4)));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(3, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
             Vec3 at = f.position();
             return () -> {
                 c.check("inside the failing field it stays", !f.isRemoved() && f.position().distanceTo(at) < 3, f.position().toString());
@@ -2323,7 +2323,7 @@ public final class StasisGameTests {
         CASES.put("fauna_field_grows_over_them", new Spec(30, (h, c) -> {
             ServerLevel level = h.getLevel();
             var list = new java.util.ArrayList<org.erisia.stasis.RiftFauna>();
-            for (int i = 0; i < 6; i++) list.add(org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9 + (i % 3), 1, 2 + (i / 3) * 3))));
+            for (int i = 0; i < 6; i++) list.add(org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9 + (i % 3), 1, 2 + (i / 3) * 3)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get()));
             h.runAtTickTime(5, () -> field(h, c, new Vec3(3.5, 2.5, 4.5), 9.5, 1.0));
             return () -> {
                 long inRunning = list.stream().filter(f -> !f.isRemoved() && Stasis.isRunning(level, f.blockPosition())).count();
@@ -2335,7 +2335,7 @@ public final class StasisGameTests {
         }));
         // no dread under it (plain stopped land): it dissolves after FADE_TICKS
         CASES.put("fauna_fades_without_dread", new Spec(org.erisia.stasis.RiftFauna.FADE_TICKS + 40, (h, c) -> {
-            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(12, 1, 4)));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(12, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
             return () -> {
                 c.check("it dissolved", f.isRemoved());
                 f.discard();
@@ -2372,9 +2372,9 @@ public final class StasisGameTests {
             ServerLevel level = h.getLevel();
             BlockPos in = h.absolutePos(new BlockPos(3, 1, 4));
             Field def = FieldData.get(level).fields().stream().filter(x -> x.containsBlock(in.getX(), in.getY(), in.getZ())).findFirst().orElseThrow();
-            var a = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9, 1, 4)));
-            var b = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9, 1, 2)));
-            var far = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(15, 1, 4)));
+            var a = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
+            var b = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9, 1, 2)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
+            var far = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(15, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
             return () -> {
                 double pr = org.erisia.stasis.TowerBlockEntity.faunaPressureForTests(level, def);
                 c.check("two by the shield: +1.0", Math.abs(pr - 1.0) < 1e-9, "" + pr);
@@ -2387,7 +2387,7 @@ public final class StasisGameTests {
             for (ServerPlayer p : new ServerPlayer[]{a, b})
                 wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
                     org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
-            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(12, 1, 1)));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(12, 1, 1)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
             java.util.function.ToDoubleFunction<ServerPlayer> used = p -> {
                 var st = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
                 return org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(st)
@@ -2402,13 +2402,82 @@ public final class StasisGameTests {
                 remove(h, b);
             };
         }));
+        // the Puppeteer pours into a frozen mob next to it (F3)
+        CASES.put("puppeteer_pours_into_a_frozen_mob", new Spec(60, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            var pig = (net.minecraft.world.entity.Mob) h.spawn(EntityTypes.PIG, new Vec3(13.5, 1.0, 4.5));
+            var pup = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(11, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_PUPPETEER.get());
+            return () -> {
+                c.check("the pig is possessed", org.erisia.stasis.Possession.possessed(pig));
+                c.check("the Puppeteer went into it", pup.isRemoved());
+                c.check("the pig shows it (synced)", pig.getData(org.erisia.stasis.StasisRegistry.POSSESSED.get()));
+                org.erisia.stasis.Possession.release(level, pig, false);
+                pig.discard();
+                pup.discard();
+            };
+        }, true, true));
+        // a host moves in stutter bursts towards the nearest survival player, frozen between; hits on it go to the grip,
+        // and at 0 the static bursts out and the host freezes again, unhurt
+        CASES.put("possessed_mob_stutters_and_lets_go", new Spec(120, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            var pig = (net.minecraft.world.entity.Mob) h.spawn(EntityTypes.PIG, new Vec3(15.5, 1.0, 6.5));
+            ServerPlayer p = survivalPlayer(h, new Vec3(10.5, 1.0, 1.5), false);   // (in grace: no statue during the test)
+            double d0 = Math.sqrt(pig.distanceToSqr(p));
+            int[] ran = {0, 0};
+            h.runAtTickTime(2, () -> org.erisia.stasis.Possession.start(level, pig));
+            h.onEachTick(() -> {
+                if (!org.erisia.stasis.Possession.possessed(pig)) return;
+                ran[1]++;
+                if (!Stasis.isFrozen(pig)) ran[0]++;
+            });
+            h.runAtTickTime(100, () -> {
+                double d1 = Math.sqrt(pig.distanceToSqr(p));
+                c.check("it came closer", d1 < d0 - 1.5, String.format("%.1f -> %.1f", d0, d1));
+                double share = ran[0] / (double) Math.max(1, ran[1]);
+                c.check("it ran in bursts, frozen most of the time", share > 0.05 && share < 0.6, String.format("ran %d of %d ticks", ran[0], ran[1]));
+                float hp = pig.getHealth();
+                for (int i = 0; i < 3; i++) pig.hurtServer(level, level.damageSources().generic(), 3f);
+                c.check("hits went to the grip: the pig is unhurt", pig.getHealth() == hp, pig.getHealth() + " of " + hp);
+                c.check("the grip broke: it let go", !org.erisia.stasis.Possession.possessed(pig));
+                c.check("the static burst out", !level.getEntitiesOfClass(org.erisia.stasis.RiftPuppeteer.class, pig.getBoundingBox().inflate(3)).isEmpty());
+            });
+            return () -> {
+                c.check("the pig is frozen again", Stasis.isFrozen(pig));
+                level.getEntitiesOfClass(org.erisia.stasis.RiftFauna.class, new AABB(h.absolutePos(new BlockPos(8, 1, 4))).inflate(12)).forEach(Entity::discard);
+                pig.discard();
+                remove(h, p);
+            };
+        }, true, true));
+        // a host keeps the fauna wall: a player inside the field, the host waits outside
+        CASES.put("possessed_mob_keeps_out_of_fields", new Spec(100, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            var pig = (net.minecraft.world.entity.Mob) h.spawn(EntityTypes.PIG, new Vec3(12.5, 1.0, 4.5));
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            h.runAtTickTime(2, () -> org.erisia.stasis.Possession.start(level, pig));
+            return () -> {
+                c.check("still possessed", org.erisia.stasis.Possession.possessed(pig));
+                c.check("never into running land", !Stasis.isRunning(level, pig.blockPosition()), pig.blockPosition().toShortString());
+                org.erisia.stasis.Possession.release(level, pig, false);
+                pig.discard();
+                remove(h, p);
+            };
+        }, true, true));
         // a player freezing sends the fauna near them away (no camping statues)
         CASES.put("fauna_leave_a_fresh_statue", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
             AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
             org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
             c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
-            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(15, 1, 6)));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(15, 1, 6)), org.erisia.stasis.StasisRegistry.RIFT_STATIC.get());
             return () -> {
                 c.check("the player froze", !p.isAlive());
                 c.check("the fauna went", f.isRemoved());

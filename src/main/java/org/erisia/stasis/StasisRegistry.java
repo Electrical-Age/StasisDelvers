@@ -217,6 +217,11 @@ public final class StasisRegistry {
         () -> EntityType.Builder.<RiftStatic>of(RiftStatic::new, MobCategory.MONSTER).sized(0.8f, 0.8f).clientTrackingRange(8)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "static"))));
 
+    /** The Puppeteer (rift fauna; notes/fauna/PLAN.md F3). Its hitbox is smaller than the cloud it draws. */
+    public static final DeferredHolder<EntityType<?>, EntityType<RiftPuppeteer>> RIFT_PUPPETEER = ENTITY_TYPES.register("puppeteer",
+        () -> EntityType.Builder.<RiftPuppeteer>of(RiftPuppeteer::new, MobCategory.MONSTER).sized(1.4f, 0.6f).clientTrackingRange(8)
+            .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "puppeteer"))));
+
     /** Frozen in time (data/stasisdelvers/damage_type/frozen_in_time.json); bypasses armour, totems and resistance. */
     public static final ResourceKey<DamageType> FROZEN_IN_TIME =
         ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "frozen_in_time"));
@@ -229,12 +234,17 @@ public final class StasisRegistry {
         DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.ATTACHMENT_TYPES, StasisDelvers.MODID);
     public static final java.util.function.Supplier<net.neoforged.neoforge.attachment.AttachmentType<Boolean>> FROZEN = ATTACHMENTS.register("frozen",
         () -> net.neoforged.neoforge.attachment.AttachmentType.builder(() -> false).sync(net.minecraft.network.codec.ByteBufCodecs.BOOL).build());
+    /** A Puppeteer is in this mob (Possession): purple eyes and a haze on the client. Synced, not saved (possession is memory only). */
+    public static final java.util.function.Supplier<net.neoforged.neoforge.attachment.AttachmentType<Boolean>> POSSESSED = ATTACHMENTS.register("possessed",
+        () -> net.neoforged.neoforge.attachment.AttachmentType.builder(() -> false).sync(net.minecraft.network.codec.ByteBufCodecs.BOOL).build());
 
     static void register(IEventBus modBus) {
         ATTACHMENTS.register(modBus);
         ENTITY_TYPES.register(modBus);
         modBus.addListener(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent.class, e ->
             e.put(RIFT_STATIC.get(), RiftStatic.createAttributes().build()));
+        modBus.addListener(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent.class, e ->
+            e.put(RIFT_PUPPETEER.get(), RiftPuppeteer.createAttributes().build()));
         FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);
         LOOT_CONDITIONS.register(modBus);
