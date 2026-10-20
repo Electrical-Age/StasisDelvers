@@ -12,6 +12,7 @@
     "stasisdelvers:rift_crystal_large",
     "stasisdelvers:rift_crystal_cluster",
     "stasisdelvers:rift_barometer",
+    "stasisdelvers:riftstone_cinnabar_ore",
     "stasisdelvers:riftstone_coal_ore",
     "stasisdelvers:riftstone_copper_ore",
     "stasisdelvers:riftstone_diamond_ore",
@@ -19,9 +20,11 @@
     "stasisdelvers:riftstone_gold_ore",
     "stasisdelvers:riftstone_iron_ore",
     "stasisdelvers:riftstone_lapis_ore",
+    "stasisdelvers:riftstone_lead_ore",
     "stasisdelvers:riftstone_redstone_ore",
     "stasisdelvers:riftstone_sal_ammoniac_ore",
     "stasisdelvers:riftstone_silver_ore",
-    "stasisdelvers:riftstone_tin_ore"
+    "stasisdelvers:riftstone_tin_ore",
+    "stasisdelvers:riftstone_tungsten_ore"
   ]
 }

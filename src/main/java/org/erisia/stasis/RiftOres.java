@@ -34,7 +34,7 @@ public final class RiftOres {
             DeferredBlock<Block> b = StasisRegistry.BLOCKS.registerBlock(e.name(),
                 p -> e.redstone() ? new RedStoneOreBlock(p) : new DropExperienceBlock(UniformInt.of(e.xpMin(), e.xpMax()), p),
                 p -> {
-                    p = p.mapColor(MapColor.COLOR_PURPLE).strength(3f, 3f).requiresCorrectToolForDrops().sound(SoundType.DEEPSLATE);
+                    p = p.mapColor(MapColor.COLOR_PURPLE).strength(3f, e.resistance()).requiresCorrectToolForDrops().sound(SoundType.DEEPSLATE);
                     // redstone: vanilla's lit glow on touch (RedStoneOreBlock needs its random ticks to go dark again)
                     return e.redstone() ? p.randomTicks().lightLevel(st -> st.getValue(BlockStateProperties.LIT) ? 9 : 0) : p;
                 });

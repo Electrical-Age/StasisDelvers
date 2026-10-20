@@ -411,7 +411,9 @@ public record DeepFeature() implements Feature {
                     String n = h.value().getDescriptionId();
                     BlockState v = RiftOres.variantOf(h.value());
                     l.add(v != null ? v : h.value().defaultBlockState());
-                    w.add(n.contains("diamond") || n.contains("emerald") ? 0.15f : n.contains("gold") || n.contains("lapis") || n.contains("redstone") ? 0.5f : 1f);
+                    // (Baughn: no diamonds to be seen at 0.15, as rare ores also make smaller veins)
+                    w.add(n.contains("diamond") || n.contains("emerald") ? 0.3f
+                        : n.contains("gold") || n.contains("lapis") || n.contains("redstone") || n.contains("tungsten") || n.contains("cinnabar") ? 0.5f : 1f);
                 });
             float[] cum = new float[w.size()];
             float t = 0;

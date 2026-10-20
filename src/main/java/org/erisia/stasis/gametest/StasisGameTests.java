@@ -1730,7 +1730,7 @@ public final class StasisGameTests {
                 c.check(name + ": the source's hardness", vs.getDestroySpeed(level, pos) == ss.getDestroySpeed(level, pos)
                     && variant.getExplosionResistance() == source.getExplosionResistance());
             }
-            c.check("the vanilla ores' riftstone ores tested", tested == 8, String.valueOf(tested));
+            c.check("the vanilla and EA ores' riftstone ores tested (8 + lead, tungsten, cinnabar)", tested == 11, String.valueOf(tested));
         }, false));
         // the rift scatter places riftstone ores, never the stone or deepslate ores (new chunks; λ-Nero): a test rift in
         // a stone-filled chunk far from the test grid, carved through a recording writer
