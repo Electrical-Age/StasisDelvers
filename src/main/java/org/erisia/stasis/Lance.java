@@ -441,6 +441,14 @@ public final class Lance {
                     int top = is.y();
                     for (long[] b : EndRiftPlan.shape(is))
                         if (foot.contains(BlockPos.asLong((int) b[0], 0, (int) b[2]))) top = Math.max(top, (int) b[1]);
+                    // ... and over every other island's blocks there too: islands overlap, and one placed later over
+                    // the pad buried it (GameTest lance_spreading_rules, now and then: "72" blocks on the pad)
+                    EndRiftPlan plan = EndRift.plan(dest);
+                    for (long f : foot) {
+                        int fx = BlockPos.getX(f), fz = BlockPos.getZ(f);
+                        for (int y = top + 1; y <= top + 4 + 48; y++)
+                            if (plan.isIsland(BlockPos.asLong(fx, y, fz))) top = Math.max(top, y);
+                    }
                     return new Spot(key, new BlockPos(is.x(), top + 1, is.z()), away, true);
                 }
                 return spot(dest, Kind.STRONGHOLD_END, g, key);

@@ -2655,7 +2655,7 @@ public final class StasisGameTests {
             };
         }, true, true));
         // stuck in a pit with its owner above: it blinks out (λ-Nero's cheat teleport)
-        CASES.put("possessed_statue_climbs_out", new Spec(200, (h, c) -> {
+        CASES.put("possessed_statue_climbs_out", new Spec(300, (h, c) -> {
             ServerLevel level = h.getLevel();
             eastDread(h, c);
             for (int x = 11; x <= 15; x++)
@@ -2670,12 +2670,17 @@ public final class StasisGameTests {
                         for (int z = 2; z <= 6; z++) h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
             });
             ServerPlayer o = survivalPlayer(h, new Vec3(9.5, 1.0, 4.5), false);
+            // (a stasis suit: the test outlasts the login grace, and an owner frozen into a statue would send it home)
+            wear(o, true, org.erisia.stasis.StasisRegistry.STASIS_HELMET.get(), org.erisia.stasis.StasisRegistry.STASIS_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.STASIS_LEGS.get(), org.erisia.stasis.StasisRegistry.STASIS_BOOTS.get());
             Statue s = gearStatue(h, o.getUUID(), "owner", new Vec3(13.5, 1.0, 4.5));
             var p = org.erisia.stasis.PossessedStatue.take(level, s);
             double y0 = p == null ? 0 : p.getY();
             return () -> {
-                c.check("out of the pit", p != null && !p.isRemoved() && (p.getY() > y0 + 2 || p.distanceTo(o) < 3),
-                    p == null ? "none" : String.format("y %.1f -> %.1f, %.1f from the owner", y0, p.getY(), p.distanceTo(o)));
+                BlockPos hole = h.absolutePos(new BlockPos(13, 1, 4));
+                boolean inHole = p != null && p.getBlockX() == hole.getX() && p.getBlockZ() == hole.getZ() && p.getY() < y0 + 2.5;
+                c.check("out of the pit", p != null && !p.isRemoved() && (!inHole || p.distanceTo(o) < 3),
+                    p == null ? "none" : String.format("y %.1f -> %.1f, at %s, %.1f from the owner", y0, p.getY(), p.blockPosition().toShortString(), p.distanceTo(o)));
                 gearAccountedFor(h, c, o.getUUID(), "pit");
                 clearGear(h, o.getUUID());
                 remove(h, o);
@@ -4275,6 +4280,22 @@ public final class StasisGameTests {
     // ---- the lance, L2: the multiblock, power, breach, hold and relax (LanceBlockEntity, Lance; docs/lance.md)
 
     /** A gate rift (r 9) registered at a local position, not opened; forgotten (with its gate) afterwards. */
+    /** Why a lance probe check failed: the zone, the gate's shape and strength there, and every deep near the probe. */
+    static String lanceProbeWhy(int seed, org.erisia.stasis.StaticDeeps.Deep d, float[] probe, float[] core) {
+        if (probe == null) {
+            StringBuilder sb = new StringBuilder("no probe; shape along +x:");
+            for (float dx = 0; dx < 4; dx += 0.5f) sb.append(String.format(" %.2f", org.erisia.stasis.StaticDeeps.shape(d, core[0] + dx, core[1], core[2])));
+            return sb.toString();
+        }
+        StringBuilder sb = new StringBuilder(String.format("zone %d, shape %.3f, strength %.3f, gate %b; near:",
+            org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]), org.erisia.stasis.StaticDeeps.shape(d, probe[0], probe[1], probe[2]),
+            org.erisia.stasis.StaticDeeps.strength(seed, d), org.erisia.stasis.StaticDeeps.isGate(d)));
+        for (var x : org.erisia.stasis.StaticDeeps.near(probe[0], probe[1], probe[2], 100, seed))
+            sb.append(String.format(" [id %d r %.0f at %.0f %.0f %.0f shape %.2f str %.2f]", x.id(), x.radius(), x.x(), x.y(), x.z(),
+                org.erisia.stasis.StaticDeeps.shape(x, probe[0], probe[1], probe[2]), org.erisia.stasis.StaticDeeps.strength(seed, x)));
+        return sb.toString();
+    }
+
     static org.erisia.stasis.StaticDeeps.Deep lanceRift(GameTestHelper h, Checks c, BlockPos local) {
         ServerLevel level = h.getLevel();
         BlockPos centre = h.absolutePos(local);
@@ -4320,7 +4341,9 @@ public final class StasisGameTests {
             // a boom pointing away: its tip is over no eye
             var away = lance(h, c, new BlockPos(1, 1, 4), 3, Direction.WEST, 6);
             away.testTick();
-            c.check("a boom away from the rift: unbound", away.boundId() == 0 && away.problem().contains("no rift"), away.problem());
+            // (not bound to this rift; the test world's own deeps may put a natural rift under that tip now and then)
+            c.check("a boom away from the rift: not bound to it", away.boundId() != d.id()
+                && (away.boundId() != 0 || away.problem().contains("no rift")), away.boundId() + " " + away.problem());
             for (int i = 1; i <= 6; i++) h.setBlock(new BlockPos(1 - i, 4, 4), Blocks.AIR);
             // the boom out over the eye: bound
             var pole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState().setValue(org.erisia.stasis.TowerPoleBlock.AXIS, Direction.Axis.X);
@@ -4374,14 +4397,21 @@ public final class StasisGameTests {
             t.testStorm = false;
             t.testTick();
             c.check("bound", t.boundId() == d.id(), t.problem());
-            // a probe inside the whole rift but outside its quarter
+            // a probe inside the whole rift (shape <= RIFT 0.35) and, once breached to a quarter, inside the shrunk outer
+            // zone but outside its rift: shape / 0.25 in (0.35, 1], so shape in (0.0875, 0.25]; 0.095..0.24 for margin
+            // (it was 0.15..0.3, and a probe past 0.25 lands outside the shrunk zone; the shape moves in steps of about a
+            // block, so the search goes out in six directions: the test failed now and then)
             float[] k = org.erisia.stasis.StaticDeeps.core(d);
             float[] probe = null;
-            for (float dx = 0; dx < 4 && probe == null; dx += 0.25f) {
-                float s = org.erisia.stasis.StaticDeeps.shape(d, k[0] + dx, k[1], k[2]);
-                if (s > 0.15f && s < 0.3f) probe = new float[]{k[0] + dx, k[1], k[2]};
-            }
-            c.check("a probe in the rift's body", probe != null && org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 2);
+            int[][] dirs = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+            for (int[] dv : dirs)
+                for (float u = 0; u < 4 && probe == null; u += 0.125f) {
+                    float px = k[0] + dv[0] * u, py = k[1] + dv[1] * u, pz = k[2] + dv[2] * u;
+                    float s = org.erisia.stasis.StaticDeeps.shape(d, px, py, pz);
+                    if (s > 0.095f && s < 0.24f) probe = new float[]{px, py, pz};
+                }
+            c.check("a probe in the rift's body", probe != null && org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 2,
+                lanceProbeWhy(seed, d, probe, k));
             // no focus, then a tier-1 focus on an End-bound stronghold gate: nothing moves
             for (int i = 0; i < 20; i++) t.testTick();
             c.check("no focus: no breach, no draw", gs.get().step() == 0 && t.drawW() == 0);
@@ -4402,7 +4432,8 @@ public final class StasisGameTests {
             c.check("the breach steps one at a time to the floor and latches OPEN", oneAtATime && gs.get().step() == org.erisia.stasis.Lance.STEPS
                 && org.erisia.stasis.Lance.isOpen(level, d.id()), "step " + gs.get().step() + " after " + ticks + " ticks");
             c.check("the zones follow each step", followed && org.erisia.stasis.Lance.effectiveRadius(level, d) == d.radius() * 0.25f);
-            if (probe != null) c.check("the rift's body shrank: the probe is outer zone now", org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 1);
+            if (probe != null) c.check("the rift's body shrank: the probe is outer zone now", org.erisia.stasis.StaticDeeps.zone(seed, probe[0], probe[1], probe[2]) == 1,
+                lanceProbeWhy(seed, d, probe, k));
             // (at a quarter a r 9 rift's black is under a block across: somewhere at the eye, if not its exact solved centre)
             boolean riftAtEye = false;
             for (float dx = -1; dx <= 1; dx += 0.5f)

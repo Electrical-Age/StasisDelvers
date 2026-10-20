@@ -73,6 +73,9 @@ These have failed intermittently before. Each was hardened, so a single failure 
 debugging:
 - `furnace_cart_pushes_frozen_cart` (9164234: client position sync)
 - `ruined_cottage_templates` (23d07eb: far test chunk didn't tick)
+- Fauna tests made robust 2026-10-20: the wall now acts in the host's / possessed statue's own tick (a test saw one a tick
+  inside a field); `possessed_statue_climbs_out` measures closeness (bouncing in a pit isn't progress) and suits the
+  owner (the test outlasts the login grace)
 - `eddies_stop_mobs`, `flames_*`, `tower_collapses_when_empty` (a15602d)
 - `rift_crystals_grow` (5907f24: cross-chunk keys)
 - `eddies_in_a_weak_field` (once over its 60 % pocket share, 3568 of 5457, when test positions moved; passed on rerun)
@@ -86,11 +89,11 @@ debugging:
   new_chunk_grace is isolated now)
 - `spread_hard_mode_gate_rooms` (once, 2026-10-19: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
   passed on rerun; not looked into)
-- `lance_breach_hold_relax`, `lance_multiblock_binds`, `lance_spreading_rules`: flaky since the remains work (2026-10-20).
-  Bisect in a worktree (`tools/stasis-build-at.sh`, same run/config): 942ede4 0 lance failures in 15 runs (incl. 4 dummy
-  tests added); e22aa3d 2 runs of 6 failed; e22aa3d with its 4 remains GameTests disabled 1 of 7
-  (`lance_spreading_rules`). The failing checks are pure rift-zone geometry and island placement, so probably an
-  interaction in the test server (the remains tests' deaths?), not game behaviour. Not resolved
+- Lance tests, fixed 2026-10-20 (they had flaked since the remains work; the bisect pointed at chance, not remains):
+  `lance_breach_hold_relax` picked a probe whose shape could lie past the breached quarter (now 0.095..0.24, six
+  directions; one failure in ~30 runs since, with diagnostics in the message); `lance_multiblock_binds`' west boom could
+  land over a natural rift of the test world (now: not bound to *this* rift); `lance_spreading_rules` found a real bug:
+  an End arrival pad could sit under another island's blocks placed later (Lance.spot now clears every planned island)
 - `rate_perf` only logs a timing.
 - `rate_random_ticks` accepts a wide band.
 - `flames_*` accept a random gutter.

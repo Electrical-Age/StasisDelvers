@@ -76,7 +76,7 @@ public class PossessedStatue extends PathfinderMob {
     // memory only
     long burstUntil, nextBurst;
     private BlockPos lastStopped;
-    private Vec3 progressAt;
+    private double stuckDist = Double.MAX_VALUE;
     private int stuckTicks, lostTicks, hitCooldown;
     private double bestDist = Double.MAX_VALUE;
     private long ticketChunk = Long.MIN_VALUE;
@@ -390,20 +390,7 @@ public class PossessedStatue extends PathfinderMob {
         long now = level.getGameTime();
         retarget(level);
         if (now % 20 == 0) Data.get(level).seen(getUUID(), now);
-        // the wall (as fauna; never a discard: a field grown over it means remains)
-        if (RiftFauna.inStopped(level, blockPosition())) lastStopped = blockPosition();
-        else {
-            BlockPos back = lastStopped != null && RiftFauna.inStopped(level, lastStopped) ? lastStopped
-                : level.getRandom().nextBoolean() ? RiftFauna.escape(level, blockPosition()) : null;
-            if (back == null) {
-                revert(true, "a field grew over it");
-                return;
-            }
-            lastStopped = back;
-            setPos(back.getX() + 0.5, back.getY(), back.getZ() + 0.5);
-            getNavigation().stop();
-            setDeltaMovement(Vec3.ZERO);
-        }
+        if (!wall(level)) return;
         ServerPlayer o = level.getServer().getPlayerList().getPlayer(owner);
         if (o == null || o.level() != level || o.isSpectator()) {
             goHome(level, o == null ? "its owner left" : "its owner left the dimension");
@@ -436,14 +423,15 @@ public class PossessedStatue extends PathfinderMob {
         }
         if (now < burstUntil) {
             if (getNavigation().isDone()) getNavigation().moveTo(o, pace);   // (keep going for the whole burst)
-            // stuck (5 s of burst time without a block of movement, owner further than 3): the cheat blink (λ-Nero)
-            if (progressAt == null || position().distanceToSqr(progressAt) > 1) {
-                progressAt = position();
+            // stuck (20 burst ticks, about 5 s, without getting a block closer, owner further than 3): the cheat blink
+            // (λ-Nero). Closer, not moved: bouncing about in a pit is no progress (the fast bursts kept it moving there)
+            if (dist < stuckDist - 1) {
+                stuckDist = dist;
                 stuckTicks = 0;
             } else if (dist > 3 && ++stuckTicks >= STUCK_TICKS / 5) {   // (bursts are a fifth of the time or so)
                 blinkTowards(level, o.position());
                 stuckTicks = 0;
-                progressAt = position();
+                stuckDist = Math.sqrt(distanceToSqr(o));
             }
             if (hitCooldown == 0 && distanceToSqr(o) < Math.pow(1.4 + getBbWidth() / 2, 2)) {
                 var v = o.getDeltaMovement();
@@ -453,6 +441,32 @@ public class PossessedStatue extends PathfinderMob {
                 hitCooldown = 30;
             }
         }
+    }
+
+    /**
+     * The wall (as fauna; never a discard: a field grown over it means remains). Run in its own tick too, right after it
+     * moved, so it never stands a tick in running land (a GameTest caught it there, before the server tick's check).
+     * False if it reverted.
+     */
+    boolean wall(ServerLevel level) {
+        if (RiftFauna.inStopped(level, blockPosition())) {
+            lastStopped = blockPosition();
+            return true;
+        }
+        BlockPos back = lastStopped != null && RiftFauna.inStopped(level, lastStopped) ? lastStopped
+            : level.getRandom().nextBoolean() ? RiftFauna.escape(level, blockPosition()) : null;
+        if (back == null) return !revert(true, "a field grew over it");
+        lastStopped = back;
+        setPos(back.getX() + 0.5, back.getY(), back.getZ() + 0.5);
+        getNavigation().stop();
+        setDeltaMovement(Vec3.ZERO);
+        return true;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (level() instanceof ServerLevel level && !isRemoved() && LIVE.containsKey(this)) wall(level);
     }
 
     /** Up to 8 blocks towards {@code to}, onto a standable stopped spot with room for it. */

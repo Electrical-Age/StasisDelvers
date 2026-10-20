@@ -185,6 +185,18 @@ public final class Possession {
         return (run + hold) / (double) run;
     }
 
+    /** The wall right after a host's own tick (EntityTickEvent.Post), so it never stands a tick in running land. */
+    static void afterTick(net.neoforged.neoforge.event.tick.EntityTickEvent.Post e) {
+        if (!(e.getEntity() instanceof Mob host) || !(host.level() instanceof ServerLevel level)) return;
+        Hold h = HOSTS.get(host);
+        if (h == null || RiftFauna.inStopped(level, host.blockPosition())) return;
+        if (h.lastStopped != null && RiftFauna.inStopped(level, h.lastStopped)) {
+            host.setPos(h.lastStopped.getX() + 0.5, h.lastStopped.getY(), h.lastStopped.getZ() + 0.5);
+            host.getNavigation().stop();
+            host.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        }   // (else the server tick's step decides: out, or the Puppeteer goes)
+    }
+
     /** Damage to a host goes to the grip; at 0 the static bursts out. */
     static void hurt(net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent e) {
         if (!(e.getEntity() instanceof Mob host) || !(host.level() instanceof ServerLevel level)) return;
