@@ -53,7 +53,12 @@ public class RiftStatic extends RiftFauna {
 
     @Override
     public int getAmbientSoundInterval() {
-        return 40;
+        return 12;   // (AdventurAgent: 2-3 clicks in 11 s was too few to notice)
+    }
+
+    @Override
+    protected float getSoundVolume() {
+        return 0.7f;
     }
 
     @Override
@@ -78,12 +83,19 @@ public class RiftStatic extends RiftFauna {
         if (level().isClientSide()) clientStatic();
     }
 
-    /** A dense knot of static pixels, about 0.8 blocks across, flickering round its centre. */
+    /**
+     * A dense knot of static, about 0.8 blocks across, flickering round its centre. Black and white mostly, so it reads in
+     * the grey (AdventurAgent: sparse grey specks were nearly invisible, the violet washed out); dense and big enough to
+     * catch the eye at 10 blocks. In stopped land the specks hang where they appeared and fade (ParticleGroupMixin), so it
+     * leaves a short trail.
+     */
     void clientStatic() {
-        for (int i = 0; i < 3; i++) {
-            double dx = (random.nextDouble() - 0.5) * 0.8, dy = (random.nextDouble() - 0.5) * 0.8, dz = (random.nextDouble() - 0.5) * 0.8;
-            if (dx * dx + dy * dy + dz * dz > 0.16) continue;
-            level().addParticle(staticDust(random.nextInt(3)), getX() + dx, getY() + 0.5 + dy, getZ() + dz, 0, 0, 0);
+        for (int i = 0; i < 10; i++) {
+            double dx = (random.nextDouble() - 0.5) * 0.9, dy = (random.nextDouble() - 0.5) * 0.9, dz = (random.nextDouble() - 0.5) * 0.9;
+            if (dx * dx + dy * dy + dz * dz > 0.2) continue;
+            int kind = random.nextInt(10);
+            level().addParticle(new net.minecraft.core.particles.DustParticleOptions(kind < 5 ? 0x050508 : kind < 9 ? 0xF4F4FF : 0xB060FF,
+                0.9f + random.nextFloat() * 0.6f), getX() + dx, getY() + 0.55 + dy, getZ() + dz, 0, 0, 0);
         }
     }
 }

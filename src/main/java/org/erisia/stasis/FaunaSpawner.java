@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * its caps are per category), so this runs its own pass, rare on purpose (Argon's encounter budget, adopted):
  * <ul>
  *   <li>Every {@link #EVERY} ticks, for each player in a stopping dimension (not spectators), at most once per roll
- *       cooldown (45-90 s): a few spots 16-48 blocks out; a spot spawns with probability faunaChance x dread.</li>
+ *       cooldown (45-90 s): up to {@link #TRIES} standable spots 16-48 blocks out (from up to {@link #SAMPLES} samples);
+ *       each spawns with probability faunaChance x dread.</li>
  *   <li>Caps: {@code faunaPerPlayer} (2) within 64 blocks, {@code faunaPerPlayerStorm} (3) in a storm.</li>
  *   <li>After an encounter (a fauna within {@link #ENCOUNTER} blocks of the player) no new ones for 10-15 minutes, 2-3 in a
  *       storm.</li>
@@ -32,7 +33,7 @@ public final class FaunaSpawner {
 
     static final int EVERY = 40;
     static final double ENCOUNTER = 8;
-    static final int TRIES = 4;
+    static final int TRIES = 4, SAMPLES = 32;
 
     static final class State {
         long nextRoll;        // game time of the next roll
@@ -74,9 +75,12 @@ public final class FaunaSpawner {
         int room = cap - near.size();
         double chance = test ? testChance : StasisConfig.faunaChance;
         int made = 0;
-        for (int i = 0; i < TRIES && made < room; i++) {
+        // up to TRIES standable spots, from up to SAMPLES samples (AdventurAgent: on rugged riftstone only 4-9 of 40 samples
+        // were standable, and 3 rolls at a rift spawned nothing)
+        for (int i = 0, tried = 0; i < SAMPLES && tried < TRIES && made < room; i++) {
             BlockPos spot = testSpot != null ? testSpot.apply(p) : spot(level, p);
             if (spot == null) continue;
+            tried++;
             float dread = Dread.at(level, spot.getX(), spot.getY(), spot.getZ());
             if (dread <= 0 || level.getRandom().nextDouble() >= chance * dread) continue;
             if (spawn(level, spot) != null) made++;
@@ -121,6 +125,25 @@ public final class FaunaSpawner {
 
     static long minutes(ServerLevel level, double m) {
         return (long) (m * 1200 * (0.85 + 0.3 * level.getRandom().nextDouble()));
+    }
+
+    /** /stasis fauna PLAYER: dread here, the spawner's clocks, fauna within 64 blocks, and how often spawn spots fail. */
+    static String describe(ServerPlayer p) {
+        if (!(p.level() instanceof ServerLevel level)) return "no level";
+        State s = state(p);
+        long now = level.getGameTime();
+        int spots = 0, inDread = 0;
+        for (int i = 0; i < 40; i++) {
+            BlockPos q = spot(level, p);
+            if (q == null) continue;
+            spots++;
+            if (Dread.at(level, q.getX(), q.getY(), q.getZ()) > 0) inDread++;
+        }
+        int near = level.getEntitiesOfClass(RiftFauna.class, new AABB(p.blockPosition()).inflate(64)).size();
+        return String.format("%s: dread here %.2f%s; next roll in %d s, quiet for %d s; %d fauna within 64; of 40 sample spots %d standable, %d in dread",
+            p.getName().getString(), Dread.at(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()),
+            Dread.storm(level, p.getBlockX(), p.getBlockY(), p.getBlockZ()) ? " (storm)" : "",
+            Math.max(0, (s.nextRoll - now) / 20), Math.max(0, (s.quietUntil - now) / 20), near, spots, inDread);
     }
 
     static void logout(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent e) {

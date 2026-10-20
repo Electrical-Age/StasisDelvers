@@ -17,13 +17,17 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
     the other direction).
   - Speed x (1 + dread), so at most 2x (λ-Nero). Updated every 10 ticks.
   - Dread 0 at and around it for `FADE_TICKS` (200) and it dissolves (static particles, no drop).
-- `RiftStatic.java`: Static, the suit drainer. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
+- `RiftStatic.java`: Static, the suit drainer. Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
+  (AdventurAgent: sparse grey specks were invisible, violet washes out in the grey); clicks every ~12 ticks. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
   `Freezing.tick` multiplies the suit's draw factor by 1 + that, in stopped land only (a field is safety), so a rift
   capacitor takes the surcharge like the weather's. It never hits. Sounds: sculk clicking (a Geiger-ish crackle). No model: `NoopRenderer`, and the client draws a knot
   of static pixels (`DustParticleOptions` black / white / violet; in stopped land they hang and fade, `ParticleGroupMixin`).
 - `FaunaSpawner.java`: its own spawn pass (vanilla vetoes natural spawns in stopped land, and its caps are per category).
-  - Every 40 ticks per player in a stopping dimension, at most once per roll (45-90 s): 4 spots 16-48 blocks out,
-    each spawns with `faunaChance` x dread.
+  - Every 40 ticks per player in a stopping dimension, at most once per roll (45-90 s): 4 standable spots 16-48 blocks
+    out (from up to 32 samples), each spawns with `faunaChance` x dread. In a rift's outer zone (dread 0.5) that's about
+    40 % per roll.
+  - `/stasis fauna PLAYER`: dread there, the roll and quiet timers, fauna within 64 blocks, and how many of 40 sample spots
+    are standable and in dread.
   - Caps `faunaPerPlayer` (2) within 64 blocks, `faunaPerPlayerStorm` (3).
   - After an encounter (a fauna within 8 blocks) nothing new for `faunaQuietMinutes` (12.5, ±15 %), `faunaStormQuietMinutes` (2.5)
     in a storm. `Freezing.freeze` calls `froze`: the fauna within 48 blocks dissolve and the quiet starts (no camping statues).

@@ -125,6 +125,13 @@ final class StasisCommands {
                 c.getSource().sendSuccess(() -> Component.literal(msg), false);
                 return 1;
             })))
+            // rift fauna (FaunaSpawner): a player's dread, spawner state and the fauna near them
+            .then(Commands.literal("fauna").then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player()).executes(c -> {
+                var p = net.minecraft.commands.arguments.EntityArgument.getPlayer(c, "player");
+                String msg = FaunaSpawner.describe(p);
+                c.getSource().sendSuccess(() -> Component.literal(msg), false);
+                return 1;
+            })))
             // spreading mode (Spread): where the stillness has got to, and test hooks to move it
             .then(Commands.literal("spread")
                 .then(Commands.literal("status").executes(c -> {
