@@ -98,7 +98,7 @@ public final class Possession {
             RiftPuppeteer p = StasisRegistry.RIFT_PUPPETEER.get().create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
             if (p != null) {
                 p.snapTo(host.getX(), host.getY(), host.getZ(), host.getYRot(), 0f);
-                p.stun(60);
+                p.stun(60, host);
                 level.addFreshEntity(p);
             }
         }

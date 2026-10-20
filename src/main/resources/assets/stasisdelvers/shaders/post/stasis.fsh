@@ -26,6 +26,7 @@
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
 // shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
 // [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
+// [1600] possessed eye count (<= 16), [1601 + 3i ..] eye i - floor(camera);
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
@@ -1236,6 +1237,17 @@ void main() {
             float fl = 0.8 + 0.2 * sin(data(29) * 23.0 + sB * 1.7) * sin(data(29) * 7.3 - sB * 0.9);
             float glow = (exp(-dist * dist / 0.012) + 0.35 * exp(-dist * dist / 0.3)) * fl * smoothstep(0.0, 0.6, sB);
             c += vec3(0.62, 0.3, 1.0) * glow;
+        }
+        // possessed mobs' eyes (Possession; StasisPost from PossessedLook.eyes; slots 1600-1648): purple points drawn after the
+        // desaturation, so they stay purple in the grey (Baughn, λ-Nero), hidden behind the scene. The point sits on the
+        // front of the head by an estimate, so it may be a little inside: a 0.35-block allowance
+        int ne = int(data(1600));
+        for (int i = 0; i < ne && i < 16; i++) {
+            vec3 P = vec3(data(1601 + 3 * i), data(1602 + 3 * i), data(1603 + 3 * i)) - camFrac;
+            float t = dot(dir, P);
+            if (t <= 0.0 || (depth > 0.0 && t > tScene + 0.35)) continue;
+            float dist = length(dir * t - P);
+            c += vec3(0.78, 0.22, 1.0) * (exp(-dist * dist / 0.0012) + 0.3 * exp(-dist * dist / 0.012));
         }
         if (vivid > 0.0) c = clamp(mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + 2.0 * vivid) * (1.0 + 0.3 * vivid), 0.0, 1.0);
     }

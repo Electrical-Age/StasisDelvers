@@ -73,6 +73,8 @@ through hooks set in `StasisClient`.
   - 1024 + 12i: drifting deep i (`DEEP_BASE`, `DEEP_STRIDE`, `MAX_DEEPS` = 24)
   - 1312-1319: storm; 1320 + 16j + i: a 16x16 ground grid
   - 1580-1597: eye NDCs, strain, inhale
+  - 1600: possessed eye count (≤ 16); 1601 + 3i: eye i - floor(camera) (`PossessedLook.eyes`, up to 8 hosts within 48
+    blocks; drawn purple after the desaturation, so they stay purple in the grey: Baughn)
   - 1700 + 4i: field shields (`SHIELD_BASE`)
   - 1752 + 4i: field stretch (`STRETCH_BASE`)
   - 2048 + 64i: drifting-deep ground grids (`GROUND_BASE`); 3584 + 64i: static-deep ground grids

@@ -30,6 +30,8 @@ public class RiftPuppeteer extends RiftFauna {
     static final EntityDataAccessor<Integer> POURING = SynchedEntityData.defineId(RiftPuppeteer.class, EntityDataSerializers.INT);
 
     private int moveIn = 10, pour, stunned;
+    /** The host it burst out of: never that one again (AdventurAgent: it waited beside it a minute and poured back in). */
+    private int spentHost = -1;
 
     public RiftPuppeteer(EntityType<? extends RiftPuppeteer> type, Level level) {
         super(type, level);
@@ -51,9 +53,10 @@ public class RiftPuppeteer extends RiftFauna {
     protected void registerGoals() {
     }
 
-    /** Freshly burst out of a host: still for a while. */
-    void stun(int ticks) {
+    /** Freshly burst out of a host: still for a while, and done with that host. */
+    void stun(int ticks, Entity from) {
         stunned = ticks;
+        spentHost = from.getId();
     }
 
     @Override
@@ -102,7 +105,7 @@ public class RiftPuppeteer extends RiftFauna {
     Mob nearestHost(ServerLevel level) {
         Mob best = null;
         double bd = SEEK * SEEK;
-        for (Mob m : level.getEntitiesOfClass(Mob.class, getBoundingBox().inflate(SEEK), Possession::canHost)) {
+        for (Mob m : level.getEntitiesOfClass(Mob.class, getBoundingBox().inflate(SEEK), m -> m.getId() != spentHost && Possession.canHost(m))) {
             double d = m.distanceToSqr(this);
             if (d < bd) {
                 bd = d;

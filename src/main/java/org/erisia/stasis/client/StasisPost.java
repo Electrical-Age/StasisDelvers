@@ -323,6 +323,21 @@ public final class StasisPost {
             d[249] = (float) (eye[2] - fz);
             d[250] = 1;
         }
+        // possessed mobs' eyes (Possession): up to 8 hosts within 48 blocks, two points each, drawn purple by the shader
+        int ne = 0;
+        float pt = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        for (var en : mc.level.entitiesForRendering()) {
+            if (ne > 14) break;
+            if (!(en instanceof net.minecraft.world.entity.LivingEntity le) || !en.getData(org.erisia.stasis.StasisRegistry.POSSESSED.get())
+                || en.distanceToSqr(cam.x, cam.y, cam.z) > 48 * 48) continue;
+            for (double[] eye : PossessedLook.eyes(le, pt)) {
+                d[1601 + 3 * ne] = (float) (eye[0] - fx);
+                d[1602 + 3 * ne] = (float) (eye[1] - fy);
+                d[1603 + 3 * ne] = (float) (eye[2] - fz);
+                ne++;
+            }
+        }
+        d[1600] = ne;
         // rift core surroundings (λ-Nero): each core's place on screen (for the lens pull) and the strain on reality,
         // stronger nearer a core, so players can home in by following "darker and greyer"
         Matrix4f fwd0 = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);

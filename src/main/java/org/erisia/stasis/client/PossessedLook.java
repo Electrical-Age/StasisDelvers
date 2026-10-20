@@ -14,11 +14,26 @@ public final class PossessedLook {
     }
 
     /**
-     * Static round a host and its eyes, also while it stands frozen between bursts (so this runs before FrozenEntities
-     * cancels). The eyes are reverse-portal sparks (purple, full-bright) at eye height on the front of the head, by its
-     * yaw: rendered quads didn't show (AdventurAgent), and in stopped land the sparks hang a moment, so it leaves a purple
-     * trail as it moves.
+     * Where a host's two eyes are now (world coordinates): eye height, on the front of the head by its yaw (drawn by the
+     * post shader after the desaturation: sparks and quads came out grey in stopped land; AdventurAgent).
      */
+    static double[][] eyes(LivingEntity le, float partial) {
+        boolean still = FrozenEntities.frozen(le);
+        var pos = still ? le.position() : le.getPosition(partial);
+        float yawDeg = still ? le.yHeadRot : net.minecraft.util.Mth.rotLerp(partial, le.yHeadRotO, le.yHeadRot);
+        double yaw = Math.toRadians(yawDeg);
+        double fx = -Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
+        // (a narrow one, a humanoid: the face is just in front of the box's middle; a wide one, a quadruped: the head sticks
+        // out in front of the body, about a box width ahead; AdventurAgent saw a cow's eyes mid-body at 0.55 w)
+        double w = le.getBbWidth();
+        double ahead = w < 0.8 ? Math.max(0.3, w * 0.55) : w * 0.95, apart = Math.max(0.09, w * 0.17);
+        double y = pos.y + le.getEyeHeight();
+        return new double[][]{
+            {pos.x + fx * ahead - rx * apart, y, pos.z + fz * ahead - rz * apart},
+            {pos.x + fx * ahead + rx * apart, y, pos.z + fz * ahead + rz * apart}};
+    }
+
+    /** Static round a host, also while it stands frozen between bursts (so this runs before FrozenEntities cancels). */
     static void haze(EntityTickEvent.Pre e) {
         var en = e.getEntity();
         if (!en.level().isClientSide() || !(en instanceof LivingEntity le) || !en.getData(StasisRegistry.POSSESSED.get())) return;
@@ -27,15 +42,5 @@ public final class PossessedLook {
             en.level().addParticle(new net.minecraft.core.particles.DustParticleOptions(r.nextInt(5) < 3 ? 0x08080C : 0xE0E0EA, 0.9f + r.nextFloat() * 0.5f),
                 en.getX() + (r.nextDouble() - 0.5) * en.getBbWidth() * 1.3, en.getY() + r.nextDouble() * en.getBbHeight(),
                 en.getZ() + (r.nextDouble() - 0.5) * en.getBbWidth() * 1.3, 0, 0, 0);
-        float yaw = (float) Math.toRadians(le.getYHeadRot());
-        double fx = -Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
-        // (a narrow one, a humanoid: the face is just in front of the box's middle; a wide one, a quadruped: the head sticks
-        // out in front of the body, about a box width ahead; AdventurAgent saw a cow's eyes mid-body at 0.55 w)
-        double w = en.getBbWidth();
-        double ahead = w < 0.8 ? Math.max(0.3, w * 0.55) : w * 0.95, apart = Math.max(0.09, w * 0.17);
-        double y = en.getY() + en.getEyeHeight();
-        for (int side = -1; side <= 1; side += 2)
-            en.level().addParticle(net.minecraft.core.particles.ParticleTypes.REVERSE_PORTAL, en.getX() + fx * ahead + rx * apart * side, y,
-                en.getZ() + fz * ahead + rz * apart * side, 0, 0, 0);
     }
 }
