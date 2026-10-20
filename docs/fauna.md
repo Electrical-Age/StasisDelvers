@@ -42,6 +42,12 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
   - Client (`client/PossessedLook`): purple eyes (two full-bright quads at eye height, on the head's front by its yaw;
     `RenderLivingEvent.Post`, render data from `RegisterRenderStateModifiersEvent`) and a static haze (EntityTickEvent.Pre at
     HIGHEST, before FrozenEntities cancels the frozen host's client tick).
+- `RiftAskew.java`: the Askew, an enderman gone wrong (client `AskewRenderer`: the enderman model with joints bent the wrong
+  way and its head turned too far, seeded per entity, drifting). Held while any player looks at it (`watched`: within 48,
+  look within ~16° of its head or body, line of sight); unwatched it teleports 3-6 blocks towards the nearest survival
+  player every 15-30 ticks (/(1 + dread)), leaving an afterimage; within 2.2 blocks it displaces them 6-12 blocks onto
+  stopped ground (preferring dread) and teleports away; 200-tick cooldown, no damage. POSSESSED set on it, so its eyes are
+  drawn purple by the post shader and static hangs round it. The spawner makes one in dread >= 0.5, a third of the time.
 - `PossessedStatue.java` (F4; design: notes/fauna/F4-DESIGN.md): a statue a Puppeteer took. **It never loses the gear**
   (λ-Nero): every end is `revert`, which adds a `Statue` with exactly the items (list + every equipment slot) and xp first,
   and only then discards itself.
@@ -89,6 +95,6 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
 `possessed_mob_keeps_out_of_fields`, `possessed_mob_field_grows_over_it`, `possessed_mob_leaves_a_fresh_statue`,
 `possessed_statue_taken`, `possessed_statue_damage_and_death`, `possessed_statue_owner_leaves`,
 `possessed_statue_owner_dies_home|hunt`, `possessed_statue_field_grows_over_it`, `possessed_statue_save_load`,
-`possessed_statue_climbs_out`, `possessed_statue_keeps_out_of_fields`, `fauna_death_advancements` (all isolated; every possessed-statue test ends
+`possessed_statue_climbs_out`, `possessed_statue_keeps_out_of_fields`, `fauna_death_advancements`, `askew_held_by_a_stare`, `askew_displaces` (all isolated; every possessed-statue test ends
 with `gearAccountedFor`: exactly one holder of the owner's gear, every item and the xp), `fauna_field_is_a_wall` (isolated: a freeze in a neighbouring test dissolves fauna within 48 blocks), `fauna_press_on_the_shield`, `fauna_leave_a_fresh_statue`.
 Dread in tests comes from `Pockets.TEST` / `Storms.TEST` boxes (the test deep seed is 0).

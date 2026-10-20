@@ -82,5 +82,6 @@
   "advancements.stasisdelvers.deaths.self_made.title": "Self Made",
   "advancements.stasisdelvers.deaths.self_made.description": "Beaten by your own body. In your own armour.",
   "advancements.stasisdelvers.deaths.low_battery.title": "Low Battery",
-  "advancements.stasisdelvers.deaths.low_battery.description": "Frozen with Static on your back. It was hungry."
+  "advancements.stasisdelvers.deaths.low_battery.description": "Frozen with Static on your back. It was hungry.",
+  "entity.stasisdelvers.askew": "Askew"
 }

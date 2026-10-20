@@ -2736,6 +2736,44 @@ public final class StasisGameTests {
                 for (ServerPlayer p : new ServerPlayer[]{a, b, d}) remove(h, p);
             };
         }, true, true));
+        // the Askew: held by a stare, it comes on when you look away (F5)
+        CASES.put("askew_held_by_a_stare", new Spec(140, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer p = survivalPlayer(h, new Vec3(8.5, 1.0, 4.5), false);
+            p.setYRot(-90f);   // (facing east, at it)
+            p.setXRot(0f);
+            var a = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(15, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_ASKEW.get());
+            Vec3 at = a.position();
+            double[] d = new double[2];
+            h.runAtTickTime(60, () -> {
+                d[0] = a.position().distanceTo(at);
+                p.setYRot(90f);   // (looking away, west)
+            });
+            return () -> {
+                c.check("watched: it didn't move", d[0] < 0.01, String.format("moved %.2f", d[0]));
+                c.check("unwatched: it came on", a.isRemoved() || a.distanceTo(p) < 15.5 - 8.5 - 1, String.format("%.1f from the player", a.distanceTo(p)));
+                a.discard();
+                remove(h, p);
+            };
+        }, true, true));
+        // next to an unwatching player it throws them 6-12 blocks off onto stopped ground, and leaves
+        CASES.put("askew_displaces", new Spec(40, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            eastDread(h, c);
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
+            p.setYRot(-90f);   // (facing east, away from it)
+            Vec3 from = p.position();
+            var a = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(11, 1, 4)), org.erisia.stasis.StasisRegistry.RIFT_ASKEW.get());
+            return () -> {
+                double moved = p.position().distanceTo(from);
+                c.check("the player was thrown 5-13 blocks", moved > 5 && moved < 13, String.format("%.1f", moved));
+                c.check("onto stopped ground", !Stasis.isRunning(level, p.blockPosition()));
+                c.check("unhurt", p.getHealth() == p.getMaxHealth(), p.getHealth() + "");
+                a.discard();
+                remove(h, p);
+            };
+        }, false, true));
         // a player freezing sends the fauna near them away (no camping statues)
         CASES.put("fauna_leave_a_fresh_statue", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);

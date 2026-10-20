@@ -1,6 +1,7 @@
 {
   "values": [
     "stasisdelvers:static",
-    "stasisdelvers:puppeteer"
+    "stasisdelvers:puppeteer",
+    "stasisdelvers:askew"
   ]
 }

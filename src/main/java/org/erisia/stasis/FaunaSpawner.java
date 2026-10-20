@@ -107,11 +107,15 @@ public final class FaunaSpawner {
             && level.getBlockState(q.above()).getCollisionShape(level, q.above()).isEmpty();
     }
 
-    /** Spawn one fauna at a spot: a Puppeteer if a frozen mob is within its reach (a third of the time), else Static. */
+    /** Spawn one fauna at a spot: a Puppeteer if a frozen mob is within its reach (a third of the time), an Askew in
+     *  strong dread (a third of the time), else Static. */
     public static RiftFauna spawn(ServerLevel level, BlockPos spot) {
         boolean host = level.getRandom().nextInt(3) == 0
             && !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new AABB(spot).inflate(RiftPuppeteer.SEEK), Possession::canHost).isEmpty();
         if (host) return spawn(level, spot, StasisRegistry.RIFT_PUPPETEER.get());
+        // the Askew only where the dread is strong (rifts' outer zones, violet and rift pockets, storm rift), a third of the time
+        if (Dread.at(level, spot.getX(), spot.getY(), spot.getZ()) >= 0.5f && level.getRandom().nextInt(3) == 0)
+            return spawn(level, spot, StasisRegistry.RIFT_ASKEW.get());
         return spawn(level, spot, StasisRegistry.RIFT_STATIC.get());
     }
 
