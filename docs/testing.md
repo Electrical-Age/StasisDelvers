@@ -83,10 +83,10 @@ debugging:
   new_chunk_grace is isolated now)
 - `spread_hard_mode_gate_rooms` (once, 2026-10-19: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
   passed on rerun; not looked into)
-- `lance_breach_hold_relax` (once, 2026-10-20: "the rift's body shrank: the probe is outer zone now"; passed on the
-  next two runs; not looked into)
-
-These are deliberately soft, so a pass proves less than it seems:
+- `lance_breach_hold_relax` (3 of ~8 runs on 2026-10-20, it alone in its isolated batch: "a probe in the rift's body" or
+  "the rift's body shrank". The probe is a point on +x of the gate's eye, checked with `StaticDeeps.zone`, which also
+  sees the world's natural deeps at the test's random position, and reads the `sectionMayHave` cache. Not looked into
+  further; it doesn't involve remains or endermen)
 - `rate_perf` only logs a timing.
 - `rate_random_ticks` accepts a wide band.
 - `flames_*` accept a random gutter.

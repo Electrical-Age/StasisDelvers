@@ -58,6 +58,7 @@ public final class StasisConfig {
     static final ModConfigSpec.BooleanValue END_BARRIER;
     static final ModConfigSpec.IntValue END_BARRIER_RADIUS;
     static final ModConfigSpec.DoubleValue HARD_MODE_TELEPORT_SECONDS;
+    static final ModConfigSpec.IntValue STOPPED_UNBOUND_CAP;
     static final ModConfigSpec.DoubleValue LANCE_HOLD_W, LANCE_BREACH_MIN, LANCE_BREACH_MAX, LANCE_BREACH_SECONDS, LANCE_RELAX_SECONDS,
         LANCE_GRACE_SECONDS, LANCE_STORM_DRAW, LANCE_STORE_SECONDS;
 
@@ -170,6 +171,9 @@ public final class StasisConfig {
             .defineInRange("lanceStormDrawFactor", 2.0, 1.0, 100.0);
         LANCE_STORE_SECONDS = b.comment("Rift lance: the core's store holds this many seconds of its breach draw. After running dry it waits",
             "until full again, so a supply short of the draw can't hold a gate.").defineInRange("lanceStoreSeconds", 30.0, 1.0, 3600.0);
+        STOPPED_UNBOUND_CAP = b.comment("Natural spawns of unbound mobs (endermen) in stopped land: at most this many unbound mobs",
+            "within 64 blocks. Nothing else spawns there, so without it endermen fill the whole monster cap (AdventurAgent: 70",
+            "around one player in 2 minutes).").defineInRange("stoppedLandEndermen", 2, 0, 1000);
         SPEC = b.build();
     }
 
@@ -210,6 +214,7 @@ public final class StasisConfig {
     static volatile boolean endBarrier = true;
     static volatile int endBarrierRadius = 140;
     static volatile double hardModeTeleportSeconds = 6;
+    static volatile int stoppedUnboundCap = 2;
     static volatile double lanceHoldW = 10000, lanceBreachMin = 3, lanceBreachMax = 5, lanceBreachSeconds = 120, lanceRelaxSeconds = 240,
         lanceGraceSeconds = 30, lanceStormDraw = 2, lanceStoreSeconds = 30;
 
@@ -223,6 +228,11 @@ public final class StasisConfig {
     /** Is the game mode "spreading" (Spread; docs/spreading-mode.md)? */
     public static boolean spreading() {
         return spreading;
+    }
+
+    /** stoppedLandEndermen (GameTests). */
+    public static int stoppedLandEndermenForTests() {
+        return stoppedUnboundCap;
     }
 
     /** spreadHours (GameTests). */
@@ -332,6 +342,7 @@ public final class StasisConfig {
         endBarrier = END_BARRIER.get();
         endBarrierRadius = END_BARRIER_RADIUS.get();
         hardModeTeleportSeconds = HARD_MODE_TELEPORT_SECONDS.get();
+        stoppedUnboundCap = STOPPED_UNBOUND_CAP.get();
         lanceHoldW = LANCE_HOLD_W.get();
         lanceBreachMin = LANCE_BREACH_MIN.get();
         lanceBreachMax = LANCE_BREACH_MAX.get();

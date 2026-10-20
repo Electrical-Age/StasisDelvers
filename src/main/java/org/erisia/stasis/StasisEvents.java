@@ -70,7 +70,12 @@ public final class StasisEvents {
      */
     static void spawnCheck(MobSpawnEvent.PositionCheck e) {
         if (e.getSpawnType() == EntitySpawnReason.CHUNK_GENERATION) return;
-        if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) return;
+        if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) {
+            if (e.getLevel().getLevel() instanceof ServerLevel level && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ()))
+                && !unboundRoom(level, e.getX(), e.getZ()))
+                e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
+            return;
+        }
         if (e.getLevel().getLevel() instanceof ServerLevel level
             && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
             e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
@@ -86,10 +91,38 @@ public final class StasisEvents {
         if (why != EntitySpawnReason.NATURAL && why != EntitySpawnReason.PATROL && why != EntitySpawnReason.EVENT
             && why != EntitySpawnReason.REINFORCEMENT && why != EntitySpawnReason.JOCKEY && why != EntitySpawnReason.SPAWNER
             && why != EntitySpawnReason.TRIAL_SPAWNER) return;
-        if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) return;   // (as spawnCheck)
         if (e.getLevel().getLevel() instanceof ServerLevel level && Stasis.stops(level)
-            && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ())))
+            && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ()))
+            && (!e.getEntity().typeHolder().is(Stasis.UNBOUND)
+                || why != EntitySpawnReason.NATURAL && !unboundRoom(level, e.getX(), e.getZ())))   // (natural ones: counted in spawnCheck)
             e.setSpawnCancelled(true);
+    }
+
+    /** Unbound mobs counted per 32-block cell (key: level + cell), refreshed every 40 ticks: spawn checks come often. */
+    private static final java.util.Map<Long, long[]> UNBOUND_COUNT = new java.util.HashMap<>();
+
+    /**
+     * May another unbound mob spawn here in stopped land: fewer than {@code stoppedLandEndermen} within 64 blocks? Nothing
+     * else spawns in stopped land, so endermen would fill the monster cap (AdventurAgent, 2026-10-20: 70 in 2 minutes).
+     */
+    static boolean unboundRoom(ServerLevel level, double x, double z) {
+        int cap = StasisConfig.stoppedUnboundCap;
+        if (cap <= 0) return false;
+        int cx = (int) Math.floor(x) >> 5, cz = (int) Math.floor(z) >> 5;
+        long key = ((long) level.dimension().hashCode() << 42) ^ ((long) (cx & 0x1FFFFF) << 21) ^ (cz & 0x1FFFFF);
+        long now = level.getGameTime();
+        long[] c = UNBOUND_COUNT.get(key);
+        if (c == null || now - c[1] >= 40 || now < c[1]) {
+            if (UNBOUND_COUNT.size() > 4096) UNBOUND_COUNT.clear();
+            double mx = (cx << 5) + 16, mz = (cz << 5) + 16;
+            var box = new net.minecraft.world.phys.AABB(mx - 64, level.getMinY(), mz - 64, mx + 64, level.getMaxY(), mz + 64);
+            int n = level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, box, m -> m.typeHolder().is(Stasis.UNBOUND)).size();
+            c = new long[]{n, now};
+            UNBOUND_COUNT.put(key, c);
+        }
+        if (c[0] >= cap) return false;
+        c[0]++;   // (counted at once: several may pass in one batch)
+        return true;
     }
 
     /**

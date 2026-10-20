@@ -2244,6 +2244,16 @@ public final class StasisGameTests {
             net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(ender, level, diff, net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
             net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(zombie, level, diff, net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
             c.check("stopped land: an enderman may spawn", !ender.isSpawnCancelled());
+            // ... but only a few near each other (else endermen fill the monster cap): the cap's worth of them already here
+            var crowd = new java.util.ArrayList<net.minecraft.world.entity.Entity>();
+            for (int i = 0; i < org.erisia.stasis.StasisConfig.stoppedLandEndermenForTests(); i++)
+                crowd.add(h.spawn(EntityTypes.ENDERMAN, new Vec3(13.5, 1.0, 6.5)));
+            var late = EntityTypes.ENDERMAN.create(level, net.minecraft.world.entity.EntitySpawnReason.SPAWNER);
+            late.snapTo(out.x + 20, out.y, out.z + 20, 0, 0);
+            net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(late, level, diff, net.minecraft.world.entity.EntitySpawnReason.SPAWNER, null);
+            c.check("stopped land: not past the cap nearby (" + crowd.size() + ")", late.isSpawnCancelled());
+            crowd.forEach(net.minecraft.world.entity.Entity::discard);
+            late.discard();
             c.check("stopped land: a zombie may not", zombie.isSpawnCancelled());
             var rules = level.getGameRules();
             boolean was = rules.get(net.minecraft.world.level.gamerules.GameRules.MOB_GRIEFING);
