@@ -79,6 +79,8 @@ debugging:
 - `remains_*` (2026-10-20: ran beside `remains_not_with_keep_inventory`, whose world-wide keepInventory left them no drops;
   that test is isolated now)
 - `spread_hard_mode_entry` (once, 2026-10-20: "the flash removes a dragon still alive": removed false; passed on 4 reruns)
+- `lance_multiblock_binds` (once, 2026-10-20: "a boom away from the rift: unbound"; like `lance_breach_hold_relax`, a
+  lance test whose geometry meets the test's random world position; passed on rerun)
 - `spread_rates` (once, 2026-10-20: "spawn column runs", "a slow field in running land: still 1: 0.3"; passed on 2 reruns)
 - `time_resumes` (new_chunk_grace's chunk grace reached its sand when the grid put both in one chunk;
   new_chunk_grace is isolated now)

@@ -17,9 +17,11 @@ Plan and decisions: `/var/lib/mclab/agent/notes/fauna/` (PLAN.md, OPTIONS.md). P
     the other direction).
   - Speed x (1 + dread), so at most 2x (λ-Nero). Updated every 10 ticks.
   - Dread 0 at and around it for `FADE_TICKS` (200) and it dissolves (static particles, no drop).
-- `RiftStatic.java`: Static, the suit drainer. It floats (FlyingMoveControl, `StoppedOnlyFly` paths; walking it stuck in
-  riftstone pits). Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
-  plus full-bright electric sparks for rift darkness (AdventurAgent: sparse grey specks were invisible, violet washes out
+- `RiftStatic.java`: Static, the suit drainer. It **blinks**: every 10-25 ticks (/(1 + dread)) a step of 2.5-3.5 blocks
+  (x (1 + dread)) towards the nearest survival player within 24 blocks, onto a free spot in stopped land, hovering 0.6 over
+  ground within 3 blocks below; idle, a 1.5-block blink every 40-100 ticks. No gravity, no pathfinding (walking it stuck in
+  riftstone pits, flying it drifted off: AdventurAgent). Client look: 10 dust specks a tick, mostly black and white, size 0.9-1.5
+  plus full-bright end-rod glints for rift darkness (AdventurAgent: sparse grey specks were invisible, violet washes out
   in the grey); clicks every ~12 ticks. `feeding(level, p)`: each Static within `REACH` (4) blocks, at most 3;
   `Freezing.tick` multiplies the suit's draw factor by 1 + that, in stopped land only (a field is safety), so a rift
   capacitor takes the surcharge like the weather's. It never hits. Sounds: sculk clicking (a Geiger-ish crackle). No model: `NoopRenderer`, and the client draws a knot
