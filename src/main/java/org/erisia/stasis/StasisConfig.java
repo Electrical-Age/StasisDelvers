@@ -59,6 +59,9 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue END_BARRIER_RADIUS;
     static final ModConfigSpec.DoubleValue HARD_MODE_TELEPORT_SECONDS;
     static final ModConfigSpec.IntValue STOPPED_UNBOUND_CAP;
+    static final ModConfigSpec.BooleanValue FAUNA;
+    static final ModConfigSpec.DoubleValue FAUNA_CHANCE, FAUNA_QUIET_MINUTES, FAUNA_STORM_QUIET_MINUTES;
+    static final ModConfigSpec.IntValue FAUNA_PER_PLAYER, FAUNA_PER_PLAYER_STORM;
     static final ModConfigSpec.DoubleValue LANCE_HOLD_W, LANCE_BREACH_MIN, LANCE_BREACH_MAX, LANCE_BREACH_SECONDS, LANCE_RELAX_SECONDS,
         LANCE_GRACE_SECONDS, LANCE_STORM_DRAW, LANCE_STORE_SECONDS;
 
@@ -174,6 +177,14 @@ public final class StasisConfig {
         STOPPED_UNBOUND_CAP = b.comment("Natural spawns of unbound mobs (endermen) in stopped land: at most this many unbound mobs",
             "within 64 blocks. Nothing else spawns there, so without it endermen fill the whole monster cap (AdventurAgent: 70",
             "around one player in 2 minutes).").defineInRange("stoppedLandEndermen", 2, 0, 1000);
+        FAUNA = b.comment("Rift fauna: things time doesn't stop spawn near weather, rifts and storms (notes/fauna).").define("fauna", true);
+        FAUNA_CHANCE = b.comment("Rift fauna: chance per spawn try at full dread (4 tries per roll; a roll every 45-90 s per player).")
+            .defineInRange("faunaChance", 0.25, 0.0, 1.0);
+        FAUNA_PER_PLAYER = b.comment("Rift fauna: at most this many within 64 blocks of a player...").defineInRange("faunaPerPlayer", 2, 0, 100);
+        FAUNA_PER_PLAYER_STORM = b.comment("... and this many in a storm.").defineInRange("faunaPerPlayerStorm", 3, 0, 100);
+        FAUNA_QUIET_MINUTES = b.comment("Rift fauna: minutes without new ones after an encounter (one within 8 blocks) or a freeze (±15 %)...")
+            .defineInRange("faunaQuietMinutes", 12.5, 0.0, 1000.0);
+        FAUNA_STORM_QUIET_MINUTES = b.comment("... and after an encounter in a storm.").defineInRange("faunaStormQuietMinutes", 2.5, 0.0, 1000.0);
         SPEC = b.build();
     }
 
@@ -215,6 +226,9 @@ public final class StasisConfig {
     static volatile int endBarrierRadius = 140;
     static volatile double hardModeTeleportSeconds = 6;
     static volatile int stoppedUnboundCap = 2;
+    static volatile boolean fauna = true;
+    static volatile double faunaChance = 0.25, faunaQuietMinutes = 12.5, faunaStormQuietMinutes = 2.5;
+    static volatile int faunaPerPlayer = 2, faunaPerPlayerStorm = 3;
     static volatile double lanceHoldW = 10000, lanceBreachMin = 3, lanceBreachMax = 5, lanceBreachSeconds = 120, lanceRelaxSeconds = 240,
         lanceGraceSeconds = 30, lanceStormDraw = 2, lanceStoreSeconds = 30;
 
@@ -343,6 +357,12 @@ public final class StasisConfig {
         endBarrierRadius = END_BARRIER_RADIUS.get();
         hardModeTeleportSeconds = HARD_MODE_TELEPORT_SECONDS.get();
         stoppedUnboundCap = STOPPED_UNBOUND_CAP.get();
+        fauna = FAUNA.get();
+        faunaChance = FAUNA_CHANCE.get();
+        faunaPerPlayer = FAUNA_PER_PLAYER.get();
+        faunaPerPlayerStorm = FAUNA_PER_PLAYER_STORM.get();
+        faunaQuietMinutes = FAUNA_QUIET_MINUTES.get();
+        faunaStormQuietMinutes = FAUNA_STORM_QUIET_MINUTES.get();
         lanceHoldW = LANCE_HOLD_W.get();
         lanceBreachMin = LANCE_BREACH_MIN.get();
         lanceBreachMax = LANCE_BREACH_MAX.get();

@@ -53,6 +53,7 @@ Javadocs often cite them as `notes/...`.
   spreads from the rifts over online time (`SpreadMap`, `Spread`; client sync `SpreadSync`, `SpreadTiles`); hard mode
   at the dragon's death (`HardMode`), the strongholds torn into gate rifts (`HardRifts`), the End's wall (`EndBarrier`,
   `client/EndBarrierFx`).
+- [fauna.md](fauna.md): rift fauna: `Dread`, `RiftFauna` (the field wall, speed, fading), `RiftStatic`, `FaunaSpawner`.
 - [client-rendering.md](client-rendering.md): post chain, data-texture slots, frozen textures, tower meshes.
 - [networking.md](networking.md): `StasisNet` payloads, protocol version.
 - [mixins.md](mixins.md): the 27 mixins, the required and cosmetic configs, `CosmeticPlugin`.

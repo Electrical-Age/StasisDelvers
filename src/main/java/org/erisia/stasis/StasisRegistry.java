@@ -212,6 +212,11 @@ public final class StasisRegistry {
             .updateInterval(4).fireImmune().noSummon()   // (4: remains fall where time runs)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "statue"))));
 
+    /** Static, the suit drainer (rift fauna; notes/fauna/PLAN.md). */
+    public static final DeferredHolder<EntityType<?>, EntityType<RiftStatic>> RIFT_STATIC = ENTITY_TYPES.register("static",
+        () -> EntityType.Builder.<RiftStatic>of(RiftStatic::new, MobCategory.MONSTER).sized(0.8f, 0.8f).clientTrackingRange(8)
+            .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "static"))));
+
     /** Frozen in time (data/stasisdelvers/damage_type/frozen_in_time.json); bypasses armour, totems and resistance. */
     public static final ResourceKey<DamageType> FROZEN_IN_TIME =
         ResourceKey.create(Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "frozen_in_time"));
@@ -228,6 +233,8 @@ public final class StasisRegistry {
     static void register(IEventBus modBus) {
         ATTACHMENTS.register(modBus);
         ENTITY_TYPES.register(modBus);
+        modBus.addListener(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent.class, e ->
+            e.put(RIFT_STATIC.get(), RiftStatic.createAttributes().build()));
         FEATURE_TYPES.register(modBus);
         SOUNDS.register(modBus);
         LOOT_CONDITIONS.register(modBus);

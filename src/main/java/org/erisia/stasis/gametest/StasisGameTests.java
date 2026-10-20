@@ -2266,6 +2266,130 @@ public final class StasisGameTests {
             zombie.discard();
         }));
 
+        // ---- rift fauna (notes/fauna/PLAN.md, F1) ----
+        // dread: 0 where time runs, the pocket's weight in strata mist, a storm's in storm rift; nothing in plain stopped land
+        CASES.put("fauna_dread", new Spec(2, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(10, 1, 0)), h.absoluteVec(new Vec3(12, 3, 3)));
+            AABB storm = new AABB(h.absoluteVec(new Vec3(13, 1, 5)), h.absoluteVec(new Vec3(16, 3, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));
+            org.erisia.stasis.Storms.TEST.put(storm, 2);
+            c.cleanup.add(() -> { org.erisia.stasis.Pockets.TEST.remove(mist); org.erisia.stasis.Storms.TEST.remove(storm); });
+            return () -> {
+                BlockPos in = h.absolutePos(new BlockPos(3, 1, 4)), plain = h.absolutePos(new BlockPos(12, 1, 4));
+                BlockPos m = h.absolutePos(new BlockPos(11, 1, 1)), st = h.absolutePos(new BlockPos(14, 1, 6));
+                c.check("in the field: none", org.erisia.stasis.Dread.at(level, in.getX(), in.getY(), in.getZ()) == 0);
+                c.check("plain stopped land: none", org.erisia.stasis.Dread.at(level, plain.getX(), plain.getY(), plain.getZ()) == 0);
+                float dm = org.erisia.stasis.Dread.at(level, m.getX(), m.getY(), m.getZ()), ds = org.erisia.stasis.Dread.at(level, st.getX(), st.getY(), st.getZ());
+                c.check("strata mist: 0.35", Math.abs(dm - 0.35f) < 1e-4, "" + dm);
+                c.check("storm rift: 0.9", Math.abs(ds - 0.9f) < 1e-4, "" + ds);
+            };
+        }));
+        // a healthy field is a wall: Static after a player inside never gets in (λ-Nero), and presses on the shield
+        CASES.put("fauna_field_is_a_wall", new Spec(100, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));   // (dread, so it doesn't fade)
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            var f = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(11, 1, 4)));
+            boolean[] got = {false};
+            h.onEachTick(() -> {
+                if (!f.isRemoved() && Stasis.isRunning(level, f.blockPosition())) got[0] = true;
+            });
+            return () -> {
+                c.check("it's still there", !f.isRemoved());
+                c.check("it never stood where time runs", !got[0]);
+                c.check("it came up to the shield", f.getX() < h.absoluteVec(new Vec3(10.5, 0, 0)).x, String.format("x %.2f (local)", f.getX() - h.absoluteVec(Vec3.ZERO).x));
+                f.discard();
+                remove(h, p);
+            };
+        }));
+        // a failing field lets them in (λ-Nero)
+        CASES.put("fauna_failing_field_lets_in", new Spec(30, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var fd = FieldData.get(level);
+            Field def = fd.fields().stream().filter(x -> x.containsBlock(h.absolutePos(new BlockPos(3, 1, 4)).getX(), h.absolutePos(new BlockPos(3, 1, 4)).getY(),
+                h.absolutePos(new BlockPos(3, 1, 4)).getZ())).findFirst().orElseThrow();
+            fd.update(level, def.id(), x -> x.withFailing(0.8));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(3, 1, 4)));
+            Vec3 at = f.position();
+            return () -> {
+                c.check("inside the failing field it stays", !f.isRemoved() && f.position().distanceTo(at) < 3, f.position().toString());
+                f.discard();
+            };
+        }));
+        // a field growing over them: they escape outward or dissolve, never stay where time runs (Baughn)
+        CASES.put("fauna_field_grows_over_them", new Spec(30, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var list = new java.util.ArrayList<org.erisia.stasis.RiftFauna>();
+            for (int i = 0; i < 6; i++) list.add(org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9 + (i % 3), 1, 2 + (i / 3) * 3))));
+            h.runAtTickTime(5, () -> field(h, c, new Vec3(3.5, 2.5, 4.5), 9.5, 1.0));
+            return () -> {
+                long inRunning = list.stream().filter(f -> !f.isRemoved() && Stasis.isRunning(level, f.blockPosition())).count();
+                long gone = list.stream().filter(net.minecraft.world.entity.Entity::isRemoved).count();
+                c.check("none stand where time runs", inRunning == 0, inRunning + " of 6");
+                c.check("some escaped or dissolved", gone + list.stream().filter(f -> !f.isRemoved()).count() == 6, gone + " dissolved");
+                list.forEach(net.minecraft.world.entity.Entity::discard);
+            };
+        }));
+        // no dread under it (plain stopped land): it dissolves after FADE_TICKS
+        CASES.put("fauna_fades_without_dread", new Spec(org.erisia.stasis.RiftFauna.FADE_TICKS + 40, (h, c) -> {
+            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(12, 1, 4)));
+            return () -> {
+                c.check("it dissolved", f.isRemoved());
+                f.discard();
+            };
+        }));
+        // the spawner: spawns in dread, up to the cap, nothing past it
+        CASES.put("fauna_spawner_caps", new Spec(5, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 o = h.absoluteVec(new Vec3(12.5, 1.0, 4.5));
+            AABB mist = new AABB(o, o).inflate(60, 20, 60);
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.RIFT, 1f, 100000));
+            org.erisia.stasis.FaunaSpawner.testChance = 1.0;
+            c.cleanup.add(() -> { org.erisia.stasis.Pockets.TEST.remove(mist); org.erisia.stasis.FaunaSpawner.testChance = Double.NaN; });
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
+            return () -> {
+                int made = 0;
+                for (int i = 0; i < 20; i++) made += org.erisia.stasis.FaunaSpawner.step(level, p, level.getGameTime());
+                var near = level.getEntitiesOfClass(org.erisia.stasis.RiftFauna.class, new AABB(p.blockPosition()).inflate(64));
+                c.check("it spawned some", made > 0, "made " + made);
+                c.check("no more than the cap (2) near the player", near.size() <= 2, near.size() + " near");
+                near.forEach(net.minecraft.world.entity.Entity::discard);
+                remove(h, p);
+            };
+        }, true, true));   // (isolated: the other fauna tests' Static would count against the cap)
+        // fauna by the shield raise the tower's draw (λ-Nero): 0.5 each, outside the field only
+        CASES.put("fauna_press_on_the_shield", new Spec(3, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos in = h.absolutePos(new BlockPos(3, 1, 4));
+            Field def = FieldData.get(level).fields().stream().filter(x -> x.containsBlock(in.getX(), in.getY(), in.getZ())).findFirst().orElseThrow();
+            var a = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9, 1, 4)));
+            var b = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(9, 1, 2)));
+            var far = org.erisia.stasis.FaunaSpawner.spawn(level, h.absolutePos(new BlockPos(15, 1, 4)));
+            return () -> {
+                double pr = org.erisia.stasis.TowerBlockEntity.faunaPressureForTests(level, def);
+                c.check("two by the shield: +1.0", Math.abs(pr - 1.0) < 1e-9, "" + pr);
+                a.discard(); b.discard(); far.discard();
+            };
+        }));
+        // a player freezing sends the fauna near them away (no camping statues)
+        CASES.put("fauna_leave_a_fresh_statue", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            AABB mist = new AABB(h.absoluteVec(new Vec3(7, 0, 0)), h.absoluteVec(new Vec3(16, 4, 8)));
+            org.erisia.stasis.Pockets.TEST.put(mist, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 100000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(mist));
+            var f = org.erisia.stasis.FaunaSpawner.spawn(h.getLevel(), h.absolutePos(new BlockPos(15, 1, 6)));
+            return () -> {
+                c.check("the player froze", !p.isAlive());
+                c.check("the fauna went", f.isRemoved());
+                f.discard();
+                h.getLevel().getEntitiesOfClass(Statue.class, new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(3)).forEach(Entity::discard);
+                remove(h, p);
+            };
+        }));
+
         // ---- field tick rates (rate = share of 20 TPS; stopped land = 0; overlapping fields: the fastest) ----
         // the gate and the scheduled-tick delay, exactly
         CASES.put("rate_math", new Spec(1, (h, c) -> () -> {

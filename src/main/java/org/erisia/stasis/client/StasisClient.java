@@ -24,6 +24,9 @@ public final class StasisClient {
             net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "suit_gauge"),
             SuitGauge::render));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
+        // (Static has no model: it draws itself as particles, RiftStatic.clientStatic)
+        modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.RIFT_STATIC.get(),
+            net.minecraft.client.renderer.entity.NoopRenderer::new));
         // the shield is drawn by the post effect (so the desaturation can't grey it)
         NeoForge.EVENT_BUS.addListener(FrameGraphSetupEvent.class, StasisPost::frame);
         // flames' light in chunk meshes (smooth lighting) depends on where they are

@@ -2,6 +2,7 @@
   "values": [
     "minecraft:enderman",
     "minecraft:ender_dragon",
-    "minecraft:warden"
+    "minecraft:warden",
+    "#stasisdelvers:rift_fauna"
   ]
 }

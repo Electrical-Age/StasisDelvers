@@ -67,6 +67,7 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 - `docs/lance.md`: the rift lance: gate state, travel, destinations, arrival pads, return rifts, hard-mode guards (L1); the
   multiblock, power, breach, hold and relax, the effective radius on both sides, the beam (L2).
 - `docs/spreading-mode.md`: config `mode = spreading`, `SpreadMap` ranks, the online clock, `Spread` in `rateAt`.
+- `docs/fauna.md`: rift fauna: dread, the field wall, the spawner, Static (and later the Puppeteer).
 - `docs/client-rendering.md`: the post chain, data-texture slot layout, `MAX_FIELDS`, frozen textures, tower meshes.
 - `docs/networking.md`: the `StasisNet` payloads both ways, the protocol version, size limits.
 - `docs/mixins.md`: each of the 27 mixins (target, why no event), the required and cosmetic configs, `CosmeticPlugin`.

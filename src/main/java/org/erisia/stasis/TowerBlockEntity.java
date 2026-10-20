@@ -48,7 +48,26 @@ public class TowerBlockEntity extends BlockEntity {
     /** Baughn: in a storm mist x2 and rift x3 (as disjoint shares); in normal weather a drifting deep x1.5. */
     double weatherFactor() {
         double w = storming ? stormMist + 2 * stormRift : 0.5 * weather;
-        return 1 + w + 2 * staticWeather;
+        return 1 + w + 2 * staticWeather + faunaPressure;
+    }
+
+    /** Rift fauna pressing on the shield (λ-Nero: they raise the draw, like a storm, and can make it fail): +0.5 each, at most +2. */
+    double faunaPressure;
+
+    public static double faunaPressureForTests(ServerLevel level, Field f) {
+        return faunaPressure(level, f);
+    }
+
+    /** Fauna within 4 blocks outside the field's surface. Every 20 ticks with the weather (weatherFactor is read every tick). */
+    static double faunaPressure(ServerLevel level, Field f) {
+        double reach = f.radius() + 4;
+        var box = new net.minecraft.world.phys.AABB(f.x() - reach, f.y() - reach, f.z() - reach, f.x() + reach, f.y() + reach, f.z() + reach);
+        int n = 0;
+        for (RiftFauna e : level.getEntitiesOfClass(RiftFauna.class, box)) {
+            double d = Math.sqrt(e.distanceToSqr(f.x(), f.y(), f.z()));
+            if (d <= reach && !f.containsPoint(e.getX(), e.getY(), e.getZ())) n++;
+        }
+        return Math.min(4, n) * 0.5;
     }
 
     static float staticOverlap(ServerLevel level, Field f) {
@@ -471,8 +490,10 @@ public class TowerBlockEntity extends BlockEntity {
             float[] st = storming ? FieldData.get(sl).get(fieldId).map(f -> Storms.overlap(sl, f)).orElse(new float[2]) : new float[2];
             stormMist = st[0];
             stormRift = st[1];
+            faunaPressure = FieldData.get(sl).get(fieldId).map(f -> faunaPressure(sl, f)).orElse(0.0);
         } else if (state != State.RUNNING) {
             weather = staticWeather = stormMist = stormRift = 0;
+            faunaPressure = 0;
             storming = false;
         }
         double perTick = drawAt(r) * testDrawFactor * weatherFactor() / 20.0;
