@@ -246,8 +246,6 @@ public final class Freezing {
         }
     }
 
-    /** Players sent to world spawn instead of a respawn point in stopped land (told so once they're back). */
-    private static final java.util.Set<UUID> REDIRECTED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /**
      * No death loop (softlock audit 1): an unprotected player whose bed or anchor is in stopped land respawns at world
@@ -260,17 +258,10 @@ public final class Freezing {
 
     /**
      * The respawn rule as a function (respawnPosition, and HardMode's teleport out of the End): t, unless it lies in
-     * stopped land and the player is unprotected, in which case world spawn if that runs.
+     * stopped land and the player is unprotected, in which case SafeRespawn's chain (spawn, a working field, any field).
      */
     static net.minecraft.world.level.portal.TeleportTransition safeRespawn(ServerPlayer p, net.minecraft.world.level.portal.TeleportTransition t) {
-        if (p.isCreative() || p.isSpectator()) return t;
-        if (Stasis.isRunning(t.newLevel(), net.minecraft.core.BlockPos.containing(t.position())) || Suits.protect(p)) return t;
-        var spawn = net.minecraft.world.level.portal.TeleportTransition.createDefault(p, t.postTeleportTransition());
-        if (!Stasis.isRunning(spawn.newLevel(), net.minecraft.core.BlockPos.containing(spawn.position()))) return t;   // no safe place either
-        REDIRECTED.add(p.getUUID());
-        StasisDelvers.LOG.info("{}'s respawn point {} is in stopped land: respawning at world spawn", p.getName().getString(),
-            net.minecraft.core.BlockPos.containing(t.position()).toShortString());
-        return spawn;
+        return SafeRespawn.choose(p, t);   // (bed, spawn, a working field, any field: Baughn's chain)
     }
 
     /** The players of a level who stand where time runs (before a field shrinks or goes: see graceIfStopped). */
@@ -328,9 +319,8 @@ public final class Freezing {
             s.ticks = 0;
             s.graceUntil = now + StasisConfig.graceTicks;
             StasisNet.sendFields(p);
-            if (REDIRECTED.remove(p.getUUID()))
-                p.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                    "Your respawn point is in stopped land, where you would freeze without a charged suit. You woke at world spawn."));
+            String why = SafeRespawn.NOTES.remove(p.getUUID());
+            if (why != null) p.sendSystemMessage(net.minecraft.network.chat.Component.literal(why));
         }
     }
 

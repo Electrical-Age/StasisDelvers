@@ -539,6 +539,34 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // Baughn's respawn chain: a bed in stopped land, world spawn stopped too: the nearest working field's surface,
+        // else any field with room to stand
+        CASES.put("respawn_into_a_field", new Spec(3, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            BlockPos bed = h.absolutePos(new BlockPos(14, 1, 6));
+            var t = new net.minecraft.world.level.portal.TeleportTransition(level, Vec3.atBottomCenterOf(bed), Vec3.ZERO, 0, 0,
+                net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING);
+            Vec3 small = h.absoluteVec(new Vec3(3.5, 2.5, 4.5)), big = h.absoluteVec(new Vec3(9.5, 1.0, 4.5));
+            Field smallF = FieldData.get(level).add(level, small.x, small.y, small.z, 3.2);
+            Field working = FieldData.get(level).add(level, big.x, big.y, big.z, 8.5);
+            c.cleanup.add(() -> FieldData.get(level).remove(level, smallF.id()));
+            c.cleanup.add(() -> FieldData.get(level).remove(level, working.id()));
+            BlockPos inSmall = org.erisia.stasis.SafeRespawn.anywhereIn(level, smallF), inBig = org.erisia.stasis.SafeRespawn.anywhereIn(level, working);
+            // (only this test's fields: other tests' run beside it; and the test area is roofed, so none is "above ground"
+            // and the chain goes on to any field, the nearest to the bed first)
+            var into = org.erisia.stasis.SafeRespawn.intoFields(p, t, List.of(smallF, working));
+            BlockPos chosen = into == null ? null : BlockPos.containing(into.position());
+            int floor = h.absolutePos(BlockPos.ZERO).getY();
+            return () -> {
+                c.check("a field: the highest spot with room to stand, by its centre", inSmall != null
+                    && smallF.containsBlock(inSmall.getX(), inSmall.getY(), inSmall.getZ()) && inSmall.getY() == floor + 1, String.valueOf(inSmall));
+                c.check("bed stopped: into the nearest field with room (its highest spot: the test area's roof is in it)",
+                    chosen != null && chosen.equals(inBig) && working.containsBlock(chosen.getX(), chosen.getY(), chosen.getZ()),
+                    chosen + " vs " + inBig);
+                remove(h, p);
+            };
+        }, false, true));
         CASES.put("empty_suit_freezes", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
             wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
