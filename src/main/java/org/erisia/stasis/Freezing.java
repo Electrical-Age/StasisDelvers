@@ -48,6 +48,8 @@ public final class Freezing {
         boolean quietHold;
         /** The freeze's fractional ticks while a weak suit lets it creep in (a Delver suit or missing pieces in a deep). */
         double creep;
+        /** The freeze's progress 0..1 (PlayerRates). */
+        float progress;
     }
 
     private static final Map<UUID, State> STATES = new HashMap<>();
@@ -70,6 +72,15 @@ public final class Freezing {
         if (p.isCreative() || p.isSpectator()) return true;
         if (!Suits.protectsWithoutDraw(p)) return Suits.protect(p, drawFactor);   // (no working suit: spend no capacitor)
         return Suits.protect(p, capacitors ? Capacitors.drawFactor(p, drawFactor) : drawFactor);
+    }
+
+    /** The slowest a freeze makes a player (frozen solid, just before the statue or held by passing weather). */
+    static final double SLOWEST = 0.1;
+
+    /** The player's freeze as a slow field's rate: 1 - (1 - SLOWEST) x progress (1: not freezing). */
+    public static double rate(ServerPlayer p) {
+        State s = STATES.get(p.getUUID());
+        return s == null ? 1.0 : 1.0 - (1.0 - SLOWEST) * s.progress;
     }
 
     static void tick(PlayerTickEvent.Post e) {
@@ -189,12 +200,11 @@ public final class Freezing {
         }
         int max = StasisConfig.freezeTicks;
         float progress = Math.min(1f, s.ticks / (float) max);
+        // the freeze is a slow field of the player's own (λ-Nero: "the same as being in a static slow field, in all
+        // ways"): PlayerRates runs their client and their clocks at rateOf(progress); no walking-speed cut any more
+        s.progress = progress;
         AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (speed != null) {
-            if (progress > 0) speed.addOrUpdateTransientModifier(
-                new AttributeModifier(SLOW, -0.85 * progress, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-            else speed.removeModifier(SLOW);
-        }
+        if (speed != null) speed.removeModifier(SLOW);   // (from before: gone)
         if (Math.abs(progress - s.sent) >= 0.01f || (progress == 0f && s.sent != 0f)) {
             s.sent = progress;
             StasisNet.sendFreeze(p, progress);
@@ -232,6 +242,7 @@ public final class Freezing {
         Statue statue = Statue.of(level, p);
         level.addFreshEntity(statue);
         s.ticks = 0;
+        s.progress = 0;
         AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) speed.removeModifier(SLOW);
         StasisDelvers.LOG.info("{} froze in time at {} ({} stacks, {} xp in the statue)", p.getName().getString(),

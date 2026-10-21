@@ -449,6 +449,9 @@ public final class StasisGameTests {
                     for (int i = 0; i < 400; i++) Freezing.tick(p);
                     c.check("held in the pocket, never a statue", p.isAlive() && Freezing.ticks(p) > 0 && Freezing.ticks(p) < org.erisia.stasis.StasisConfig.freezeTicks(),
                         "alive " + p.isAlive() + ", ticks " + Freezing.ticks(p));
+                    // the freeze is a slow field of the player's own (λ-Nero): nearly frozen, nearly still
+                    double r = org.erisia.stasis.PlayerRates.rate(p);
+                    c.check("held: the player runs at ~0.1x (their own slow field)", r > 0.05 && r < 0.2, "rate " + r);
                     remove(h, p);
                 } else c.check("found a pocket at player height", false, "none");
             };

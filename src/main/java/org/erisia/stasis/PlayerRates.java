@@ -21,6 +21,7 @@ import java.util.UUID;
  * and attackClock here, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
  * 0.2.0 "client" mode.
  * <p>
+ * A freeze (Freezing.rate) is a slow field of the player's own: the slower of it and the field wins.
  * The player's rate is Stasis.rateAt at their feet block (the whole-block rule Freezing uses). Stopped land counts as
  * full speed: suited players there act at 20 TPS as before (Freezing, Mining Fatigue), so walking from a slow field into
  * stopped land speeds a suited player back up. Re-sent every second while slow, because vanilla broadcasts the global
@@ -39,9 +40,11 @@ public final class PlayerRates {
     /** The player's tick rate in (0, 1]: their field's rate, 1 elsewhere (stopped land too). */
     public static double rate(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level)) return 1.0;
-        if (fullSuit(p)) return 1.0;   // (Baughn: the suit keeps its wearer at full speed in a slow field)
+        // freezing is a slow field of the player's own (λ-Nero), the slower of the two wins
+        double freeze = Freezing.rate(p);
+        if (fullSuit(p)) return freeze;   // (Baughn: the suit keeps its wearer at full speed in a slow field)
         double r = Stasis.rateAt(level, p.blockPosition());
-        return r <= 0.0 || r >= 1.0 ? 1.0 : r;
+        return Math.min(freeze, r <= 0.0 || r >= 1.0 ? 1.0 : r);
     }
 
     /** A whole time suit worn (any charge: inside a field it draws nothing). */
