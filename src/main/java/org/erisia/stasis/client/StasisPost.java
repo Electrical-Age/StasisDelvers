@@ -150,6 +150,11 @@ public final class StasisPost {
         }
         int n = 0;
         java.util.List<Field> fields = new java.util.ArrayList<>(ClientFields.fields());
+        // lulls (Lulls: running-time weather) within the render distance, as column fields without a shell (id < 0)
+        if (Stasis.stops(mc.level))
+            for (var l : org.erisia.stasis.Lulls.within(cam.x, cam.z, mc.options.getEffectiveRenderDistance() * 16 + 48,
+                org.erisia.stasis.Lulls.time(mc.level), ClientFields.deepSeed()))
+                fields.add(new Field(-1 - l.id(), l.x(), cam.y, l.z(), l.radius(), true));
         // a collapsing field is held for a moment after it goes, until its remnant arrives (the block update can come a
         // frame later: AdventurAgent saw the shield blank for a frame as it froze)
         long nowN = System.nanoTime();
@@ -174,7 +179,7 @@ public final class StasisPost {
             d[o + 3] = (float) shownRadius(f);
             d[o + 4] = (float) sc;
             d[o + 5] = (float) f.failing();
-            d[o + 6] = f.column() ? 1 : 0;
+            d[o + 6] = f.id() < 0 ? -1 : f.column() ? 1 : 0;   // (-1: a lull, a column with no shell)
             d[o + 7] = f.seed();
             d[o + 8] = f.formedAt() > 0
                 ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;

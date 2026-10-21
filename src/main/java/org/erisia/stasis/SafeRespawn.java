@@ -19,7 +19,7 @@ import java.util.Comparator;
  *   <li>the nearest working field above ground: a tower's (radius at least {@link #WORKING_RADIUS}, not failing or
  *       collapsing; querns and lance cores hold small fields that end) whose field holds the surface;</li>
  *   <li>any field with room to stand;</li>
- *   <li>(later) a lull, the rare running-time weather.</li>
+ *   <li>the nearest lull (Lulls, the rare running-time weather): the surface at its centre.</li>
  * </ol>
  * Failing all of them, the respawn point as vanilla gives it.
  */
@@ -41,7 +41,31 @@ public final class SafeRespawn {
         if (!testStoppedSpawn && Stasis.isRunning(spawn.newLevel(), BlockPos.containing(spawn.position())))
             return note(p, t, spawn, "Your respawn point is in stopped land, where you would freeze without a charged suit. You woke at world spawn.");
         TeleportTransition into = intoFields(p, t, FieldData.get(t.newLevel()).fields());
-        return into != null ? into : t;
+        if (into != null) return into;
+        BlockPos at = intoLull(t.newLevel(), BlockPos.containing(t.position()));
+        if (at != null) return note(p, t, to(t.newLevel(), at, t),
+            "Your respawn point and world spawn are in stopped land, and there is no field. You woke in a lull, where time still runs. It drifts slowly: don't wander off.");
+        return t;
+    }
+
+    /** How far to look for a lull (about one within 1.5 km). */
+    static final double LULL_RANGE = 4096;
+
+    /** The surface at the nearest lull's centre (or the nearest standable spot in its core), or null. */
+    public static @Nullable BlockPos intoLull(ServerLevel level, BlockPos from) {
+        Lulls.Lull l = Lulls.nearest(level, from.getX() + 0.5, from.getZ() + 0.5, LULL_RANGE);
+        if (l == null) return null;
+        int cx = (int) Math.floor(l.x()), cz = (int) Math.floor(l.z());
+        int core = (int) Math.floor(l.radius() * Lulls.CORE);
+        for (int ring = 0; ring <= core; ring++)
+            for (int dx = -ring; dx <= ring; dx++)
+                for (int dz = -ring; dz <= ring; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
+                    int x = cx + dx, z = cz + dz;
+                    BlockPos q = new BlockPos(x, level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+                    if (standable(level, q) && Stasis.isRunning(level, q) && Stasis.isRunning(level, q.above())) return q;
+                }
+        return null;
     }
 
     /** Steps 3 and 4 over these fields (tests pass their own), or null. */

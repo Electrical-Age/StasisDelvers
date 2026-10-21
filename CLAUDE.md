@@ -61,7 +61,7 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 - `docs/ea-integration.md`: `NodeFreezer`, the tower yard, EA hooks, the `eln_jar` build dependency.
 - `docs/towers.md`: the `TowerBlockEntity` state machine, power and store formulas, chunk tickets, the console.
 - `docs/towergen.md`: the generator pipeline, towerview, towerweb, and why server, client and web build the same tower.
-- `docs/rifts-storms.md`: drifting and static deeps, rifts, storms (tau never jumps), pockets, crystals.
+- `docs/rifts-storms.md`: drifting and static deeps, rifts, storms (tau never jumps), pockets, crystals, lulls.
 - `docs/deeps-strata-worldgen.md`: the per-level random deep seed, `DeepFeature`, strata, gates, ruins, end sites.
 - `docs/spawn-cottage.md`: spawn site placement, the EA node data, spawn protection use.
 - `docs/lance.md`: the rift lance: gate state, travel, destinations, arrival pads, return rifts, hard-mode guards (L1); the

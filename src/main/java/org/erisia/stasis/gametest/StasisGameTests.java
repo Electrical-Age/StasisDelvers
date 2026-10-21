@@ -567,6 +567,27 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }, false, true));
+        // a lull (Baughn 2026-10-21): time runs in its column, 1.0 at the core fading to 0.4 at the edge; an unsuited player
+        // in it doesn't freeze; the respawn's last resort lands at its centre
+        CASES.put("lull_runs_time", new Spec(130, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 ctr = h.absoluteVec(new Vec3(8.0, 1.0, 4.0));
+            var lull = new org.erisia.stasis.Lulls.Lull((float) ctr.x, (float) ctr.z, 6.5f, 777);
+            org.erisia.stasis.Lulls.TEST.add(lull);
+            c.cleanup.add(() -> org.erisia.stasis.Lulls.TEST.remove(lull));
+            ServerPlayer p = survivalPlayer(h, new Vec3(8.5, 1.0, 4.5), true);
+            BlockPos core = h.absolutePos(new BlockPos(8, 1, 4)), edge = h.absolutePos(new BlockPos(13, 1, 4)), out = h.absolutePos(new BlockPos(15, 1, 4));
+            String rates = String.format("%.2f %.2f %.2f", Stasis.rateAt(level, core), Stasis.rateAt(level, edge), Stasis.rateAt(level, out));
+            BlockPos spot = org.erisia.stasis.SafeRespawn.intoLull(level, h.absolutePos(new BlockPos(1, 1, 1)));
+            return () -> {
+                c.check("core 1.0, near the edge slower (0.4-0.6), outside stopped", rates.startsWith("1.00 0.") && rates.endsWith(" 0.00")
+                    && Double.parseDouble(rates.split(" ")[1]) <= 0.6, rates);
+                c.check("an unsuited player in it doesn't freeze", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                c.check("the respawn's last resort: its core, standable, running", spot != null && Stasis.isRunning(level, spot)
+                    && Math.hypot(spot.getX() + 0.5 - ctr.x, spot.getZ() + 0.5 - ctr.z) <= 6.5 * org.erisia.stasis.Lulls.CORE + 1, String.valueOf(spot));
+                remove(h, p);
+            };
+        }, false, true));
         CASES.put("empty_suit_freezes", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
             wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),

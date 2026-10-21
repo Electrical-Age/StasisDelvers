@@ -269,6 +269,20 @@ final class StasisCommands {
                     return 0;
                 }
             })))
+            // lulls (Lulls: running-time weather) within ~3 km, nearest first, and the time rate here
+            .then(Commands.literal("lulls").executes(c -> {
+                var src = c.getSource();
+                var level = src.getLevel();
+                var pos = src.getPosition();
+                var list = new java.util.ArrayList<>(Lulls.within(pos.x, pos.z, 3000, Lulls.time(level), Deeps.seed(level)));
+                list.sort(java.util.Comparator.comparingDouble(l -> Math.hypot(l.x() - pos.x, l.z() - pos.z)));
+                src.sendSuccess(() -> Component.literal(list.size() + " lull(s) within ~3 km; rate here "
+                    + String.format("%.2f", Stasis.rateAt(level, net.minecraft.core.BlockPos.containing(pos)))), false);
+                for (var l : list.subList(0, Math.min(6, list.size())))
+                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f, radius %.0f, %.0f blocks away",
+                        l.x(), l.z(), l.radius(), Math.hypot(l.x() - pos.x, l.z() - pos.z))), false);
+                return list.size();
+            }))
             .then(Commands.literal("rifts").executes(c -> {
                 var src = c.getSource();
                 var level = src.getLevel();

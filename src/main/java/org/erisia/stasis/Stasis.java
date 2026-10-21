@@ -200,15 +200,17 @@ public final class Stasis {
         }
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz) || grace && NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
+        // a lull (Lulls: rare running-time weather; Baughn 2026-10-21), or the fastest field there
+        double rate = Lulls.rateAt(level, x, z);
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
-        if (fs == null) return 0.0;
-        double rate = 0.0;
-        for (Field f : fs) {
-            if (f.rate() > rate && f.id() != except && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
-                rate = f.rate();
-                if (rate >= 1.0) break;
+        if (fs == null && rate <= 0) return 0.0;
+        if (fs != null)
+            for (Field f : fs) {
+                if (f.rate() > rate && f.id() != except && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
+                    rate = f.rate();
+                    if (rate >= 1.0) break;
+                }
             }
-        }
         // no field holds a rift (Baughn): a stopped, dark hole through it
         if (rate > 0 && StaticDeeps.inRift(level, x, y, z)) return 0.0;
         return rate;
@@ -224,7 +226,7 @@ public final class Stasis {
 
     static boolean heldOff(Level level, int x, int y, int z, int except) {
         int cx = x >> 4, cz = z >> 4;
-        if (inSpawn(level, cx, cz)) return true;
+        if (inSpawn(level, cx, cz) || Lulls.rateAt(level, x, z) > 0) return true;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
         if (fs == null) return false;
         for (Field f : fs) if (f.id() != except && f.containsBlock(x, y, z)) return true;
@@ -255,9 +257,20 @@ public final class Stasis {
     private static int baseSectionState(Level level, int sx, int sy, int sz) {
         if (inSpawn(level, sx, sz) || NewChunkGrace.active(level, ChunkPos.pack(sx, sz))) return SECTION_RUNNING;
         Field[] fs = index(level).columns.get(ChunkPos.pack(sx, sz));
-        if (fs == null) return SECTION_STOPPED;
         double x0 = sx << 4, y0 = sy << 4, z0 = sz << 4, x1 = x0 + 16, y1 = y0 + 16, z1 = z0 + 16;
         boolean touched = false;
+        // a lull's column (Lulls): the section wholly inside one runs (rifts aside); touching one, it varies
+        for (Lulls.Lull l : Lulls.region(level, Deeps.seed(level), Math.floorDiv((int) x0, Lulls.REGION), Math.floorDiv((int) z0, Lulls.REGION))) {
+            double nx = Math.max(x0 - l.x(), Math.max(0, l.x() - x1)), nz = Math.max(z0 - l.z(), Math.max(0, l.z() - z1));
+            if (nx * nx + nz * nz > l.radius() * l.radius()) continue;
+            touched = true;
+            double fx = Math.max(Math.abs(x0 - l.x()), Math.abs(x1 - l.x())), fz = Math.max(Math.abs(z0 - l.z()), Math.abs(z1 - l.z()));
+            if (fx * fx + fz * fz <= l.radius() * l.radius()) {
+                int seed = Deeps.seed(level);
+                if (seed == 0 || !StaticDeeps.sectionMayHave(seed, sx, sy, sz)) return SECTION_RUNNING;
+            }
+        }
+        if (fs == null) return touched ? SECTION_MIXED : SECTION_STOPPED;
         for (Field f : fs) {
             // nearest and farthest point of the section's box, in the field's unit-sphere space (Field.norm: the
             // stretch is monotone per axis, so the box's ends map to the ends); a column field ignores y

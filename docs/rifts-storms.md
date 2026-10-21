@@ -57,6 +57,18 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
 - Client: `client/RiftHum.java` (the hum of a pocket about to turn rift), `client/StrataMask.java` (the 64³ strata mask for the
   shader), and the mist, eye, storm glow and puffs in `stasis.fsh` (see client-rendering.md).
 
+## Lulls (`Lulls.java`; Baughn 2026-10-21)
+- The deeps' opposite: rare running-time weather, and the respawn's last resort (`SafeRespawn`). A round column (top to
+  bottom; no heightmap read, so any thread may ask) where time runs 1.0 in the core (`CORE` 0.3 of the radius), fading to
+  `EDGE_RATE` 0.4 at the edge. Radius 24-40.
+- A 1024-block grid, 80 % occupied (a sixteenth of the deeps'), each lull carried by the deeps' wind at a tenth of the
+  speed (`time` = Deeps.time / 10: ~0.1 blocks/s) plus its own ±48-block wander. They never fade.
+- `Stasis.rateAt` takes the faster of a lull and the fields there (a rift still stops it); `heldOff` counts lulls
+  against drifting deeps over running spread land; `sectionState` knows them. Per-region cache refreshed each second
+  (`region`). Client: `StasisPost` sends the lulls in view as column fields with id < 0 and column -1 (no shell; the
+  colour comes back inside). `/stasis lulls` lists them. `TEST` lulls for GameTests.
+- Known gap: chunk meshes (frozen textures) aren't redone as a lull's edge drifts (~1 block per 10 s).
+
 ## Effects on gameplay
 - Rift (`StaticDeeps.inRift`, pocket `RIFT`, storm rift): `Stasis.rateAt` returns 0 even inside a field.
   An unprotected player becomes a statue in about 3 s; touching the eye is instant. Nothing protects. (Open lance

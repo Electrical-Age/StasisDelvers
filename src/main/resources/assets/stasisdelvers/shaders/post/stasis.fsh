@@ -29,7 +29,7 @@
 // [1600] possessed eye count (<= 16), [1601 + 3i ..] eye i - floor(camera);
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 18i ..] field i
 // (i < 32, nearest first, live before remnants): centre - floor(camera) (3), radius, collapse, failing,
-// column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
+// column (0/1; -1 a lull: a column without a shell), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
 // [4106 + 18i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
 // remnant: the eddy time [30] as it froze). [4110 + 18i ..] field i's reach east, south, west, north as multiples of
@@ -150,7 +150,7 @@ bool insideOther(vec3 p, int self, int n) {
         int k = FIELD_BASE + FIELD_STRIDE * j;
         if (data(k + 6) > 1.5 || data(k + 4) > 0.0) continue;   // (remnants and collapsing fields don't hide others)
         vec3 dv = p - vec3(data(k), data(k + 1), data(k + 2));
-        if (data(k + 6) > 0.5) dv.y = 0.0;
+        if (abs(data(k + 6)) > 0.5) dv.y = 0.0;   // (a column; -1 a lull)
         if (length(unstretch(dv, stretchOf(j))) < data(k + 3) - 0.05) return true;
     }
     return false;
@@ -1073,7 +1073,7 @@ void main() {
             vec3 fc = vec3(data(o), data(o + 1), data(o + 2));
             float r = data(o + 3), collapse = data(o + 4);
             vec3 dv = p - fc;
-            if (data(o + 6) > 0.5) dv.y = 0.0;
+            if (abs(data(o + 6)) > 0.5) dv.y = 0.0;   // (a column; -1 a lull: Lulls)
             vec4 st = stretchOf(i);
             float d = length(unstretch(dv, st));            // (round space: Field.norm * r)
             float edge = d < 1e-3 ? r : (r - d) * length(dv) / d;   // blocks to the shell along the line from the centre
@@ -1292,6 +1292,7 @@ void main() {
             float r = data(k + 3), collapse = data(k + 4), failing = data(k + 5);
             // a frozen remnant (Baughn: the collapse's last moment, stopped for good; StasisPost from Remnants): drawn
             // like the field was then, at its own fixed time
+            if (data(k + 6) < -0.5) continue;   // (a lull: running-time weather, no shell)
             bool frozen = data(k + 6) > 1.5;
             bool column = data(k + 6) > 0.5 && !frozen;
             float ftime = frozen ? data(k + 9) : time;   // (a remnant: the clocks as it froze, so it stays exactly as it was)
