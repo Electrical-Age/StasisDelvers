@@ -90,22 +90,19 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
         burnLeft = ticks;
     }
 
-    /** Client: sparkling dust dripping off the crystal while it grinds (Baughn), and now and then a spark where a laser
-     *  meets it. */
+    /** Client: sparkling dust dripping off the crystal while it grinds (Baughn): fine specks, white and violet, falling
+     *  into the bowl; now and then a spark where a laser meets it. (Falling amethyst dust piled into a solid purple blob
+     *  that hid the bowl and the crystal: AdventurAgent.) */
     void clientTick() {
         if (!grinding || burning.isEmpty() || level == null) return;
         var r = level.getRandom();
-        double x = worldPosition.getX() + 0.5, y = worldPosition.getY() + 1.12, z = worldPosition.getZ() + 0.5;
+        double x = worldPosition.getX() + 0.5, y = worldPosition.getY() + 1.08, z = worldPosition.getZ() + 0.5;
         if (r.nextInt(2) == 0)
-            level.addParticle(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.FALLING_DUST,
-                net.minecraft.world.level.block.Blocks.AMETHYST_BLOCK.defaultBlockState()),
-                x + (r.nextDouble() - 0.5) * 0.15, y - 0.08, z + (r.nextDouble() - 0.5) * 0.15, 0, 0, 0);
-        if (r.nextInt(4) == 0)
+            level.addParticle(new net.minecraft.core.particles.DustParticleOptions(r.nextInt(3) == 0 ? 0xF4EEFF : 0xC090FF, 0.25f + 0.15f * r.nextFloat()),
+                x + (r.nextDouble() - 0.5) * 0.12, y, z + (r.nextDouble() - 0.5) * 0.12, 0, -0.04, 0);
+        if (r.nextInt(6) == 0)
             level.addParticle(net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK,
-                x + (r.nextDouble() - 0.5) * 0.25, y + (r.nextDouble() - 0.5) * 0.2, z + (r.nextDouble() - 0.5) * 0.25, 0, 0, 0);
-        if (r.nextInt(10) == 0)
-            level.addParticle(new net.minecraft.core.particles.DustParticleOptions(0xB070FF, 0.6f),
-                x + (r.nextDouble() - 0.5) * 0.3, y - 0.1, z + (r.nextDouble() - 0.5) * 0.3, 0, -0.02, 0);
+                x + (r.nextDouble() - 0.5) * 0.2, y + 0.04 + (r.nextDouble() - 0.5) * 0.15, z + (r.nextDouble() - 0.5) * 0.2, 0, 0, 0);
     }
 
     /** Would time run here at the quern's rate or faster without its own field? Then it doesn't grind. */
@@ -145,6 +142,8 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
             double failing = burnLeft < WARN_TICKS && queueEmpty() ? 0.5 : 0;
             if (fieldId == Stasis.NO_FIELD || fd.get(fieldId).isEmpty()) {
                 fieldId = fd.add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, RADIUS, false, RATE).id();
+                // orange all over (Baughn: a much weaker field than a tower's)
+                fd.update(sl, fieldId, x -> x.withShield(1, 0, 0));
                 setChanged();
             }
             var f = fd.get(fieldId);

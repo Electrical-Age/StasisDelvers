@@ -1334,6 +1334,9 @@ void main() {
                 if (t <= 0.0 || t >= tmax) continue;
                 vec3 hp = o + v * t - fc;
                 if (!frozen && insideOther(o + v * t, i, n)) continue;   // (the union's surface only)
+                // not past the render distance, where no terrain is drawn (AdventurAgent: a far field's shell floated
+                // over the void)
+                if (length((o + v * t).xz) > data(216)) continue;
                 vec3 hq = hp;
                 if (column) hq.y = 0.0;
                 // the cell grid on the round shape (cells stretch with the field), the gap in blocks at the local
