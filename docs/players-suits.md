@@ -81,8 +81,10 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   `player_safe_inside`, `player_grace_after_login`, `field_removed_gives_grace`.
 - In the plain Grey a chest piece is enough. Each worn piece carries 4/worn of the draw, so a partial suit is
   never cheaper. Tests: `chest_piece_alone_protects`, `chest_piece_alone_in_mist`, `partial_suit_freezes`.
-- A suit protects only when every worn piece has charge. Tests: `empty_suit_freezes`, `delver_suit_protects`,
-  `stasis_armor_protects`.
+- A suit protects when its chest piece and the other charged pieces can pay the draw (`Suits.working`): an empty piece
+  counts as not worn (its share moves to the others, and it counts as missing for the deeps and Mining Fatigue;
+  Baughn: an empty piece should not be worse than not wearing it). An empty chest piece: no suit. Tests:
+  `empty_suit_freezes`, `empty_piece_counts_as_not_worn`, `delver_suit_protects`, `stasis_armor_protects`.
 - `Suits.available` never counts batteries that can't discharge (rift capacitors).
   Tests: `SuitsTest.bugB_aCapacitorIsNotPower`, `drainingTakesWhatAvailablePromised`, `drainRespectsLimits`.
 - Rifts are never protected (Baughn's rule). Capacitors don't help there. The exceptions are doors, not protection:

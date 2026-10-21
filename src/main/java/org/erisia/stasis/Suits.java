@@ -22,18 +22,36 @@ final class Suits {
      */
     static String problem(ServerPlayer p) {
         int pieces = 0;
-        String missing = null, empty = null;
-        for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
-            if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b) {
-                pieces++;
-                if (b.getEnergy(s) < share(p) * t.stasisDraw(s) / 20.0 && empty == null) empty = s.getHoverName().getString();
-            } else if (missing == null) missing = slot.getName();
-        }
+        for (EquipmentSlot slot : ARMOR) if (p.getItemBySlot(slot).getItem() instanceof TimeSuit) pieces++;
         if (pieces == 0) return null;
-        if (!(p.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof TimeSuit)) return "Suit incomplete: no chest piece";
-        if (empty != null) return "Suit piece out of charge: " + empty;
+        ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
+        if (!(chest.getItem() instanceof TimeSuit)) return "Suit incomplete: no chest piece";
+        if (!working(p, 1).contains(EquipmentSlot.CHEST)) return "Suit piece out of charge: " + chest.getHoverName().getString();
         return null;
+    }
+
+    /**
+     * The worn pieces that can pay their share of one tick's draw (x factor), the share counted over those pieces only:
+     * an empty piece counts as not worn (Baughn: an empty piece should not be worse than not wearing it; it used to
+     * switch the whole suit off with charge left in the chest piece). Empty without a working chest piece: no suit.
+     */
+    static java.util.EnumSet<EquipmentSlot> working(ServerPlayer p, double factor) {
+        var set = java.util.EnumSet.noneOf(EquipmentSlot.class);
+        for (EquipmentSlot slot : ARMOR) if (p.getItemBySlot(slot).getItem() instanceof TimeSuit && p.getItemBySlot(slot).getItem() instanceof IItemEnergyBattery) set.add(slot);
+        // dropping a piece raises the others' share, which may drop another: at most 4 rounds
+        for (boolean changed = true; changed && !set.isEmpty(); ) {
+            changed = false;
+            double f = factor * 4.0 / set.size();
+            for (var it = set.iterator(); it.hasNext(); ) {
+                ItemStack s = p.getItemBySlot(it.next());
+                if (((IItemEnergyBattery) s.getItem()).getEnergy(s) < f * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0) {
+                    it.remove();
+                    changed = true;
+                }
+            }
+        }
+        if (!set.contains(EquipmentSlot.CHEST)) set.clear();
+        return set;
     }
 
     /** Each worn piece carries the draw of the missing ones too (Baughn: the same or worse drain in all cases; a partial
@@ -43,10 +61,13 @@ final class Suits {
         return worn == 0 ? 1 : 4.0 / worn;
     }
 
-    /** Suit pieces not worn (0..4; a chest piece alone: 3). */
+    /** Suit pieces not worn, or worn empty (0..4; a chest piece alone: 3). */
     static int missing(ServerPlayer p) {
         int n = 0;
-        for (EquipmentSlot slot : ARMOR) if (!(p.getItemBySlot(slot).getItem() instanceof TimeSuit)) n++;
+        for (EquipmentSlot slot : ARMOR) {
+            ItemStack s = p.getItemBySlot(slot);
+            if (!(s.getItem() instanceof TimeSuit) || !(s.getItem() instanceof IItemEnergyBattery b) || b.getEnergy(s) <= 0) n++;
+        }
         return n;
     }
 
@@ -55,7 +76,8 @@ final class Suits {
         double left = Double.MAX_VALUE;
         for (EquipmentSlot slot : ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
-            if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b && t.stasisDraw(s) > 0)
+            // (an empty piece counts as not worn: it doesn't end the suit)
+            if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b && t.stasisDraw(s) > 0 && b.getEnergy(s) > 0)
                 left = Math.min(left, b.getEnergy(s) / (t.stasisDraw(s) * share(p)));
         }
         return left;
@@ -211,14 +233,7 @@ final class Suits {
 
     /** Would the suit protect (a chest piece, every worn piece charged), without drawing power? */
     static boolean protectsWithoutDraw(ServerPlayer p) {
-        if (!(p.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof TimeSuit)) return false;
-        double f = share(p);
-        for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
-            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
-            if (b.getEnergy(s) < f * t.stasisDraw(s) / 20.0) return false;
-        }
-        return true;
+        return !working(p, 1).isEmpty();
     }
 
     static boolean protect(ServerPlayer p) {
@@ -234,16 +249,11 @@ final class Suits {
     /** Is the player wearing a charged suit (a chest piece; every worn piece charged)? If so, draw one tick's power
      *  (x factor: deeps) from each worn piece. */
     static boolean protect(ServerPlayer p, double factor) {
-        if (!(p.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof TimeSuit)) return false;
-        factor *= share(p);
-        for (EquipmentSlot slot : ARMOR) {
+        var set = working(p, factor);
+        if (set.isEmpty()) return false;
+        factor *= 4.0 / set.size();
+        for (EquipmentSlot slot : set) {
             ItemStack s = p.getItemBySlot(slot);
-            if (!(s.getItem() instanceof TimeSuit t) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
-            if (b.getEnergy(s) < factor * t.stasisDraw(s) / 20.0) return false;
-        }
-        for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
-            if (!(s.getItem() instanceof TimeSuit)) continue;
             IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
             b.setEnergy(s, b.getEnergy(s) - factor * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0);
         }

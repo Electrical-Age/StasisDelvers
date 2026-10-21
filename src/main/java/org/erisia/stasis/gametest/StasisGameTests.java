@@ -519,6 +519,26 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // Baughn: an empty piece should not be worse than not wearing it (it used to switch the whole suit off, with
+        // charge left in the chest piece): a full suit with empty boots works like the three charged pieces
+        CASES.put("empty_piece_counts_as_not_worn", new Spec(130, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            var boots = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET);
+            ((org.erisia.stasis.DelverSuitItem) boots.getItem()).setEnergy(boots, 0);
+            var chest = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+            var item = (org.erisia.stasis.DelverSuitItem) chest.getItem();
+            double full = item.getEnergy(chest);
+            return () -> {
+                c.check("empty boots, the rest charged: no freezing", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                double used = full - item.getEnergy(chest), perPiece = item.stasisDraw(chest) * 130 / 20.0;
+                c.check("the three charged pieces carry the boots' share (4/3 each)", used > 1.25 * perPiece && used < 1.45 * perPiece,
+                    String.format("%.1f J, one piece's share %.1f J", used, perPiece));
+                c.check("an empty piece counts as missing (Mining Fatigue, as with three pieces)", p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
+                remove(h, p);
+            };
+        }));
         CASES.put("empty_suit_freezes", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
             wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
