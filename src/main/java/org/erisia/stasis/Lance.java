@@ -998,6 +998,7 @@ public final class Lance {
             if (n.open() && !g.open()) {
                 level.playSound(null, c[0], c[1], c[2], SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 2f, 1.4f);
                 StasisDelvers.LOG.info("Lance gate on rift {} in {} latched OPEN", id, dimId(level));
+                GuideAdvancements.awardNear(level, c[0], c[1], c[2], 128, "guide/breach");
             } else if (!n.open() && g.open()) {
                 level.playSound(null, c[0], c[1], c[2], SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 2f, 0.5f);
                 StasisDelvers.LOG.info("Lance gate on rift {} in {} unlatched: no power", id, dimId(level));

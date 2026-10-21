@@ -1,0 +1,51 @@
+{
+  "parent": "stasisdelvers:guide/root",
+  "criteria": {
+    "shard": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "stasisdelvers:rift_shard",
+              "stasisdelvers:charged_rift_shard"
+            ]
+          }
+        ]
+      }
+    },
+    "capacitor": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "stasisdelvers:charged_rift_capacitor"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:rift_shard"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.shards_of_time.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.shards_of_time.description"
+    },
+    "frame": "task",
+    "announce_to_chat": true,
+    "show_toast": true,
+    "hidden": false
+  },
+  "requirements": [
+    [
+      "shard",
+      "capacitor"
+    ]
+  ]
+}

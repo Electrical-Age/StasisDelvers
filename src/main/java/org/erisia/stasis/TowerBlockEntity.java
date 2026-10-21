@@ -558,6 +558,7 @@ public class TowerBlockEntity extends BlockEntity {
                     collapseSeed = seed;
                     FieldData.get(sl).update(sl, fieldId, f -> f.withSeed(seed).withShield(1, d0, sd));
                     StasisDelvers.LOG.info("Stasis tower at {} ran out of power: field {} collapses", worldPosition.toShortString(), fieldId);
+                    FieldData.get(sl).get(fieldId).ifPresent(x -> GuideAdvancements.awardInside(sl, x, "deaths/lights_out"));
                 }
             }
             case COLLAPSING -> {
@@ -687,6 +688,7 @@ public class TowerBlockEntity extends BlockEntity {
         draining = false;
         Tickets.update(sl, this);
         StasisDelvers.LOG.info("Stasis tower at {} started: field {} r {}", worldPosition.toShortString(), fieldId, radius());
+        FieldData.get(sl).get(fieldId).ifPresent(x -> GuideAdvancements.awardInside(sl, x, "guide/safe_harbour"));
     }
 
     void stop(ServerLevel sl) {

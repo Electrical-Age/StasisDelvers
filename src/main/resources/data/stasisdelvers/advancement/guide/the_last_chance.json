@@ -1,0 +1,54 @@
+{
+  "parent": "stasisdelvers:guide/root",
+  "criteria": {
+    "cottage": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "type": "minecraft:entity_properties",
+          "entity": "this",
+          "predicate": {
+            "minecraft:location": {
+              "structures": "stasisdelvers:ruined_cottage"
+            }
+          }
+        }
+      }
+    },
+    "end_tower": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "type": "minecraft:entity_properties",
+          "entity": "this",
+          "predicate": {
+            "minecraft:location": {
+              "structures": "stasisdelvers:end_tower_site"
+            }
+          }
+        }
+      }
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:stasis_tower_segment"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.the_last_chance.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.the_last_chance.description"
+    },
+    "frame": "task",
+    "announce_to_chat": true,
+    "show_toast": true,
+    "hidden": false
+  },
+  "requirements": [
+    [
+      "cottage",
+      "end_tower"
+    ]
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "parent": "stasisdelvers:guide/root",
+  "criteria": {
+    "got": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "stasisdelvers:delver_helmet",
+              "stasisdelvers:delver_chestplate",
+              "stasisdelvers:delver_leggings",
+              "stasisdelvers:delver_boots"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:delver_chestplate"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.the_cure.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.the_cure.description"
+    },
+    "frame": "task",
+    "announce_to_chat": true,
+    "show_toast": true,
+    "hidden": false
+  },
+  "requirements": [
+    [
+      "got"
+    ]
+  ]
+}

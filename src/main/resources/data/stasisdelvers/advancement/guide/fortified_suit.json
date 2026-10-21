@@ -1,0 +1,28 @@
+{
+  "parent": "stasisdelvers:guide/sealed_suit",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:stasis_chestplate"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.fortified_suit.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.fortified_suit.description"
+    },
+    "frame": "goal",
+    "announce_to_chat": true,
+    "show_toast": true,
+    "hidden": false
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

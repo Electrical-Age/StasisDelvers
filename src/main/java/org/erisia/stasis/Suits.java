@@ -91,6 +91,7 @@ final class Suits {
      * the like; Baughn: both suits run off inventory batteries), and the advanced suit repairs itself on power.
      */
     static void tick(ServerPlayer p) {
+        GuideAdvancements.suits(p);
         if (p.tickCount % 20 != 0 || p.isSpectator()) return;
         // what the pieces want this second, and what the inventory's batteries can give
         java.util.List<ItemStack> pieces = new java.util.ArrayList<>();

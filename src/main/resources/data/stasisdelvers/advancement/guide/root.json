@@ -1,0 +1,28 @@
+{
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:tick"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:stability_compass"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.root.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.root.description"
+    },
+    "frame": "task",
+    "announce_to_chat": false,
+    "show_toast": false,
+    "hidden": false,
+    "background": "stasisdelvers:block/riftstone"
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

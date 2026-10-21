@@ -473,6 +473,8 @@ public final class StasisGameTests {
                 c.check("the suit drew power (10 W per piece)", e < full && e > full - 10 * 135 / 20.0 - 1, String.format("%.1f J", e));
                 c.check("a full Delver suit lasts 30 minutes (Baughn)", Math.abs(full - 10 * 60 * 30) < 1e-6, full + " J");
                 c.check("a full suit: no Mining Fatigue (Baughn)", !p.hasEffect(net.minecraft.world.effect.MobEffects.MINING_FATIGUE));
+                var sealed = h.getLevel().getServer().getAdvancements().get(net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "guide/sealed_suit"));
+                c.check("all four charged: Sealed Suit (λ-Nero's guide)", sealed != null && p.getAdvancements().getOrStartProgress(sealed).isDone());
                 remove(h, p);
             };
         }));
@@ -588,6 +590,15 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }, false, true));
+        // λ-Nero's guide tab and the new deaths: every one loads (a bad trigger or predicate drops it silently)
+        CASES.put("guide_advancements_load", new Spec(1, (h, c) -> () -> {
+            var adv = h.getLevel().getServer().getAdvancements();
+            java.util.List<String> missing = new java.util.ArrayList<>();
+            for (String id : List.of("guide/root", "guide/the_cure", "guide/sealed_suit", "guide/fortified_suit", "guide/shards_of_time",
+                "guide/safe_harbour", "guide/the_last_chance", "guide/breach", "deaths/its_damp", "deaths/lights_out", "deaths/were_then", "breaking_it"))
+                if (adv.get(net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", id)) == null) missing.add(id);
+            c.check("all the guide and new death advancements load", missing.isEmpty(), missing.toString());
+        }, false));
         CASES.put("empty_suit_freezes", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
             wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),

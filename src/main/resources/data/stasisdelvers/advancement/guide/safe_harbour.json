@@ -1,0 +1,28 @@
+{
+  "parent": "stasisdelvers:guide/root",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:stasis_tower"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.safe_harbour.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.safe_harbour.description"
+    },
+    "frame": "goal",
+    "announce_to_chat": true,
+    "show_toast": true,
+    "hidden": false
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

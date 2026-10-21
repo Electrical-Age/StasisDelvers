@@ -106,3 +106,14 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 - No messages about deeps, rifts or eddies, on purpose (fear of the unknown). The `debugMessages` config
   turns on diagnostics.
 - `Freezing.onBreakSpeed`: the EA mining drill ignores Mining Fatigue in stopped land.
+
+## Advancements (`GuideAdvancements`, `DeathAdvancements`)
+- The "Stasis Delvers" tab (`advancement/guide`, hints by λ-Nero 2026-10-21, puzzle-style on purpose): A Sickness (join),
+  The Cure (any Delver piece), Sealed Suit (all four, charged), Fortified Suit (all four Stasis-Proof), Shards of Time
+  (a shard or charged capacitor), Safe Harbour (inside a tower's field as it forms), The Last Chance (in a ruined cottage
+  or an End tower site), Breach (within 128 of a lance gate as it latches). Code grants the impossible-trigger ones.
+- The "Stopped Time" deaths tab, hidden: the possessed-animal deaths, Self Made, Low Battery, Saw the end of the
+  universe (any full freeze), It's Damp (froze in mist, a deep, a rift's outer zone or a storm with a partial suit),
+  Lights Out (inside a tower's field as it collapses), You were then, and now you- (killed your own possessed statue).
+- Not yet: Tick Tock (the time-rate bauble from λ-Nero's to-do). Test: `guide_advancements_load`.
+

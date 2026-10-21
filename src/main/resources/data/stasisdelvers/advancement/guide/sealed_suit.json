@@ -1,0 +1,28 @@
+{
+  "parent": "stasisdelvers:guide/the_cure",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "stasisdelvers:delver_helmet"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.guide.sealed_suit.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.guide.sealed_suit.description"
+    },
+    "frame": "task",
+    "announce_to_chat": true,
+    "show_toast": true,
+    "hidden": false
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}
