@@ -599,6 +599,19 @@ public final class StasisGameTests {
                 if (adv.get(net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", id)) == null) missing.add(id);
             c.check("all the guide and new death advancements load", missing.isEmpty(), missing.toString());
         }, false));
+        // λ-Nero: The Last Chance within ~5 blocks of a ruin's tower (some generate without the cottage)
+        CASES.put("last_chance_near_a_ruined_tower", new Spec(45, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            t.ruined = true;
+            ServerPlayer near = survivalPlayer(h, new Vec3(8.5, 1.0, 4.5), true), far = survivalPlayer(h, new Vec3(14.5, 1.0, 4.5), true);
+            var adv = h.getLevel().getServer().getAdvancements().get(net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "guide/the_last_chance"));
+            return () -> {
+                c.check("5 blocks from the ruin's tower: The Last Chance; 11 away: not", adv != null && near.getAdvancements().getOrStartProgress(adv).isDone()
+                    && !far.getAdvancements().getOrStartProgress(adv).isDone());
+                remove(h, near);
+                remove(h, far);
+            };
+        }, true));
         CASES.put("empty_suit_freezes", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
             wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),

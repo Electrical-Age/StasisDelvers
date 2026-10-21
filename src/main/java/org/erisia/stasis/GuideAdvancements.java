@@ -31,9 +31,32 @@ public final class GuideAdvancements {
             if (!p.isSpectator() && p.distanceToSqr(x, y, z) <= r * r) award(p, path);
     }
 
+    /** The ruined towers' reach for The Last Chance (λ-Nero: within 5 blocks or so of it; some generate without the
+     *  cottage, just the tower): this far from the core. */
+    static final double RUIN_REACH = 8;
+
+    /** Within RUIN_REACH of a ruin's tower core (TowerBlockEntity.ruined), in the chunks round the player. */
+    static void lastChance(ServerPlayer p) {
+        var adv = p.level().getServer().getAdvancements().get(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "guide/the_last_chance"));
+        if (adv == null || p.getAdvancements().getOrStartProgress(adv).isDone() || !(p.level() instanceof ServerLevel level)) return;
+        int pcx = p.getBlockX() >> 4, pcz = p.getBlockZ() >> 4;
+        for (int cx = pcx - 1; cx <= pcx + 1; cx++)
+            for (int cz = pcz - 1; cz <= pcz + 1; cz++) {
+                var chunk = level.getChunkSource().getChunkNow(cx, cz);
+                if (chunk == null) continue;
+                for (var be : chunk.getBlockEntities().values())
+                    if (be instanceof TowerBlockEntity t && t.ruined && t.isMaster()
+                        && p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(be.getBlockPos())) <= RUIN_REACH * RUIN_REACH) {
+                        p.getAdvancements().award(adv, "done");
+                        return;
+                    }
+            }
+    }
+
     /** Once a second (Suits.tick): Sealed Suit (all four Delver pieces, charged), Fortified Suit (all four Stasis-Proof). */
     static void suits(ServerPlayer p) {
         if (p.tickCount % 20 != 0) return;
+        if (p.tickCount % 40 == 0) lastChance(p);
         boolean delver = true, stasis = true;
         for (EquipmentSlot slot : Suits.ARMOR) {
             ItemStack s = p.getItemBySlot(slot);
