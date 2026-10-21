@@ -33,6 +33,7 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue GUTTER_MAX_TICKS;
     static final ModConfigSpec.ConfigValue<List<? extends String>> STRATA_SHAPES;
     static final ModConfigSpec.BooleanValue RIFT_ORES;
+    static final ModConfigSpec.BooleanValue TOWER_YARD;
     static final ModConfigSpec.DoubleValue RIFT_ORE_SHARE;
     static final ModConfigSpec.IntValue CRYSTAL_STAGE_SECONDS;
     static final ModConfigSpec.ConfigValue<List<? extends String>> RIFT_DESTINATIONS;
@@ -105,6 +106,9 @@ public final class StasisConfig {
         STRATA_SHAPES = b.comment("Strata shapes around static deeps' rifts, as name:weight (saddle, staircase, splash, pods); each",
                 "rift picks one from its id. Worldgen only: changes reach newly generated chunks.")
             .defineListAllowEmpty("strataShapes", List.of("saddle:1", "staircase:1", "splash:1", "pods:1"), () -> "saddle:1", o -> o instanceof String);
+        TOWER_YARD = b.comment("A formed tower core keeps EA cables, switches, exporters and batteries within 6 blocks running in",
+                "stopped land, field or not (the tower yard). Off: only a field or a rift quern does (Baughn 2026-10-21). A",
+                "lance core keeps its yard either way.").define("towerYard", false);
         RIFT_ORES = b.comment("Ores in rift walls and strata, from the overworld ore tags, at any depth (Baughn).").define("riftOres", true);
         RIFT_ORE_SHARE = b.comment("Share of rift wall and strata rock that becomes ore, in veins (Baughn: 6-8 times the old 0.006 scatter).")
             .defineInRange("riftOreShare", 0.042, 0.0, 0.2);
@@ -205,6 +209,7 @@ public final class StasisConfig {
     static volatile int gutterMinTicks = 100;
     static volatile int gutterMaxTicks = 600;
     static volatile boolean riftOres = true;
+    public static volatile boolean towerYard = false;
     static volatile double riftOreShare = 0.042;
     public static volatile int crystalStageSeconds = 1200;
     static volatile double riftScatterRate = 0.05;
@@ -287,6 +292,7 @@ public final class StasisConfig {
         m.put("gutterMinTicks", gutterMinTicks);
         m.put("gutterMaxTicks", gutterMaxTicks);
         m.put("riftOres", riftOres);
+        m.put("towerYard", towerYard);
         m.put("riftOreShare", riftOreShare);
         m.put("crystalStageSeconds", crystalStageSeconds);
         m.put("riftScatterRate", riftScatterRate);
@@ -343,6 +349,7 @@ public final class StasisConfig {
         gutterMaxTicks = GUTTER_MAX_TICKS.get();
         Strata.setWeights(STRATA_SHAPES.get());
         riftOres = RIFT_ORES.get();
+        towerYard = TOWER_YARD.get();
         riftOreShare = RIFT_ORE_SHARE.get();
         crystalStageSeconds = CRYSTAL_STAGE_SECONDS.get();
         Gates.configure(RIFT_DESTINATIONS.get(), RIFT_SCATTER.get());

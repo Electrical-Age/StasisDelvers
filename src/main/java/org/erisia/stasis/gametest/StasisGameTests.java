@@ -2193,8 +2193,98 @@ public final class StasisGameTests {
                     + ", lamp U " + String.format("%.1f", lamp.positiveLoad.getU()));
             };
         }));
-        CASES.put("ea_tower_yard_keeps_cables", new Spec(30, (h, c) -> {
+        // the rift quern (Baughn 2026-10-21): grinding a shard holds a field r 4 at 0.4 round it, which runs EA there; a
+        // charged shard first (10 min), then the plain one (5 min)
+        CASES.put("quern_grinds_a_field", new Spec(14, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos qp = new BlockPos(8, 1, 4);
+            h.setBlock(qp, org.erisia.stasis.StasisRegistry.QUERN.get());
+            var q = (org.erisia.stasis.QuernBlockEntity) level.getBlockEntity(h.absolutePos(qp));
+            boolean took = q.offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.CHARGED_RIFT_SHARD.get()))
+                && q.offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()))
+                && !q.offer(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK));
+            var cable = eaSix(h, new BlockPos(9, 1, 4), 4 + (32 << 6));
+            var far = eaSix(h, new BlockPos(14, 1, 4), 4 + (32 << 6));
+            String[] mid = new String[1];
+            h.runAtTickTime(5, () -> {
+                BlockPos a = h.absolutePos(qp);
+                var f = FieldData.get(level).get(q.fieldId());
+                org.erisia.stasis.NodeFreezer.pass();
+                mid[0] = "grinding " + q.grinding() + ", charged " + q.burning().is(org.erisia.stasis.StasisRegistry.CHARGED_RIFT_SHARD.get())
+                    + ", field " + f.map(x -> x.radius() + "@" + x.rate()).orElse("none")
+                    + ", rate 2 off " + Stasis.rateAt(level, a.east(2)) + ", 5 off " + Stasis.rateAt(level, a.east(5))
+                    + ", cable runs " + !org.erisia.stasis.NodeFreezer.isFrozen(cable.sixNode) + ", far frozen " + org.erisia.stasis.NodeFreezer.isFrozen(far.sixNode);
+                q.setBurnLeftForTests(1);
+            });
+            return () -> {
+                c.check("the quern takes shards, not sticks", took);
+                c.check("grinding the charged shard: a field r 4 at 0.4; EA runs inside it only", mid[0] != null
+                    && mid[0].equals("grinding true, charged true, field 4.0@0.4, rate 2 off 0.4, 5 off 0.0, cable runs true, far frozen true"), mid[0]);
+                c.check("spent, the plain shard follows (5 minutes)", q.grinding() && q.burning().is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())
+                    && q.left() > 0.99 && q.queueEmpty(), q.statusText().getString());
+                h.setBlock(qp, Blocks.AIR);
+                c.check("broken: its field goes", FieldData.get(level).get(q.fieldId()).isEmpty() && q.fieldId() == Stasis.NO_FIELD, "field " + q.fieldId());
+            };
+        }, false, true));
+        // inside a faster field (a base) it doesn't spend shards; a hopper fills the queue (4, plus the one ground)
+        CASES.put("quern_idle_in_a_field", new Spec(12, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos qp = new BlockPos(3, 1, 4);   // (in the test's field)
+            org.erisia.stasis.QuernBlockEntity[] q = new org.erisia.stasis.QuernBlockEntity[1];
+            h.setBlock(qp, org.erisia.stasis.StasisRegistry.QUERN.get());
+            q[0] = (org.erisia.stasis.QuernBlockEntity) level.getBlockEntity(h.absolutePos(qp));
+            q[0].offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            return () -> {
+                c.check("in a running field it waits: no field, nothing spent", q[0] != null && !q[0].grinding() && q[0].fieldId() == Stasis.NO_FIELD
+                    && q[0].burning().isEmpty() && !q[0].queueEmpty(), q[0] == null ? "no quern" : q[0].statusText().getString());
+                h.setBlock(qp, Blocks.AIR);
+            };
+        }));
+        CASES.put("quern_hopper_and_break", new Spec(130, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos qp = new BlockPos(8, 1, 4);
+            h.setBlock(qp, org.erisia.stasis.StasisRegistry.QUERN.get());
+            h.setBlock(qp.above(), Blocks.HOPPER);
+            var hopper = (net.minecraft.world.level.block.entity.HopperBlockEntity) level.getBlockEntity(h.absolutePos(qp.above()));
+            hopper.setItem(0, new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get(), 7));
+            var q = (org.erisia.stasis.QuernBlockEntity) level.getBlockEntity(h.absolutePos(qp));
+            // the first by hand: the hopper is stopped until the quern's field holds it (then at 0.4: 20 ticks a shard)
+            q.offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            String[] mid = new String[1];
+            h.runAtTickTime(120, () -> {
+                int n = 0;
+                for (int i = 0; i < 4; i++) if (!q.queued(i).isEmpty()) n++;
+                mid[0] = "grinding " + q.grinding() + ", queued " + n + ", hopper keeps " + hopper.getItem(0).getCount()
+                    + ", comparator " + level.getBlockState(h.absolutePos(qp)).getAnalogOutputSignal(level, h.absolutePos(qp), net.minecraft.core.Direction.NORTH);
+                level.destroyBlock(h.absolutePos(qp), true);
+            });
+            return () -> {
+                c.check("then a hopper in its field fills the queue: 1 ground + 4 queued, 3 left", "grinding true, queued 4, hopper keeps 3, comparator 15".equals(mid[0]), mid[0]);
+                int dropped = 0;
+                for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(h.absolutePos(qp)).inflate(3)))
+                    if (e.getItem().is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())) dropped += e.getItem().getCount();
+                    else if (e.getItem().is(org.erisia.stasis.StasisRegistry.QUERN_ITEM.get())) e.discard();
+                c.check("broken: the 4 queued drop, the one ground is spent", dropped == 4, dropped + " dropped");
+                c.check("and its field goes", q.fieldId() == Stasis.NO_FIELD);
+                for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(h.absolutePos(qp)).inflate(3))) e.discard();
+                h.setBlock(qp.above(), Blocks.AIR);
+            };
+        }, false, true));
+        // Baughn 2026-10-21: no tower yard (config towerYard off); a lance core keeps its yard
+        CASES.put("tower_yard_off_lance_yard_on", new Spec(20, (h, c) -> {
             tower(h, new BlockPos(12, 1, 6), 0);                                   // unpowered: no field
+            var nearTower = eaSix(h, new BlockPos(12, 1, 4), 4 + (32 << 6));
+            var lanceCore = lance(h, c, new BlockPos(3, 1, 4), 2, Direction.WEST, 1);
+            var nearLance = eaSix(h, new BlockPos(4, 1, 4), 4 + (32 << 6));
+            return () -> {
+                org.erisia.stasis.NodeFreezer.pass();
+                c.check("config towerYard is off by default", !org.erisia.stasis.StasisConfig.towerYard);
+                c.check("a cable beside an unpowered tower stays stopped", org.erisia.stasis.NodeFreezer.isFrozen(nearTower.sixNode));
+                c.check("a cable beside a lance core runs", lanceCore != null && !org.erisia.stasis.NodeFreezer.isFrozen(nearLance.sixNode));
+            };
+        }, false, true));
+        CASES.put("ea_tower_yard_keeps_cables", new Spec(30, (h, c) -> {
+            tower(h, new BlockPos(12, 1, 6), 0).testYard = true;                   // unpowered: no field; the yard on (config towerYard)
             var cable = eaSix(h, new BlockPos(12, 1, 4), 4 + (32 << 6));
             var src = eaSix(h, new BlockPos(11, 1, 4), 0 + (3 << 6));
             var far = eaSix(h, new BlockPos(3, 1, 2), 4 + (32 << 6));            // 8 blocks from the core
@@ -2209,6 +2299,7 @@ public final class StasisGameTests {
         // NodeFreezer keeps going in the tower yard; it used to be a block-entity tick, exempted in Stasis)
         CASES.put("ea_tower_yard_exporter_feeds_the_tower", new Spec(30, (h, c) -> {
             var tower = tower(h, new BlockPos(12, 1, 6), 0);                     // unpowered: no field
+            tower.testYard = true;                                                // (config towerYard)
             var d = mods.eln.registry.batch.Wp11Content.elnToOtherLvu;
             ServerLevel level = h.getLevel();
             BlockPos p = h.absolutePos(new BlockPos(12, 1, 5)), core = h.absolutePos(new BlockPos(12, 1, 6));

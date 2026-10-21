@@ -145,6 +145,9 @@ public class TowerBlockEntity extends BlockEntity {
     /** The generated tower over this core (P3d). */
     public final TowerStructure structure = new TowerStructure();
 
+    /** Tests: this tower keeps its yard whatever config towerYard says (memory only). */
+    public boolean testYard;
+
     public TowerBlockEntity(BlockPos pos, BlockState state) {
         super(StasisRegistry.TOWER_ENTITY.get(), pos, state);
         structure.seed = (int) (pos.asLong() ^ (pos.asLong() >>> 32));

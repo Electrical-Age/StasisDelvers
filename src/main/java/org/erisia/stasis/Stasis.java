@@ -178,13 +178,25 @@ public final class Stasis {
     }
 
     static double rateAt(Level level, int x, int y, int z, boolean eddies, boolean grace, boolean deeps) {
+        return rateAt(level, x, y, z, eddies, grace, deeps, NO_FIELD);
+    }
+
+    /** No field id (field ids start at 0). */
+    public static final int NO_FIELD = Integer.MIN_VALUE;
+
+    /** rateAtSteady as if field {@code except} weren't there (a rift quern: does time run here without it?). */
+    public static double rateAtSteadyWithout(Level level, int x, int y, int z, int except) {
+        return rateAt(level, x, y, z, false, true, true, except);
+    }
+
+    static double rateAt(Level level, int x, int y, int z, boolean eddies, boolean grace, boolean deeps, int except) {
         if (!stops(level)) return 1.0;
         // spreading mode: a column the stillness hasn't reached runs at full rate, fields or not; rifts stop as ever, and
         // so does a drifting deep where no field (or the spawn area) holds it off (Baughn 2026-10-19). Stilled columns
         // go on to the base rules below. The client answers from its rank tiles (Spread.client).
         if (Spread.active(level) && Spread.runs(level, x, z)) {
             if (StaticDeeps.inRift(level, x, y, z)) return 0.0;
-            return deeps && Deeps.stopsRunningLand(level, x, y, z) && !heldOff(level, x, y, z) ? 0.0 : 1.0;
+            return deeps && Deeps.stopsRunningLand(level, x, y, z) && !heldOff(level, x, y, z, except) ? 0.0 : 1.0;
         }
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz) || grace && NewChunkGrace.active(level, ChunkPos.pack(cx, cz))) return 1.0;
@@ -192,7 +204,7 @@ public final class Stasis {
         if (fs == null) return 0.0;
         double rate = 0.0;
         for (Field f : fs) {
-            if (f.rate() > rate && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
+            if (f.rate() > rate && f.id() != except && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
                 rate = f.rate();
                 if (rate >= 1.0) break;
             }
@@ -207,11 +219,15 @@ public final class Stasis {
      * FrontWarnings: a player standing where it holds keeps running when the column stills, so gets no warning.
      */
     static boolean heldOff(Level level, int x, int y, int z) {
+        return heldOff(level, x, y, z, NO_FIELD);
+    }
+
+    static boolean heldOff(Level level, int x, int y, int z, int except) {
         int cx = x >> 4, cz = z >> 4;
         if (inSpawn(level, cx, cz)) return true;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
         if (fs == null) return false;
-        for (Field f : fs) if (f.containsBlock(x, y, z)) return true;
+        for (Field f : fs) if (f.id() != except && f.containsBlock(x, y, z)) return true;
         return false;
     }
 
@@ -338,6 +354,8 @@ public final class Stasis {
         if (be instanceof TowerBlockEntity t && t.isMaster()) return true;
         // a lance core drives its gate's breach, hold and relax, at a rift's rim in stopped land (Lance)
         if (be instanceof LanceBlockEntity) return true;
+        // a rift quern grinds (and so makes its field) in stopped land
+        if (be instanceof QuernBlockEntity) return true;
         // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
         // EA's light blocks (lamps, flashlights) time out in their tick: frozen, a flashlight sweep would leave its
@@ -362,7 +380,9 @@ public final class Stasis {
                 for (var be : chunk.getBlockEntities().values()) {
                     // a lance core has the same yard (Lance: its EA cables, batteries and exporter run beside it)
                     boolean lance = be instanceof LanceBlockEntity;
-                    if (!lance && (!(be instanceof TowerBlockEntity t) || !t.isMaster())) continue;
+                    // a tower's yard only while config towerYard is on (Baughn 2026-10-21: off; the rift quern's field
+                    // starts things instead); a lance keeps its yard ("we'll throw them a bone")
+                    if (!lance && (!(be instanceof TowerBlockEntity t) || !t.isMaster() || !(StasisConfig.towerYard || t.testYard))) continue;
                     BlockPos m = be.getBlockPos();
                     int dx = Math.abs(pos.getX() - m.getX());   // the core is 1x1x2 (a lance's 1x1x1)
                     int dz = Math.abs(pos.getZ() - m.getZ());

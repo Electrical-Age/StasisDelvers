@@ -90,6 +90,15 @@ public final class StasisRegistry {
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TowerCellBlockEntity>> TOWER_CELL_ENTITY =
         BLOCK_ENTITIES.register("stasis_tower_cell", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TowerCellBlockEntity::new, TOWER.get()));
 
+    /** The rift quern (QuernBlockEntity; Baughn 2026-10-21): grinds rift shards for a small field. Pistons can't move it. */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<QuernBlock> QUERN = BLOCKS.registerBlock("rift_quern",
+        QuernBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.WOOD).strength(2.5f, 3f)
+            .sound(net.minecraft.world.level.block.SoundType.WOOD).noOcclusion()
+            .pushReaction(net.minecraft.world.level.material.PushReaction.IMMOVEABLE).lightLevel(st -> 5));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> QUERN_ITEM = ITEMS.registerSimpleBlockItem(QUERN);
+    public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<QuernBlockEntity>> QUERN_ENTITY =
+        BLOCK_ENTITIES.register("rift_quern", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(QuernBlockEntity::new, QUERN.get()));
+
     /** The rift lance (Lance, LanceBlockEntity; docs/lance.md): its core block, and the crystal foci it takes. */
     public static final net.neoforged.neoforge.registries.DeferredBlock<LanceBlock> LANCE = BLOCKS.registerBlock("lance_core",
         LanceBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(5f, 6f)

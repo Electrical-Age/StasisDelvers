@@ -89,5 +89,6 @@
   "block.stasisdelvers.riftstone_tungsten_ore": "Riftstone Tungsten Ore",
   "item.stasisdelvers.delver_chestplate.tooltip": "Not ideal, but sufficient",
   "advancements.stasisdelvers.deaths.end_of_universe.title": "Saw the end of the universe",
-  "advancements.stasisdelvers.deaths.end_of_universe.description": "Try wearing your stasis suit next time!"
+  "advancements.stasisdelvers.deaths.end_of_universe.description": "Try wearing your stasis suit next time!",
+  "block.stasisdelvers.rift_quern": "Rift Quern"
 }

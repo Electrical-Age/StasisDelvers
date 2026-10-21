@@ -29,10 +29,13 @@ public final class FieldSleep {
     static final Player.BedSleepingProblem FIELD_DAY = new Player.BedSleepingProblem(
         Component.translatable("block.minecraft.bed.no_sleep"));
 
-    /** The field a player is in (the first that holds them), or null. */
+    /** The field a player is in (the fastest that holds them, as Stasis.rateAt: a rift quern inside a tower's field
+     *  doesn't take its night; Argon), or null. */
     static @Nullable Field fieldAt(ServerLevel level, double x, double y, double z) {
-        for (Field f : FieldData.get(level).fields()) if (f.containsPoint(x, y, z)) return f;
-        return null;
+        Field best = null;
+        for (Field f : FieldData.get(level).fields())
+            if (f.containsPoint(x, y, z) && (best == null || f.rate() > best.rate())) best = f;
+        return best;
     }
 
     /** Vanilla's "you can only sleep at night" (the bed rule's dark check), which follows the world's clock. */
