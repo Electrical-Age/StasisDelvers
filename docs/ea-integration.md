@@ -30,8 +30,10 @@ locally at `/var/lib/mclab/agent/eln/port26`.
   - It works from EA's own `isAdded()`, not from a list of its own, because EA reconnects nodes from many places.
 - `runs(n)` is `Stasis.isRunningSteady(pos) || (Stasis.nearTower(pos) && infrastructure(n))`.
   - It uses the steady rate: eddies never make networks flicker.
-- `infrastructure(n)` defines the **tower yard**: within `Stasis.TOWER_YARD` = 6 blocks per axis of a formed
-  core, these keep running in stopped land, so a battery can start a dead tower:
+- `infrastructure(n)` defines the **yard**: within `Stasis.TOWER_YARD` = 6 blocks per axis of a lance core, or of a
+  formed tower core while config `towerYard` is on (default off since 2026-10-21, Baughn: nothing pointed to it and it
+  was awkward; the rift quern's field starts machinery instead, docs/quern.md; a test can set
+  `TowerBlockEntity.testYard`), these keep running in stopped land:
   - `TowerSignalNode`
   - `TransparentNode` batteries (`BatteryElement`) and EA-to-FE exporters (`EnergyConverterElnToOtherElement`)
   - `VoxelNode`s made only of `CablePart`

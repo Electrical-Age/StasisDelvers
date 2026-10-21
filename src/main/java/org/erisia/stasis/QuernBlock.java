@@ -97,7 +97,9 @@ public class QuernBlock extends Block implements EntityBlock {
 
     @Override
     public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        if (level.isClientSide()) return null;
+        if (level.isClientSide()) return (l, p, s, be) -> {
+            if (be instanceof QuernBlockEntity q) q.clientTick();
+        };
         return (l, p, s, be) -> {
             if (be instanceof QuernBlockEntity q && l instanceof ServerLevel sl) q.serverTick(sl);
         };

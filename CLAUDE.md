@@ -42,7 +42,7 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
   running spread land: for chunk meshing, flame light and map overlays, which nobody refreshes as weather passes, and
   for off-thread callers). Stopped means rate 0. Don't add new "is it stopped" tests elsewhere.
 - Both sides compute the world from synced state (fields, deep seed, gates, storm override, config). Java mirrored
-  in GLSL (`Noise`, `Field.collapseScore`, the data-texture slots, `MAX_FIELDS` = 13) must change on both sides.
+  in GLSL (`Noise`, `Field.collapseScore`, the data-texture slots, `MAX_FIELDS` = 32) must change on both sides.
 - Prefer, in this order: a NeoForge event, an access transformer (`src/main/resources/META-INF/accesstransformer.cfg`),
   then a mixin. Gameplay mixins go in the required config; look-only ones in the cosmetic config.
   See `docs/mixins.md`.
@@ -67,6 +67,7 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 - `docs/lance.md`: the rift lance: gate state, travel, destinations, arrival pads, return rifts, hard-mode guards (L1); the
   multiblock, power, breach, hold and relax, the effective radius on both sides, the beam (L2).
 - `docs/spreading-mode.md`: config `mode = spreading`, `SpreadMap` ranks, the online clock, `Spread` in `rateAt`.
+- `docs/quern.md`: the rift quern (a crystal-fuelled pocket field) and why the tower yard is off.
 - `docs/fauna.md`: rift fauna: dread, the field wall, the spawner, Static (and later the Puppeteer).
 - `docs/client-rendering.md`: the post chain, data-texture slot layout, `MAX_FIELDS`, frozen textures, tower meshes.
 - `docs/networking.md`: the `StasisNet` payloads both ways, the protocol version, size limits.

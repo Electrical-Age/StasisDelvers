@@ -58,12 +58,11 @@ through hooks set in `StasisClient`.
   after `#version`. One file, three passes (`FULL_PASS` otherwise).
 
 ## Data texture slot layout
-- 1024x4 float texture, 4096 slots; slot i is pixel (i % 1024, i / 1024). `WIDTH`/`ROWS` in `StasisPost`, and
+- 1024x5 float texture, 5120 slots; slot i is pixel (i % 1024, i / 1024). `WIDTH`/`ROWS` in `StasisPost`, and
   the size again in `post_effect/stasis.json`.
 - **The authoritative layout is the comment at the top of `shaders/post/stasis.fsh`.** In brief:
   - 0-31: camera (inverse projection·view, floor and fract of the camera), stops-here, freeze warning, field
     count, spawn area, clocks, drifting-deep count
-  - 32 + 10i: field i (centre, radius, collapse, failing, column, seed, age, remnant time)
   - 168-219: static deeps' ground range, mist clocks, strata mask, pocket clocks, eyes (`ns` ≤ 4), render distance
   - 196-199: spreading mode: on (1 while `Spread.active`), P, the rank window's first cell x, z
   - 220 + 5i: static deep i; 240 + i: its strength (a lance's breach: 0.25..1, `StaticDeeps.strength`; the shape, mist
@@ -75,13 +74,17 @@ through hooks set in `StasisClient`.
   - 1580-1597: eye NDCs, strain, inhale
   - 1600: possessed eye count (≤ 16); 1601 + 3i: eye i - floor(camera) (`PossessedLook.eyes`, up to 8 hosts within 48
     blocks; drawn purple after the desaturation, so they stay purple in the grey: Baughn)
-  - 1700 + 4i: field shields (`SHIELD_BASE`)
-  - 1752 + 4i: field stretch (`STRETCH_BASE`)
   - 2048 + 64i: drifting-deep ground grids (`GROUND_BASE`); 3584 + 64i: static-deep ground grids
     (`STATIC_GROUND_BASE`)
-- **MAX_FIELDS = 13 is a bare literal**, in `StasisPost` (2x `if (n == 13) break`) and in `stasis.fsh`
-  (2x `i < 13`). The field block 32..161 and the shield and stretch blocks are sized for it. Raising it means
-  moving slot blocks.
+  - 4096 + 18i (the 5th row): field i (`FIELD_BASE`, `FIELD_STRIDE`, `MAX_FIELDS` = 32): +0..9 centre, radius,
+    collapse, failing, column, seed, age, remnant time; +10..13 the shield (amber, dropout, side, remnant eddy clock);
+    +14..17 the stretch (e, s, w, n). Slots 32-161 and 1700-1803 (the old 13-field blocks) are free.
+- Fields get slots nearest the camera first (`StasisPost.gap`: blocks to the shell), live before frozen remnants;
+  fields whose centre chunk the client hasn't loaded are left out (Baughn: their shields drew through terrain that
+  wasn't there). Rift querns made 13 too few (2026-10-21).
+- Overlapping fields draw only the union's surface: a shell fragment inside another live, uncollapsing field is
+  skipped (`insideOther` in `stasis.fsh`).
+- `FIELD_BASE`/`FIELD_STRIDE`/`MAX_FIELDS` are duplicated in `stasis.fsh` (`const int`). Change both sides together.
 - `DEEP_BASE`/`DEEP_STRIDE`/`MAX_DEEPS`/`GROUND_BASE` are duplicated in `stasis.fsh` (`const int ...`, and
   `STATIC_GROUND = 2048 + 64 * MAX_DEEPS`). Change both sides together.
 - `StasisReport` decodes the texture for bug reports (`raw_format`; slots 196-199 as `spread_on_p_window`, and the
