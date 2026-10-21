@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // Stasis Delvers: drain the colour of everything where time is stopped, and the player's freeze warning (grey
-// creeping in from the screen edges). Field data comes in a 1024x4 texture of packed floats (StasisPost.java; slot i
+// creeping in from the screen edges). Field data comes in a 1024x5 texture of packed floats (StasisPost.java; slot i
 // at (i % 1024, i / 1024)):
 // [0..15] inverse(projection * view rotation); [16..18] floor(camera); [19..21] fract(camera); [22] stops here (0/1);
 // [23] freeze warning 0..1; [24] field count; [25..28] spawn area min x, min z, max x, max z (blocks; empty if
@@ -27,11 +27,12 @@
 // shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
 // [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
 // [1600] possessed eye count (<= 16), [1601 + 3i ..] eye i - floor(camera);
-// [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [32 + 10i ..] field i: centre - floor(camera) (3), radius, collapse, failing,
+// [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 18i ..] field i
+// (i < 32, nearest first, live before remnants): centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
-// [1700 + 4i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
-// remnant: the eddy time [30] as it froze). [1752 + 4i ..] field i's reach east, south, west, north as multiples of
+// [4106 + 18i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
+// remnant: the eddy time [30] as it froze). [4110 + 18i ..] field i's reach east, south, west, north as multiples of
 // its radius (Field.Stretch: a tower's booms stretch it; 1 = round).
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
@@ -62,6 +63,9 @@ layout(std140) uniform SamplerInfo {
 
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
+
+// per-field data (StasisPost.FIELD_BASE etc.): the 5th row, FIELD_STRIDE floats per field, at most MAX_FIELDS
+const int FIELD_BASE = 4096, FIELD_STRIDE = 18, MAX_FIELDS = 32;
 
 float data(int i) {
     uvec4 b = uvec4(round(texelFetch(DataSampler, ivec2(i & 1023, i >> 10), 0) * 255.0));
@@ -127,13 +131,29 @@ float collapseScore(vec3 block, vec3 off, float dist, float r, int seed, float s
 
 // Field.Stretch of field i (east, south, west, north)
 vec4 stretchOf(int i) {
-    int b = 1752 + 4 * i;
+    int b = FIELD_BASE + FIELD_STRIDE * i + 14;
     return vec4(data(b), data(b + 1), data(b + 2), data(b + 3));
 }
+
+
 
 // d (from a field's centre) in the field's round space: the stretch on d's side divided out (Field.norm * r)
 vec3 unstretch(vec3 d, vec4 st) {
     return vec3(d.x / (d.x >= 0.0 ? st.x : st.z), d.y, d.z / (d.z >= 0.0 ? st.y : st.w));
+}
+
+// Is p (camera-fraction space) inside another live field than `self`, by more than a hair? Then a shell fragment of
+// `self` there is inside the union and not drawn (Baughn: overlapping querns; a quern inside a tower's field)
+bool insideOther(vec3 p, int self, int n) {
+    for (int j = 0; j < n && j < MAX_FIELDS; j++) {
+        if (j == self) continue;
+        int k = FIELD_BASE + FIELD_STRIDE * j;
+        if (data(k + 6) > 1.5 || data(k + 4) > 0.0) continue;   // (remnants and collapsing fields don't hide others)
+        vec3 dv = p - vec3(data(k), data(k + 1), data(k + 2));
+        if (data(k + 6) > 0.5) dv.y = 0.0;
+        if (length(unstretch(dv, stretchOf(j))) < data(k + 3) - 0.05) return true;
+    }
+    return false;
 }
 
 // The view ray's span through a stretched field (oc = ray origin - centre): each quarter (by the signs of x and z) is
@@ -1047,8 +1067,8 @@ void main() {
         vec3 w = p + camInt;
         if (w.x >= data(25) && w.z >= data(26) && w.x < data(27) + 1.0 && w.z < data(28) + 1.0) run = 1.0;
         int n = int(data(24));
-        for (int i = 0; i < n && i < 13; i++) {
-            int o = 32 + 10 * i;
+        for (int i = 0; i < n && i < MAX_FIELDS; i++) {
+            int o = FIELD_BASE + FIELD_STRIDE * i;
             if (data(o + 6) > 1.5) continue;   // (a frozen remnant: time is stopped there)
             vec3 fc = vec3(data(o), data(o + 1), data(o + 2));
             float r = data(o + 3), collapse = data(o + 4);
@@ -1063,7 +1083,7 @@ void main() {
                 vec3 blk = floor(w);
                 vec3 off = blk + 0.5 - (camInt + fc);
                 if (data(o + 6) > 0.5) off.y = 0.0;
-                float score = collapseScore(blk, unstretch(off, st), d, r, int(data(o + 7)), data(1700 + 4 * i + 2));
+                float score = collapseScore(blk, unstretch(off, st), d, r, int(data(o + 7)), data(FIELD_BASE + FIELD_STRIDE * i + 12));
                 inside *= 1.0 - smoothstep(-0.02, 0.02, 1.6 * collapse - (1.0 - score));
             }
             float age = data(o + 8);
@@ -1266,8 +1286,8 @@ void main() {
         float time = data(29);
         int n = int(data(24));
         float camY = data(17);
-        for (int i = 0; i < n && i < 13; i++) {
-            int k = 32 + 10 * i;
+        for (int i = 0; i < n && i < MAX_FIELDS; i++) {
+            int k = FIELD_BASE + FIELD_STRIDE * i;
             vec3 fc = vec3(data(k), data(k + 1), data(k + 2));
             float r = data(k + 3), collapse = data(k + 4), failing = data(k + 5);
             // a frozen remnant (Baughn: the collapse's last moment, stopped for good; StasisPost from Remnants): drawn
@@ -1294,7 +1314,7 @@ void main() {
                 float ta = max(t1, 0.0), tb = min(t2, tmax);
                 if (tb > ta) {
                     vec3 camI = vec3(data(16), data(17), data(18));
-                    float et = frozen ? data(1700 + 4 * i + 3) : data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
+                    float et = frozen ? data(k + 13) : data(30), mist = 0.0, stepLen = (tb - ta) / 12.0;
                     int sd = int(data(k + 7));
                     float jit = ign(gl_FragCoord.xy);   // (jittered steps: fixed ones left seams)
                     for (int m = 0; m < 12; m++) {
@@ -1313,6 +1333,7 @@ void main() {
                 float t = h2 == 0 ? t2 : t1;
                 if (t <= 0.0 || t >= tmax) continue;
                 vec3 hp = o + v * t - fc;
+                if (!frozen && insideOther(o + v * t, i, n)) continue;   // (the union's surface only)
                 vec3 hq = hp;
                 if (column) hq.y = 0.0;
                 // the cell grid on the round shape (cells stretch with the field), the gap in blocks at the local
@@ -1331,7 +1352,7 @@ void main() {
                 }
                 // (a collapse is amber all over)
                 float warm = collapse > 0.0 ? 1.0 : 0.0;
-                int sb = 1700 + 4 * i;
+                int sb = k + 10;
                 vec4 sh = shieldAt(cell, nrm, centre, -v, r, data(sb), data(sb + 1), collapse, data(sb + 2), warm, ftime, h2 == 0 && !inside);
                 if (data(31) > 0.0) {
                     // weather: where a deep crosses the field the hexes brighten (the opposite of dropout), pulsing

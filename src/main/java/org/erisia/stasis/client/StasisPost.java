@@ -30,12 +30,14 @@ public final class StasisPost {
     /** Post chains look textures up at textures/effect/&lt;path&gt;.png. */
     static final Identifier DATA = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/fielddata.png");
     static DynamicTexture texture;
-    /** Data texture size: 1024 x 4 (GL 3.3 only promises 1024-wide textures). */
-    static final int WIDTH = 1024, ROWS = 4, SLOTS = WIDTH * ROWS;
-    /** Field i's shield (amber, dropout, side): 4 slots from SHIELD_BASE + 4i. */
-    static final int SHIELD_BASE = 1700;
-    /** Field i's reach east, south, west, north as multiples of its radius (Field.Stretch): 4 slots from STRETCH_BASE + 4i. */
-    static final int STRETCH_BASE = 1752;
+    /** Data texture size: 1024 x 5 (GL 3.3 only promises 1024-wide textures). */
+    static final int WIDTH = 1024, ROWS = 5, SLOTS = WIDTH * ROWS;
+    /**
+     * Fields: at most MAX_FIELDS (stasis.fsh; was 13 in shared slots: Baughn asked for more, as rift querns come in
+     * numbers), FIELD_STRIDE slots each from FIELD_BASE (the 5th row): 10 core (centre, radius, ...), then the shield
+     * (amber, dropout, side, remnant eddy clock) at +10, then the stretch (e, s, w, n) at +14.
+     */
+    static final int FIELD_BASE = 4096, FIELD_STRIDE = 18, MAX_FIELDS = 32, SHIELD_OFF = 10, STRETCH_OFF = 14;
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
     /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
@@ -156,11 +158,16 @@ public final class StasisPost {
         LAST_COLLAPSING.entrySet().removeIf(h -> !live.contains(h.getKey()) && (nowN - h.getValue().nanos() > 1_500_000_000L
             || Remnants.has(net.minecraft.core.BlockPos.containing(h.getValue().field().x(), h.getValue().field().y(), h.getValue().field().z()))));
         for (var h : LAST_COLLAPSING.entrySet()) if (!live.contains(h.getKey())) fields.add(h.getValue().field());
+        // the nearest MAX_FIELDS (Argon: the first 13 in list order let far querns hide a new tower's field), live ones
+        // before remnants; not those whose centre's chunk this client hasn't loaded (Baughn: their shields drew through
+        // terrain that wasn't there yet)
+        fields.removeIf(f -> !mc.level.getChunkSource().hasChunk((int) Math.floor(f.x()) >> 4, (int) Math.floor(f.z()) >> 4));
+        fields.sort(java.util.Comparator.comparingDouble(f -> gap(f, cam.x, cam.y, cam.z)));
         for (Field f : fields) {
-            if (n == 13) break;
+            if (n == MAX_FIELDS) break;
             double sc = live.contains(f.id()) ? shownCollapse(f) : f.collapse();
             if (f.collapse() > 0 && live.contains(f.id())) LAST_COLLAPSING.put(f.id(), new Held(f.withCollapse(sc), nowN));
-            int o = 32 + 10 * n++;
+            int o = FIELD_BASE + FIELD_STRIDE * n++;
             d[o] = (float) (f.x() - fx);
             d[o + 1] = (float) (f.y() - fy);
             d[o + 2] = (float) (f.z() - fz);
@@ -171,17 +178,21 @@ public final class StasisPost {
             d[o + 7] = f.seed();
             d[o + 8] = f.formedAt() > 0
                 ? (mc.level.getGameTime() - f.formedAt() + mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)) / 20f : -1;
-            int sh = SHIELD_BASE + 4 * (n - 1);
+            int sh = o + SHIELD_OFF;
             d[sh] = (float) f.amber();
             d[sh + 1] = (float) f.dropout();
             d[sh + 2] = (float) f.side();
             putStretch(d, n - 1, shownStretch(f));
         }
-        // frozen remnants of collapsed towers (column 2: the shader draws them at a fixed time, and time doesn't run there)
-        for (var re : Remnants.all()) {
-            if (n == 13) break;
+        // frozen remnants of collapsed towers (column 2: the shader draws them at a fixed time, and time doesn't run there),
+        // nearest first, in the slots left
+        var rems = new java.util.ArrayList<>(Remnants.all());
+        rems.removeIf(re -> !mc.level.getChunkSource().hasChunk(re.getKey().getX() >> 4, re.getKey().getZ() >> 4));
+        rems.sort(java.util.Comparator.comparingDouble(re -> re.getKey().distToCenterSqr(cam.x, cam.y, cam.z)));
+        for (var re : rems) {
+            if (n == MAX_FIELDS) break;
             var rem = re.getValue();
-            int o = 32 + 10 * n++;
+            int o = FIELD_BASE + FIELD_STRIDE * n++;
             d[o] = (float) (re.getKey().getX() + 0.5 - fx);
             d[o + 1] = (float) (re.getKey().getY() + 0.5 - fy);
             d[o + 2] = (float) (re.getKey().getZ() + 0.5 - fz);
@@ -191,7 +202,7 @@ public final class StasisPost {
             d[o + 6] = 2;
             d[o + 7] = rem.seed();
             d[o + 8] = -1;
-            int sh = SHIELD_BASE + 4 * (n - 1);
+            int sh = o + SHIELD_OFF;
             d[sh] = 1;
             d[sh + 1] = (float) rem.dropout();
             d[sh + 2] = (float) rem.side();
@@ -502,8 +513,15 @@ public final class StasisPost {
         return (float) e[0];
     }
 
+    /** Blocks from the camera to the field's shell (0 inside it): the order fields get the shader's slots in. */
+    static double gap(Field f, double x, double y, double z) {
+        double dx = x - f.x(), dy = f.column() ? 0 : y - f.y(), dz = z - f.z();
+        double reach = f.radius() * Math.max(Math.max(f.stretch().e(), f.stretch().w()), Math.max(f.stretch().s(), f.stretch().n()));
+        return Math.max(0, Math.sqrt(dx * dx + dy * dy + dz * dz) - reach);
+    }
+
     static void putStretch(float[] d, int i, Field.Stretch st) {
-        int b = STRETCH_BASE + 4 * i;
+        int b = FIELD_BASE + FIELD_STRIDE * i + STRETCH_OFF;
         d[b] = (float) st.e();
         d[b + 1] = (float) st.s();
         d[b + 2] = (float) st.w();

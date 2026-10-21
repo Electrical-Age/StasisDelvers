@@ -24,7 +24,7 @@
                     "sampler_name": "Data",
                     "location": "stasisdelvers:fielddata",
                     "width": 1024,
-                    "height": 4
+                    "height": 5
                 },
                 {
                     "sampler_name": "Mist",
@@ -49,7 +49,7 @@
                     "sampler_name": "Data",
                     "location": "stasisdelvers:fielddata",
                     "width": 1024,
-                    "height": 4
+                    "height": 5
                 },
                 {
                     "sampler_name": "Mist",
@@ -84,7 +84,7 @@
                     "sampler_name": "Data",
                     "location": "stasisdelvers:fielddata",
                     "width": 1024,
-                    "height": 4
+                    "height": 5
                 },
                 {
                     "sampler_name": "Mist",

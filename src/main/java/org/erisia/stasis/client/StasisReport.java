@@ -397,17 +397,18 @@ public final class StasisReport {
             for (int k = 0; k < h[1]; k++) a.add(d[h[0] + k]);
             o.add(HEADLINE_NAMES[h[2]], a);
         }
-        int count = Math.max(0, Math.min(13, (int) d[24]));
+        int count = Math.max(0, Math.min(StasisPost.MAX_FIELDS, (int) d[24]));
         String[] fieldNames = {"dx", "dy", "dz", "shown_radius", "collapse", "failing", "column", "seed", "age", "remnant_clock"};
         JsonArray fields = new JsonArray();
         for (int k = 0; k < count; k++) {
             JsonObject f = new JsonObject();
-            for (int j = 0; j < 10; j++) f.addProperty(fieldNames[j], d[32 + 10 * k + j]);
-            f.addProperty("amber", d[StasisPost.SHIELD_BASE + 4 * k]);
-            f.addProperty("dropout", d[StasisPost.SHIELD_BASE + 4 * k + 1]);
-            f.addProperty("side", d[StasisPost.SHIELD_BASE + 4 * k + 2]);
+            int b = StasisPost.FIELD_BASE + StasisPost.FIELD_STRIDE * k;
+            for (int j = 0; j < 10; j++) f.addProperty(fieldNames[j], d[b + j]);
+            f.addProperty("amber", d[b + StasisPost.SHIELD_OFF]);
+            f.addProperty("dropout", d[b + StasisPost.SHIELD_OFF + 1]);
+            f.addProperty("side", d[b + StasisPost.SHIELD_OFF + 2]);
             JsonArray st = new JsonArray();
-            for (int j = 0; j < 4; j++) st.add(d[StasisPost.STRETCH_BASE + 4 * k + j]);
+            for (int j = 0; j < 4; j++) st.add(d[b + StasisPost.STRETCH_OFF + j]);
             f.add("shown_stretch_eswn", st);
             fields.add(f);
         }
