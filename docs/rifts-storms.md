@@ -67,7 +67,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
   against drifting deeps over running spread land; `sectionState` knows them. Per-region cache refreshed each second
   (`region`). Client: `StasisPost` sends the lulls in view as column fields with id < 0 and column -1 (no shell; the
   colour comes back inside). `/stasis lulls` lists them. `TEST` lulls for GameTests.
-- Known gap: chunk meshes (frozen textures) aren't redone as a lull's edge drifts (~1 block per 10 s).
+- The client re-meshes and relights the chunk columns a lull's edge crosses every 10 s (`FrozenSprites.lullsMoved`, near
+  the player's height): the water it passed stayed meshed as running (AdventurAgent).
 
 ## Effects on gameplay
 - Rift (`StaticDeeps.inRift`, pocket `RIFT`, storm rift): `Stasis.rateAt` returns 0 even inside a field.

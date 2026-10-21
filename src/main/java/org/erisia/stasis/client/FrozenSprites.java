@@ -339,8 +339,51 @@ public final class FrozenSprites {
         }
     };
 
+    /** The chunk columns a lull's edge crossed at the last look (re-meshed again next time: the edge moved off them). */
+    static it.unimi.dsi.fastutil.longs.LongOpenHashSet lullEdges = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+
+    /**
+     * Every 10 s, re-mesh and relight the chunk columns a lull's edge crosses, now or at the last look (AdventurAgent:
+     * the water a lull had passed stayed meshed as running water, in blocky patches). Near the player's height only
+     * (6 sections each way): the edge moves ~1 block in 10 s.
+     */
+    static void lullsMoved(Minecraft mc) {
+        ClientLevel level = mc.level;
+        if (level == null || mc.player == null || ticks % 200 != 0) return;
+        if (!Stasis.stops(level)) {
+            lullEdges.clear();
+            return;
+        }
+        var now = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        double range = mc.options.getEffectiveRenderDistance() * 16 + 48;
+        for (var l : org.erisia.stasis.Lulls.within(mc.player.getX(), mc.player.getZ(), range, org.erisia.stasis.Lulls.time(level), org.erisia.stasis.ClientFields.deepSeed())) {
+            int r = (int) Math.ceil(l.radius()) + 16;
+            for (int cx = (int) Math.floor(l.x() - r) >> 4; cx <= (int) Math.floor(l.x() + r) >> 4; cx++)
+                for (int cz = (int) Math.floor(l.z() - r) >> 4; cz <= (int) Math.floor(l.z() + r) >> 4; cz++) {
+                    double x0 = cx << 4, z0 = cz << 4;
+                    double nx = Math.max(x0 - l.x(), Math.max(0, l.x() - x0 - 16)), nz = Math.max(z0 - l.z(), Math.max(0, l.z() - z0 - 16));
+                    double fx = Math.max(Math.abs(x0 - l.x()), Math.abs(x0 + 16 - l.x())), fz = Math.max(Math.abs(z0 - l.z()), Math.abs(z0 + 16 - l.z()));
+                    double rr = l.radius() * l.radius();
+                    if (nx * nx + nz * nz <= rr && fx * fx + fz * fz > rr) now.add(net.minecraft.world.level.ChunkPos.pack(cx, cz));
+                }
+        }
+        var dirty = new it.unimi.dsi.fastutil.longs.LongOpenHashSet(now);
+        dirty.addAll(lullEdges);
+        lullEdges = now;
+        if (dirty.isEmpty()) return;
+        int py = mc.player.getBlockY() >> 4;
+        int y0 = Math.max(level.getMinSectionY(), py - 6), y1 = Math.min(level.getMaxSectionY(), py + 6);
+        for (long k : dirty) {
+            int cx = net.minecraft.world.level.ChunkPos.getX(k), cz = net.minecraft.world.level.ChunkPos.getZ(k);
+            if (level.getChunkSource().getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false) == null) continue;
+            if (!frozen.isEmpty() && y0 <= y1) level.setSectionRangeDirty(cx, y0, cz, cx, y1, cz);
+            org.erisia.stasis.Flames.relightChunk(level, cx, cz, null);
+        }
+    }
+
     static void tick(Minecraft mc) {
         ticks++;
+        lullsMoved(mc);
         boolean spread = movedLo <= movedHi || !ARRIVED.isEmpty();
         if (PENDING.isEmpty() && PENDING_RIFTS.isEmpty() && !spread) return;
         ClientLevel level = mc.level;
