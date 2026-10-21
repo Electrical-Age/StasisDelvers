@@ -2744,6 +2744,7 @@ public final class StasisGameTests {
                 c.check("killed by a possessed pig: Just a Pig", has.apply(a, "pig"));
                 c.check("killed by your own statue: Self Made", has.apply(b, "self_made"));
                 c.check("frozen with Static on you: Low Battery", !d.isAlive() && has.apply(d, "low_battery"), "alive " + d.isAlive());
+                c.check("frozen: Saw the end of the universe (Baughn); killed otherwise: not", has.apply(d, "end_of_universe") && !has.apply(a, "end_of_universe"));
                 c.check("nothing else", !has.apply(a, "cow") && !has.apply(a, "self_made"));
                 org.erisia.stasis.Possession.release(level, pig, false);
                 pig.discard();

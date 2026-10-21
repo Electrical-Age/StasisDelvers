@@ -86,5 +86,8 @@
   "block.stasisdelvers.riftstone_sal_ammoniac_ore": "Riftstone Sal Ammoniac Ore",
   "block.stasisdelvers.riftstone_silver_ore": "Riftstone Silver Ore",
   "block.stasisdelvers.riftstone_tin_ore": "Riftstone Tin Ore",
-  "block.stasisdelvers.riftstone_tungsten_ore": "Riftstone Tungsten Ore"
+  "block.stasisdelvers.riftstone_tungsten_ore": "Riftstone Tungsten Ore",
+  "item.stasisdelvers.delver_chestplate.tooltip": "Not ideal, but sufficient",
+  "advancements.stasisdelvers.deaths.end_of_universe.title": "Saw the end of the universe",
+  "advancements.stasisdelvers.deaths.end_of_universe.description": "Try wearing your stasis suit next time!"
 }

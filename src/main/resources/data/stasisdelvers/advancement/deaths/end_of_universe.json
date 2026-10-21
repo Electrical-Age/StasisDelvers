@@ -1,0 +1,27 @@
+{
+  "parent": "stasisdelvers:deaths/root",
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "display": {
+    "icon": {
+      "id": "minecraft:clock"
+    },
+    "title": {
+      "translate": "advancements.stasisdelvers.deaths.end_of_universe.title"
+    },
+    "description": {
+      "translate": "advancements.stasisdelvers.deaths.end_of_universe.description"
+    },
+    "announce_to_chat": true,
+    "hidden": true,
+    "frame": "task"
+  },
+  "requirements": [
+    [
+      "done"
+    ]
+  ]
+}

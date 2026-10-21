@@ -33,6 +33,7 @@ public final class DeathAdvancements {
 
     /** Freezing.freeze, before the fauna near a fresh statue go: frozen with Static feeding on the suit. */
     static void freezing(ServerLevel level, ServerPlayer p) {
+        award(p, "end_of_universe");   // (Baughn: froze up completely and respawned; a deep's hold, let pass, isn't this)
         if (RiftStatic.feeding(level, p) > 0) award(p, "low_battery");
     }
 

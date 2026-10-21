@@ -75,4 +75,12 @@ public class DelverSuitItem extends Item implements IItemEnergyBattery, TimeSuit
     public int getBarColor(ItemStack stack) {
         return 0x3fd0c8;
     }
+
+    /** The chest piece, the one that's enough in the plain Grey (Baughn: "Not ideal, but sufficient"). */
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display,
+                                java.util.function.Consumer<net.minecraft.network.chat.Component> out, net.minecraft.world.item.TooltipFlag flag) {
+        if (stack.is(StasisRegistry.DELVER_CHEST.get()))
+            out.accept(net.minecraft.network.chat.Component.translatable("item.stasisdelvers.delver_chestplate.tooltip").withStyle(net.minecraft.ChatFormatting.GRAY));
+    }
 }
