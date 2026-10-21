@@ -2222,6 +2222,8 @@ public final class StasisGameTests {
                     && mid[0].equals("grinding true, charged true, field 4.0@0.4, rate 2 off 0.4, 5 off 0.0, cable runs true, far frozen true"), mid[0]);
                 c.check("spent, the plain shard follows (5 minutes)", q.grinding() && q.burning().is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())
                     && q.left() > 0.99 && q.queueEmpty(), q.statusText().getString());
+                c.check("its status: the field time left in all its shards (Baughn)", q.ticksLeft() > org.erisia.stasis.QuernBlockEntity.PLAIN_TICKS - 20
+                    && q.statusText().getString().matches("Rift quern: 4:5\\d of field left\\."), q.statusText().getString());
                 h.setBlock(qp, Blocks.AIR);
                 c.check("broken: its field goes", FieldData.get(level).get(q.fieldId()).isEmpty() && q.fieldId() == Stasis.NO_FIELD, "field " + q.fieldId());
             };

@@ -9,8 +9,10 @@ stopped land now that the tower yard is off (config `towerYard`, ea-integration.
   of 4 waits (`QUEUE`). Use a shard on it to queue it; sneak-use with an empty hand takes the last one back; use
   with an empty hand for its state. Hoppers may fill the queue (Baughn: for now); nothing comes out. Comparators read
   the queue.
-- While grinding: a field (`FieldData`) of `RADIUS` 4 at `RATE` 0.4 (towers run at 0.6) centred on the block. Its last
-  30 s (with the queue empty) it is failing 0.5: the shield's flicker, below the eddies' 0.7.
+- While grinding: a field (`FieldData`) of `RADIUS` 4 at `RATE` 0.4 (towers run at 0.6) centred on the block, orange
+  all over (amber 1; Baughn: a much weaker field). Its last 30 s (with the queue empty) its hexes drop out, up to 80 %
+  (a failing flicker was lost in the orange shield's pulse: AdventurAgent).
+- Its status (empty-hand use) is the field time left in all its shards (Baughn), or "waiting" when time runs there.
 - It grinds only where time would run slower than 0.4 without it (`Stasis.rateAtSteadyWithout`): stopped land, a
   drifting deep over running spread land; not in a tower's field, the spawn area or running land. Otherwise it waits
   with its field down (a started shard keeps its time).
@@ -24,7 +26,8 @@ stopped land now that the tower yard is off (config `towerYard`, ea-integration.
 ## Look (client)
 - The table and bowl are the block model (`models/block/rift_quern.json`).
 - `client/QuernRenderer`: the shard hovers over the bowl, turning, smaller as it wears down (full bright); the queue lies
-  in the corners; five two-segment arms (netherite, copper joints) stand round the bowl, each re-aiming at a point near
+  in the corners; five two-segment arms (netherite, copper joints) stand round the bowl, off the corners (asymmetric: an arm
+  overlapped a queued shard), each re-aiming at a point near
   the crystal every 0.7-1.3 s (eased) and firing a violet laser (two crossed additive quads, a white core) while it
   holds. The arms' clock runs at the quern's rate while it grinds; idle, they rest folded.
 - `QuernBlockEntity.clientTick`: falling amethyst dust, sparks and violet specks while it grinds.

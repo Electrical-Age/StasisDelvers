@@ -35,6 +35,9 @@ public class QuernRenderer implements BlockEntityRenderer<QuernBlockEntity, Quer
     static final Identifier ARM = Identifier.withDefaultNamespace("textures/block/netherite_block.png");
     static final Identifier JOINT = Identifier.withDefaultNamespace("textures/block/copper_block.png");
     static final int ARMS = 5;
+    /** Where the arms stand round the bowl (degrees, 0 = east): off the corners, where the queue lies (Baughn: an arm
+     *  overlapped a queued shard; asymmetric is fine). */
+    static final float[] ARM_ANGLES = {0, 88, 172, 258, 292};
     static final float TOP = 15.3f / 16f, L1 = 0.27f, L2 = 0.23f, NOZZLE = 0.05f, BASE_R = 0.41f;
 
     public static class State extends BlockEntityRenderState {
@@ -104,10 +107,10 @@ public class QuernRenderer implements BlockEntityRenderer<QuernBlockEntity, Quer
         for (int i = 0; i < QuernBlockEntity.QUEUE; i++) {
             if (s.queue[i].isEmpty()) continue;
             pose.pushPose();
-            pose.translate(i % 2 == 0 ? 0.16f : 0.84f, TOP + 0.01f, i < 2 ? 0.16f : 0.84f);
+            pose.translate(i % 2 == 0 ? 0.14f : 0.86f, TOP + 0.01f, i < 2 ? 0.14f : 0.86f);
             pose.rotateDegrees(Axis.YP, 45 + 90 * i);
             pose.rotateDegrees(Axis.XP, 90);
-            pose.scale(0.28f, 0.28f, 0.28f);
+            pose.scale(0.24f, 0.24f, 0.24f);
             s.queue[i].submit(pose, out, s.lightCoords, OverlayTexture.NO_OVERLAY, 0);
             pose.popPose();
         }
@@ -125,7 +128,7 @@ public class QuernRenderer implements BlockEntityRenderer<QuernBlockEntity, Quer
         Vector3f[][] arms = new Vector3f[ARMS][];
         boolean[] firing = new boolean[ARMS];
         for (int k = 0; k < ARMS; k++) {
-            float a = (float) (k * Math.PI * 2 / ARMS + 0.3 + 0.2 * hash(s.seed, k, -1));
+            float a = (float) Math.toRadians(ARM_ANGLES[k]);
             Vector3f base = new Vector3f(0.5f + BASE_R * (float) Math.cos(a), TOP, 0.5f + BASE_R * (float) Math.sin(a));
             Vector3f tip;
             if (s.grinding && s.hasCrystal) {

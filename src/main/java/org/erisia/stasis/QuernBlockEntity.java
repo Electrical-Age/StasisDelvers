@@ -26,7 +26,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>It grinds only where time would run slower than its own field without it: in stopped land, not inside a tower's
  *       field or running land, so shards aren't wasted in a base. It pauses (its field gone) until that changes.</li>
  *   <li>A shard is spent once it starts: breaking the quern drops only the queue.</li>
- *   <li>Its last {@link #WARN_TICKS} show as a failing field (the shield's flicker).</li>
+ *   <li>Its last {@link #WARN_TICKS} its shield's hexes drop out, more and more (a failing field's flicker was lost in
+ *       the orange shield's pulse: AdventurAgent).</li>
  *   <li>It counts down only while its chunk is loaded (it loads no chunks), and pistons can't move it.</li>
  * </ul>
  */
@@ -135,11 +136,11 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
         if (grinding != was || burning != wasBurning || sl.getGameTime() % 100 == 0) sync(sl);
     }
 
-    /** The field while grinding, failing in its last WARN_TICKS (the flicker); none otherwise. */
+    /** The field while grinding, its hexes dropping out over its last WARN_TICKS; none otherwise. */
     void field(ServerLevel sl, boolean on) {
         FieldData fd = FieldData.get(sl);
         if (on) {
-            double failing = burnLeft < WARN_TICKS && queueEmpty() ? 0.5 : 0;
+            double dropout = burnLeft < WARN_TICKS && queueEmpty() ? Math.round(12 * (1 - burnLeft / (double) WARN_TICKS)) / 15.0 : 0;
             if (fieldId == Stasis.NO_FIELD || fd.get(fieldId).isEmpty()) {
                 fieldId = fd.add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, RADIUS, false, RATE).id();
                 // orange all over (Baughn: a much weaker field than a tower's)
@@ -147,7 +148,7 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
                 setChanged();
             }
             var f = fd.get(fieldId);
-            if (f.isPresent() && f.get().failing() != failing) fd.update(sl, fieldId, x -> x.withFailing(failing));
+            if (f.isPresent() && f.get().dropout() != dropout) fd.update(sl, fieldId, x -> x.withShield(1, dropout, 0));
         } else if (fieldId != Stasis.NO_FIELD) {
             fd.remove(sl, fieldId);
             fieldId = Stasis.NO_FIELD;
@@ -184,12 +185,18 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
         return ItemStack.EMPTY;
     }
 
+    /** Field time left in all its shards, the one grinding and the queue (Baughn: one total, not "x of y queued"). */
+    public int ticksLeft() {
+        int t = Math.max(0, burnLeft);
+        for (ItemStack s : queue) t += ticksFor(s);
+        return t;
+    }
+
     public Component statusText() {
-        int n = 0;
-        for (ItemStack s : queue) if (!s.isEmpty()) n++;
-        String now = burnLeft > 0 ? String.format("%d:%02d left of this shard", burnLeft / 1200, burnLeft / 20 % 60) : "nothing grinding";
-        String why = burnLeft > 0 && !grinding ? " (paused: time runs here without it)" : "";
-        return Component.literal("Rift quern: " + now + why + "; " + n + " of " + QUEUE + " queued.");
+        int t = ticksLeft();
+        if (t == 0) return Component.literal("Rift quern: empty.");
+        String why = !grinding ? " (waiting: time runs here without it)" : "";
+        return Component.literal(String.format("Rift quern: %d:%02d of field left%s.", t / 1200, t / 20 % 60, why));
     }
 
     void changed() {
