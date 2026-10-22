@@ -19,7 +19,10 @@ public abstract class BoatClampMixin {
     @Inject(method = "clampRotation", at = @At("HEAD"), cancellable = true)
     private void stasis$frozenBoat(Entity passenger, CallbackInfoReturnable<Float> cir) {
         AbstractBoat self = (AbstractBoat) (Object) this;
-        if (passenger instanceof Player && self.hasData(StasisRegistry.FROZEN.get()) && self.getData(StasisRegistry.FROZEN.get())) {
+        // (or the rider is held or freezing: a deep's hold leaves the boat running but unsteerable; AdventurAgent)
+        boolean held = passenger instanceof net.minecraft.server.level.ServerPlayer sp ? org.erisia.stasis.Freezing.rate(sp) < 1
+            : passenger instanceof Player && self.level().isClientSide() && org.erisia.stasis.StasisNet.clientFreeze > 0;
+        if (passenger instanceof Player && (held || self.hasData(StasisRegistry.FROZEN.get()) && self.getData(StasisRegistry.FROZEN.get()))) {
             passenger.setYBodyRot(self.getYRot());
             cir.setReturnValue(0f);
         }
