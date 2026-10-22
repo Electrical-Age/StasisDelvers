@@ -226,7 +226,7 @@ public final class StasisPost {
             double t = wclock;
             List<org.erisia.stasis.Deeps.Deep> deeps = new ArrayList<>();
             List<Double> gaps = new ArrayList<>();
-            for (var dp : org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed())) {
+            for (var dp : org.erisia.stasis.Deeps.calmed(mc.level, org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, view + 50, t, ClientFields.deepSeed()))) {
                 // the shader's cylinder is radius + 6 (ragged edge); past the render distance it's fogged away
                 double gap = Math.hypot(dp.x() - cam.x, dp.z() - cam.z) - dp.radius();
                 if (gap - 6 > view || dp.strength() <= 0) continue;

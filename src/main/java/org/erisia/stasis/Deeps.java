@@ -211,10 +211,48 @@ public final class Deeps {
         return s.regions().computeIfAbsent(net.minecraft.world.level.ChunkPos.pack(rx, rz), k -> {
             float cx = rx * (float) REGION + REGION / 2f, cz = rz * (float) REGION + REGION / 2f;
             List<Deep> out = new ArrayList<>();
-            for (Deep d : within(cx, cz, REGION_REACH, t, seed))
+            for (Deep d : calmed(level, within(cx, cz, REGION_REACH, t, seed)))
                 if (d.strength() > 0 && Math.abs(d.x() - cx) <= REGION / 2f + d.radius() + 8 && Math.abs(d.z() - cz) <= REGION / 2f + d.radius() + 8) out.add(d);
             return out.toArray(new Deep[0]);
         });
+    }
+
+    /**
+     * Pre-hard-mode spreading: drifting deeps keep off stable land (Baughn 2026-10-22: anything at or above
+     * min(80 %, coverage + 20 %) stability never sees stasis clouds). A deep's strength is scaled by how far below that
+     * threshold its stability is at its centre and round its rim (9 points), fading over 3 %, so its disc doesn't reach
+     * stable land. 1 outside spreading mode, in hard mode, or where the ranks aren't known (client, before the tiles).
+     */
+    /** Tests about other things switch calm() off. */
+    public static volatile boolean calmOff;
+
+    public static float calm(Level level, Deep d) {
+        if (calmOff || !Spread.active(level)) return 1;
+        Spread.State s = Spread.state(level);
+        if (s.hard() || s.map() == null || s.count() <= 0) return 1;
+        double thr = Math.min(0.8, s.p() / (double) s.count() + 0.2);
+        float f = 1;
+        for (int k = -1; k < 8; k++) {
+            double a = k * Math.PI / 4, r = k < 0 ? 0 : d.radius() + 6;
+            int x = (int) Math.floor(d.x() + r * Math.cos(a)), z = (int) Math.floor(d.z() + r * Math.sin(a));
+            long r1024 = SpreadMap.rank1024(s.map(), x, z);
+            if (r1024 < 0 || r1024 >= (long) s.count() * SpreadMap.SCALE) continue;   // (outside the map, or no tile: unknown)
+            double st = r1024 / (double) SpreadMap.SCALE / s.count();
+            f = Math.min(f, smooth((float) ((thr - st) / 0.03)));
+            if (f <= 0) return 0;
+        }
+        return f;
+    }
+
+    /** The deeps with calm() applied (strength scaled; those calmed away dropped). */
+    public static List<Deep> calmed(Level level, List<Deep> deeps) {
+        List<Deep> out = new ArrayList<>(deeps.size());
+        for (Deep d : deeps) {
+            float c = calm(level, d);
+            if (c <= 0) continue;
+            out.add(c >= 1 ? d : new Deep(d.x(), d.z(), d.radius(), d.strength() * c, d.id(), d.puff()));
+        }
+        return out;
     }
 
     /** horizontal() for a block column of this level now, from the tick's region cache. */

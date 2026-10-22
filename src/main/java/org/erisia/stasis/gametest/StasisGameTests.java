@@ -3199,6 +3199,35 @@ public final class StasisGameTests {
         // spreading mode, drifting deeps (Baughn 2026-10-19): a drifting deep stops time on running land it passes over
         // where no field holds it (rateAt 0, so a block tick doesn't run); the land's own rate (flames, meshing) stays 1;
         // an unsuited player caught in one is held, not made a statue (Freezing.SPREAD_DEEP_HOLDS)
+        // Baughn 2026-10-22: before hard mode no stasis clouds on land at or above min(80 %, coverage + 20 %) stability
+        CASES.put("spread_calm_keeps_deeps_off_stable_land", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            int old = org.erisia.stasis.Deeps.seed(level);
+            org.erisia.stasis.Deeps.testDeeps = true;
+            FieldData.get(level).testDeepSeed(777);
+            c.cleanup.add(() -> {
+                org.erisia.stasis.Deeps.testDeeps = false;
+                FieldData.get(level).testDeepSeed(old);
+            });
+            c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            var near = org.erisia.stasis.Deeps.near(0, 0, org.erisia.stasis.Deeps.time(level), 777);
+            var d = near.stream().filter(x -> x.strength() > 0.9f && x.radius() > 20 && !x.puff()).findFirst();
+            if (d.isEmpty()) {
+                c.check("found a strong deep", false, near.toString());
+                return;
+            }
+            int bx = (int) Math.floor(d.get().x()), bz = (int) Math.floor(d.get().z());
+            // spawn on the deep: its land is the map's most stable (spawn's raise), far above 20 % at P 0
+            org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(777, bx, bz, 600);
+            org.erisia.stasis.Spread.testInstall(m, 0);
+            double st = org.erisia.stasis.SpreadMap.rank1024(m, bx, bz) / (double) org.erisia.stasis.SpreadMap.SCALE / m.count;
+            float calm = org.erisia.stasis.Deeps.calm(level, d.get());
+            c.check("the deep's land is stable (> 25 %)", st > 0.25, "stability " + st);
+            c.check("so the deep is calmed away before hard mode", calm == 0f, "calm " + calm);
+            org.erisia.stasis.Deeps.calmOff = true;
+            c.check("(calm off: the deep is back)", org.erisia.stasis.Deeps.calm(level, d.get()) == 1f, "");
+            org.erisia.stasis.Deeps.calmOff = false;
+        }, false, true));
         CASES.put("spread_deep_stops_running_land", new Spec(1, (h, c) -> () -> {
             ServerLevel level = h.getLevel();
             int old = org.erisia.stasis.Deeps.seed(level);
@@ -3209,6 +3238,9 @@ public final class StasisGameTests {
                 FieldData.get(level).testDeepSeed(old);
             });
             c.cleanup.add(org.erisia.stasis.Spread::testReset);
+            // (this test is about the stop: the deep sits on spawn's high ground, which calm() would keep it off)
+            org.erisia.stasis.Deeps.calmOff = true;
+            c.cleanup.add(() -> org.erisia.stasis.Deeps.calmOff = false);
             var near = org.erisia.stasis.Deeps.near(0, 0, org.erisia.stasis.Deeps.time(level), 777);
             var d = near.stream().filter(x -> x.strength() > 0.9f && x.radius() > 20 && !x.puff()).findFirst();
             if (d.isEmpty()) {
