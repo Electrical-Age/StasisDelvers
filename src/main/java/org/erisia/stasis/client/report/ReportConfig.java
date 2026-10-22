@@ -27,7 +27,7 @@ public final class ReportConfig {
         DISTANT_RIFTS = b.comment("With Distant Horizons installed: the farthest (blocks) rifts are drawn over its far terrain; they go as far as",
                 "Distant Horizons draws terrain, up to this. Without it they end with the vanilla view (~200 blocks). Lower it",
                 "on a weak machine; 0 = as without Distant Horizons.")
-            .defineInRange("distantRifts", 1000, 0, 4000);
+            .defineInRange("distantRifts", 500, 0, 4000);
         b.pop();
         SPEC = b.build();
     }
@@ -50,9 +50,9 @@ public final class ReportConfig {
         if (!net.neoforged.fml.ModList.get().isLoaded("distanthorizons")) return 200;
         int r;
         try {
-            r = SPEC.isLoaded() ? DISTANT_RIFTS.get() : 1000;
+            r = SPEC.isLoaded() ? DISTANT_RIFTS.get() : 500;
         } catch (RuntimeException e) {
-            r = 1000;
+            r = 500;
         }
         // as far as DH draws terrain, if that's nearer (Baughn: something cleverer than a flat 1 km), the config the cap
         int dh = dhRange();
@@ -76,7 +76,10 @@ public final class ReportConfig {
             Object graphics = configs.getClass().getMethod("graphics").invoke(configs);
             Object dist = graphics.getClass().getMethod("chunkRenderDistance").invoke(graphics);
             Object v = dist.getClass().getMethod("getValue").invoke(dist);
+            int was = dhBlocks;
             dhBlocks = v instanceof Number n ? n.intValue() * 16 : -1;
+            if (dhBlocks != was) org.erisia.stasis.StasisDelvers.LOG.info("Distant Horizons draws terrain to {} blocks ({}): rifts to {}", dhBlocks, v,
+                Math.min(SPEC.isLoaded() ? DISTANT_RIFTS.get() : 500, dhBlocks));
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             dhBlocks = -1;
         }
