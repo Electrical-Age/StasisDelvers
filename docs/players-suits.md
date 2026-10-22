@@ -117,3 +117,11 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   Lights Out (inside a tower's field as it collapses), You were then, and now you- (killed your own possessed statue).
 - Not yet: Tick Tock (the time-rate bauble from λ-Nero's to-do). Test: `guide_advancements_load`.
 
+
+## Rift pendants and exemption (2026-10-22)
+- `RiftPendantItem` (Curios necklace slot, `CuriosCompat`; Curios is optional): a rift shard or charged rift shard on a
+  string. It stands in for the chest piece when none with charge is worn (`Suits.piece`), so alone it is a Delver
+  chest piece without armour. It holds 10 or 30 minutes of a lone piece's draw (4 x 10 W), never recharges, and
+  crumbles to its string when spent. Right-click equips it.
+- `/stasis exempt <player> on|off` (`Exempt`, SavedData `stasisdelvers:exempt`): the mechanic leaves that player
+  alone: no freezing anywhere (`Freezing.tick` returns early) and full speed in slow fields (`PlayerRates.rate`).
