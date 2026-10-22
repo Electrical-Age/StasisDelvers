@@ -4212,6 +4212,15 @@ public final class StasisGameTests {
             }
             c.check("exactly one stability compass after joining and logging in again", compasses == 1, compasses + " compasses");
             c.check("and one rift-safety pamphlet", pamphlets == 1, pamphlets + " pamphlets");
+            var pm = org.erisia.stasis.StarterKit.pamphlet().get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+            c.check("the pamphlet has its own icon (Baughn)", pm != null && pm.getPath().equals("pamphlet"), String.valueOf(pm));
+            // one handed out before the icon gets it at the next login
+            ItemStack old = org.erisia.stasis.StarterKit.pamphlet();
+            old.remove(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+            p.getInventory().setItem(20, old);
+            org.erisia.stasis.StarterKit.login(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p));
+            var om = p.getInventory().getItem(20).get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+            c.check("an old pamphlet gets the icon at login", om != null && om.getPath().equals("pamphlet"), String.valueOf(om));
             c.check("nothing else", other == 0, other + " other stacks");
         }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range

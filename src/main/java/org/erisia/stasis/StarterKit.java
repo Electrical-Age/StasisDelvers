@@ -26,6 +26,7 @@ public final class StarterKit {
     public static final String COMPASS_TAG = "stasisdelvers_starter_compass";
     public static final String PAMPHLET_TAG = "stasisdelvers_pamphlet";
     static final int PAMPHLET_PAGES = 8;
+    static final net.minecraft.resources.Identifier PAMPHLET_MODEL = net.minecraft.resources.Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "pamphlet");
 
     /** "Rift Safety", the government's pamphlet (Baughn's text, en_us book.stasisdelvers.pamphlet.*): a written book. */
     public static ItemStack pamphlet() {
@@ -37,12 +38,22 @@ public final class StarterKit {
             net.minecraft.server.network.Filterable.passThrough("Rift Safety"), "The Government", 0, pages, true));
         b.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.translatable("book.stasisdelvers.pamphlet.title")
             .withStyle(s -> s.withItalic(false)));
+        // its own icon, a folded leaflet (Baughn)
+        b.set(net.minecraft.core.component.DataComponents.ITEM_MODEL, PAMPHLET_MODEL);
         return b;
     }
 
     public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         CompoundTag persisted = p.getPersistentData().getCompoundOrEmpty(Player.PERSISTED_NBT_TAG);
+        // pamphlets handed out before it had its icon get it (Baughn)
+        for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
+            ItemStack st = p.getInventory().getItem(i);
+            var wb = st.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+            if (st.is(net.minecraft.world.item.Items.WRITTEN_BOOK) && wb != null && "The Government".equals(wb.author())
+                && "Rift Safety".equals(wb.title().raw()) && !PAMPHLET_MODEL.equals(st.get(net.minecraft.core.component.DataComponents.ITEM_MODEL)))
+                st.set(net.minecraft.core.component.DataComponents.ITEM_MODEL, PAMPHLET_MODEL);
+        }
         if (StasisConfig.spreading) {
             // the rift-safety pamphlet (Baughn 2026-10-22), to everyone who hasn't had it, old players included
             if (!persisted.getBooleanOr(PAMPHLET_TAG, false)) {
