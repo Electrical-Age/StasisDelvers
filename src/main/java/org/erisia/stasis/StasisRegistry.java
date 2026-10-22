@@ -174,6 +174,12 @@ public final class StasisRegistry {
     /** What a ruined tower core breaks into (Baughn 2026-10-17: they never drop as cores); smelts into an iron nugget. */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> SCRAP = ITEMS.registerSimpleItem("scrap");
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_SHARD = ITEMS.registerSimpleItem("rift_shard");
+    /** Rift crystals on a string for the necklace slot (Baughn 2026-10-22): a Delver chest piece without the armour,
+     *  10 minutes (a shard) or 30 (a charged shard), never recharged. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<RiftPendantItem> RIFT_PENDANT = ITEMS.registerItem("rift_pendant",
+        p -> new RiftPendantItem(p, 10), p -> p.stacksTo(1));
+    public static final net.neoforged.neoforge.registries.DeferredItem<RiftPendantItem> CHARGED_RIFT_PENDANT = ITEMS.registerItem("charged_rift_pendant",
+        p -> new RiftPendantItem(p, 30), p -> p.stacksTo(1));
     /** The crystal grades (Crystals): dust from small and medium buds, charged shards from a cluster broken in violet. */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_DUST = ITEMS.registerSimpleItem("rift_dust");
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHARGED_RIFT_SHARD = ITEMS.registerSimpleItem("charged_rift_shard",

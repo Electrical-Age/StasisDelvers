@@ -112,5 +112,9 @@
   "advancements.stasisdelvers.deaths.lights_out.title": "Lights Out",
   "advancements.stasisdelvers.deaths.lights_out.description": "In a storm, you need a supply of candles, not just one.",
   "advancements.stasisdelvers.deaths.were_then.title": "You were then, and now you-",
-  "advancements.stasisdelvers.deaths.were_then.description": "It wears what you were, not what you are."
+  "advancements.stasisdelvers.deaths.were_then.description": "It wears what you were, not what you are.",
+  "item.stasisdelvers.rift_pendant": "Rift Pendant",
+  "item.stasisdelvers.charged_rift_pendant": "Charged Rift Pendant",
+  "item.stasisdelvers.rift_pendant.tooltip": "Holds off the stillness: %s:%s left",
+  "message.stasisdelvers.pendant_crumbled": "The crystal on your pendant crumbles to dust"
 }

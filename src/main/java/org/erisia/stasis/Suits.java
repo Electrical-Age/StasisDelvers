@@ -16,15 +16,26 @@ final class Suits {
 
     static final EquipmentSlot[] ARMOR = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
 
+    /** The suit piece in a slot: the armour worn there; for the chest, a rift pendant with charge left in the necklace
+     *  slot when no suit chest piece is worn (RiftPendantItem: a Delver chest piece without the armour). */
+    static ItemStack piece(ServerPlayer p, EquipmentSlot slot) {
+        ItemStack s = p.getItemBySlot(slot);
+        if (slot == EquipmentSlot.CHEST && !(s.getItem() instanceof TimeSuit)) {
+            ItemStack pendant = CuriosCompat.pendant(p);
+            if (!pendant.isEmpty()) return pendant;
+        }
+        return s;
+    }
+
     /**
      * Why a worn suit doesn't protect (null: it does, or no suit pieces at all). Shown to the player in stopped land, so
      * a missing or empty piece isn't a silent death (softlock audit 7).
      */
     static String problem(ServerPlayer p) {
         int pieces = 0;
-        for (EquipmentSlot slot : ARMOR) if (p.getItemBySlot(slot).getItem() instanceof TimeSuit) pieces++;
+        for (EquipmentSlot slot : ARMOR) if (piece(p, slot).getItem() instanceof TimeSuit) pieces++;
         if (pieces == 0) return null;
-        ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
+        ItemStack chest = piece(p, EquipmentSlot.CHEST);
         if (!(chest.getItem() instanceof TimeSuit)) return "Suit incomplete: no chest piece";
         if (!working(p, 1).contains(EquipmentSlot.CHEST)) return "Suit piece out of charge: " + chest.getHoverName().getString();
         return null;
@@ -37,13 +48,13 @@ final class Suits {
      */
     static java.util.EnumSet<EquipmentSlot> working(ServerPlayer p, double factor) {
         var set = java.util.EnumSet.noneOf(EquipmentSlot.class);
-        for (EquipmentSlot slot : ARMOR) if (p.getItemBySlot(slot).getItem() instanceof TimeSuit && p.getItemBySlot(slot).getItem() instanceof IItemEnergyBattery) set.add(slot);
+        for (EquipmentSlot slot : ARMOR) if (piece(p, slot).getItem() instanceof TimeSuit && piece(p, slot).getItem() instanceof IItemEnergyBattery) set.add(slot);
         // dropping a piece raises the others' share, which may drop another: at most 4 rounds
         for (boolean changed = true; changed && !set.isEmpty(); ) {
             changed = false;
             double f = factor * 4.0 / set.size();
             for (var it = set.iterator(); it.hasNext(); ) {
-                ItemStack s = p.getItemBySlot(it.next());
+                ItemStack s = piece(p, it.next());
                 if (((IItemEnergyBattery) s.getItem()).getEnergy(s) < f * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0) {
                     it.remove();
                     changed = true;
@@ -65,7 +76,7 @@ final class Suits {
     static int missing(ServerPlayer p) {
         int n = 0;
         for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
+            ItemStack s = piece(p, slot);
             if (!(s.getItem() instanceof TimeSuit) || !(s.getItem() instanceof IItemEnergyBattery b) || b.getEnergy(s) <= 0) n++;
         }
         return n;
@@ -75,7 +86,7 @@ final class Suits {
     static double secondsLeft(ServerPlayer p) {
         double left = Double.MAX_VALUE;
         for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
+            ItemStack s = piece(p, slot);
             // (an empty piece counts as not worn: it doesn't end the suit)
             if (s.getItem() instanceof TimeSuit t && s.getItem() instanceof IItemEnergyBattery b && t.stasisDraw(s) > 0 && b.getEnergy(s) > 0)
                 left = Math.min(left, b.getEnergy(s) / (t.stasisDraw(s) * share(p)));
@@ -97,7 +108,7 @@ final class Suits {
         java.util.List<ItemStack> pieces = new java.util.ArrayList<>();
         double[] want = new double[4];
         for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
+            ItemStack s = piece(p, slot);
             if (!(s.getItem() instanceof TimeSuit) || !(s.getItem() instanceof IItemEnergyBattery b)) continue;
             want[pieces.size()] = Math.max(0, Math.min(b.getEnergyMax(s) - b.getEnergy(s), b.getChargePower(s)));
             pieces.add(s);
@@ -167,7 +178,7 @@ final class Suits {
     static java.util.List<Cell> worn(ServerPlayer p) {
         java.util.List<Cell> out = new java.util.ArrayList<>();
         for (EquipmentSlot slot : ARMOR) {
-            ItemStack s = p.getItemBySlot(slot);
+            ItemStack s = piece(p, slot);
             if (s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery) out.add(cell(s));
         }
         return out;
@@ -243,7 +254,7 @@ final class Suits {
 
     /** Only Delver pieces (no stasis suit piece): the weaker suit, not fully protective in a deep (Deeps). */
     static boolean delverOnly(ServerPlayer p) {
-        for (EquipmentSlot slot : ARMOR) if (p.getItemBySlot(slot).getItem() instanceof StasisArmorItem) return false;
+        for (EquipmentSlot slot : ARMOR) if (piece(p, slot).getItem() instanceof StasisArmorItem) return false;
         return true;
     }
 
@@ -254,9 +265,10 @@ final class Suits {
         if (set.isEmpty()) return false;
         factor *= 4.0 / set.size();
         for (EquipmentSlot slot : set) {
-            ItemStack s = p.getItemBySlot(slot);
+            ItemStack s = piece(p, slot);
             IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
             b.setEnergy(s, b.getEnergy(s) - factor * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0);
+            if (s.getItem() instanceof RiftPendantItem && b.getEnergy(s) <= 0) CuriosCompat.crumble(p);
         }
         return true;
     }

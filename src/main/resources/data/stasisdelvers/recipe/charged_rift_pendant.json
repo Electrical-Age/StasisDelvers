@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    "stasisdelvers:charged_rift_shard",
+    "minecraft:string"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:charged_rift_pendant"
+  }
+}
