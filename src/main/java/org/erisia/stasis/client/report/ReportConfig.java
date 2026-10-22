@@ -2,7 +2,7 @@ package org.erisia.stasis.client.report;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-/** Client config for bug reports (stasisdelvers-client.toml). Read at report time; defaults until the file is loaded. */
+/** Client config (stasisdelvers-client.toml): bug reports, and how far rifts are drawn. Read at report time; defaults until the file is loaded. */
 public final class ReportConfig {
     private ReportConfig() {
     }
@@ -11,6 +11,7 @@ public final class ReportConfig {
     static final ModConfigSpec.BooleanValue INCLUDE_CHAT;
     static final ModConfigSpec.BooleanValue CHAT_SYSTEM_ONLY;
     static final ModConfigSpec.BooleanValue INCLUDE_POST_DATA;
+    static final ModConfigSpec.IntValue DISTANT_RIFTS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -21,6 +22,12 @@ public final class ReportConfig {
             .define("chatSystemOnly", false);
         INCLUDE_POST_DATA = b.comment("Bug reports include a summary of the stasis effect's data texture (small).")
             .define("includePostData", true);
+        b.pop();
+        b.push("view");
+        DISTANT_RIFTS = b.comment("With Distant Horizons installed: the farthest (blocks) rifts are drawn over its far terrain; they go as far as",
+                "Distant Horizons draws terrain, up to this. Without it they end with the vanilla view (~200 blocks). Lower it",
+                "on a weak machine; 0 = as without Distant Horizons.")
+            .defineInRange("distantRifts", 1000, 0, 4000);
         b.pop();
         SPEC = b.build();
     }
@@ -35,6 +42,45 @@ public final class ReportConfig {
 
     public static boolean includePostData() {
         return get(INCLUDE_POST_DATA, true);
+    }
+
+    /** How far rifts are drawn (blocks): the config with Distant Horizons (Baughn: they vanished at the vanilla fog line
+     *  over DH's terrain), 200 without it. */
+    public static int riftRange() {
+        if (!net.neoforged.fml.ModList.get().isLoaded("distanthorizons")) return 200;
+        int r;
+        try {
+            r = SPEC.isLoaded() ? DISTANT_RIFTS.get() : 1000;
+        } catch (RuntimeException e) {
+            r = 1000;
+        }
+        // as far as DH draws terrain, if that's nearer (Baughn: something cleverer than a flat 1 km), the config the cap
+        int dh = dhRange();
+        if (dh > 0) r = Math.min(r, dh);
+        return Math.max(200, r);
+    }
+
+    private static long dhAsked;
+    private static int dhBlocks = -1;
+
+    /** Distant Horizons' LOD render distance in blocks (its API, by reflection: no build dependency), -1 if unknown;
+     *  asked once a second. */
+    static int dhRange() {
+        long now = System.currentTimeMillis();
+        if (now - dhAsked < 1000) return dhBlocks;
+        dhAsked = now;
+        try {
+            Class<?> delayed = Class.forName("com.seibel.distanthorizons.api.DhApi$Delayed");
+            Object configs = delayed.getField("configs").get(null);
+            if (configs == null) return dhBlocks = -1;
+            Object graphics = configs.getClass().getMethod("graphics").invoke(configs);
+            Object dist = graphics.getClass().getMethod("chunkRenderDistance").invoke(graphics);
+            Object v = dist.getClass().getMethod("getValue").invoke(dist);
+            dhBlocks = v instanceof Number n ? n.intValue() * 16 : -1;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            dhBlocks = -1;
+        }
+        return dhBlocks;
     }
 
     private static boolean get(ModConfigSpec.BooleanValue v, boolean def) {

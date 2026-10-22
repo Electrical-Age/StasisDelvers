@@ -106,6 +106,29 @@ public final class StasisPost {
         return !Stasis.stops(level) && seed != 0 && org.erisia.stasis.StaticDeeps.hasReturns(seed);
     }
 
+    private static List<org.erisia.stasis.StaticDeeps.Deep> nearCache = List.of();
+    private static double nearX = Double.NaN, nearY, nearZ;
+    private static int nearRange, nearSeed;
+    private static long nearAt;
+
+    /** The static deeps within range (StaticDeeps.near), looked up again after 32 blocks of movement, 2 s (a new
+     *  return rift) or a change of range (over Distant Horizons' kilometres it's hundreds of cells). */
+    static List<org.erisia.stasis.StaticDeeps.Deep> nearRifts(double x, double y, double z, int range) {
+        int seed = ClientFields.deepSeed();
+        long now = System.currentTimeMillis();
+        if (Double.isNaN(nearX) || range != nearRange || seed != nearSeed || now - nearAt > 2000
+            || Math.abs(x - nearX) + Math.abs(y - nearY) + Math.abs(z - nearZ) > 32) {
+            nearAt = now;
+            nearCache = org.erisia.stasis.StaticDeeps.near((float) x, (float) y, (float) z, range + 92, seed);
+            nearX = x;
+            nearY = y;
+            nearZ = z;
+            nearRange = range;
+            nearSeed = seed;
+        }
+        return nearCache;
+    }
+
     static void frame(FrameGraphSetupEvent e) {
         var mc = Minecraft.getInstance();
         if (mc.level == null) return;
@@ -275,11 +298,16 @@ public final class StasisPost {
         // static deeps near the camera (StaticDeeps): centre - floor(camera), radius, shape id; at most 4
         int ns = 0;
         if ((Stasis.stops(mc.level) || returnsOnly) && ClientFields.deepSeed() != 0) {
-            for (var sd : org.erisia.stasis.StaticDeeps.near((float) cam.x, (float) cam.y, (float) cam.z, 260, ClientFields.deepSeed())) {
+            int riftRange = org.erisia.stasis.client.report.ReportConfig.riftRange();
+            d[251] = riftRange;
+            // nearest first (the shader keeps 4; over a wide range the cells come in grid order)
+            var near = new ArrayList<>(nearRifts(cam.x, cam.y, cam.z, riftRange));
+            near.sort(java.util.Comparator.comparingDouble(sd -> Math.pow(sd.x() - cam.x, 2) + Math.pow(sd.y() - cam.y, 2) + Math.pow(sd.z() - cam.z, 2)));
+            for (var sd : near) {
                 if (ns == 4) break;
                 if (returnsOnly && !org.erisia.stasis.StaticDeeps.isReturn(sd)) continue;   // (the land's own rifts aren't there yet)
                 double dist = Math.sqrt(Math.pow(sd.x() - cam.x, 2) + Math.pow(sd.y() - cam.y, 2) + Math.pow(sd.z() - cam.z, 2));
-                if (dist - sd.radius() * 1.5 > 200) continue;
+                if (dist - sd.radius() * 1.5 > riftRange) continue;
                 // the mist's reach (stasis.fsh STATIC_REACH): the warped, roughened shape stays within ~1.3 r + 8
                 Grid g = grid(mc, ~sd.id(), sd.x(), sd.z(), sd.radius() * 1.3f + 10, sd.y(), false);
                 packGrid(d, STATIC_GROUND_BASE + G * G * ns, g, fy);

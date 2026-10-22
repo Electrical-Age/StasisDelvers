@@ -25,7 +25,7 @@
 // floor(camera y), row = z); [3584 + 64i ..] static deep i's (corner centre - (1.3 r + 10), spacing 2 (1.3 r + 10) / 7);
 // [256] bolt point count; [218] static deep count; [220 + 5i ..] static deep i: centre - floor(camera) (3), radius,
 // shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
-// [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
+// [251] how far rifts are drawn on the sky (ReportConfig.riftRange); [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
 // [1600] possessed eye count (<= 16), [1601 + 3i ..] eye i - floor(camera);
 // [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 18i ..] field i
 // (i < 32, nearest first, live before remnants): centre - floor(camera) (3), radius, collapse, failing,
@@ -1172,7 +1172,9 @@ void main() {
             // rifts: no light at all, a faint violet fringe at the edge, and they swallow what lies behind them
             c = mix(c, vec3(0.0), riftHere);
             c += vec3(0.25, 0.1, 0.4) * fringe * 0.6;
-            float tEnd = depth > 0.0 ? length(rel) : 200.0;
+            // (on the sky out to the rift range: 200, or ReportConfig.distantRifts over Distant Horizons' terrain, which
+            // the depth buffer doesn't hold, so it reads as sky; Baughn: rifts shrank away at the vanilla fog line)
+            float tEnd = depth > 0.0 ? length(rel) : max(data(251), 200.0);
             vec4 hs2 = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
             vec3 dir2 = depth > 0.0 ? normalize(rel) : normalize(hs2.xyz / hs2.w);
             // in open air the rift is a dark body that tapers off through a violet border (Baughn: the hard black blob
