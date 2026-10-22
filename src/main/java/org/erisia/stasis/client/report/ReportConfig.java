@@ -24,10 +24,9 @@ public final class ReportConfig {
             .define("includePostData", true);
         b.pop();
         b.push("view");
-        DISTANT_RIFTS = b.comment("With Distant Horizons installed: the farthest (blocks) rifts are drawn over its far terrain; they go as far as",
-                "Distant Horizons draws terrain, up to this. Without it they end with the vanilla view (~200 blocks). Lower it",
-                "on a weak machine; 0 = as without Distant Horizons.")
-            .defineInRange("distantRifts", 500, 0, 4000);
+        DISTANT_RIFTS = b.comment("The farthest (blocks) rifts are drawn: they show as far as terrain does (the render distance, or",
+                "Distant Horizons' if installed), at least 200 and at most this. Lower it on a weak machine.")
+            .defineInRange("distantRifts", 500, 0, 500);
         b.pop();
         SPEC = b.build();
     }
@@ -47,17 +46,20 @@ public final class ReportConfig {
     /** How far rifts are drawn (blocks): the config with Distant Horizons (Baughn: they vanished at the vanilla fog line
      *  over DH's terrain), 200 without it. */
     public static int riftRange() {
-        if (!net.neoforged.fml.ModList.get().isLoaded("distanthorizons")) return 200;
-        int r;
+        // Baughn: rifts are visible where terrain is, at most 500 blocks: Distant Horizons' terrain distance if it's
+        // installed, else the render distance; never under 200 (the sky's rifts before), and the config may lower the cap
+        int cap;
         try {
-            r = SPEC.isLoaded() ? DISTANT_RIFTS.get() : 500;
+            cap = SPEC.isLoaded() ? DISTANT_RIFTS.get() : 500;
         } catch (RuntimeException e) {
-            r = 500;
+            cap = 500;
         }
-        // as far as DH draws terrain, if that's nearer (Baughn: something cleverer than a flat 1 km), the config the cap
-        int dh = dhRange();
-        if (dh > 0) r = Math.min(r, dh);
-        return Math.max(200, r);
+        int terrain = net.minecraft.client.Minecraft.getInstance().options.getEffectiveRenderDistance() * 16;
+        if (net.neoforged.fml.ModList.get().isLoaded("distanthorizons")) {
+            int dh = dhRange();
+            if (dh > 0) terrain = Math.max(terrain, dh);
+        }
+        return Math.max(200, Math.min(cap, terrain));
     }
 
     private static long dhAsked;
