@@ -1062,6 +1062,9 @@ void main() {
         vec3 camFrac = vec3(data(19), data(20), data(21));
         vec3 p = rel + camFrac;                                    // world position minus floor(camera)
         vec3 camInt = vec3(data(16), data(17), data(18));
+        // the block a pixel belongs to: a hair past the surface along the view ray, so a face on a block boundary is its
+        // own block's and doesn't flicker between the two (Baughn: stopped and running columns z-fought at their border)
+        vec3 pBlk = p + (depth > 0.0 ? normalize(rel) * 0.01 : vec3(0.0));
         // how much time runs here: 1 inside a field (soft at the edge: the border shouldn't look blocky), 0 outside
         float run = 0.0, vivid = 0.0;
         vec3 w = p + camInt;
@@ -1080,7 +1083,7 @@ void main() {
             float inside = smoothstep(0.0, 1.2, edge);
             if (collapse > 0.0) {
                 // the same rule as Field.collapsed (patches and tears on the field's seed)
-                vec3 blk = floor(w);
+                vec3 blk = floor(pBlk + camInt);
                 vec3 off = blk + 0.5 - (camInt + fc);
                 if (data(o + 6) > 0.5) off.y = 0.0;
                 float score = collapseScore(blk, unstretch(off, st), d, r, int(data(o + 7)), data(FIELD_BASE + FIELD_STRIDE * i + 12));
@@ -1100,7 +1103,7 @@ void main() {
         // drifting deep stops it (below). The block column as the server sees it; the sky takes the camera's.
         float spreadRun = 0.0;
         if (data(196) > 0.5) {
-            ivec2 blk = ivec2(camInt.xz) + ivec2(floor(p.xz));
+            ivec2 blk = ivec2(camInt.xz) + ivec2(floor(pBlk.xz));
             spreadRun = spreadStilled(blk, int(data(197))) ? 0.0 : 1.0;
         }
         bool deepStop = false;
@@ -1124,7 +1127,7 @@ void main() {
                 dp.yb = groundAt(GROUND_BASE + 64 * hits[i].idx, hits[i].g, q.xz);
                 deep = max(deep, deepShape(dp, q, camInt));
                 // over running spread land a drifting deep stops time (Baughn 2026-10-19), unless a field holds it off
-                if (spreadRun > 0.0 && !deepStop) deepStop = deepStops(dp, floor(q), camInt, dp.yb);
+                if (spreadRun > 0.0 && !deepStop) deepStop = deepStops(dp, floor(depth > 0.0 ? pBlk : q), camInt, dp.yb);
             }
         // the spread's running land joins the fields' (a field or the spawn area holds a deep off: run stays theirs)
         run = max(run, deepStop ? 0.0 : spreadRun);
