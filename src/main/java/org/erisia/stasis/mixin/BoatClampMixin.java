@@ -25,6 +25,17 @@ public abstract class BoatClampMixin {
         if (passenger instanceof Player && (held || self.hasData(StasisRegistry.FROZEN.get()) && self.getData(StasisRegistry.FROZEN.get()))) {
             passenger.setYBodyRot(self.getYRot());
             cir.setReturnValue(0f);
+            return;
+        }
+        // just after a hold or a freeze ends the view may lie past 105 degrees: the boat turns to it instead of the view
+        // snapping back (AdventurAgent: a jolt as the clamp returned)
+        if (passenger instanceof Player) {
+            float delta = net.minecraft.util.Mth.wrapDegrees(passenger.getYRot() - self.getYRot());
+            if (Math.abs(delta) > 105) {
+                float turn = delta - Math.copySign(105f, delta);
+                self.setYRot(self.getYRot() + turn);
+                self.yRotO += turn;
+            }
         }
     }
 }
