@@ -40,6 +40,7 @@ public final class PlayerRates {
     /** The player's tick rate in (0, 1]: their field's rate, 1 elsewhere (stopped land too). */
     public static double rate(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level)) return 1.0;
+        if (Exempt.is(p)) return 1.0;   // (/stasis exempt: the mechanic leaves them alone)
         // freezing is a slow field of the player's own (λ-Nero), the slower of the two wins
         double freeze = Freezing.rate(p);
         if (fullSuit(p)) return freeze;   // (Baughn: the suit keeps its wearer at full speed in a slow field)

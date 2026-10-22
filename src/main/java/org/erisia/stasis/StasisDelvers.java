@@ -19,6 +19,7 @@ public final class StasisDelvers {
 
     public StasisDelvers(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.SYNCED, StasisConfig.SPEC);
+        CuriosCompat.register(modBus);
         // (only our synced config: the client config's Loading came first on clients and crashed refresh, AdventurAgent)
         modBus.addListener(ModConfigEvent.Loading.class, e -> {
             if (e.getConfig().getSpec() == StasisConfig.SPEC) StasisConfig.refresh();
@@ -72,6 +73,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, LocalTime::tick);
         NeoForge.EVENT_BUS.addListener(SpawnCottage::serverStarted);
         NeoForge.EVENT_BUS.addListener(Spread::serverStarted);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStartedEvent.class, e -> Exempt.load(e.getServer()));
         NeoForge.EVENT_BUS.addListener(Spread::serverStopped);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Spread::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, SpawnMove::tick);

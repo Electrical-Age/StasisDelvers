@@ -34,8 +34,26 @@ final class StasisCommands {
         return Commands.argument("rate", DoubleArgumentType.doubleArg(0.001, 1.0));
     }
 
+    static int exempt(com.mojang.brigadier.context.CommandContext<CommandSourceStack> c, boolean on) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        var p = net.minecraft.commands.arguments.EntityArgument.getPlayer(c, "player");
+        Exempt.set(c.getSource().getServer(), p.getUUID(), on);
+        StasisDelvers.LOG.info("{} {} {} from stasis", c.getSource().getTextName(), on ? "exempted" : "un-exempted", p.getName().getString());
+        c.getSource().sendSuccess(() -> Component.literal(p.getName().getString() + (on ? " is now exempt from stasis (no freezing, full speed in fields)"
+            : " is subject to stasis again")), true);
+        return 1;
+    }
+
     static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("stasis").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+            // the whole mechanic off (or on again) for a player (Baughn): no freezing, full speed in slow fields
+            .then(Commands.literal("exempt").then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
+                .then(Commands.literal("on").executes(c -> exempt(c, true)))
+                .then(Commands.literal("off").executes(c -> exempt(c, false)))
+                .executes(c -> {
+                    var p = net.minecraft.commands.arguments.EntityArgument.getPlayer(c, "player");
+                    c.getSource().sendSuccess(() -> Component.literal(p.getName().getString() + (Exempt.is(p) ? " is exempt from stasis" : " is not exempt")), false);
+                    return 1;
+                })))
             // a whole two-block tower core with its bottom block at pos (setblock would place a single cell)
             .then(Commands.literal("core").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
                 BlockPos p = BlockPosArgument.getLoadedBlockPos(c, "pos");

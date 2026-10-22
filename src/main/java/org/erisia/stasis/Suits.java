@@ -20,7 +20,8 @@ final class Suits {
      *  slot when no suit chest piece is worn (RiftPendantItem: a Delver chest piece without the armour). */
     static ItemStack piece(ServerPlayer p, EquipmentSlot slot) {
         ItemStack s = p.getItemBySlot(slot);
-        if (slot == EquipmentSlot.CHEST && !(s.getItem() instanceof TimeSuit)) {
+        // (an empty chest piece doesn't block it: AdventurAgent died with a flat Delver chest and a fresh pendant)
+        if (slot == EquipmentSlot.CHEST && !(s.getItem() instanceof TimeSuit && s.getItem() instanceof IItemEnergyBattery b && b.getEnergy(s) > 0)) {
             ItemStack pendant = CuriosCompat.pendant(p);
             if (!pendant.isEmpty()) return pendant;
         }

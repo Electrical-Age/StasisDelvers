@@ -93,6 +93,18 @@ public final class Freezing {
         // a lance gate's disc or a return rift first: stepping into one is a trip, not the eye's statue (Lance)
         if (Lance.step(p)) return;
         State s = state(p);
+        if (Exempt.is(p)) {   // (the mechanic is off for this player, /stasis exempt: no freeze, no fatigue)
+            s.ticks = 0;
+            s.heldUntil = 0;
+            s.progress = 0;
+            AttributeInstance speed = p.getAttribute(Attributes.MOVEMENT_SPEED);
+            if (speed != null) speed.removeModifier(SLOW);
+            if (s.sent != 0f) {
+                s.sent = 0f;
+                StasisNet.sendFreeze(p, 0f);
+            }
+            return;
+        }
         s.counted++;
         Suits.tick(p);
         boolean stopped = p.isAlive() && !Stasis.isRunning(level, p.blockPosition());

@@ -19,12 +19,28 @@ final class CuriosCompat {
         return Impl.pendant(p);
     }
 
+    /** Right-click equips a pendant into the necklace slot (AdventurAgent: it had to be dragged in). */
+    static void register(net.neoforged.bus.api.IEventBus modBus) {
+        if (LOADED) modBus.addListener(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent.class, e -> e.enqueueWork(Impl::register));
+    }
+
     /** A spent pendant crumbles: the crystal is gone, the string stays in the slot. */
     static void crumble(ServerPlayer p) {
         if (LOADED) Impl.crumble(p);
     }
 
     private static final class Impl {
+        static void register() {
+            top.theillusivec4.curios.api.type.capability.ICurioItem curio = new top.theillusivec4.curios.api.type.capability.ICurioItem() {
+                @Override
+                public boolean canEquipFromUse(top.theillusivec4.curios.api.SlotContext ctx, ItemStack stack) {
+                    return true;
+                }
+            };
+            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.RIFT_PENDANT.get(), curio);
+            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHARGED_RIFT_PENDANT.get(), curio);
+        }
+
         static ItemStack pendant(ServerPlayer p) {
             return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p)
                 .flatMap(h -> h.findFirstCurio(s -> s.getItem() instanceof RiftPendantItem pi && pi.getEnergy(s) > 0))

@@ -456,6 +456,24 @@ public final class StasisGameTests {
                 } else c.check("found a pocket at player height", false, "none");
             };
         }, false, true));
+        // /stasis exempt (Baughn): the mechanic leaves the player alone in stopped land; off again, they freeze
+        CASES.put("exempt_player_never_freezes", new Spec(60, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            var server = h.getLevel().getServer();
+            return () -> {
+                org.erisia.stasis.Exempt.set(server, p.getUUID(), true);
+                try {
+                    for (int i = 0; i < 300; i++) Freezing.tick(p);
+                    c.check("exempt: no freeze in stopped land", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                    c.check("exempt: full speed", org.erisia.stasis.PlayerRates.rate(p) == 1.0, "rate " + org.erisia.stasis.PlayerRates.rate(p));
+                } finally {
+                    org.erisia.stasis.Exempt.set(server, p.getUUID(), false);
+                }
+                for (int i = 0; i < 40; i++) Freezing.tick(p);
+                c.check("not exempt: the freeze starts", Freezing.ticks(p) > 0, "ticks " + Freezing.ticks(p));
+                remove(h, p);
+            };
+        }));
         CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {

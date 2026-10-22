@@ -24,8 +24,10 @@ public class RiftPendantItem extends Item implements IItemEnergyBattery, TimeSui
         this.minutes = minutes;
     }
 
+    /** Worn alone it pays the whole suit's draw (Suits.share: 4 x a piece's; AdventurAgent saw it last a quarter of
+     *  its time), so it holds MINUTES of that. */
     double storage() {
-        return DRAW * 60 * minutes;
+        return 4 * DRAW * 60 * minutes;
     }
 
     static double used(ItemStack stack) {
@@ -91,7 +93,7 @@ public class RiftPendantItem extends Item implements IItemEnergyBattery, TimeSui
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display,
                                 java.util.function.Consumer<net.minecraft.network.chat.Component> out, net.minecraft.world.item.TooltipFlag flag) {
-        int left = (int) Math.ceil(getEnergy(stack) / DRAW);
+        int left = (int) Math.ceil(getEnergy(stack) / (4 * DRAW));   // (seconds, worn alone)
         out.accept(net.minecraft.network.chat.Component.translatable("item.stasisdelvers.rift_pendant.tooltip", left / 60, String.format("%02d", left % 60))
             .withStyle(net.minecraft.ChatFormatting.GRAY));
     }
