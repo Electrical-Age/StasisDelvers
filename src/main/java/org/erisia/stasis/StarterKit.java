@@ -24,11 +24,33 @@ public final class StarterKit {
 
     public static final String TAG = "stasisdelvers_starter_suit";
     public static final String COMPASS_TAG = "stasisdelvers_starter_compass";
+    public static final String PAMPHLET_TAG = "stasisdelvers_pamphlet";
+    static final int PAMPHLET_PAGES = 8;
+
+    /** "Rift Safety", the government's pamphlet (Baughn's text, en_us book.stasisdelvers.pamphlet.*): a written book. */
+    public static ItemStack pamphlet() {
+        ItemStack b = new ItemStack(net.minecraft.world.item.Items.WRITTEN_BOOK);
+        java.util.List<net.minecraft.server.network.Filterable<net.minecraft.network.chat.Component>> pages = new java.util.ArrayList<>();
+        for (int i = 1; i <= PAMPHLET_PAGES; i++)
+            pages.add(net.minecraft.server.network.Filterable.passThrough(net.minecraft.network.chat.Component.translatable("book.stasisdelvers.pamphlet.page" + i)));
+        b.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
+            net.minecraft.server.network.Filterable.passThrough("Rift Safety"), "The Government", 0, pages, true));
+        b.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.translatable("book.stasisdelvers.pamphlet.title")
+            .withStyle(s -> s.withItalic(false)));
+        return b;
+    }
 
     public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         CompoundTag persisted = p.getPersistentData().getCompoundOrEmpty(Player.PERSISTED_NBT_TAG);
         if (StasisConfig.spreading) {
+            // the rift-safety pamphlet (Baughn 2026-10-22), to everyone who hasn't had it, old players included
+            if (!persisted.getBooleanOr(PAMPHLET_TAG, false)) {
+                p.getInventory().placeItemBackInInventory(pamphlet(), net.minecraft.util.Prediction.SERVER_ONLY);
+                persisted.putBoolean(PAMPHLET_TAG, true);
+                p.getPersistentData().put(Player.PERSISTED_NBT_TAG, persisted);
+                StasisDelvers.LOG.info("Rift-safety pamphlet for {}", p.getName().getString());
+            }
             if (persisted.getBooleanOr(COMPASS_TAG, false)) return;
             p.getInventory().placeItemBackInInventory(new ItemStack(StasisRegistry.STABILITY_COMPASS.get()), net.minecraft.util.Prediction.SERVER_ONLY);
             persisted.putBoolean(COMPASS_TAG, true);

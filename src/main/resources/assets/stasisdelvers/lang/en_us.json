@@ -116,5 +116,15 @@
   "item.stasisdelvers.rift_pendant": "Rift Pendant",
   "item.stasisdelvers.charged_rift_pendant": "Charged Rift Pendant",
   "item.stasisdelvers.rift_pendant.tooltip": "Holds off the stillness: %s:%s left",
-  "message.stasisdelvers.pendant_crumbled": "The crystal on your pendant crumbles to dust"
+  "message.stasisdelvers.pendant_crumbled": "The crystal on your pendant crumbles to dust",
+  "book.stasisdelvers.pamphlet.title": "Rift Safety",
+  "book.stasisdelvers.pamphlet.author": "The Government",
+  "book.stasisdelvers.pamphlet.page1": "§lWARNING!§r\nTemporal stability is falling in your region.\n\nRest assured the government has your back! Your priority should be to keep yourself safe and maintain productivity until rescue can be arranged.",
+  "book.stasisdelvers.pamphlet.page2": "Here are some simple rules to follow, for your safety:\n\n§o1. Follow your compass.§r The Uppsala Alignment has yet to observe stasis in areas above 80% stability.",
+  "book.stasisdelvers.pamphlet.page3": "§o2. Do not be afraid of the rift next door!§r Temporal stability can vary wildly, meter by meter, and living next to a temporal sinkhole is not inherently dangerous.",
+  "book.stasisdelvers.pamphlet.page4": "§o3. Shelter in a government-approved temporal stasis field if possible.§r The safeguard towers, and their stasis fields, should be clearly visible from a distance.",
+  "book.stasisdelvers.pamphlet.page5": "§o4. Do not enter the wandering clouds!§r They will freeze you, albeit only temporarily. If you must wander through the Deeps, seek protective equipment beforehand.",
+  "book.stasisdelvers.pamphlet.page6": "A government-issue delver suit will keep you safe for up to thirty minutes, more with batteries.\n\n§o5. If your child wanders into a Deep and is frozen,§r then you can extract them with a leash.",
+  "book.stasisdelvers.pamphlet.page7": "There have been reports of citizens utilising rift crystals to create bootleg, unstable stasis fields and pendants. The government disavows this practice.",
+  "book.stasisdelvers.pamphlet.page8": "Such bootleg equipment lasts barely half an hour at most, and cannot be used to speed up work.\n\nExclusion Zone STRHLD has been established at the Bypass site. Do not approach without a permit and the prescribed defensive measures."
 }

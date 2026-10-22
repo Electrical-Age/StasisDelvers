@@ -45,6 +45,18 @@ public final class Remains {
         if (e.getEntity() instanceof ServerPlayer p && !keeps(p.level())) e.setDroppedExperience(0);
     }
 
+    /** Per dying player: their inventory's stacks (by identity: the drops are the same objects) and slots. */
+    static final java.util.Map<java.util.UUID, java.util.Map<ItemStack, Integer>> SLOTS = new java.util.HashMap<>();
+
+    /** Just before the death drops: where each stack sat. */
+    static void dying(net.neoforged.neoforge.event.entity.living.LivingDeathEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer p)) return;
+        java.util.Map<ItemStack, Integer> m = new java.util.IdentityHashMap<>();
+        var inv = p.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) if (!inv.getItem(i).isEmpty()) m.put(inv.getItem(i), i);
+        SLOTS.put(p.getUUID(), m);
+    }
+
     static void drops(LivingDropsEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p) || p.isSpectator()) return;
         ServerLevel level = p.level();
@@ -58,9 +70,12 @@ public final class Remains {
             p.experienceLevel = 0;
             p.experienceProgress = 0;
         }
+        java.util.Map<ItemStack, Integer> where = SLOTS.remove(p.getUUID());
         for (ItemEntity item : e.getDrops()) {
             ItemStack st = item.getItem();
-            if (!st.isEmpty()) statue.items().add(st.copy());
+            // (each item's inventory slot, from just before the death, so it goes back there: Statue.crumble)
+            Integer slot = where == null ? null : where.get(st);
+            if (!st.isEmpty()) statue.add(st.copy(), slot == null ? -1 : slot);
         }
         e.getDrops().clear();
         if (fresh) {

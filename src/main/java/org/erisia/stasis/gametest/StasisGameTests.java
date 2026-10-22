@@ -474,6 +474,28 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        // Baughn (like the Corpse mod): breaking your statue puts each thing back where it was
+        CASES.put("statue_items_back_in_place", new Spec(20, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            return () -> {
+                var inv = p.getInventory();
+                inv.setItem(3, new ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE));
+                inv.setItem(20, new ItemStack(net.minecraft.world.item.Items.BREAD, 7));
+                p.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(net.minecraft.world.item.Items.IRON_HELMET));
+                int head = -1;
+                for (int i = 0; i < inv.getContainerSize(); i++) if (inv.getItem(i).is(net.minecraft.world.item.Items.IRON_HELMET)) head = i;
+                org.erisia.stasis.Statue st = org.erisia.stasis.Statue.of(h.getLevel(), p);
+                c.check("the statue took everything", inv.isEmpty() && st.items().size() == 3, st.items().size() + " items");
+                inv.setItem(0, new ItemStack(net.minecraft.world.item.Items.STICK));   // (something picked up since)
+                st.crumble(h.getLevel(), p);
+                c.check("pickaxe back in hotbar slot 3", inv.getItem(3).is(net.minecraft.world.item.Items.DIAMOND_PICKAXE), inv.getItem(3).toString());
+                c.check("bread back in slot 20", inv.getItem(20).is(net.minecraft.world.item.Items.BREAD) && inv.getItem(20).getCount() == 7, inv.getItem(20).toString());
+                c.check("helmet back on the head", head >= 0 && p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(net.minecraft.world.item.Items.IRON_HELMET),
+                    "slot " + head + ": " + p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
+                c.check("what was picked up since stays", inv.getItem(0).is(net.minecraft.world.item.Items.STICK), inv.getItem(0).toString());
+                remove(h, p);
+            };
+        }));
         CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {
@@ -4180,14 +4202,16 @@ public final class StasisGameTests {
             ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
             c.cleanup.add(0, () -> remove(h, p));
             org.erisia.stasis.StarterKit.login(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p));
-            int compasses = 0, other = 0;
+            int compasses = 0, other = 0, pamphlets = 0;
             for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
                 ItemStack st = p.getInventory().getItem(i);
                 if (st.isEmpty()) continue;
                 if (st.is(org.erisia.stasis.StasisRegistry.STABILITY_COMPASS.get())) compasses += st.getCount();
+                else if (st.is(net.minecraft.world.item.Items.WRITTEN_BOOK)) pamphlets += st.getCount();   // (the rift-safety pamphlet: Baughn)
                 else other++;
             }
             c.check("exactly one stability compass after joining and logging in again", compasses == 1, compasses + " compasses");
+            c.check("and one rift-safety pamphlet", pamphlets == 1, pamphlets + " pamphlets");
             c.check("nothing else", other == 0, other + " other stacks");
         }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range

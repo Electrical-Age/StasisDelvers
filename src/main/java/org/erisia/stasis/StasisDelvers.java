@@ -43,6 +43,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(DeathAdvancements::died);
         NeoForge.EVENT_BUS.addListener(PossessedStatue::login);
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::drops);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::dying);   // (slots, for putting things back)
         NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, Remains::experience);
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, Remains::respawn);
         NeoForge.EVENT_BUS.addListener(StasisEvents::keepFriendlyInside);

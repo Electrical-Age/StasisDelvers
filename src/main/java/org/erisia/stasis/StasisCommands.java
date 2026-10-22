@@ -129,8 +129,10 @@ final class StasisCommands {
                 src.sendSuccess(() -> Component.literal(list.size() + " drifting deep(s) around; here: "
                     + String.format("%.2f", Deeps.at(level, (int) Math.floor(pos.x), (int) Math.floor(pos.y), (int) Math.floor(pos.z)))), false);
                 for (var dp : list)
-                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f, radius %.0f, strength %.2f, %.0f blocks away",
-                        dp.x(), dp.z(), dp.radius(), dp.strength(), Math.hypot(dp.x() - pos.x, dp.z() - pos.z))), false);
+                    src.sendSuccess(() -> Component.literal(String.format("  centre %.0f %.0f, radius %.0f, strength %.2f, %.0f blocks away%s",
+                        dp.x(), dp.z(), dp.radius(), dp.strength(), Math.hypot(dp.x() - pos.x, dp.z() - pos.z),
+                        // (before hard mode a deep fades off stable land: Deeps.calm)
+                        Deeps.calm(level, dp) < 1 ? String.format(", calmed to %.0f %% (stable land)", 100 * Deeps.calm(level, dp)) : "")), false);
                 return list.size();
             }))
             .then(Commands.literal("status").then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player()).executes(c -> {

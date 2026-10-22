@@ -46,6 +46,9 @@ public class Statue extends Entity {
     private UUID owner = UUID.randomUUID();
     private String ownerName = "";
     private NonNullList<ItemStack> items = NonNullList.create();
+    /** Each item's slot in its owner's inventory when it was taken (-1: not known), so it goes back there (Baughn
+     *  2026-10-22: like the Corpse mod). Parallel to items. */
+    private final java.util.List<Integer> slots = new java.util.ArrayList<>();
     private int xp;
 
     public Statue(EntityType<? extends Statue> type, Level level) {
@@ -66,7 +69,7 @@ public class Statue extends Entity {
         var inv = player.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) {
             ItemStack st = inv.removeItemNoUpdate(i);
-            if (!st.isEmpty()) s.items.add(st);
+            if (!st.isEmpty()) s.add(st, i);
         }
         s.xp = points(player);
         player.totalExperience = 0;
@@ -193,6 +196,17 @@ public class Statue extends Entity {
         return owner;
     }
 
+    /** Add an item that came from inventory slot slot (-1: unknown). */
+    public void add(ItemStack st, int slot) {
+        items.add(st);
+        while (slots.size() < items.size() - 1) slots.add(-1);
+        slots.add(slot);
+    }
+
+    int slotOf(int i) {
+        return i < slots.size() ? slots.get(i) : -1;
+    }
+
     public List<ItemStack> items() {
         return items;
     }
@@ -257,17 +271,79 @@ public class Statue extends Entity {
             player.sendOverlayMessage(Component.literal("This statue won't move for you."));
             return InteractionResult.FAIL;
         }
+        // sneaking: a chest of its things, to take some (Baughn: like the Corpse mod); else all of it, back in place
+        if (player.isSecondaryUseActive() && player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            open(sp);
+            return InteractionResult.SUCCESS_SERVER;
+        }
         crumble(level, player);
         return InteractionResult.SUCCESS_SERVER;
     }
 
-    /** Give everything back to the player who broke the statue (what doesn't fit drops), and remove it. */
+    /**
+     * Give everything back to the player who broke the statue, each item into the slot it came from when that slot is
+     * free (armour onto them, the hotbar as it was; Baughn: like the Corpse mod), the rest anywhere (what doesn't fit
+     * drops), and remove it.
+     */
     public void crumble(ServerLevel level, Player player) {
-        for (ItemStack st : items) player.getInventory().placeItemBackInInventory(st.copy(), net.minecraft.util.Prediction.SERVER_ONLY);
+        var inv = player.getInventory();
+        List<ItemStack> rest = new java.util.ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            ItemStack st = items.get(i);
+            int slot = slotOf(i);
+            if (slot >= 0 && slot < inv.getContainerSize() && inv.getItem(slot).isEmpty()) inv.setItem(slot, st.copy());
+            else rest.add(st);
+        }
+        for (ItemStack st : rest) inv.placeItemBackInInventory(st.copy(), net.minecraft.util.Prediction.SERVER_ONLY);
         items.clear();
+        slots.clear();
         if (xp > 0) player.giveExperiencePoints(xp);
         xp = 0;
         discard();
+    }
+
+    /** The statue's things in a chest window (54 slots): take what you like; what's left stays in the statue, which
+     *  crumbles once it's empty. Its experience comes with the first look. */
+    void open(net.minecraft.server.level.ServerPlayer player) {
+        int n = Math.min(54, items.size());
+        net.minecraft.world.SimpleContainer box = new net.minecraft.world.SimpleContainer(54);
+        int[] from = new int[54];
+        java.util.Arrays.fill(from, -1);
+        for (int i = 0; i < n; i++) {
+            box.setItem(i, items.get(i));
+            from[i] = slotOf(i);
+        }
+        List<ItemStack> hidden = new java.util.ArrayList<>(items.subList(n, items.size()));
+        List<Integer> hiddenSlots = new java.util.ArrayList<>();
+        for (int i = n; i < items.size(); i++) hiddenSlots.add(slotOf(i));
+        if (xp > 0) {
+            player.giveExperiencePoints(xp);
+            xp = 0;
+        }
+        Statue self = this;
+        player.openMenu(new net.minecraft.world.SimpleMenuProvider((id, pinv, pl) -> new net.minecraft.world.inventory.ChestMenu(
+            net.minecraft.world.inventory.MenuType.GENERIC_9x6, id, pinv, box, 6) {
+            @Override
+            public void removed(Player p) {
+                super.removed(p);
+                // what's left goes back into the statue (an item still where it was keeps its old slot)
+                List<ItemStack> was = List.copyOf(self.items);
+                self.items.clear();
+                self.slots.clear();
+                for (int i = 0; i < 54; i++) {
+                    ItemStack st = box.getItem(i);
+                    if (st.isEmpty()) continue;
+                    self.add(st, i < n && i < was.size() && st == was.get(i) ? from[i] : -1);
+                }
+                for (int i = 0; i < hidden.size(); i++) self.add(hidden.get(i), hiddenSlots.get(i));
+                if (self.items.isEmpty() && !self.isRemoved()) self.discard();
+            }
+
+            @Override
+            public boolean stillValid(Player p) {
+                return !self.isRemoved() && p.distanceToSqr(self) < 64;
+            }
+        }, Component.literal(ownerName)));
     }
 
     /** Give back everything where the statue stands, and remove it. */
@@ -278,6 +354,7 @@ public class Statue extends Entity {
             level.addFreshEntity(e);
         }
         items.clear();
+        slots.clear();
         if (xp > 0) ExperienceOrb.award(level, position(), xp);
         xp = 0;
         discard();
@@ -290,6 +367,8 @@ public class Statue extends Entity {
         Optional<List<ItemStack>> list = in.read("items", ItemStack.CODEC.listOf());
         items = NonNullList.create();
         list.ifPresent(items::addAll);
+        slots.clear();
+        in.read("slots", com.mojang.serialization.Codec.INT.listOf()).ifPresent(slots::addAll);   // (older statues: none)
         xp = in.getIntOr("xp", 0);
         setFallen(in.getBooleanOr("fallen", false));
         syncOwner();
@@ -300,6 +379,9 @@ public class Statue extends Entity {
         out.store("owner", UUIDUtil.CODEC, owner);
         out.putString("owner_name", ownerName);
         out.store("items", ItemStack.CODEC.listOf(), List.copyOf(items));
+        List<Integer> sl = new java.util.ArrayList<>();
+        for (int i = 0; i < items.size(); i++) sl.add(slotOf(i));
+        out.store("slots", com.mojang.serialization.Codec.INT.listOf(), sl);
         out.putInt("xp", xp);
         out.putBoolean("fallen", fallen());
     }
