@@ -18,7 +18,8 @@
     "EntityPushMixin",
     "EndBarrierMixin",
     "PathfindingContextMixin",
-    "WalkNodeEvaluatorMixin"
+    "WalkNodeEvaluatorMixin",
+    "BoatClampMixin"
   ],
   "injectors": {
     "defaultRequire": 1

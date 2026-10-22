@@ -43,6 +43,7 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Pre.class, FrozenEntities::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, RiftHum::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, DeepWarning::tick);   // (deeps seen and heard from outside)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent.class, DeepWarning::wall);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, EndBarrierFx::tick);   // spreading mode's End wall
         // the End event: the End's fog pushed out so the island's breaking up can be seen (AdventurAgent)
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, EndEventFog::tick);

@@ -99,3 +99,4 @@ mods) has rewritten a target, only that effect is lost.
   `rate_player_eats_slowly`, `rift_gates`, `spread_stronghold_rooms`, `spread_hard_mode_entry` (the entry point
   `EnderDragonFightMixin` calls; the mixin itself needs a real dragon fight and is untested).
 - Cosmetic mixins have no automated test; a missing hook shows as a startup warning.
+- `BoatClampMixin` (required): `AbstractBoat.clampRotation` HEAD: a frozen boat (FROZEN attachment) leaves its player rider's view free (Baughn: a frozen boat pinned the camera; vanilla clamps to +-105 degrees of a boat that can't turn). No event exists for it.
