@@ -978,7 +978,7 @@ public final class StasisGameTests {
         }, false, true));
         // λ-Nero, variant B: a chronal accelerator in the wall of a sealed riftstone room runs it (in stopped land too) at
         // its setting while it has power; a hole in the wall ends it; no power, no room
-        CASES.put("chronal_room", new Spec(100, (h, c) -> {
+        CASES.put("chronal_room", new Spec(150, (h, c) -> {
             ServerLevel level = h.getLevel();
             // a riftstone box x 9..13, y 1..4, z 1..5 (inside: x 10..12, y 2..3, z 2..4: 18 blocks), outside the test's field
             for (int x = 9; x <= 13; x++)
@@ -991,8 +991,14 @@ public final class StasisGameTests {
                 .setValue(org.erisia.stasis.ChronalAcceleratorBlock.STEP, 2));   // (2x)
             var acc = (org.erisia.stasis.ChronalAcceleratorBlockEntity) level.getBlockEntity(h.absolutePos(new BlockPos(9, 2, 3)));
             BlockPos in = h.absolutePos(new BlockPos(11, 2, 3)), out = h.absolutePos(new BlockPos(15, 2, 3));
-            boolean[] unpowered = new boolean[1];
+            boolean[] unpowered = new boolean[1], glassRoom = new boolean[1], doorOpen = new boolean[1];
             double[] seen = new double[4];
+            // a pane of riftstone glass in a wall and a shut riftstone door still seal it (Baughn 2026-10-23)
+            h.setBlock(new BlockPos(11, 3, 5), org.erisia.stasis.StasisRegistry.RIFTSTONE_GLASS.get());
+            h.setBlock(new BlockPos(11, 2, 1), org.erisia.stasis.StasisRegistry.RIFTSTONE_DOOR.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.DoorBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER));
+            h.setBlock(new BlockPos(11, 3, 1), org.erisia.stasis.StasisRegistry.RIFTSTONE_DOOR.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.DoorBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
             h.runAfterDelay(5, () -> {
                 unpowered[0] = org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ()) == null && Stasis.rateAt(level, in) == 0.0;
                 try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
@@ -1002,10 +1008,23 @@ public final class StasisGameTests {
             });
             h.runAfterDelay(50, () -> {
                 var room = org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ());
+                glassRoom[0] = room != null;
                 seen[0] = room == null ? -1 : room.volume();
                 seen[1] = Stasis.rateAt(level, in);
                 seen[2] = Stasis.speedAt(level, in);
                 seen[3] = Stasis.rateAt(level, out);
+                // the door opened: the room is gone at its next fill (2 s)
+                for (int y = 2; y <= 3; y++) {
+                    BlockPos dp = new BlockPos(11, y, 1);
+                    h.setBlock(dp, h.getBlockState(dp).setValue(net.minecraft.world.level.block.DoorBlock.OPEN, true));
+                }
+            });
+            h.runAfterDelay(95, () -> doorOpen[0] = org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ()) == null);
+            h.runAfterDelay(96, () -> {
+                for (int y = 2; y <= 3; y++) {
+                    BlockPos dp = new BlockPos(11, y, 1);
+                    h.setBlock(dp, h.getBlockState(dp).setValue(net.minecraft.world.level.block.DoorBlock.OPEN, false));
+                }
                 h.setBlock(new BlockPos(13, 3, 3), Blocks.AIR);   // (a hole in the far wall)
             });
             return () -> {
@@ -1013,8 +1032,11 @@ public final class StasisGameTests {
                 c.check("powered: an 18-block room", seen[0] == 18, "volume " + seen[0] + "; " + acc.status());
                 c.check("time runs inside (rateAt 1) at 2x (speedAt), stopped outside", seen[1] == 1.0 && seen[2] == 2.0 && seen[3] == 0.0,
                     seen[1] + " " + seen[2] + " " + seen[3]);
+                c.check("riftstone glass and a shut riftstone door seal the room", glassRoom[0]);
+                c.check("an open door: the room is gone", doorOpen[0], acc.status());
                 c.check("a hole in the wall: the room is gone", org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ()) == null
                     && Stasis.rateAt(level, in) == 0.0, acc.status());
+                c.check("riftstone macerates to dust (EA)", mods.eln.Eln.maceratorRecipes.getRecipe(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFTSTONE.get())) != null);
                 c.check("max volume: 512 plain walls, 1728 all refined", org.erisia.stasis.ChronalAcceleratorBlockEntity.maxVolumeForTests(0) == 512
                     && org.erisia.stasis.ChronalAcceleratorBlockEntity.maxVolumeForTests(1) == 1728);
                 level.setBlock(h.absolutePos(new BlockPos(9, 2, 3)), Blocks.AIR.defaultBlockState(), 3);

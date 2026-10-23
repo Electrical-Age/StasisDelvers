@@ -379,6 +379,17 @@ final class StasisCommands {
                 src.sendSuccess(() -> Component.literal(line), false);
                 return 1;
             }))
+            // testing: fill a chronal accelerator's store (a riftstone room without an EA line)
+            .then(Commands.literal("room").then(Commands.literal("charge").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
+                if (!(c.getSource().getLevel().getBlockEntity(BlockPosArgument.getBlockPos(c, "pos")) instanceof ChronalAcceleratorBlockEntity a)) {
+                    c.getSource().sendFailure(Component.literal("No chronal accelerator there"));
+                    return 0;
+                }
+                a.refill(c.getSource().getLevel());
+                a.testFill();
+                c.getSource().sendSuccess(() -> Component.literal("Accelerator store filled. " + a.status()), true);
+                return 1;
+            }))))
             .then(Commands.literal("tower")
                 .then(Commands.literal("charge").then(Commands.argument("pos", BlockPosArgument.blockPos())
                     .then(Commands.argument("share", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0, 1)).executes(c -> {

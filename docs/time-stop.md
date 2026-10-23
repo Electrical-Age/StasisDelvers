@@ -82,18 +82,20 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 
 ## Riftstone rooms (`Rooms`, `ChronalAcceleratorBlock(Entity)`; λ-Nero's variant B)
 - A chronal accelerator set into a wall fills from each of its sides (6-connected) through everything not tagged
-  `stasisdelvers:chronal_casing` (riftstone, refined riftstone, accelerators), within a 16-block span and at most 1728
+  `stasisdelvers:chronal_casing` (riftstone, refined riftstone, accelerators, riftstone glass; riftstone doors only while
+  shut), within a 16-block span and at most 1728
   blocks; the side that stays sealed is the room. Max volume 512 with plain walls, up to 1728 with all refined (by the
   refined share of its wall blocks). Every 2 s and on every click.
 - It runs while its FE store pays `2 W x volume x rate² x (1 - 0.5 x refined share)`: at its setting (`STEP` 0..18:
   1x..10x), else the highest half step the store carries, else not at all. Power comes from outside: an EA exporter
   against the accelerator (it counts as wall).
 - A running room is in `Rooms` (per level, copy-on-write, not saved: its accelerator registers it again after a load):
+  Riftstone glass: 3 sand + 1 riftstone dust (EA macerator, `ElnMachineRecipes.EXTRA`) make 4 glass mix, smelted.
   `rateAt` floors it at 1 (stopped land too; a rift still wins), `speedAt` takes its rate, `heldOff` (deeps pass over it),
   `mayRunInColumn`, `baseSectionState` (MIXED). Synced whole (`RoomsSync`); the client re-meshes and relights round a
   change (`FrozenSprites.roomsChanged`). The accelerator is `exemptBlockEntity` and `multiTickExempt`.
-- Not done: the post shader doesn't know rooms, so a room in stopped land still looks grey inside (its blocks run);
-  casing glass and doors. Test: `chronal_room`.
+- The post shader takes the rooms' boxes, walls included (slots 32+, `StasisPost.ROOM_BASE`): a room and its walls are
+  in colour in stopped land. Test: `chronal_room`.
 
 ## Data flow
 1. A tower (`TowerBlockEntity.start`) or a command (`StasisCommands`) calls `FieldData.add` or `update`.

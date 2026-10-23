@@ -38,6 +38,12 @@ public final class StasisPost {
      * (amber, dropout, side, remnant eddy clock) at +10, then the stretch (e, s, w, n) at +14, then at +18 an
      * acceleration field's rate (0 for the rest: Field.fast; λ-Nero: its shield turns gold and its hexes shimmer faster).
      */
+    /** Riftstone rooms (Rooms): ROOM_BASE count, then 6 slots a room (stasis.fsh; in the old free block 32-161). */
+    static final int ROOM_BASE = 32, MAX_ROOMS = 16;
+    static double sq(double v) {
+        return v * v;
+    }
+
     static final int FIELD_BASE = 4096, FIELD_STRIDE = 19, MAX_FIELDS = 32, SHIELD_OFF = 10, STRETCH_OFF = 14, SPEED_OFF = 18;
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
@@ -241,6 +247,22 @@ public final class StasisPost {
             d[sh + 3] = (float) ((rem.frozeAt() / 20.0) % (1048576 / 20.0));
         }
         d[24] = n;
+        // riftstone rooms (Rooms): up to MAX_ROOMS boxes, nearest first, walls included (they light up with the room),
+        // relative to floor(camera): [32] count, [33 + 6i] min x y z, max x y z (exclusive)
+        var rooms = new java.util.ArrayList<>(org.erisia.stasis.Rooms.all(mc.level));
+        rooms.sort(java.util.Comparator.comparingDouble(r -> sq(r.x0() + r.sx() / 2.0 - cam.x) + sq(r.y0() + r.sy() / 2.0 - cam.y) + sq(r.z0() + r.sz() / 2.0 - cam.z)));
+        int nr = Math.min(MAX_ROOMS, rooms.size());
+        d[ROOM_BASE] = nr;
+        for (int i = 0; i < nr; i++) {
+            var r = rooms.get(i);
+            int o = ROOM_BASE + 1 + 6 * i;
+            d[o] = (float) (r.x0() - 1 - fx);
+            d[o + 1] = (float) (r.y0() - 1 - fy);
+            d[o + 2] = (float) (r.z0() - 1 - fz);
+            d[o + 3] = (float) (r.x0() + r.sx() + 1 - fx);
+            d[o + 4] = (float) (r.y0() + r.sy() + 1 - fy);
+            d[o + 5] = (float) (r.z0() + r.sz() + 1 - fz);
+        }
         // the client's render distance in blocks (terrain ends, and vanilla's render-distance fog with it, there)
         float view = mc.options.getEffectiveRenderDistance() * 16f;
         d[216] = view;

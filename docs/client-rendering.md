@@ -79,7 +79,8 @@ through hooks set in `StasisClient`.
   - 4096 + 19i (the 5th row): field i (`FIELD_BASE`, `FIELD_STRIDE`, `MAX_FIELDS` = 32): +0..9 centre, radius,
     collapse, failing, column, seed, age, remnant time; +10..13 the shield (amber, dropout, side, remnant eddy clock);
     +14..17 the stretch (e, s, w, n); +18 an acceleration field's rate (0 otherwise: its shield shimmers that much faster
-    and turns gold). Slots 32-161 and 1700-1803 (the old 13-field blocks) are free.
+    and turns gold). Slots 32-129: riftstone rooms (`ROOM_BASE`: count, then 6 a room, their boxes with walls, up to 16).
+    Slots 130-161 and 1700-1803 (the old 13-field blocks) are free.
 - Fields get slots nearest the camera first (`StasisPost.gap`: blocks to the shell), live before frozen remnants;
   fields whose centre chunk the client hasn't loaded are left out (Baughn: their shields drew through terrain that
   wasn't there). Rift querns made 13 too few (2026-10-21).

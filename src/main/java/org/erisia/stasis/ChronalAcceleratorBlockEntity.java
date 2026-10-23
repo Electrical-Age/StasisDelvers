@@ -18,7 +18,8 @@ import java.util.ArrayDeque;
 /**
  * A chronal accelerator's room (λ-Nero, variant B; notes/timestop/ACCEL-DESIGN.md). Every 2 s (and when its setting
  * changes) it flood-fills from each of its sides through everything that isn't chronal casing (the block tag
- * stasisdelvers:chronal_casing: riftstone, refined riftstone and accelerators), 6-connected, within a 16-block span;
+ * stasisdelvers:chronal_casing: riftstone, refined riftstone, accelerators, riftstone glass, and riftstone doors while
+ * shut), 6-connected, within a 16-block span;
  * the side that stays sealed is the room. A room may hold MAX_PLAIN blocks walled in plain riftstone, up to
  * MAX_REFINED all refined (in proportion to the refined share of its walls). It runs while the accelerator can pay
  * W_PER_BLOCK x volume x rate² (refined walls take off up to half) W from its FE store: at its setting, or the highest half
@@ -50,6 +51,11 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
         /** Size the store to the room (never below what it holds: a room that hasn't been filled yet has no size). */
         void size() {
             capacity = Math.max(Math.max(1000, energy), (int) Math.ceil(drawW(10) * STORE_SECONDS * FE_PER_J));
+        }
+
+        void fill() {
+            energy = capacity;
+            setChanged();
         }
 
         void load(int fe) {
@@ -134,6 +140,12 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
         return new Rooms.Room(r.key(), r.x0(), r.y0(), r.z0(), r.sx(), r.sy(), r.sz(), r.bits(), rate);
     }
 
+    /** Testing (/stasis room charge): fill the store. */
+    void testFill() {
+        store.size();
+        store.fill();
+    }
+
     /** What a click shows: the room and its draw, or why there's none. */
     public String status() {
         if (shape == null) return why;
@@ -163,7 +175,13 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
     }
 
     static boolean casing(ServerLevel sl, BlockPos p) {
-        return sl.getBlockState(p).is(CASING);
+        return casing(sl.getBlockState(p));
+    }
+
+    /** Chronal casing: the tag, and a riftstone door only while it's shut (an open door lets the room out). */
+    static boolean casing(BlockState s) {
+        if (!s.is(CASING)) return false;
+        return !s.hasProperty(net.minecraft.world.level.block.DoorBlock.OPEN) || !s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN);
     }
 
     /** Fill from start; null when it found a sealed room (shape set), else why not. */
@@ -192,7 +210,7 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
                 if (lx < 0 || ly < 0 || lz < 0 || lx >= n || ly >= n || lz >= n) return "Not sealed (or wider than " + SPAN + " blocks)";
                 int i = idx(lx, ly, lz, n);
                 BlockState s = sl.getBlockState(o);
-                if (s.is(CASING)) {
+                if (casing(s)) {
                     if (!wallSeen.get(i)) {
                         wallSeen.set(i);
                         walls++;

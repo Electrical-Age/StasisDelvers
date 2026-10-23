@@ -27,7 +27,8 @@
 // shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
 // [251] how far rifts are drawn on the sky (ReportConfig.riftRange); [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
 // [1600] possessed eye count (<= 16), [1601 + 3i ..] eye i - floor(camera);
-// [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 19i ..] field i
+// [32] riftstone room count (<= 16), [33 + 6i ..] room i's box, walls included, - floor(camera): min x y z, max x y z
+// (exclusive); [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 19i ..] field i
 // (i < 32, nearest first, live before remnants): centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1; -1 a lull: a column without a shell), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
@@ -1098,6 +1099,13 @@ void main() {
                 vivid = max(vivid, inside * 0.35 * exp(-(age - 2.5) * (age - 2.5) / 0.08));
             }
             run = max(run, inside);
+        }
+        // riftstone rooms (Rooms): their box, walls included, runs (slots 32 + 6i; StasisPost.ROOM_BASE)
+        int nrooms = int(data(32));
+        vec3 rb = floor(pBlk);
+        for (int i = 0; i < nrooms && i < 16; i++) {
+            int o = 33 + 6 * i;
+            if (all(greaterThanEqual(rb, vec3(data(o), data(o + 1), data(o + 2)))) && all(lessThan(rb, vec3(data(o + 3), data(o + 4), data(o + 5))))) run = 1.0;
         }
         // spreading mode: land the stillness hasn't reached runs, whatever the fields (Stasis.rateAt), except where a
         // drifting deep stops it (below). The block column as the server sees it; the sky takes the camera's.

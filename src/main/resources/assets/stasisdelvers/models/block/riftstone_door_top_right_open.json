@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/door_top_right_open",
+  "textures": {
+    "bottom": "stasisdelvers:block/riftstone_door_bottom",
+    "top": "stasisdelvers:block/riftstone_door_top"
+  }
+}

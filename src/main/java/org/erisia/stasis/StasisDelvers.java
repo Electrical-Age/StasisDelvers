@@ -132,6 +132,9 @@ public final class StasisDelvers {
         // clients draw flashlight beams (client/FlashlightPost): EA lights only the holder's block, not a trail
         mods.eln.item.electricalitem.LampItem.clientBeam = e -> true;
         NodeFreezer.install();
+        // an EA macerator grinds riftstone to dust: three sand to one make riftstone glass (Baughn 2026-10-23)
+        mods.eln.registry.ElnMachineRecipes.EXTRA.add(() -> mods.eln.Eln.maceratorRecipes.addRecipe(new mods.eln.misc.Recipe(
+            new net.minecraft.world.item.ItemStack(StasisRegistry.RIFTSTONE.get()), new net.minecraft.world.item.ItemStack(StasisRegistry.RIFTSTONE_DUST.get()), 4000)));
         org.erisia.stasis.gametest.StasisGameTests.register(modBus);
     }
 }

@@ -165,6 +165,28 @@ public final class StasisRegistry {
         p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(3f, 12f).requiresCorrectToolForDrops()
             .sound(net.minecraft.world.level.block.SoundType.DEEPSLATE_BRICKS));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> REFINED_RIFTSTONE_ITEM = ITEMS.registerSimpleBlockItem(REFINED_RIFTSTONE);
+    /** Riftstone doors (Baughn 2026-10-23): chronal casing while shut (a riftstone room's door), opened by hand. */
+    public static final net.minecraft.world.level.block.state.properties.BlockSetType RIFTSTONE_SET = net.minecraft.world.level.block.state.properties.BlockSetType.register(
+        new net.minecraft.world.level.block.state.properties.BlockSetType("stasisdelvers_riftstone", true, false, false,
+            net.minecraft.world.level.block.state.properties.BlockSetType.PressurePlateSensitivity.MOBS, net.minecraft.world.level.block.SoundType.DEEPSLATE_BRICKS,
+            net.minecraft.sounds.SoundEvents.IRON_DOOR_CLOSE, net.minecraft.sounds.SoundEvents.IRON_DOOR_OPEN,
+            net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_CLOSE, net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_OPEN,
+            net.minecraft.sounds.SoundEvents.STONE_PRESSURE_PLATE_CLICK_OFF, net.minecraft.sounds.SoundEvents.STONE_PRESSURE_PLATE_CLICK_ON,
+            net.minecraft.sounds.SoundEvents.STONE_BUTTON_CLICK_OFF, net.minecraft.sounds.SoundEvents.STONE_BUTTON_CLICK_ON));
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.DoorBlock> RIFTSTONE_DOOR = BLOCKS.registerBlock("riftstone_door",
+        p -> new net.minecraft.world.level.block.DoorBlock(RIFTSTONE_SET, p), p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE)
+            .strength(3f, 12f).requiresCorrectToolForDrops().noOcclusion().pushReaction(net.minecraft.world.level.material.PushReaction.POPPED));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> RIFTSTONE_DOOR_ITEM = ITEMS.registerItem("riftstone_door",
+        p -> new net.minecraft.world.item.DoubleHighBlockItem(RIFTSTONE_DOOR.get(), p));
+    /** Riftstone glass (Baughn: sand and macerated riftstone, 3 to 1, smelted): chronal casing you can see through. */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.TransparentBlock> RIFTSTONE_GLASS = BLOCKS.registerBlock("riftstone_glass",
+        net.minecraft.world.level.block.TransparentBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(1.5f, 9f)
+            .sound(net.minecraft.world.level.block.SoundType.GLASS).noOcclusion()
+            .isRedstoneConductor((st, l, ps) -> false).isSuffocating((st, l, ps) -> false));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> RIFTSTONE_GLASS_ITEM = ITEMS.registerSimpleBlockItem(RIFTSTONE_GLASS);
+    /** Macerated riftstone (an EA macerator); three sand to one make riftstone glass mix, which smelts to riftstone glass. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFTSTONE_DUST = ITEMS.registerSimpleItem("riftstone_dust");
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFTSTONE_GLASS_MIX = ITEMS.registerSimpleItem("riftstone_glass_mix");
     /** The chronal accelerator (λ-Nero, variant B): set in the wall of a sealed riftstone room, it runs the room fast. */
     public static final net.neoforged.neoforge.registries.DeferredBlock<ChronalAcceleratorBlock> CHRONAL_ACCELERATOR = BLOCKS.registerBlock("chronal_accelerator",
         ChronalAcceleratorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.GOLD).strength(3f, 12f)

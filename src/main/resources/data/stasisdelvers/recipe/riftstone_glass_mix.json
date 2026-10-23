@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    "minecraft:sand",
+    "minecraft:sand",
+    "minecraft:sand",
+    "stasisdelvers:riftstone_dust"
+  ],
+  "result": {
+    "count": 4,
+    "id": "stasisdelvers:riftstone_glass_mix"
+  }
+}

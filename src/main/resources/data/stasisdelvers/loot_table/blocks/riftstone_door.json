@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "condition": {
+            "type": "minecraft:match_block",
+            "blocks": "stasisdelvers:riftstone_door",
+            "state": {
+              "half": "lower"
+            }
+          },
+          "name": "stasisdelvers:riftstone_door"
+        }
+      ],
+      "rolls": 1
+    }
+  ],
+  "random_sequence": "stasisdelvers:blocks/riftstone_door"
+}

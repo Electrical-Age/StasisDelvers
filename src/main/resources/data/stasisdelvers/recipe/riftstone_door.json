@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "F": "stasisdelvers:refined_riftstone"
+  },
+  "pattern": [
+    "FF",
+    "FF",
+    "FF"
+  ],
+  "result": {
+    "count": 3,
+    "id": "stasisdelvers:riftstone_door"
+  }
+}

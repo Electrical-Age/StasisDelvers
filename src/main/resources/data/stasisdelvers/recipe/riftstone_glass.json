@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:smelting",
+  "category": "blocks",
+  "cookingtime": 200,
+  "experience": 0.1,
+  "ingredient": "stasisdelvers:riftstone_glass_mix",
+  "result": {
+    "id": "stasisdelvers:riftstone_glass"
+  }
+}

@@ -2,6 +2,8 @@
   "values": [
     "stasisdelvers:riftstone",
     "stasisdelvers:refined_riftstone",
-    "stasisdelvers:chronal_accelerator"
+    "stasisdelvers:chronal_accelerator",
+    "stasisdelvers:riftstone_glass",
+    "stasisdelvers:riftstone_door"
   ]
 }
