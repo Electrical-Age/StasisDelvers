@@ -1042,6 +1042,33 @@ public final class StasisGameTests {
                 level.setBlock(h.absolutePos(new BlockPos(9, 2, 3)), Blocks.AIR.defaultBlockState(), 3);
             };
         }));
+        // Baughn: the accelerators' lever: a right-click raises the setting (round from the top), a sneak-right-click lowers
+        // it even with something in hand; the lever moves to the face clicked
+        CASES.put("accelerator_lever", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            BlockPos at = new BlockPos(12, 2, 4);
+            h.setBlock(at, org.erisia.stasis.StasisRegistry.CHRONAL_ACCELERATOR.get().defaultBlockState().setValue(org.erisia.stasis.ChronalAcceleratorBlock.STEP, 2));
+            BlockPos abs = h.absolutePos(at);
+            ServerPlayer p = survivalPlayer(h, new Vec3(10.5, 1.0, 4.5), true);
+            p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.STICK));
+            var hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(abs).add(-0.5, 0, 0), net.minecraft.core.Direction.WEST, abs, false);
+            java.util.function.IntSupplier step = () -> level.getBlockState(abs).getValue(org.erisia.stasis.ChronalAcceleratorBlock.STEP);
+            p.gameMode.useItemOn(p, level, p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND, hit);
+            int up = step.getAsInt();
+            p.setShiftKeyDown(true);
+            p.gameMode.useItemOn(p, level, p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND, hit);
+            p.gameMode.useItemOn(p, level, p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND, hit);
+            int down = step.getAsInt();
+            p.setShiftKeyDown(false);
+            level.setBlock(abs, level.getBlockState(abs).setValue(org.erisia.stasis.ChronalAcceleratorBlock.STEP, 18), 3);
+            p.gameMode.useItemOn(p, level, p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND, hit);
+            int wrapped = step.getAsInt();
+            int face = ((org.erisia.stasis.AcceleratorLevers.Lever) level.getBlockEntity(abs)).leverFace();
+            c.check("a click raises, a sneak-click with a stick in hand lowers, 10x wraps to 1x", up == 3 && down == 1 && wrapped == 0, up + " " + down + " " + wrapped);
+            c.check("the lever is on the face clicked (west)", face == net.minecraft.core.Direction.WEST.get3DDataValue(), "" + face);
+            remove(h, p);
+            level.setBlock(abs, Blocks.AIR.defaultBlockState(), 3);
+        }));
         // λ-Nero: a temporal accelerator against the core runs the tower's field at its setting, for the rate squared in
         // power; with nothing coming in, the rate the power carries is 1x; taking it away puts the field back
         CASES.put("tower_temporal_accelerator", new Spec(70, (h, c) -> {

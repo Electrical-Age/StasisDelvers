@@ -25,7 +25,7 @@ import java.util.ArrayDeque;
  * W_PER_BLOCK x volume x rate² (refined walls take off up to half) W from its FE store: at its setting, or the highest half
  * step the store carries, or not at all (Rooms).
  */
-public class ChronalAcceleratorBlockEntity extends BlockEntity {
+public class ChronalAcceleratorBlockEntity extends BlockEntity implements AcceleratorLevers.Lever {
     public static final TagKey<Block> CASING = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "chronal_casing"));
     static final int MAX_PLAIN = 512, MAX_REFINED = 1728, SPAN = 16;
     /** Draw per block of room at 1x (W); FE is 4/3 J as EA's. */
@@ -42,6 +42,28 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
     private int ticks;
 
     final Store store = new Store();
+    int leverFace = AcceleratorLevers.DEFAULT_FACE;
+
+    @Override
+    public int leverFace() {
+        return leverFace;
+    }
+
+    @Override
+    public void setLeverFace(int face) {
+        leverFace = face;
+        setChanged();
+    }
+
+    @Override
+    public net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveCustomOnly(registries);
+    }
 
     final class Store extends SimpleEnergyHandler {
         Store() {
@@ -253,11 +275,13 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
     protected void saveAdditional(ValueOutput out) {
         super.saveAdditional(out);
         out.putInt("energy", store.amount());
+        out.putInt("lever", leverFace);
     }
 
     @Override
     protected void loadAdditional(ValueInput in) {
         super.loadAdditional(in);
         store.load(in.getIntOr("energy", 0));
+        leverFace = in.getIntOr("lever", AcceleratorLevers.DEFAULT_FACE);
     }
 }

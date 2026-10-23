@@ -25,6 +25,10 @@ public final class StasisClient {
             SuitGauge::render));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerBlockEntityRenderer(StasisRegistry.QUERN_ENTITY.get(), QuernRenderer::new));
+        modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> {
+            e.registerBlockEntityRenderer(StasisRegistry.TEMPORAL_ACCELERATOR_ENTITY.get(), AcceleratorLeverRenderer::new);
+            e.registerBlockEntityRenderer(StasisRegistry.CHRONAL_ACCELERATOR_ENTITY.get(), AcceleratorLeverRenderer::new);
+        });
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.RIFT_ASKEW.get(),
             AskewRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.POSSESSED_STATUE.get(),

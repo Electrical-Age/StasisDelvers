@@ -160,6 +160,8 @@ public final class StasisRegistry {
         TemporalAcceleratorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.GOLD).strength(3f, 9f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> 4 + st.getValue(TemporalAcceleratorBlock.STEP) / 3));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TEMPORAL_ACCELERATOR = ITEMS.registerSimpleBlockItem(TEMPORAL_ACCELERATOR_BLOCK);
+    public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TemporalAcceleratorBlockEntity>> TEMPORAL_ACCELERATOR_ENTITY =
+        BLOCK_ENTITIES.register("temporal_accelerator", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TemporalAcceleratorBlockEntity::new, TEMPORAL_ACCELERATOR_BLOCK.get()));
     /** Refined riftstone (λ-Nero): chronal casing that lets a riftstone room grow bigger and cost less (ChronalAcceleratorBlockEntity). */
     public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> REFINED_RIFTSTONE = BLOCKS.registerSimpleBlock("refined_riftstone",
         p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(3f, 12f).requiresCorrectToolForDrops()

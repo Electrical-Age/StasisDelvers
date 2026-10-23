@@ -64,8 +64,9 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
 - Config: `towerDrawK`, `towerStoreC`, `towerMaxSegments`, `towerBoomStretch`, `towerFieldRate` (`StasisConfig`).
 
 ## Temporal accelerator (`TemporalAcceleratorBlock`; λ-Nero, notes/timestop/ACCEL-DESIGN.md)
-- A block against either core cell (any side). Right-click raises its `STEP` (1..18), sneak-right-click lowers it:
-  rate = 1 + step / 2 (1.5x..10x). `want(level, master)`: the highest setting against the core.
+- A block against either core cell (any side), set by its lever (`AcceleratorLevers`: a right-click raises `STEP` 1..18,
+  round from the top; a sneak-right-click lowers it, with anything in hand; `AcceleratorLeverRenderer` draws the
+  lever on the face last clicked, swinging with the setting): rate = 1 + step / 2 (1.5x..10x). `want(level, master)`: the highest setting against the core.
 - `TowerBlockEntity.accelerate` (once a second while running, after `safety`): the field runs at `accelRate`
   (saved), or at `towerFieldRate` when it's 1. `drawAt(r)` includes `(accelRate / towerFieldRate)²` (Baughn: priced by
   the speed-up, 0.6 to 1.5 is 2.5²).

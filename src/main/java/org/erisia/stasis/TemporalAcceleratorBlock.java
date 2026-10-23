@@ -15,11 +15,11 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * The temporal accelerator (λ-Nero: a block placed against the tower's power core): a tower with one beside its core
  * runs its field faster than time (Field.fast; the blocks inside get Stasis.speedAt ticks), for the tower's draw times
- * the square of the speed-up over its own field's rate (Baughn: 0.6 to 1.5 is 2.5²). Right-click raises its setting by half, sneak-right-click lowers it:
- * 1.5x .. 10x (STEP 1..18). Short of power, the tower drops its rate back towards 1x before it shrinks its field
+ * the square of the speed-up over its own field's rate (Baughn: 0.6 to 1.5 is 2.5²). Its lever sets it, 1.5x .. 10x (STEP 1..18):
+ * AcceleratorLevers. Short of power, the tower drops its rate back towards 1x before it shrinks its field
  * (TowerBlockEntity.safety).
  */
-public class TemporalAcceleratorBlock extends Block {
+public class TemporalAcceleratorBlock extends Block implements net.minecraft.world.level.block.EntityBlock {
     public static final IntegerProperty STEP = IntegerProperty.create("step", 1, 18);
 
     public TemporalAcceleratorBlock(Properties p) {
@@ -32,23 +32,16 @@ public class TemporalAcceleratorBlock extends Block {
         b.add(STEP);
     }
 
+    @Override
+    public net.minecraft.world.level.block.entity.BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new TemporalAcceleratorBlockEntity(pos, state);
+    }
+
     /** The rate a setting stands for: 1 + step / 2. */
     public static double rate(int step) {
         return 1 + step * 0.5;
     }
 
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        // up by half a step a click, round from 10x back to 1.5x; a sneak-click with an empty hand goes down
-        int step = player.isSecondaryUseActive() ? Math.max(1, state.getValue(STEP) - 1) : state.getValue(STEP) % 18 + 1;
-        if (!level.isClientSide()) {
-            level.setBlock(pos, state.setValue(STEP, step), Block.UPDATE_ALL);
-            boolean atCore = coreBeside(level, pos) != null;
-            player.sendOverlayMessage(Component.literal(String.format("Temporal accelerator: %.1fx", rate(step))
-                + (atCore ? "" : " (not against a tower core)")));
-        }
-        return InteractionResult.SUCCESS;
-    }
 
     /** The formed tower core block next to pos (sideways), or null. */
     static BlockPos coreBeside(Level level, BlockPos pos) {
