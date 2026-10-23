@@ -136,6 +136,11 @@ public final class Spread {
         return s.map() == null || !SpreadMap.stilled(s.map(), x, z, s.p());
     }
 
+    /** runs(), for the client's edge curtain (StillEdge). */
+    public static boolean runsAt(Level level, int x, int z) {
+        return runs(level, x, z);
+    }
+
     /** Chunk (cx, cz) in spreading mode: 1 every column runs, 0 every column is stilled, 2 some of each. */
     static int chunk(Level level, int cx, int cz) {
         State s = state(level);
