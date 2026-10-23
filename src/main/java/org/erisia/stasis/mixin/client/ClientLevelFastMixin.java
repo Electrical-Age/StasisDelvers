@@ -25,7 +25,7 @@ public abstract class ClientLevelFastMixin {
         ClientLevel self = (ClientLevel) (Object) this;
         if (stasis$extra || entity instanceof Player || !Stasis.hasFast(self)) return;
         for (Entity p : entity.getIndirectPassengers()) if (p instanceof Player) return;
-        int k = Stasis.ticksThisTurn(Stasis.speedAt(self, entity.blockPosition()), self.getGameTime());
+        int k = Stasis.ticksThisTurn(Stasis.clientSpeedAt(self, entity.blockPosition()), self.getGameTime());   // (over the client's own tick rate)
         if (k <= 1) return;
         stasis$extra = true;
         try {

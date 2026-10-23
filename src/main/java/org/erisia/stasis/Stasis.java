@@ -299,6 +299,19 @@ public final class Stasis {
     }
 
     /**
+     * speedAt as the client should run it per client tick: the client's own tick rate may already be faster or slower
+     * than the server's 20 TPS (PlayerRates sends a sped-up or slowed player their rate), so the extra ticks are what is
+     * left of the speed after that (Argon via the advisor: else a 3x player saw a 3x field's cows at 9x). On the server,
+     * speedAt.
+     */
+    public static double clientSpeedAt(Level level, BlockPos pos) {
+        double s = speedAt(level, pos);
+        if (!level.isClientSide() || s <= 1.0) return s;
+        float tps = level.tickRateManager().tickrate();
+        return tps > 0 ? s * 20.0 / tps : s;
+    }
+
+    /**
      * How many ticks a block running `speed` times faster gets in game tick t: floor(t m / 1000) - floor((t - 1) m / 1000)
      * with m = speed in thousandths (1000..MAX_RATE*1000): at 2.5, 2 and 3 alternately. As runs() for slow rates:
      * stateless, the same for every block at that speed. 1 at speed 1 or below.

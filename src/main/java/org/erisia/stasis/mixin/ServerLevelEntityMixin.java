@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Entities in an acceleration field (Stasis.speedAt above 1) get that many ticks a game tick: they grow, breed, burn
  * and despawn faster, and items fall and age faster (λ-Nero). The extra passes go through tickNonPassenger itself
  * (EntityTickEvent, old position, riders), guarded against re-entry; each re-checks that the entity is still there and
- * still in the field. Not players (PlayerRates), not passengers (their vehicle carries them).
+ * still in the field. Not players (PlayerRates), not passengers (their vehicle carries them), not what a player rides.
  */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelEntityMixin {
@@ -25,6 +25,7 @@ public abstract class ServerLevelEntityMixin {
     private void stasis$fastTicks(Entity entity, CallbackInfo ci) {
         ServerLevel self = (ServerLevel) (Object) this;
         if (stasis$extra || entity instanceof Player || !Stasis.hasFast(self)) return;
+        for (Entity p : entity.getIndirectPassengers()) if (p instanceof Player) return;   // (a ridden boat or horse: its rider drives it)
         int k = Stasis.ticksThisTurn(Stasis.speedAt(self, entity.blockPosition()), self.getGameTime());
         if (k <= 1) return;
         stasis$extra = true;

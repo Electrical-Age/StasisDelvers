@@ -750,6 +750,8 @@ public class TowerBlockEntity extends BlockEntity {
         state = State.OFF;
         effRadius = 0;
         retreating = false;
+        accelRate = 1;   // (a stopped tower draws nothing extra)
+        accelRetreat = false;
         collapseTicks = 0;
         failing = amber = dropout = 0;
         Tickets.update(sl, this);

@@ -5,7 +5,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 (`RegisterPayloadHandlersEvent`).
 
 ## Protocol version
-- `e.registrar("15")` (15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+- `e.registrar("16")` (16: `field_speeds`; 15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
   are then refused at login instead of failing mid-game.
   - 9 added `dig_stilled`.
   - 10 removed the unused `chunk_clocks`.
@@ -24,6 +24,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 | `StormOverride(active, start, end, folded)` | `storm_override` | `sendStorm` (`Storms.start/stop`), `sendGates` | `Storms.clientOverride` |
 | `Freeze(progress)` | `freeze` | `Freezing.tick` on a change ≥ 0.01 | `StasisNet.clientFreeze` (shader slot 23) |
 | `FieldClocks(map id → double[])` | `field_clocks` | `LocalTime.tick` every 40 ticks | `LocalTime.Client.fieldClocks` |
+| `FieldSpeeds(map id → double)` | `field_speeds` | `Speeds.recount` each second, while a level has acceleration fields held below their rate (once more, empty, after) | `Speeds.clientAchieved` |
 | `Gutters(map pos → light)` | `gutters` | `Flames` (on watch and on change) | `Flames.clientGutters` |
 | `Bolt(from, to, seed)` | `bolt` | `TowerBlockEntity.bolt/boltOut/freeze` | `boltSink` → `client/BoltRenderer` + `client/AntiSound` |
 | `SpreadState(reset, map, count, p, hard, complete, endStill, endEvent, stormOrigin)` | `spread_state` | `SpreadSync.tick`: to every player when the state changes (P at most once a second, `STATE_EVERY`; completion, hard mode, the End stilling, the End event, the storms' origin and P going back at once), and with `reset` on login, respawn, dimension change and a new map | `Spread.clientState` (resets drop the tiles; a P change tells `FrozenSprites` what to re-mesh; `stormOrigin` feeds `Storms.clientOrigin`; `endEvent` drives `client/EndEventFog`) |

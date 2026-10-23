@@ -24,7 +24,7 @@ public abstract class BoundTickingBlockEntityMixin {
     private <T extends BlockEntity> void stasis$fastTicks(BlockEntityTicker<T> ticker, Level level, BlockPos pos, BlockState state, T be, Operation<Void> op) {
         op.call(ticker, level, pos, state, be);
         if (!Stasis.hasFast(level) || Stasis.multiTickExempt(be)) return;   // (both sides: client animations keep pace)
-        int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
+        int k = Stasis.ticksThisTurn(Stasis.clientSpeedAt(level, pos), level.getGameTime());   // (the client: over its own tick rate)
         for (int i = 1; i < k; i++) {
             if (be.isRemoved() || level.getBlockEntity(pos) != be) return;
             BlockState now = level.getBlockState(pos);

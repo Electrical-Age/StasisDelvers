@@ -142,6 +142,7 @@ class NetCodecTest {
         assertEquals(clocks.keySet(), back.keySet());
         clocks.forEach((id, v) -> assertArrayEquals(v, back.get(id)));
         assertEquals(new StasisNet.Gutters(lights), trip(StasisNet.Gutters.CODEC, new StasisNet.Gutters(lights)));
+        assertEquals(new StasisNet.FieldSpeeds(fieldTimes), trip(StasisNet.FieldSpeeds.CODEC, new StasisNet.FieldSpeeds(fieldTimes)));
     }
 
     @Property(tries = 200)

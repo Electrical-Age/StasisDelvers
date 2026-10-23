@@ -18,8 +18,8 @@ import java.util.Map;
  * The rate acceleration fields (Field.fast: rate above 1) achieve: every extra tick is real server work, so once a second
  * each one counts what it holds (block entities and entities) and runs at 1 + min(rate - 1, budget / count), with the
  * extra ticks of all of them together held to the server budget (StasisConfig accelBudget, accelServerBudget). Kept
- * here, not on the Field: a change to FieldData re-syncs, re-meshes and relights. The client has no copy yet and uses
- * the field's rate (client-side extra ticks are later work).
+ * here, not on the Field: a change to FieldData re-syncs, re-meshes and relights. Clients get the fields held below
+ * their rate (StasisNet.FieldSpeeds) for their own extra ticks.
  */
 public final class Speeds {
     private Speeds() {
@@ -29,9 +29,19 @@ public final class Speeds {
      *  without a lock (speedAt asks per block-entity and entity tick). */
     private static volatile Map<Level, Int2ObjectOpenHashMap<double[]>> state = Map.of();
 
-    /** The rate field f runs its blocks at now (the server's budgeted rate; on the client, its rate). */
+    /** The client's copy: field id to achieved rate, for the fields held below their rate (FieldSpeeds). */
+    private static volatile Map<Integer, Double> client = Map.of();
+
+    static void clientAchieved(Map<Integer, Double> m) {
+        client = Map.copyOf(m);
+    }
+
+    /** The rate field f runs its blocks at now (the budgeted rate; the client has it from the server). */
     public static double achieved(Level level, Field f) {
-        if (!(level instanceof ServerLevel)) return f.rate();
+        if (!(level instanceof ServerLevel)) {
+            Double v = client.get(f.id());
+            return v == null ? f.rate() : Math.min(f.rate(), v);
+        }
         var m = state.get(level);
         double[] v = m == null ? null : m.get(f.id());
         return v == null ? f.rate() : Math.min(f.rate(), v[0]);
@@ -75,7 +85,22 @@ public final class Speeds {
             next.computeIfAbsent(w.level(), k -> new Int2ObjectOpenHashMap<>()).put(w.f().id(), new double[]{1 + (a[i] - 1) * scale, w.count()});
         }
         state = next;
+        // the clients: each level's fields held below their rate, sent each second while there are any (and once more,
+        // empty, when they're gone)
+        for (ServerLevel level : server.getAllLevels()) {
+            Map<Integer, Double> held = new java.util.HashMap<>();
+            var m = next.get(level);
+            if (m != null)
+                for (Field f : Stasis.fields(level))
+                    if (f.fast() && m.containsKey(f.id()) && m.get(f.id())[0] < f.rate() - 1e-9) held.put(f.id(), m.get(f.id())[0]);
+            if (!held.isEmpty() || SENT_HELD.contains(level)) StasisNet.sendFieldSpeeds(level, held);
+            if (held.isEmpty()) SENT_HELD.remove(level);
+            else SENT_HELD.add(level);
+        }
     }
+
+    /** Levels whose clients were last sent a non-empty FieldSpeeds. */
+    private static final java.util.Set<Level> SENT_HELD = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
 
     /** The block entities and entities (not players) whose whole block field f holds, in loaded chunks. */
     static int count(ServerLevel level, Field f) {

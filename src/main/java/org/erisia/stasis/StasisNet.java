@@ -322,6 +322,32 @@ public final class StasisNet {
     /** Client side: the latest freeze progress, for the screen effect. */
     public static volatile float clientFreeze;
 
+    /** Acceleration fields' achieved rates (Speeds: field id -> rate the budget allows), for the client's extra ticks. */
+    public record FieldSpeeds(java.util.Map<Integer, Double> achieved) implements CustomPacketPayload {
+        public static final Type<FieldSpeeds> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "field_speeds"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, FieldSpeeds> CODEC = StreamCodec.of(
+            (buf, p) -> {
+                buf.writeVarInt(p.achieved().size());
+                p.achieved().forEach((id, v) -> { buf.writeVarInt(id); buf.writeDouble(v); });
+            },
+            buf -> {
+                int n = buf.readVarInt();
+                java.util.Map<Integer, Double> m = new java.util.HashMap<>();
+                for (int i = 0; i < n; i++) m.put(buf.readVarInt(), buf.readDouble());
+                return new FieldSpeeds(m);
+            });
+
+        @Override
+        public Type<FieldSpeeds> type() {
+            return TYPE;
+        }
+    }
+
+    static void sendFieldSpeeds(ServerLevel level, java.util.Map<Integer, Double> achieved) {
+        FieldSpeeds f = new FieldSpeeds(achieved);
+        for (ServerPlayer p : level.players()) send(p, f);
+    }
+
     /** Flame gutters (pos -> light; 0 = recovered). */
     public record Gutters(java.util.Map<Long, Byte> lights) implements CustomPacketPayload {
         public static final Type<Gutters> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "gutters"));
@@ -380,7 +406,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("15");   // 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar("16");   // 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -425,6 +451,7 @@ public final class StasisNet {
                 Storms.clientOverride = p.active() ? new double[]{p.start(), p.end(), p.folded()} : null);
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
+            r.playToClient(FieldSpeeds.TYPE, FieldSpeeds.CODEC, (p, ctx) -> Speeds.clientAchieved(p.achieved()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
             r.playToClient(SpreadState.TYPE, SpreadState.CODEC, (p, ctx) ->
                 Spread.clientState(p.reset(), p.map(), p.count(), p.p(), p.hard(), p.complete(), p.endStill(), p.endEvent(), p.stormOrigin()));
