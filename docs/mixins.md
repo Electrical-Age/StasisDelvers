@@ -31,7 +31,7 @@ If one of these can't apply, the game stops at startup, on purpose: without them
 |---|---|---|---|
 | `ServerLevelMixin` | `ServerLevel.isPositionTickingWithEntitiesLoaded` (RETURN), `tickBlock`/`tickFluid` (HEAD cancel), `tickChunk` (HEAD cancel + 2 `@WrapOperation` on `randomTick`), merged `createTick` x2 | Scheduled ticks wait or are rate-delayed (`Stasis.dueTick`; shortened by `speedAt` in acceleration fields); no random ticks, snow or ice in stopped land; random ticks run `ticksThisTurn` times in acceleration fields | No scheduled-tick or random-tick event exists |
 | `LevelChunkMixin` | `LevelChunk.isTicking` (RETURN) | Block entities tick only on running ticks; `Stasis.exemptBlockEntity` is exempt | No block-entity-tick event |
-| `BoundTickingBlockEntityMixin` | `LevelChunk$BoundTickingBlockEntity.tick` (`@WrapOperation` on `BlockEntityTicker.tick`) | Block entities in an acceleration field tick `ticksThisTurn` times (server; `Stasis.multiTickExempt`: towers, lances, querns, EA) | No block-entity-tick event |
+| `BoundTickingBlockEntityMixin` | `LevelChunk$BoundTickingBlockEntity.tick` (HEAD cancel; `@WrapOperation` on `BlockEntityTicker.tick`) | The time-stop gate again (Lithium's `world_border` mixin replaces `isTicking`, so `LevelChunkMixin` alone let furnaces run in stopped land on Incognito); block entities in an acceleration field tick `ticksThisTurn` times (`Stasis.multiTickExempt`: towers, lances, querns, EA) | No block-entity-tick event |
 | `ServerLevelEntityMixin` | `ServerLevel.tickNonPassenger` (TAIL) | Entities (not players or passengers) in an acceleration field get the extra ticks, through `tickNonPassenger` again under a re-entrancy guard | `EntityTickEvent.Post` can't re-run the whole tick (old position, riders) |
 | `LiquidBlockMixin` | `LiquidBlock.getCollisionShape` (RETURN) | Stopped water and lava are solid (both sides) | No collision hook for vanilla blocks |
 | `BlockMixin` | `Block.stepOn` (HEAD) + merged `getLightEmission(state, getter, pos)` / `hasDynamicLightEmission` | Stopped lava burns like magma; flame light by position (`Flames`) | The light API has no hook for vanilla blocks |
@@ -85,6 +85,8 @@ mods) has rewritten a target, only that effect is lost.
   Modrinth maven.
 
 ## Risks to keep in mind
+- Lithium (in Incognito's pack) replaces `LevelChunk.isTicking` in block-entity ticking (`world_border`): the gate in
+  `BoundTickingBlockEntityMixin` covers it. Other mods that tick block entities their own way would need the same.
 - **Merged methods** (no annotation, so they behave like an overwrite of an interface default):
   `BlockMixin.getLightEmission`/`hasDynamicLightEmission` (every block that doesn't override it) and
   `ServerLevelMixin.createTick` x2. If another mod merges the same method, one wins silently.

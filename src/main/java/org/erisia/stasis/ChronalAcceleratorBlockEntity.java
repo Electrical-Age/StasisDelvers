@@ -150,7 +150,9 @@ public class ChronalAcceleratorBlockEntity extends BlockEntity {
     public String status() {
         if (shape == null) return why;
         return String.format("Room of %d blocks (%.0f%% refined walls, max %d): %s, %.0f W at %.1fx", shape.volume(), refined * 100,
-            maxVolume(refined), running > 0 ? String.format("running at %.1fx", running) : "no power", drawW(want()), want());
+            maxVolume(refined), running > 0 ? String.format("running at %.1fx", running)
+                : store.amount() >= drawW(1) / 20 * FE_PER_J ? "starting" : "no power", drawW(want()), want())
+            + String.format(", store %.0f s", store.amount() / Math.max(1e-9, drawW(want()) * FE_PER_J));
     }
 
     public static int maxVolumeForTests(double refined) {

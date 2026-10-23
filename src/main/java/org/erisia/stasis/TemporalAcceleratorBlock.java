@@ -39,7 +39,8 @@ public class TemporalAcceleratorBlock extends Block {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        int step = Math.max(1, Math.min(18, state.getValue(STEP) + (player.isSecondaryUseActive() ? -1 : 1)));
+        // up by half a step a click, round from 10x back to 1.5x; a sneak-click with an empty hand goes down
+        int step = player.isSecondaryUseActive() ? Math.max(1, state.getValue(STEP) - 1) : state.getValue(STEP) % 18 + 1;
         if (!level.isClientSide()) {
             level.setBlock(pos, state.setValue(STEP, step), Block.UPDATE_ALL);
             boolean atCore = coreBeside(level, pos) != null;

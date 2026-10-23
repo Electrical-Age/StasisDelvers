@@ -106,6 +106,8 @@ debugging:
 - `eddies_stop_mobs` passes if the mob never ran.
 
 ## Gaps (no automated test)
+- Block entities under Lithium (not in the test environment): checked in the lab (a furnace in stopped land stays
+  frozen, one in a field smelts; 2026-10-23).
 - Acceleration fields: extra random ticks (the `randomTick` wraps) have no in-world test (random); `accel_in_running_land`
   skips when every level stops (the test config). `accel_*` cover the rule, scheduled delays, furnaces, item ages and the budget.
 - The serverbound handlers (`ConsoleSet`/`ConsoleFeed`/`ConsoleQuery`/`DigStilled` paths, `ReportResponder`).

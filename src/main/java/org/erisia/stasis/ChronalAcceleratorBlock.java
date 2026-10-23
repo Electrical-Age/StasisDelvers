@@ -22,8 +22,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * The chronal accelerator (λ-Nero, variant B): a machine set into a wall of a sealed riftstone room. It finds the room
  * (ChronalAcceleratorBlockEntity: a flood fill from its sides), takes FE from outside (an EA exporter against it) and
- * makes the room run, in stopped land too, at its setting: right-click raises it by half, sneak-right-click lowers it,
- * 1x .. 10x (STEP 0..18). Every click says how the room stands.
+ * makes the room run, in stopped land too, at its setting: right-click raises it by half (from 10x round to 1x),
+ * sneak-right-click with an empty hand lowers it: 1x .. 10x (STEP 0..18). Every click says how the room stands.
  */
 public class ChronalAcceleratorBlock extends Block implements EntityBlock {
     public static final IntegerProperty STEP = IntegerProperty.create("step", 0, 18);
@@ -51,7 +51,9 @@ public class ChronalAcceleratorBlock extends Block implements EntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        int step = Math.max(0, Math.min(18, state.getValue(STEP) + (player.isSecondaryUseActive() ? -1 : 1)));
+        // up by half a step a click, round from 10x back to 1x (AdventurAgent: a sneak-click with something in hand never
+        // reaches the block); a sneak-click with an empty hand goes down
+        int step = player.isSecondaryUseActive() ? Math.max(0, state.getValue(STEP) - 1) : (state.getValue(STEP) + 1) % 19;
         if (level instanceof ServerLevel sl && level.getBlockEntity(pos) instanceof ChronalAcceleratorBlockEntity be) {
             level.setBlock(pos, state.setValue(STEP, step), Block.UPDATE_ALL);
             be.refill(sl);
