@@ -66,10 +66,10 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   - A full suit means rate 1.
   - Acceleration fields (λ-Nero): rate up to `FAST_CAP` = 3 (`Stasis.speedAt`, so a 10x field runs blocks and mobs at
     10x and players at 3x); a whole time suit or a chronal anchor (`StasisRegistry.CHRONAL_ANCHOR`, a Curios charm or
-    the off hand) keeps 1x; a freezing player stays at the freeze's rate. `ticksThisTurn(p)` (0, 1 or more) drives the
-    clocks: the mining and attack clocks get the extra ticks, `LivingEntityMixin` runs item use that many times.
-    Movement: vanilla takes up to 5 move packets per server tick before it calls a player "too frequent", so 3x (60 TPS,
-    3 a tick) needs no allowance. Test: `rate_player_fast`.
+    the off hand) keeps 1x; a freezing player stays at the freeze's rate. A fast player's client stays at 20 TPS
+    (vanilla's `Minecraft.getTickTargetMillis` never ticks a client faster; AdventurAgent saw no speed-up at "60 TPS"):
+    `fast()` adds attribute modifiers `stasisdelvers:accelerated` (r - 1, multiplied total) to movement speed, block
+    break speed and attack speed, and `LivingEntityMixin` runs item use `ticksThisTurn(p)` times. Test: `rate_player_fast`.
 - Client side: `client/SuitGauge.java` (HUD), `client/SuitArm.java` (first-person arm), and the freeze
   warning in `stasis.fsh` (slot 23, fed by `StasisNet.Freeze`).
 

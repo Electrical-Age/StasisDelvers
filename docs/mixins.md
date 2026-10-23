@@ -54,7 +54,7 @@ mods) has rewritten a target, only that effect is lost.
 
 | Mixin | Target | Effect lost without it |
 |---|---|---|
-| `ClientLevelFastMixin` | `ClientLevel.tickNonPassenger` (TAIL) | Entities in an acceleration field ticking at the server's pace on the client (not players or what they ride): without it they rubber-band |
+| `ClientLevelFastMixin` | `ClientLevel.tickNonPassenger` (TAIL) | Client-moved entities (items, falling blocks, arrows; not interpolated mobs, players or what they ride) in an acceleration field ticking at the server's pace: without it they jump at each sync |
 | `GameRendererMixin` | `render3dHud` (HEAD), `renderItemInHand` (HEAD cancel), `render` after `applyPostEffects` | The suited hand drawn in colour after the post chain |
 | `ClientLevelMixin` | `doAnimateTick` (3 calls), `tickWeatherEffects` (particles, rain sounds) | No ambience, drips or rain sound in stopped land; muffled rain under a shield |
 | `ClientClockManagerMixin` | `ClientClockManager.getInstance` | Marks the overworld clock (`LocalClockMark`) |

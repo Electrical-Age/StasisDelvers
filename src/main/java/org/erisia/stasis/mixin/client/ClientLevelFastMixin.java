@@ -12,8 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * The client's half of ServerLevelEntityMixin (cosmetic: without it only the look suffers): entities in an acceleration field tick as many times on the client as on
- * the server, so items fall, mobs walk and animate at the server's pace instead of being dragged back at every sync
- * (Argon). Not players, nor anything a player rides (the player drives it).
+ * the server, so items fall and arrows fly at the server's pace instead of being dragged back at every sync (Argon).
+ * Not interpolated entities (mobs: they follow the server's positions anyway). Not players, nor anything a player rides (the player drives it).
  */
 @Mixin(ClientLevel.class)
 public abstract class ClientLevelFastMixin {
@@ -25,6 +25,10 @@ public abstract class ClientLevelFastMixin {
         ClientLevel self = (ClientLevel) (Object) this;
         if (stasis$extra || entity instanceof Player || !Stasis.hasFast(self)) return;
         for (Entity p : entity.getIndirectPassengers()) if (p instanceof Player) return;
+        // entities the client interpolates towards the server's positions (mobs, minecarts, boats) already move at the
+        // server's pace; extra ticks would finish each step early and wait (AdventurAgent saw them jump). Only what the
+        // client moves itself (items, falling blocks, arrows) needs them.
+        if (entity.getInterpolation() != net.minecraft.world.entity.InterpolationHandler.NO_OP) return;
         int k = Stasis.ticksThisTurn(Stasis.clientSpeedAt(self, entity.blockPosition()), self.getGameTime());   // (over the client's own tick rate)
         if (k <= 1) return;
         stasis$extra = true;

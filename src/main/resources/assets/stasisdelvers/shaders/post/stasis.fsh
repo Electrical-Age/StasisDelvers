@@ -1365,7 +1365,7 @@ void main() {
                 // an acceleration field (λ-Nero): its shield shimmers at its own pace and turns warm gold
                 float speed = data(k + 18);
                 vec4 sh = shieldAt(cell, nrm, centre, -v, r, data(sb), data(sb + 1), collapse, data(sb + 2), warm, speed > 1.0 ? ftime * speed : ftime, h2 == 0 && !inside);
-                if (speed > 1.0) sh.rgb = mix(sh.rgb, vec3(1.0, 0.84, 0.42), 0.35 + 0.25 * clamp((speed - 1.0) / 9.0, 0.0, 1.0));
+                if (speed > 1.0) sh = vec4(mix(sh.rgb, vec3(1.0, 0.78, 0.25), 0.75 + 0.2 * clamp((speed - 1.0) / 9.0, 0.0, 1.0)), min(0.9, sh.a * 1.4));
                 if (data(31) > 0.0) {
                     // weather: where a deep crosses the field the hexes brighten (the opposite of dropout), pulsing
                     float dp = deepAt(fc + hp, vec3(data(16), data(17), data(18)));

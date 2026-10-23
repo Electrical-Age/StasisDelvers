@@ -93,12 +93,12 @@ public final class PlayerRates {
      * (StasisEvents.entityTick) this doesn't run, so the clock never drifts.
      */
     static void miningClock(EntityTickEvent.Pre e) {
-        if (e.getEntity() instanceof ServerPlayer p) p.gameMode.gameTicks += ticksThisTurn(p) - 1;   // (fast: the extra ticks)
+        if (e.getEntity() instanceof ServerPlayer p && ticksThisTurn(p) == 0) p.gameMode.gameTicks--;   // (fast: the break-speed attribute)
     }
 
-    /** Player.tick adds one to the attack cooldown after this event: no net tick in a skipped one, more when fast. */
+    /** Player.tick adds one to the attack cooldown after this event: no net tick in a skipped one. */
     static void attackClock(PlayerTickEvent.Pre e) {
-        if (e.getEntity() instanceof ServerPlayer p) p.attackStrengthTicker += ticksThisTurn(p) - 1;
+        if (e.getEntity() instanceof ServerPlayer p && ticksThisTurn(p) == 0) p.attackStrengthTicker--;   // (fast: the attack-speed attribute)
     }
 
     static void tick(ServerTickEvent.Post e) {
@@ -114,13 +114,39 @@ public final class PlayerRates {
     public static void update(MinecraftServer server, ServerPlayer p, boolean refresh) {
         TickRateManager global = server.tickRateManager();
         double r = rate(p);
-        Sent want = new Sent(r == 1.0 ? global.tickrate() : (float) Math.max(1.0, global.tickrate() * r), global.isFrozen());
+        fast(p, r);
+        // (a fast player's client stays at 20 TPS: vanilla never ticks a client faster than that, and the speed comes
+        // from attributes, fast() below)
+        if (r > 1.0) r = 1.0;
+        Sent want = new Sent(r >= 1.0 ? global.tickrate() : (float) Math.max(1.0, global.tickrate() * r), global.isFrozen());
         Sent had = SENT.get(p.getUUID());
-        if (had == null && r == 1.0) return;   // never slowed or sped up: vanilla's state is what the client has
-        if (want.equals(had) && !(refresh && r != 1.0)) return;
-        if (r == 1.0) SENT.remove(p.getUUID());
+        if (had == null && r >= 1.0) return;   // never slowed: vanilla's state is what the client has
+        if (want.equals(had) && !(refresh && r < 1.0)) return;
+        if (r >= 1.0) SENT.remove(p.getUUID());
         else SENT.put(p.getUUID(), want);
         if (p.connection != null) p.connection.send(new ClientboundTickingStatePacket(want.rate(), want.frozen()));
+    }
+
+    static final net.minecraft.resources.Identifier FAST = net.minecraft.resources.Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "accelerated");
+
+    /**
+     * A player in an acceleration field moves, mines and swings r times as fast (attribute modifiers, r - 1 on top):
+     * the client can't run faster than 20 TPS (vanilla clamps it), and attributes keep client and server in step.
+     * Eating and drinking count r times on the server (LivingEntityMixin). Removed at 1x.
+     */
+    static void fast(ServerPlayer p, double r) {
+        double extra = r > 1.0 ? r - 1.0 : 0;
+        for (var attr : java.util.List.of(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED,
+            net.minecraft.world.entity.ai.attributes.Attributes.BLOCK_BREAK_SPEED, net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED)) {
+            var inst = p.getAttribute(attr);
+            if (inst == null) continue;
+            var have = inst.getModifier(FAST);
+            if (extra == 0) {
+                if (have != null) inst.removeModifier(FAST);
+            } else if (have == null || have.amount() != extra)
+                inst.addOrUpdateTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(FAST, extra,
+                    net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+        }
     }
 
     /** For tests: the tick rate last sent to this player, or 0 if they have the server's. */

@@ -4459,12 +4459,15 @@ public final class StasisGameTests {
                 c.check("15 ticks: at 3x the bread is eaten (32 ticks at 1x)", fast.getMainHandItem().isEmpty() && fast.getFoodData().getFoodLevel() > 10,
                     fast.getMainHandItem() + " food " + fast.getFoodData().getFoodLevel());
                 c.check("15 ticks: at 1x still eating", full.isUsingItem(), full.getMainHandItem() + " remaining " + full.getUseItemRemainingTicks());
-                int g1 = gameTicks(full) - ticks0[0], g3 = gameTicks(fast) - ticks0[1];
-                c.check("mining clock: 3x in the field", Math.abs(g3 - 3 * g1) <= 3, g3 + " vs " + g1);
-                c.check("client rate: 60 TPS sent in a 5x field (the cap)", org.erisia.stasis.PlayerRates.sent(fast) == 60f,
-                    "" + org.erisia.stasis.PlayerRates.sent(fast));
+                // (vanilla never ticks a client above 20 TPS: a fast player's speed is attributes, AdventurAgent)
+                double sp = fast.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED),
+                    sp1 = full.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+                c.check("3x the movement speed in a 5x field (the cap)", Math.abs(sp / sp1 - 3) < 1e-6, sp + " vs " + sp1);
+                c.check("no tick rate sent to a fast player", org.erisia.stasis.PlayerRates.sent(fast) == 0f, "" + org.erisia.stasis.PlayerRates.sent(fast));
             });
             return () -> {
+                c.check("anchored: normal movement speed", anchored.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED)
+                    == full.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
                 c.check("player rate: 3 (capped), anchored 1, suited 1", org.erisia.stasis.PlayerRates.rate(fast) == 3.0
                     && org.erisia.stasis.PlayerRates.rate(anchored) == 1.0 && org.erisia.stasis.PlayerRates.rate(suited) == 1.0,
                     org.erisia.stasis.PlayerRates.rate(fast) + " " + org.erisia.stasis.PlayerRates.rate(anchored) + " " + org.erisia.stasis.PlayerRates.rate(suited));
