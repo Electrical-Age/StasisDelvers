@@ -56,6 +56,10 @@ public class AcceleratorLeverRenderer<T extends BlockEntity & AcceleratorLevers.
     public void extractRenderState(T be, State state, float partialTicks, Vec3 cameraPosition, ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
         BlockEntityRenderer.super.extractRenderState(be, state, partialTicks, cameraPosition, breakProgress);
         state.face = be.leverFace();
+        // lit as the space in front of its face (inside the block, the light is nil: AdventurAgent saw a black lever)
+        if (be.getLevel() != null)
+            state.lightCoords = net.minecraft.util.LightCoordsUtil.getLightCoords(be.getLevel(),
+                be.getBlockPos().relative(net.minecraft.core.Direction.from3DDataValue(state.face)));
         float want = target(be.getBlockState());
         long now = System.nanoTime();
         float[] s = SHOWN.computeIfAbsent(be.getBlockPos().immutable(), k -> new float[]{want, now});
