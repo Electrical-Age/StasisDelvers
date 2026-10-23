@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "stasisdelvers:block/temporal_accelerator_end",
+    "side": "stasisdelvers:block/temporal_accelerator_side"
+  }
+}

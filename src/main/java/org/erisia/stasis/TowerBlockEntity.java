@@ -326,6 +326,12 @@ public class TowerBlockEntity extends BlockEntity {
      */
     boolean retreating;
     double retreatRadius;
+    /**
+     * The rate a temporal accelerator against the core has the field run at (1: none; TemporalAcceleratorBlock), and
+     * whether the tower has dropped it for want of power (it goes back up once the store is 80% full again).
+     */
+    double accelRate = 1;
+    boolean accelRetreat;
 
     public boolean retreating() {
         return retreating;
@@ -351,6 +357,13 @@ public class TowerBlockEntity extends BlockEntity {
             retreating = false;
             return;
         }
+        // an accelerated field drops its rate (towards 1x) before it gives up radius (λ-Nero: not off, the rate the
+        // power carries)
+        if (accelRate > 1 && failing > 0.5) {
+            accelRetreat = true;
+            return;
+        }
+        if (accelRetreat && share >= 0.8) accelRetreat = false;
         if (!retreating && failing > 0.5) {
             double carry = carryRadius();
             if (carry > 0 && carry < effRadius - 2) {
@@ -397,9 +410,46 @@ public class TowerBlockEntity extends BlockEntity {
         return Math.cbrt((t.e() * t.s() + t.s() * t.w() + t.w() * t.n() + t.n() * t.e()) / 4);
     }
 
-    /** Draw in W at radius r, with this tower's stretch and the penalty above the preferred range. */
+    /** Draw in W at radius r, with this tower's stretch, the penalty above the preferred range and its acceleration. */
     public double drawAt(double r) {
-        return drawFor(r * volumeScale()) * drawPenalty(r);
+        return drawAt(r, accelRate);
+    }
+
+    /** Draw at radius r and rate: an accelerated field costs the rate squared (λ-Nero: 2x for 4x the power). */
+    public double drawAt(double r, double rate) {
+        return drawFor(r * volumeScale()) * drawPenalty(r) * Math.max(1, rate) * Math.max(1, rate);
+    }
+
+    /** The highest rate (in the accelerator's half steps, at most want) whose draw the input carries with a margin at
+     *  radius r; at least 1. */
+    public double carryRate(double r, double want) {
+        double w = weatherFactor();
+        for (double rate = want; rate > 1; rate -= 0.5)
+            if (drawAt(r, rate) * w <= 0.9 * inAvgW) return rate;
+        return 1;
+    }
+
+    /** The averaged input (W). */
+    public double inAvgW() {
+        return inAvgW;
+    }
+
+    /** Once a second while running: the rate the accelerators ask for, held to what the power carries during a drop. */
+    void accelerate(ServerLevel sl) {
+        double want = TemporalAcceleratorBlock.want(sl, worldPosition);
+        double next = want;
+        if (accelRetreat) {
+            // short of power: down to what the input carries, at least half a step a second while the shield fails,
+            // and not back up until the store has refilled (safety)
+            next = Math.min(want, carryRate(effRadius, want));
+            if (failing > 0.5) next = Math.min(next, accelRate - 0.5);
+            next = Math.max(1, Math.min(next, accelRate));
+        }
+        if (next == accelRate) return;
+        accelRate = next;
+        double fieldRate = next > 1 ? next : StasisConfig.towerFieldRate;
+        FieldData.get(sl).update(sl, fieldId, f -> f.withRate(fieldRate));
+        setChanged();
     }
 
     void updateStretch(ServerLevel sl) {
@@ -467,6 +517,7 @@ public class TowerBlockEntity extends BlockEntity {
             if (effRadius <= 0)   // (a save from before the console: take the field as it is)
                 effRadius = FieldData.get(sl).get(fieldId).map(Field::radius).orElse(designRadius());
             safety();
+            accelerate(sl);
             double g = goalRadius();
             // coarse steps on the server (each one re-meshes the shell's chunks): a retreat in two jumps, growth
             // a block or two a second; clients ease the shield between them (StasisPost)
@@ -683,6 +734,8 @@ public class TowerBlockEntity extends BlockEntity {
         startedAt = now;
         sl.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.BEACON_ACTIVATE, net.minecraft.sounds.SoundSource.BLOCKS, 2.0F, 0.6F);
         state = State.RUNNING;
+        accelRate = 1;   // (the accelerators speed it up from the next second)
+        accelRetreat = false;
         failing = amber = dropout = 0;
         netAvg = 0;
         draining = false;
@@ -753,6 +806,8 @@ public class TowerBlockEntity extends BlockEntity {
         out.putDouble("stretchN", stretch.n());
         out.putBoolean("retreating", retreating);
         out.putDouble("retreatRadius", retreatRadius);
+        out.putDouble("accelRate", accelRate);
+        out.putBoolean("accelRetreat", accelRetreat);
         out.putString("facing", facing.getSerializedName());
         if (remnant != null) {
             out.putDouble("remnantRadius", remnant.radius());
@@ -808,6 +863,8 @@ public class TowerBlockEntity extends BlockEntity {
         facing = fd != null && fd.getAxis().isHorizontal() ? fd : net.minecraft.core.Direction.SOUTH;
         retreating = in.getBooleanOr("retreating", false);
         retreatRadius = in.getDoubleOr("retreatRadius", 0);
+        accelRate = Math.max(1, in.getDoubleOr("accelRate", 1));
+        accelRetreat = in.getBooleanOr("accelRetreat", false);
         double rr = in.getDoubleOr("remnantRadius", 0);
         remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.5),
             in.getDoubleOr("remnantDropout", 0), in.getDoubleOr("remnantSide", 0), in.getLongOr("remnantFrozeAt", 0L),

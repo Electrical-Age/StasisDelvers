@@ -155,6 +155,11 @@ public final class StasisRegistry {
         RiftBarometerBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(2.5f, 9f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> st.getValue(RiftBarometerBlock.POWER) / 3));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> RIFT_BAROMETER = ITEMS.registerSimpleBlockItem(RIFT_BAROMETER_BLOCK);
+    /** The temporal accelerator: against a tower's core, it runs the field faster than time (λ-Nero; TemporalAcceleratorBlock). */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<TemporalAcceleratorBlock> TEMPORAL_ACCELERATOR_BLOCK = BLOCKS.registerBlock("temporal_accelerator",
+        TemporalAcceleratorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.GOLD).strength(3f, 9f)
+            .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> 4 + st.getValue(TemporalAcceleratorBlock.STEP) / 3));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TEMPORAL_ACCELERATOR = ITEMS.registerSimpleBlockItem(TEMPORAL_ACCELERATOR_BLOCK);
     /** The surveyor's desk (spawn cottage; stronghold libraries in spreading mode): maps to ruined cottages (MapDeskBlock). */
     public static final net.neoforged.neoforge.registries.DeferredBlock<MapDeskBlock> MAP_DESK_BLOCK = BLOCKS.registerBlock("surveyors_desk",
         MapDeskBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.WOOD).strength(2.5f).sound(net.minecraft.world.level.block.SoundType.WOOD));

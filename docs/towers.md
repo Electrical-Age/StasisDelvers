@@ -63,6 +63,16 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
   tower leaves 25% in each piece (`FEED_RESERVE`).
 - Config: `towerDrawK`, `towerStoreC`, `towerMaxSegments`, `towerBoomStretch`, `towerFieldRate` (`StasisConfig`).
 
+## Temporal accelerator (`TemporalAcceleratorBlock`; λ-Nero, notes/timestop/ACCEL-DESIGN.md)
+- A block against either core cell (any side). Right-click raises its `STEP` (1..18), sneak-right-click lowers it:
+  rate = 1 + step / 2 (1.5x..10x). `want(level, master)`: the highest setting against the core.
+- `TowerBlockEntity.accelerate` (once a second while running, after `safety`): the field runs at `accelRate`
+  (saved), or at `towerFieldRate` when it's 1. `drawAt(r)` includes `accelRate²`.
+- Short of power (`failing > 0.5`), `safety` sets `accelRetreat` and returns before any radius retreat: the rate falls
+  to `carryRate` (the highest half step whose draw the input carries at 90%), at least half a step a second while the
+  shield fails, and comes back once the store is 80% full. Override turns this off with the rest of the safety.
+- Test: `tower_temporal_accelerator`.
+
 ## Chunk tickets (`Tickets.java`)
 - `update(level, tower)` forces the rectangle of chunks covering max(radius, target)·stretch per side, while the
   state is not OFF. It releases chunks no longer needed.

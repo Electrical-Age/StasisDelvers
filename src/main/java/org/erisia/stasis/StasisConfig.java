@@ -273,6 +273,11 @@ public final class StasisConfig {
         return stoppedUnboundCap;
     }
 
+    /** The rate a tower's field starts at (towerFieldRate). */
+    public static double towerFieldRate() {
+        return towerFieldRate;
+    }
+
     /** Set the acceleration budget per field (GameTests); returns the old one. */
     public static int setAccelBudgetForTests(int v) {
         int old = accelBudget;

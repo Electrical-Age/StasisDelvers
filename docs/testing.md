@@ -96,6 +96,8 @@ debugging:
   directions; one failure in ~30 runs since, with diagnostics in the message); `lance_multiblock_binds`' west boom could
   land over a natural rift of the test world (now: not bound to *this* rift); `lance_spreading_rules` found a real bug:
   an End arrival pad could sit under another island's blocks placed later (Lance.spot now clears every planned island)
+- `rate_random_ticks` (once 2026-10-23: "stopped: none: ticks 21"; passed on two reruns; maybe a fresh chunk's grace at
+  the random test position) and `fauna_press_on_the_shield` (once 2026-10-23: "+1.0: 0.5", a Static walked off in 3 ticks).
 - `rate_perf` only logs a timing.
 - `rate_random_ticks` accepts a wide band.
 - `flames_*` accept a random gutter.
