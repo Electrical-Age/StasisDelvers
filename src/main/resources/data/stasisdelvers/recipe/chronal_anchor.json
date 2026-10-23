@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "S": "stasisdelvers:rift_shard",
+    "K": "minecraft:clock"
+  },
+  "pattern": [
+    " G ",
+    "GKG",
+    " S "
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:chronal_anchor"
+  }
+}

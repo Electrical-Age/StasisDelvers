@@ -15,7 +15,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Players in a slow field run slow (unless they wear a whole time suit: Baughn 2026-10-17): their client is sent the field's tick rate (vanilla's ticking-state packet, 20 x
+ * Players in a slow field run slow, and in an acceleration field fast, up to FAST_CAP (unless they wear a whole time
+ * suit: Baughn 2026-10-17; or a chronal anchor in a fast field: λ-Nero): their client is sent the field's tick rate (vanilla's ticking-state packet, 20 x
  * rate), so movement, animations, mining and eating all slow down together on their screen, and the server counts the
  * player's own countdowns (mining progress, item use, attack cooldown) only in the ticks that rate runs in (miningClock
  * and attackClock here, LivingEntityMixin), so it agrees with the client. Folded in from ErisiAgent's tickzone
@@ -37,7 +38,14 @@ public final class PlayerRates {
     private static final Map<UUID, Sent> SENT = new HashMap<>();
     private static int counter;
 
-    /** The player's tick rate in (0, 1]: their field's rate, 1 elsewhere (stopped land too). */
+    /** The fastest a player runs in an acceleration field (λ-Nero: cap players at 3x; blocks and mobs get the full rate). */
+    public static final double FAST_CAP = 3.0;
+
+    /**
+     * The player's tick rate: their field's rate (0, 1] in a slow field, up to FAST_CAP in an acceleration field
+     * (Stasis.speedAt), 1 elsewhere (stopped land too). A whole time suit or a chronal anchor keeps its wearer at 1x in
+     * an acceleration field (λ-Nero); a thawing player stays at their freeze's rate until it's gone (Argon).
+     */
     public static double rate(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level)) return 1.0;
         if (Exempt.is(p)) return 1.0;   // (/stasis exempt: the mechanic leaves them alone)
@@ -45,7 +53,23 @@ public final class PlayerRates {
         double freeze = Freezing.rate(p);
         if (fullSuit(p)) return freeze;   // (Baughn: the suit keeps its wearer at full speed in a slow field)
         double r = Stasis.rateAt(level, p.blockPosition());
+        if (r >= 1.0 && freeze >= 1.0 && !anchored(p)) {
+            double s = Stasis.speedAt(level, p.blockPosition());
+            if (s > 1.0) return Math.min(FAST_CAP, s);
+        }
         return Math.min(freeze, r <= 0.0 || r >= 1.0 ? 1.0 : r);
+    }
+
+    /** A chronal anchor worn (Curios charm slot) or held in the off hand. */
+    static boolean anchored(ServerPlayer p) {
+        return p.getOffhandItem().is(StasisRegistry.CHRONAL_ANCHOR.get()) || CuriosCompat.anchor(p);
+    }
+
+    /** How many of the player's own ticks this game tick holds: 0 or 1 at a slow rate, more when fast. */
+    public static int ticksThisTurn(ServerPlayer p) {
+        double r = rate(p);
+        if (r > 1.0) return Stasis.ticksThisTurn(r, p.level().getGameTime());
+        return r >= 1.0 || Stasis.runs(r, p.level().getGameTime()) ? 1 : 0;
     }
 
     /** A whole time suit worn (any charge: inside a field it draws nothing). */
@@ -69,12 +93,12 @@ public final class PlayerRates {
      * (StasisEvents.entityTick) this doesn't run, so the clock never drifts.
      */
     static void miningClock(EntityTickEvent.Pre e) {
-        if (e.getEntity() instanceof ServerPlayer p && !ticksNow(p)) p.gameMode.gameTicks--;
+        if (e.getEntity() instanceof ServerPlayer p) p.gameMode.gameTicks += ticksThisTurn(p) - 1;   // (fast: the extra ticks)
     }
 
-    /** Player.tick adds one to the attack cooldown after this event: no net tick in a skipped one. */
+    /** Player.tick adds one to the attack cooldown after this event: no net tick in a skipped one, more when fast. */
     static void attackClock(PlayerTickEvent.Pre e) {
-        if (e.getEntity() instanceof ServerPlayer p && !ticksNow(p)) p.attackStrengthTicker--;
+        if (e.getEntity() instanceof ServerPlayer p) p.attackStrengthTicker += ticksThisTurn(p) - 1;
     }
 
     static void tick(ServerTickEvent.Post e) {
@@ -90,11 +114,11 @@ public final class PlayerRates {
     public static void update(MinecraftServer server, ServerPlayer p, boolean refresh) {
         TickRateManager global = server.tickRateManager();
         double r = rate(p);
-        Sent want = new Sent(r >= 1.0 ? global.tickrate() : (float) Math.max(1.0, global.tickrate() * r), global.isFrozen());
+        Sent want = new Sent(r == 1.0 ? global.tickrate() : (float) Math.max(1.0, global.tickrate() * r), global.isFrozen());
         Sent had = SENT.get(p.getUUID());
-        if (had == null && r >= 1.0) return;   // never slowed: vanilla's state is what the client has
-        if (want.equals(had) && !(refresh && r < 1.0)) return;
-        if (r >= 1.0) SENT.remove(p.getUUID());
+        if (had == null && r == 1.0) return;   // never slowed or sped up: vanilla's state is what the client has
+        if (want.equals(had) && !(refresh && r != 1.0)) return;
+        if (r == 1.0) SENT.remove(p.getUUID());
         else SENT.put(p.getUUID(), want);
         if (p.connection != null) p.connection.send(new ClientboundTickingStatePacket(want.rate(), want.frozen()));
     }

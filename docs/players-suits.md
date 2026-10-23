@@ -57,13 +57,19 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 - `Capacitors.java` / `CapacitorItem.java`: rift capacitors absorb the mist surcharge and the Delver creep
   (`absorb`, `drawFactor`). A raw shard takes half and crumbles after `SHARD_SECONDS`. EA chargers vent them.
 - `StarterKit.java`: a full charged Delver suit + EA flashlight on first join (player NBT `stasisdelvers_starter_suit`). None in spreading mode.
-- `PlayerRates.java`: per-player tick rate in a slow field.
+- `PlayerRates.java`: per-player tick rate in a slow or acceleration field.
   - Sends vanilla's ticking-state packet at 20·rate.
   - `miningClock` (EntityTickEvent.Pre, LOWEST) and `attackClock` (PlayerTickEvent.Pre) hold back
     `ServerPlayerGameMode.gameTicks` and `LivingEntity.attackStrengthTicker` (made public by
     `accesstransformer.cfg`) in skipped ticks.
   - `LivingEntityMixin` does the same for item use.
   - A full suit means rate 1.
+  - Acceleration fields (λ-Nero): rate up to `FAST_CAP` = 3 (`Stasis.speedAt`, so a 10x field runs blocks and mobs at
+    10x and players at 3x); a whole time suit or a chronal anchor (`StasisRegistry.CHRONAL_ANCHOR`, a Curios charm or
+    the off hand) keeps 1x; a freezing player stays at the freeze's rate. `ticksThisTurn(p)` (0, 1 or more) drives the
+    clocks: the mining and attack clocks get the extra ticks, `LivingEntityMixin` runs item use that many times.
+    Movement: vanilla takes up to 5 move packets per server tick before it calls a player "too frequent", so 3x (60 TPS,
+    3 a tick) needs no allowance. Test: `rate_player_fast`.
 - Client side: `client/SuitGauge.java` (HUD), `client/SuitArm.java` (first-person arm), and the freeze
   warning in `stasis.fsh` (slot 23, fed by `StasisNet.Freeze`).
 

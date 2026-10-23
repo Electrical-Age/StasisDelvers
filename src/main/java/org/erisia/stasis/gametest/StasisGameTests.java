@@ -4380,6 +4380,44 @@ public final class StasisGameTests {
         }));
         // players: in a 0.5 field the client is sent 10 TPS, and eating (32 ticks for bread), mining progress
         // (gameTicks) and the attack cooldown count at half speed
+        // λ-Nero: in an acceleration field players run fast too, capped at 3x (here a 5x field), their client sent 60 TPS and
+        // their own clocks (eating, mining) counting 3 a tick; a whole time suit or a chronal anchor keeps them at 1x
+        CASES.put("rate_player_fast", new Spec(30, (h, c) -> {
+            halfField(h, c, 5.0);
+            ServerPlayer full = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            ServerPlayer fast = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            ServerPlayer anchored = survivalPlayer(h, new Vec3(11.5, 1.0, 4.5), true);
+            ServerPlayer suited = survivalPlayer(h, new Vec3(13.5, 1.0, 4.5), true);
+            anchored.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND, new ItemStack(org.erisia.stasis.StasisRegistry.CHRONAL_ANCHOR.get()));
+            wear(suited, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            int[] ticks0 = new int[2];
+            for (ServerPlayer p : new ServerPlayer[]{full, fast}) {
+                p.getFoodData().setFoodLevel(10);
+                p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new ItemStack(Items.BREAD));
+                p.startUsingItem(net.minecraft.world.InteractionHand.MAIN_HAND);
+                h.onEachTick(() -> {
+                    if (p.isAlive() && !p.isRemoved()) p.doTick();
+                });
+            }
+            ticks0[0] = gameTicks(full);
+            ticks0[1] = gameTicks(fast);
+            h.runAfterDelay(15, () -> {
+                c.check("15 ticks: at 3x the bread is eaten (32 ticks at 1x)", fast.getMainHandItem().isEmpty() && fast.getFoodData().getFoodLevel() > 10,
+                    fast.getMainHandItem() + " food " + fast.getFoodData().getFoodLevel());
+                c.check("15 ticks: at 1x still eating", full.isUsingItem(), full.getMainHandItem() + " remaining " + full.getUseItemRemainingTicks());
+                int g1 = gameTicks(full) - ticks0[0], g3 = gameTicks(fast) - ticks0[1];
+                c.check("mining clock: 3x in the field", Math.abs(g3 - 3 * g1) <= 3, g3 + " vs " + g1);
+                c.check("client rate: 60 TPS sent in a 5x field (the cap)", org.erisia.stasis.PlayerRates.sent(fast) == 60f,
+                    "" + org.erisia.stasis.PlayerRates.sent(fast));
+            });
+            return () -> {
+                c.check("player rate: 3 (capped), anchored 1, suited 1", org.erisia.stasis.PlayerRates.rate(fast) == 3.0
+                    && org.erisia.stasis.PlayerRates.rate(anchored) == 1.0 && org.erisia.stasis.PlayerRates.rate(suited) == 1.0,
+                    org.erisia.stasis.PlayerRates.rate(fast) + " " + org.erisia.stasis.PlayerRates.rate(anchored) + " " + org.erisia.stasis.PlayerRates.rate(suited));
+                for (ServerPlayer p : new ServerPlayer[]{full, fast, anchored, suited}) remove(h, p);
+            };
+        }));
         CASES.put("rate_player_eats_slowly", new Spec(80, (h, c) -> {
             halfField(h, c, 0.5);
             ServerPlayer full = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);

@@ -19,6 +19,11 @@ final class CuriosCompat {
         return Impl.pendant(p);
     }
 
+    /** A chronal anchor worn in a Curios slot (charm). */
+    static boolean anchor(ServerPlayer p) {
+        return LOADED && Impl.anchor(p);
+    }
+
     /** Right-click equips a pendant into the necklace slot (AdventurAgent: it had to be dragged in). */
     static void register(net.neoforged.bus.api.IEventBus modBus) {
         if (LOADED) modBus.addListener(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent.class, e -> e.enqueueWork(Impl::register));
@@ -39,12 +44,18 @@ final class CuriosCompat {
             };
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHARGED_RIFT_PENDANT.get(), curio);
+            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHRONAL_ANCHOR.get(), curio);
         }
 
         static ItemStack pendant(ServerPlayer p) {
             return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p)
                 .flatMap(h -> h.findFirstCurio(s -> s.getItem() instanceof RiftPendantItem pi && pi.getEnergy(s) > 0))
                 .map(top.theillusivec4.curios.api.SlotResult::stack).orElse(ItemStack.EMPTY);
+        }
+
+        static boolean anchor(ServerPlayer p) {
+            return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p)
+                .flatMap(h -> h.findFirstCurio(StasisRegistry.CHRONAL_ANCHOR.get())).isPresent();
         }
 
         static void crumble(ServerPlayer p) {

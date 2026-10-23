@@ -160,6 +160,10 @@ public final class StasisRegistry {
         TemporalAcceleratorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.GOLD).strength(3f, 9f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> 4 + st.getValue(TemporalAcceleratorBlock.STEP) / 3));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TEMPORAL_ACCELERATOR = ITEMS.registerSimpleBlockItem(TEMPORAL_ACCELERATOR_BLOCK);
+    /** The chronal anchor (λ-Nero: "or a bauble"): worn as a Curios charm or held in the off hand, it keeps its wearer at
+     *  1x in an acceleration field, as a whole time suit does (PlayerRates). No protection in stopped land. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHRONAL_ANCHOR = ITEMS.registerSimpleItem("chronal_anchor",
+        p -> p.stacksTo(1));
     /** The surveyor's desk (spawn cottage; stronghold libraries in spreading mode): maps to ruined cottages (MapDeskBlock). */
     public static final net.neoforged.neoforge.registries.DeferredBlock<MapDeskBlock> MAP_DESK_BLOCK = BLOCKS.registerBlock("surveyors_desk",
         MapDeskBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.WOOD).strength(2.5f).sound(net.minecraft.world.level.block.SoundType.WOOD));
