@@ -27,13 +27,13 @@
 // shape id; [240 + i] static deep i's strength (0.25..1: a lance's breach shrinks it round its eye, Lance; 1 unlanced);
 // [251] how far rifts are drawn on the sky (ReportConfig.riftRange); [244..246] the nearest lance beam's start (the boom's tip) - floor(camera), [247..249] its end (the rift's eye), [250] on;
 // [1600] possessed eye count (<= 16), [1601 + 3i ..] eye i - floor(camera);
-// [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 18i ..] field i
+// [260 + 5i ..] bolt point i: NDC x, y, depth, half width (NDC), intensity (0 breaks the line); [4096 + 19i ..] field i
 // (i < 32, nearest first, live before remnants): centre - floor(camera) (3), radius, collapse, failing,
 // column (0/1; -1 a lull: a column without a shell), seed (24-bit, exact), seconds since it formed (-1: no start-up animation), reserved (a remnant: the time
 // [29] as it froze). Column 2: a frozen remnant.
-// [4106 + 18i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
-// remnant: the eddy time [30] as it froze). [4110 + 18i ..] field i's reach east, south, west, north as multiples of
-// its radius (Field.Stretch: a tower's booms stretch it; 1 = round).
+// [4106 + 19i ..] field i's shield: amber share, dropout share, side (yaw, radians: towards (cos, 0, sin)), unused (a
+// remnant: the eddy time [30] as it froze). [4110 + 19i ..] field i's reach east, south, west, north as multiples of
+// its radius (Field.Stretch: a tower's booms stretch it; 1 = round). [4114 + 19i] an acceleration field's rate (0: not one).
 // The shield is drawn here too, after the desaturation, so its colour survives (Baughn's option a): each field's
 // sphere is hit by the view ray, and the hit point is placed on a Goldberg-style hexagon grid (a triangular
 // lattice on each icosahedron face; the nearest lattice point is the cell, the gap to the second nearest its rim).
@@ -65,7 +65,7 @@ layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
 // per-field data (StasisPost.FIELD_BASE etc.): the 5th row, FIELD_STRIDE floats per field, at most MAX_FIELDS
-const int FIELD_BASE = 4096, FIELD_STRIDE = 18, MAX_FIELDS = 32;
+const int FIELD_BASE = 4096, FIELD_STRIDE = 19, MAX_FIELDS = 32;
 
 float data(int i) {
     uvec4 b = uvec4(round(texelFetch(DataSampler, ivec2(i & 1023, i >> 10), 0) * 255.0));
@@ -1362,7 +1362,10 @@ void main() {
                 // (a collapse is amber all over)
                 float warm = collapse > 0.0 ? 1.0 : 0.0;
                 int sb = k + 10;
-                vec4 sh = shieldAt(cell, nrm, centre, -v, r, data(sb), data(sb + 1), collapse, data(sb + 2), warm, ftime, h2 == 0 && !inside);
+                // an acceleration field (λ-Nero): its shield shimmers at its own pace and turns warm gold
+                float speed = data(k + 18);
+                vec4 sh = shieldAt(cell, nrm, centre, -v, r, data(sb), data(sb + 1), collapse, data(sb + 2), warm, speed > 1.0 ? ftime * speed : ftime, h2 == 0 && !inside);
+                if (speed > 1.0) sh.rgb = mix(sh.rgb, vec3(1.0, 0.84, 0.42), 0.35 + 0.25 * clamp((speed - 1.0) / 9.0, 0.0, 1.0));
                 if (data(31) > 0.0) {
                     // weather: where a deep crosses the field the hexes brighten (the opposite of dropout), pulsing
                     float dp = deepAt(fc + hp, vec3(data(16), data(17), data(18)));

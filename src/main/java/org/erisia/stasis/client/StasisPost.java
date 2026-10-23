@@ -35,9 +35,10 @@ public final class StasisPost {
     /**
      * Fields: at most MAX_FIELDS (stasis.fsh; was 13 in shared slots: Baughn asked for more, as rift querns come in
      * numbers), FIELD_STRIDE slots each from FIELD_BASE (the 5th row): 10 core (centre, radius, ...), then the shield
-     * (amber, dropout, side, remnant eddy clock) at +10, then the stretch (e, s, w, n) at +14.
+     * (amber, dropout, side, remnant eddy clock) at +10, then the stretch (e, s, w, n) at +14, then at +18 an
+     * acceleration field's rate (0 for the rest: Field.fast; λ-Nero: its shield turns gold and its hexes shimmer faster).
      */
-    static final int FIELD_BASE = 4096, FIELD_STRIDE = 18, MAX_FIELDS = 32, SHIELD_OFF = 10, STRETCH_OFF = 14;
+    static final int FIELD_BASE = 4096, FIELD_STRIDE = 19, MAX_FIELDS = 32, SHIELD_OFF = 10, STRETCH_OFF = 14, SPEED_OFF = 18;
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
     /** Ground grids (G x G surface heights) of the drifting deeps (GROUND_BASE + G*G i) and the static deeps (STATIC_GROUND_BASE + G*G i). */
@@ -211,6 +212,7 @@ public final class StasisPost {
             d[sh + 1] = (float) f.dropout();
             d[sh + 2] = (float) f.side();
             putStretch(d, n - 1, shownStretch(f));
+            d[o + SPEED_OFF] = f.fast() ? (float) f.rate() : 0;
         }
         // frozen remnants of collapsed towers (column 2: the shader draws them at a fixed time, and time doesn't run there),
         // nearest first, in the slots left
