@@ -81,7 +81,7 @@ debugging:
 - `eddies_in_a_weak_field` (once over its 60 % pocket share, 3568 of 5457, when test positions moved; passed on rerun)
 - `remains_*` (2026-10-20: ran beside `remains_not_with_keep_inventory`, whose world-wide keepInventory left them no drops;
   that test is isolated now)
-- `spread_hard_mode_entry` (once, 2026-10-20: "the flash removes a dragon still alive": removed false; passed on 4 reruns)
+- `spread_hard_mode_entry` (2026-10-20, and twice on 2026-10-23: "the flash removes a dragon still alive": removed false; passed on reruns)
 - `lance_multiblock_binds` (once, 2026-10-20: "a boom away from the rift: unbound"; like `lance_breach_hold_relax`, a
   lance test whose geometry meets the test's random world position; passed on rerun)
 - `spread_rates` (fixed 2026-10-20: the spawn column is a bilinear blend of its cell, ranked only >= split - 1, and lower
