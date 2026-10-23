@@ -15,7 +15,7 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * The temporal accelerator (λ-Nero: a block placed against the tower's power core): a tower with one beside its core
  * runs its field faster than time (Field.fast; the blocks inside get Stasis.speedAt ticks), for the tower's draw times
- * the rate squared (2x for 4x the power). Right-click raises its setting by half, sneak-right-click lowers it:
+ * the square of the speed-up over its own field's rate (Baughn: 0.6 to 1.5 is 2.5²). Right-click raises its setting by half, sneak-right-click lowers it:
  * 1.5x .. 10x (STEP 1..18). Short of power, the tower drops its rate back towards 1x before it shrinks its field
  * (TowerBlockEntity.safety).
  */

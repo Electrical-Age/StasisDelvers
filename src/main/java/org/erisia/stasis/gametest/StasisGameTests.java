@@ -1044,8 +1044,9 @@ public final class StasisGameTests {
             });
             return () -> {
                 c.check("the field runs at the accelerator's 2x", rate[0] == 2.0, "rate " + rate[0]);
-                double used = at[0] - at[1], expect = org.erisia.stasis.TowerBlockEntity.drawFor(16) * 4 / 20 * 20;
-                c.check("2x draws 4x", Math.abs(used - expect) < 0.05 * expect, String.format("%.0f J vs %.0f J", used, expect));
+                double up = 2.0 / org.erisia.stasis.StasisConfig.towerFieldRate();
+                double used = at[0] - at[1], expect = org.erisia.stasis.TowerBlockEntity.drawFor(16) * up * up / 20 * 20;
+                c.check("2x draws (2 / the tower's own rate)² (Baughn: 0.6 -> 1.5 is 2.5²)", Math.abs(used - expect) < 0.05 * expect, String.format("%.0f J vs %.0f J", used, expect));
                 // the carried rate: the highest half step whose draw (x weather) is within 90% of the input
                 double cr = t.carryRate(16, 10), in = t.inAvgW();
                 boolean carryOk = (cr == 1 || t.drawAt(16, cr) <= 0.9 * in + 1e-6) && (cr == 10 || t.drawAt(16, cr + 0.5) > 0.9 * in - 1e-6);

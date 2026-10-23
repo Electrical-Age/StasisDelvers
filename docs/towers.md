@@ -67,7 +67,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
 - A block against either core cell (any side). Right-click raises its `STEP` (1..18), sneak-right-click lowers it:
   rate = 1 + step / 2 (1.5x..10x). `want(level, master)`: the highest setting against the core.
 - `TowerBlockEntity.accelerate` (once a second while running, after `safety`): the field runs at `accelRate`
-  (saved), or at `towerFieldRate` when it's 1. `drawAt(r)` includes `accelRate²`.
+  (saved), or at `towerFieldRate` when it's 1. `drawAt(r)` includes `(accelRate / towerFieldRate)²` (Baughn: priced by
+  the speed-up, 0.6 to 1.5 is 2.5²).
 - Short of power (`failing > 0.5`), `safety` sets `accelRetreat` and returns before any radius retreat: the rate falls
   to `carryRate` (the highest half step whose draw the input carries at 90%), at least half a step a second while the
   shield fails, and comes back once the store is 80% full. Override turns this off with the rest of the safety.

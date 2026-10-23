@@ -415,9 +415,13 @@ public class TowerBlockEntity extends BlockEntity {
         return drawAt(r, accelRate);
     }
 
-    /** Draw at radius r and rate: an accelerated field costs the rate squared (λ-Nero: 2x for 4x the power). */
+    /**
+     * Draw at radius r and rate: an accelerated field costs the square of how much faster it runs than the tower's own
+     * field (λ-Nero: 2x for 4x the power; Baughn: from 0.6 to 1.5 is 2.5², from 1.0 less).
+     */
     public double drawAt(double r, double rate) {
-        return drawFor(r * volumeScale()) * drawPenalty(r) * Math.max(1, rate) * Math.max(1, rate);
+        double up = rate > 1 ? rate / Math.min(1, Math.max(0.001, StasisConfig.towerFieldRate)) : 1;
+        return drawFor(r * volumeScale()) * drawPenalty(r) * up * up;
     }
 
     /** The highest rate (in the accelerator's half steps, at most want) whose draw the input carries with a margin at
