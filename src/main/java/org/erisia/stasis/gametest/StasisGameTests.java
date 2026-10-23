@@ -3182,8 +3182,8 @@ public final class StasisGameTests {
             ServerLevel level = h.getLevel();
             halfField(h, c, 3.0);
             FurnaceBlockEntity fast = furnace(h, new BlockPos(12, 1, 4)), slow = furnace(h, new BlockPos(3, 1, 4));
-            var itemFast = new net.minecraft.world.entity.item.ItemEntity(level, h.absoluteVec(new Vec3(12.5, 1.2, 4.5)).x, h.absoluteVec(new Vec3(12.5, 1.2, 4.5)).y,
-                h.absoluteVec(new Vec3(12.5, 1.2, 4.5)).z, new ItemStack(Items.STICK));
+            var itemFast = new net.minecraft.world.entity.item.ItemEntity(level, h.absoluteVec(new Vec3(12.5, 1.2, 3.5)).x, h.absoluteVec(new Vec3(12.5, 1.2, 3.5)).y,
+                h.absoluteVec(new Vec3(12.5, 1.2, 3.5)).z, new ItemStack(Items.STICK));
             var itemSlow = new net.minecraft.world.entity.item.ItemEntity(level, h.absoluteVec(new Vec3(3.5, 1.2, 3.5)).x, h.absoluteVec(new Vec3(3.5, 1.2, 3.5)).y,
                 h.absoluteVec(new Vec3(3.5, 1.2, 3.5)).z, new ItemStack(Items.STICK));
             itemFast.setDeltaMovement(Vec3.ZERO);   // (a spawned item's random toss, three times as fast, takes it out of the field)

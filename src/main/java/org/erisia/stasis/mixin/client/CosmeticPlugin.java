@@ -43,7 +43,8 @@ public class CosmeticPlugin implements IMixinConfigPlugin {
         Map.entry("GameRendererMixin", "the suited hand drawn in colour in stopped land"),
         Map.entry("SoundEngineMixin", "the pitch sag of a failing field"),
         Map.entry("EntityRendererAgeMixin", "frozen entities' idle animations standing still"),
-        Map.entry("LivingEntityRendererFrozenMixin", "frozen living entities drawn at their frozen pose (no flicker)"));
+        Map.entry("LivingEntityRendererFrozenMixin", "frozen living entities drawn at their frozen pose (no flicker)"),
+        Map.entry("ClientLevelFastMixin", "entities in acceleration fields moving at the server's pace (no rubber-banding)"));
 
     /** Injector annotations (Mixin and MixinExtras) whose handler the target class must end up calling. */
     private static final Set<String> INJECTORS = Set.of(

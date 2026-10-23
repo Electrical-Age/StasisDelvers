@@ -14,7 +14,8 @@
     "SoundEngineMixin",
     "WeatherEffectRendererMixin",
     "EntityRendererAgeMixin",
-    "LivingEntityRendererFrozenMixin"
+    "LivingEntityRendererFrozenMixin",
+    "ClientLevelFastMixin"
   ],
   "injectors": {
     "defaultRequire": 0
