@@ -136,9 +136,12 @@ public final class Spread {
         return s.map() == null || !SpreadMap.stilled(s.map(), x, z, s.p());
     }
 
-    /** runs(), for the client's edge curtain (StillEdge). */
-    public static boolean runsAt(Level level, int x, int z) {
-        return runs(level, x, z);
+    /** The stillness field at column (x, z): rank1024 - P x SCALE (stilled where < 0), for the client's edge curtain
+     *  (StillEdge: its zero line, smooth across columns); Long.MIN_VALUE without a map. */
+    public static long edgeField(Level level, int x, int z) {
+        State s = state(level);
+        if (s.map() == null) return Long.MIN_VALUE;
+        return SpreadMap.rank1024(s.map(), x, z) - (long) s.p() * SpreadMap.SCALE;
     }
 
     /** Chunk (cx, cz) in spreading mode: 1 every column runs, 0 every column is stilled, 2 some of each. */

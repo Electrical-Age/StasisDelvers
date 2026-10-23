@@ -19,14 +19,20 @@ public final class StillEdge {
     }
 
     static final int REACH = 48;
-    static final double H = 3.5;
+    static final double H = 6;
 
-    /** One edge: a block side between columns (x0, z0) and its neighbour along +x (alongX) or +z, the ground height. */
-    record Edge(int x, int z, boolean alongX, double y) {
+    /** One stretch of the edge: from (x0, z0) to (x1, z1) (blocks, smooth: the stillness field's zero line), each end's
+     *  ground height. */
+    record Edge(double x0, double z0, double y0, double x1, double z1, double y1) {
     }
 
     static volatile List<Edge> edges = List.of();
 
+    /**
+     * Once a second: the zero line of the stillness field (Spread.edgeField: stilled where negative), by marching squares
+     * over the column centres within REACH, interpolated, so a diagonal edge is a straight curtain, not a staircase of
+     * 1-block sheets seen edge-on (AdventurAgent: scattered thin ribbons).
+     */
     static void tick(ClientTickEvent.Post e) {
         var mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.isPaused() || mc.level.getGameTime() % 20 != 0) return;
@@ -35,47 +41,62 @@ public final class StillEdge {
             return;
         }
         int px = mc.player.getBlockX(), pz = mc.player.getBlockZ(), n = 2 * REACH + 1;
-        boolean[] run = new boolean[n * n];
-        for (int j = 0; j < n; j++)
-            for (int i = 0; i < n; i++) run[j * n + i] = Spread.runsAt(mc.level, px - REACH + i, pz - REACH + j);
-        List<Edge> out = new ArrayList<>();
+        double[] f = new double[n * n];
         for (int j = 0; j < n; j++)
             for (int i = 0; i < n; i++) {
-                int x = px - REACH + i, z = pz - REACH + j;
-                if (i + 1 < n && run[j * n + i] != run[j * n + i + 1]) out.add(new Edge(x, z, true, ground(mc, x, z, x + 1, z)));
-                if (j + 1 < n && run[j * n + i] != run[(j + 1) * n + i]) out.add(new Edge(x, z, false, ground(mc, x, z, x, z + 1)));
+                long v = Spread.edgeField(mc.level, px - REACH + i, pz - REACH + j);
+                if (v == Long.MIN_VALUE) {
+                    edges = List.of();
+                    return;
+                }
+                f[j * n + i] = v + 0.5;   // (stilled where v < 0, i.e. f < 0.5; shifted so no corner is exactly 0)
+            }
+        List<Edge> out = new ArrayList<>();
+        for (int j = 0; j + 1 < n; j++)
+            for (int i = 0; i + 1 < n; i++) {
+                double a = f[j * n + i], b = f[j * n + i + 1], c = f[(j + 1) * n + i + 1], d = f[(j + 1) * n + i];
+                // the crossings on the cell's four sides (corners at column centres)
+                double[] pts = new double[8];
+                int k = 0;
+                double x0 = px - REACH + i + 0.5, z0 = pz - REACH + j + 0.5;
+                if ((a < 0) != (b < 0)) { pts[k++] = x0 + a / (a - b); pts[k++] = z0; }
+                if ((b < 0) != (c < 0)) { pts[k++] = x0 + 1; pts[k++] = z0 + b / (b - c); }
+                if ((c < 0) != (d < 0)) { pts[k++] = x0 + 1 - c / (c - d); pts[k++] = z0 + 1; }
+                if ((d < 0) != (a < 0)) { pts[k++] = x0; pts[k++] = z0 + 1 - d / (d - a); }
+                for (int q = 0; q + 3 < k; q += 4)
+                    out.add(new Edge(pts[q], pts[q + 1], ground(mc, pts[q], pts[q + 1]), pts[q + 2], pts[q + 3], ground(mc, pts[q + 2], pts[q + 3])));
             }
         edges = out;
     }
 
-    /** The higher of the two columns' ground (the curtain stands on the edge above both). */
-    static double ground(Minecraft mc, int x0, int z0, int x1, int z1) {
-        if (!mc.level.hasChunk(x0 >> 4, z0 >> 4) || !mc.level.hasChunk(x1 >> 4, z1 >> 4)) return mc.player.getY();
-        return Math.max(mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x0, z0), mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x1, z1));
+    /** The ground's top at (x, z). */
+    static double ground(Minecraft mc, double x, double z) {
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
+        if (!mc.level.hasChunk(bx >> 4, bz >> 4)) return mc.player.getY();
+        return mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
     }
 
-    /** The curtain: per edge, a few bands whose brightness runs downwards with time (falling streaks). */
+    /** The curtain: per stretch, bands whose darkness runs downwards with time (falling streaks). */
     static void draw(net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent e) {
         var es = edges;
         var mc = Minecraft.getInstance();
         if (es.isEmpty() || mc.level == null) return;
         var cam = e.getLevelRenderState().cameraRenderState.pos;
         double time = (mc.level.getGameTime() % 100000) / 20.0;
-        int bands = 6;
+        int bands = 8;
         e.getSubmitNodeCollector().submitCustomGeometry(e.getPoseStack(), net.minecraft.client.renderer.rendertype.RenderTypes.debugQuads(), (pose, buf) -> {
             for (Edge g : es) {
-                double ax = g.alongX ? g.x + 1 : g.x, az = g.alongX ? g.z : g.z + 1;
-                double bx = g.alongX ? g.x + 1 : g.x + 1, bz = g.alongX ? g.z + 1 : g.z + 1;
-                double dist = Math.hypot(ax - cam.x, az - cam.z);
+                double dist = Math.hypot(0.5 * (g.x0 + g.x1) - cam.x, 0.5 * (g.z0 + g.z1) - cam.z);
                 double fade = Math.max(0, Math.min(1, (REACH - dist) / 12));
                 if (fade <= 0) continue;
                 for (int k = 0; k < bands; k++) {
-                    double y0 = g.y - 0.5 + H * k / bands, y1 = g.y - 0.5 + H * (k + 1) / bands;
-                    int a0 = alpha(y0 - g.y, time, ax + az, fade), a1 = alpha(y1 - g.y, time, ax + az, fade);
-                    v(buf, pose, cam, ax, y0, az, a0);
-                    v(buf, pose, cam, bx, y0, bz, a0);
-                    v(buf, pose, cam, bx, y1, bz, a1);
-                    v(buf, pose, cam, ax, y1, az, a1);
+                    double h0 = -0.5 + H * k / bands, h1 = -0.5 + H * (k + 1) / bands;
+                    int a0 = alpha(h0, time, g.x0 + g.z0, fade), a1 = alpha(h1, time, g.x0 + g.z0, fade);
+                    int b0 = alpha(h0, time, g.x1 + g.z1, fade), b1 = alpha(h1, time, g.x1 + g.z1, fade);
+                    v(buf, pose, cam, g.x0, g.y0 + h0, g.z0, a0);
+                    v(buf, pose, cam, g.x1, g.y1 + h0, g.z1, b0);
+                    v(buf, pose, cam, g.x1, g.y1 + h1, g.z1, b1);
+                    v(buf, pose, cam, g.x0, g.y0 + h1, g.z0, a1);
                 }
             }
         });
@@ -83,13 +104,13 @@ public final class StillEdge {
 
     /** Darker streaks sliding down (phase moves with time), thinning towards the top. */
     static int alpha(double h, double time, double seed, double fade) {
-        double streak = 0.6 + 0.4 * Math.sin((h + time * 1.6) * 3.0 + seed * 1.7);
+        double streak = 0.55 + 0.45 * Math.sin((h + time * 1.6) * 2.2 + seed * 1.3);
         double top = Math.max(0, 1 - h / H);
-        return (int) (255 * 0.55 * fade * streak * top);
+        return (int) (255 * 0.9 * fade * streak * Math.sqrt(top));
     }
 
     static void v(com.mojang.blaze3d.vertex.VertexConsumer buf, com.mojang.blaze3d.vertex.PoseStack.Pose pose, net.minecraft.world.phys.Vec3 cam,
                   double x, double y, double z, int a) {
-        buf.addVertex(pose, (float) (x - cam.x), (float) (y - cam.y), (float) (z - cam.z)).setColor(40, 10, 60, a);
+        buf.addVertex(pose, (float) (x - cam.x), (float) (y - cam.y), (float) (z - cam.z)).setColor(55, 12, 85, a);
     }
 }
