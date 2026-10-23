@@ -63,6 +63,23 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   - `LiquidBlockMixin`, `EntityPushMixin`, `BucketItemMixin`
   - `WalkNodeEvaluatorMixin` + `PathfindingContextMixin`
 
+## Acceleration fields (rate above 1; λ-Nero, notes/timestop/ACCEL-*.md)
+- `Field.clampRate` allows (0, `Field.MAX_RATE` = 10]. For the rule a field counts as `min(1, rate)`: `rateAt`, `rateAtSteady`
+  and `rateAtLand` stay in [0, 1] for all their callers (PlayerRates, EA's NodeFreezer, meshing).
+- `Stasis.speedAt(level, x, y, z)` (>= 1): the achieved rate of the fastest acceleration field holding the whole block, 1 in
+  a rift. It ignores `stops()`: it works in running land and in levels that don't stop. Per-level `Index.fast` by column;
+  `anyFast` (set by the `Field` constructor) makes it one read until an acceleration field exists. The server's built
+  indexes are also in the copy-on-write `serverIndex`, read without the lock.
+- `Stasis.ticksThisTurn(speed, t)`: how many ticks a block at that speed gets in game tick t (exact thousandths, like `runs`).
+- Extra ticks (server only): scheduled delays become `max(1, ceil(delay / speed))` (`dueTick`); random ticks
+  (`ServerLevelMixin`), block entities (`BoundTickingBlockEntityMixin`; not `multiTickExempt`) and entities
+  (`ServerLevelEntityMixin`; not players or passengers) run `ticksThisTurn` times.
+- `Speeds`: once a second each acceleration field counts its block entities and entities and achieves
+  `1 + min(rate - 1, accelBudget / count)`, all together within `accelServerBudget`. Kept outside `FieldData` (a change
+  there re-syncs and re-meshes). The client has no copy yet: it uses the field's rate.
+- Not done yet: client-side extra ticks (entities rubber-band in a fast field), players (3x cap), the EA hook, the
+  tower block and the riftstone room.
+
 ## Data flow
 1. A tower (`TowerBlockEntity.start`) or a command (`StasisCommands`) calls `FieldData.add` or `update`.
 2. `FieldData.changed()` does, in order:
@@ -97,7 +114,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   water as solid while the server does not.
 
 ## Invariants
-- Stopped means rate 0, and field rates are in [0.001, 1]. Where fields overlap, the fastest wins.
+- Stopped means rate 0, and `rateAt` is in [0, 1] (field rates in [0.001, 10]; above 1 only `speedAt` sees it). Where fields overlap, the fastest wins.
   Guarded by GameTests `rate_overlap_max`, `rate_math`, `TickGateTest`.
 - Whole-block rule: a block the boundary cuts is outside, for stretched fields too.
   Guarded by `FieldTest.containsBlockIsAllEightCorners` and `bugA_westCornerOfACentreBlock`, and GameTests

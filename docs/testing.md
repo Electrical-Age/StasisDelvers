@@ -104,6 +104,8 @@ debugging:
 - `eddies_stop_mobs` passes if the mob never ran.
 
 ## Gaps (no automated test)
+- Acceleration fields: extra random ticks (the `randomTick` wraps) have no in-world test (random); `accel_in_running_land`
+  skips when every level stops (the test config). `accel_*` cover the rule, scheduled delays, furnaces, item ages and the budget.
 - The serverbound handlers (`ConsoleSet`/`ConsoleFeed`/`ConsoleQuery`/`DigStilled` paths, `ReportResponder`).
 - Most `StasisCommands` (only `field add` and `field rate`, through `rate_command`).
 - `Tickets` across a restart, `TowerSignalNode`, `FieldSleep`, `MapDeskBlock`, `RiftBarometerBlock`,

@@ -29,8 +29,10 @@ If one of these can't apply, the game stops at startup, on purpose: without them
 
 | Mixin | Target | What | Why no event |
 |---|---|---|---|
-| `ServerLevelMixin` | `ServerLevel.isPositionTickingWithEntitiesLoaded` (RETURN), `tickBlock`/`tickFluid` (HEAD cancel), `tickChunk` (HEAD cancel + 2 `@WrapWithCondition` on `randomTick`), merged `createTick` x2 | Scheduled ticks wait or are rate-delayed (`Stasis.dueTick`); no random ticks, snow or ice in stopped land | No scheduled-tick or random-tick event exists |
+| `ServerLevelMixin` | `ServerLevel.isPositionTickingWithEntitiesLoaded` (RETURN), `tickBlock`/`tickFluid` (HEAD cancel), `tickChunk` (HEAD cancel + 2 `@WrapOperation` on `randomTick`), merged `createTick` x2 | Scheduled ticks wait or are rate-delayed (`Stasis.dueTick`; shortened by `speedAt` in acceleration fields); no random ticks, snow or ice in stopped land; random ticks run `ticksThisTurn` times in acceleration fields | No scheduled-tick or random-tick event exists |
 | `LevelChunkMixin` | `LevelChunk.isTicking` (RETURN) | Block entities tick only on running ticks; `Stasis.exemptBlockEntity` is exempt | No block-entity-tick event |
+| `BoundTickingBlockEntityMixin` | `LevelChunk$BoundTickingBlockEntity.tick` (`@WrapOperation` on `BlockEntityTicker.tick`) | Block entities in an acceleration field tick `ticksThisTurn` times (server; `Stasis.multiTickExempt`: towers, lances, querns, EA) | No block-entity-tick event |
+| `ServerLevelEntityMixin` | `ServerLevel.tickNonPassenger` (TAIL) | Entities (not players or passengers) in an acceleration field get the extra ticks, through `tickNonPassenger` again under a re-entrancy guard | `EntityTickEvent.Post` can't re-run the whole tick (old position, riders) |
 | `LiquidBlockMixin` | `LiquidBlock.getCollisionShape` (RETURN) | Stopped water and lava are solid (both sides) | No collision hook for vanilla blocks |
 | `BlockMixin` | `Block.stepOn` (HEAD) + merged `getLightEmission(state, getter, pos)` / `hasDynamicLightEmission` | Stopped lava burns like magma; flame light by position (`Flames`) | The light API has no hook for vanilla blocks |
 | `BlockStateBaseMixin` | `BlockStateBase.isRandomlyTicking`, `randomTick` (HEAD) | Flames get random ticks so they can gutter | None |

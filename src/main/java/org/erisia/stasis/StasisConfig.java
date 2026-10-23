@@ -28,6 +28,7 @@ public final class StasisConfig {
     static final ModConfigSpec.DoubleValue TOWER_BOOM_STRETCH;
     static final ModConfigSpec.DoubleValue TOWER_FIELD_RATE;
     static final ModConfigSpec.DoubleValue GUTTER_CHANCE;
+    static final ModConfigSpec.IntValue ACCEL_BUDGET, ACCEL_SERVER_BUDGET;
     static final ModConfigSpec.BooleanValue DEBUG_MESSAGES;
     static final ModConfigSpec.IntValue GUTTER_MIN_TICKS;
     static final ModConfigSpec.IntValue GUTTER_MAX_TICKS;
@@ -101,6 +102,11 @@ public final class StasisConfig {
         GUTTER_CHANCE = b.comment("Chance that a random tick makes a flame (block tag stasisdelvers:flames) gutter to light 4-7.",
                 "A block gets a random tick about every 68 s at randomTickSpeed 3, so 0.25 is about once in 4.5 minutes.")
             .defineInRange("gutterChance", 0.25, 0.0, 1.0);
+        ACCEL_BUDGET = b.comment("Acceleration fields (rate above 1): at most this many extra ticks (block entities plus entities) per",
+                "game tick in one field; a fuller field runs slower than its rate (Speeds).")
+            .defineInRange("accelBudget", 2000, 0, 1000000);
+        ACCEL_SERVER_BUDGET = b.comment("At most this many extra ticks per game tick in all acceleration fields together.")
+            .defineInRange("accelServerBudget", 8000, 0, 10000000);
         GUTTER_MIN_TICKS = b.comment("Shortest gutter, in ticks.").defineInRange("gutterMinTicks", 100, 1, 72000);
         GUTTER_MAX_TICKS = b.comment("Longest gutter, in ticks.").defineInRange("gutterMaxTicks", 600, 1, 72000);
         STRATA_SHAPES = b.comment("Strata shapes around static deeps' rifts, as name:weight (saddle, staircase, splash, pods); each",
@@ -205,6 +211,7 @@ public final class StasisConfig {
     static volatile double towerBoomStretch = 0.5;
     static volatile double towerFieldRate = 0.6;
     static volatile double gutterChance = 0.25;
+    static volatile int accelBudget = 2000, accelServerBudget = 8000;
     static volatile boolean debugMessages = false;
     static volatile int gutterMinTicks = 100;
     static volatile int gutterMaxTicks = 600;
@@ -266,6 +273,13 @@ public final class StasisConfig {
         return stoppedUnboundCap;
     }
 
+    /** Set the acceleration budget per field (GameTests); returns the old one. */
+    public static int setAccelBudgetForTests(int v) {
+        int old = accelBudget;
+        accelBudget = v;
+        return old;
+    }
+
     /** spreadHours (GameTests). */
     public static double spreadHoursForTests() {
         return spreadHours;
@@ -288,6 +302,8 @@ public final class StasisConfig {
         m.put("towerMaxSegments", towerMaxSegments);
         m.put("towerFieldRate", towerFieldRate);
         m.put("gutterChance", gutterChance);
+        m.put("accelBudget", accelBudget);
+        m.put("accelServerBudget", accelServerBudget);
         m.put("debugMessages", debugMessages);
         m.put("gutterMinTicks", gutterMinTicks);
         m.put("gutterMaxTicks", gutterMaxTicks);
@@ -344,6 +360,8 @@ public final class StasisConfig {
         towerBoomStretch = TOWER_BOOM_STRETCH.get();
         towerFieldRate = TOWER_FIELD_RATE.get();
         gutterChance = GUTTER_CHANCE.get();
+        accelBudget = ACCEL_BUDGET.get();
+        accelServerBudget = ACCEL_SERVER_BUDGET.get();
         debugMessages = DEBUG_MESSAGES.get();
         gutterMinTicks = GUTTER_MIN_TICKS.get();
         gutterMaxTicks = GUTTER_MAX_TICKS.get();

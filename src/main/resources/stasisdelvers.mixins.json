@@ -5,6 +5,8 @@
   "mixins": [
     "ServerLevelMixin",
     "LevelChunkMixin",
+    "BoundTickingBlockEntityMixin",
+    "ServerLevelEntityMixin",
     "LiquidBlockMixin",
     "BlockMixin",
     "BlockStateBaseMixin",

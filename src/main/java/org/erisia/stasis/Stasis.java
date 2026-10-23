@@ -37,6 +37,16 @@ public final class Stasis {
 
     private static final class Index {
         final Long2ObjectOpenHashMap<Field[]> columns = new Long2ObjectOpenHashMap<>();
+        /** The acceleration fields (rate above 1) by column; empty in most levels. */
+        final Long2ObjectOpenHashMap<Field[]> fast = new Long2ObjectOpenHashMap<>();
+    }
+
+    /** Has an acceleration field ever existed in this JVM? Until then speedAt is one read (it's asked per tick of every
+     *  block entity and entity). */
+    private static volatile boolean anyFast;
+
+    static void noteFast() {
+        anyFast = true;
     }
 
     private static final Map<Level, Index> INDEX = new WeakHashMap<>();
@@ -49,6 +59,10 @@ public final class Stasis {
     }
 
     private static volatile ClientIndex clientIndex;
+
+    /** The server levels' built indexes, copy-on-write and read without the lock: speedAt asks per block-entity and
+     *  entity tick once an acceleration field exists. Dropped with the level's index (invalidate; level unload). */
+    private static volatile Map<Level, Index> serverIndex = Map.of();
 
     /** Counts invalidations: whatever caches an answer of rateAt (chunk meshing per section) compares this. */
     private static volatile int version;
@@ -64,6 +78,11 @@ public final class Stasis {
 
     public static synchronized void invalidate(Level level) {
         INDEX.remove(level);
+        if (serverIndex.containsKey(level)) {
+            Map<Level, Index> m = new java.util.IdentityHashMap<>(serverIndex);
+            m.remove(level);
+            serverIndex = m;
+        }
         ClientIndex c = clientIndex;
         if (c != null && c.level() == level) clientIndex = null;
         version++;
@@ -77,6 +96,8 @@ public final class Stasis {
     private static Index index(Level level) {
         ClientIndex c = clientIndex;
         if (c != null && c.level() == level) return c.index();
+        Index s = serverIndex.get(level);
+        if (s != null) return s;
         return indexLocked(level);
     }
 
@@ -101,9 +122,18 @@ public final class Stasis {
                 for (int cx = x0; cx <= x1; cx++)
                     for (int cz = z0; cz <= z1; cz++) lists.computeIfAbsent(ChunkPos.pack(cx, cz), k -> new ArrayList<>()).add(f);
             }
-            for (var e : lists.long2ObjectEntrySet()) idx.columns.put(e.getLongKey(), e.getValue().toArray(NONE));
+            for (var e : lists.long2ObjectEntrySet()) {
+                idx.columns.put(e.getLongKey(), e.getValue().toArray(NONE));
+                Field[] fast = e.getValue().stream().filter(Field::fast).toArray(Field[]::new);
+                if (fast.length > 0) idx.fast.put(e.getLongKey(), fast);
+            }
         }
         if (level.isClientSide()) clientIndex = new ClientIndex(level, idx);
+        else if (INDEX.get(level) == idx && serverIndex.get(level) != idx) {
+            Map<Level, Index> m = new java.util.IdentityHashMap<>(serverIndex);
+            m.put(level, idx);
+            serverIndex = m;
+        }
         return idx;
     }
 
@@ -206,8 +236,9 @@ public final class Stasis {
         if (fs == null && rate <= 0) return 0.0;
         if (fs != null)
             for (Field f : fs) {
-                if (f.rate() > rate && f.id() != except && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
-                    rate = f.rate();
+                double fr = Math.min(1.0, f.rate());   // (an acceleration field runs its blocks: speedAt has the rest)
+                if (fr > rate && f.id() != except && f.containsBlock(x, y, z) && !(eddies && Eddies.stopped(level, f, x, y, z))) {
+                    rate = fr;
                     if (rate >= 1.0) break;
                 }
             }
@@ -231,6 +262,51 @@ public final class Stasis {
         if (fs == null) return false;
         for (Field f : fs) if (f.id() != except && f.containsBlock(x, y, z)) return true;
         return false;
+    }
+
+    /**
+     * How many times faster than normal the whole block at (x, y, z) runs: the achieved rate (Speeds: the budget may hold
+     * it below the field's rate) of the fastest acceleration field (rate above 1) holding it, or 1. On top of rateAt,
+     * which stays in [0, 1] for its callers: a block in an acceleration field has rateAt 1 and gets speedAt ticks per
+     * game tick (λ-Nero). In every level, stopped or not (a fast farm in running land); 1 in a rift.
+     */
+    public static double speedAt(Level level, int x, int y, int z) {
+        if (!anyFast || !StasisConfig.enabled) return 1.0;
+        Field[] fs = index(level).fast.get(ChunkPos.pack(x >> 4, z >> 4));
+        if (fs == null) return 1.0;
+        double s = 1.0;
+        for (Field f : fs) {
+            double a = Speeds.achieved(level, f);
+            if (a > s && f.containsBlock(x, y, z)) s = a;
+        }
+        return s > 1.0 && StaticDeeps.inRift(level, x, y, z) ? 1.0 : s;
+    }
+
+    public static double speedAt(Level level, BlockPos pos) {
+        return speedAt(level, pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    /** Does this level have an acceleration field at all (a cheap test before per-block speedAt)? */
+    public static boolean hasFast(Level level) {
+        return anyFast && StasisConfig.enabled && !index(level).fast.isEmpty();
+    }
+
+    /** The acceleration fields touching a chunk column (none: an empty array). */
+    static Field[] fastIn(Level level, long chunkKey) {
+        if (!anyFast) return NONE;
+        Field[] fs = index(level).fast.get(chunkKey);
+        return fs == null ? NONE : fs;
+    }
+
+    /**
+     * How many ticks a block running `speed` times faster gets in game tick t: floor(t m / 1000) - floor((t - 1) m / 1000)
+     * with m = speed in thousandths (1000..MAX_RATE*1000): at 2.5, 2 and 3 alternately. As runs() for slow rates:
+     * stateless, the same for every block at that speed. 1 at speed 1 or below.
+     */
+    public static int ticksThisTurn(double speed, long gameTime) {
+        long m = Math.max(1000, Math.min(Math.round(Field.MAX_RATE * 1000), Math.round(speed * 1000)));
+        if (m == 1000) return 1;
+        return (int) (Math.floorDiv(gameTime * m, 1000) - Math.floorDiv((gameTime - 1) * m, 1000));
     }
 
     /** sectionState: every block of the section is stopped (rateAtLand 0), every one runs, or it varies. */
@@ -344,7 +420,12 @@ public final class Stasis {
     /** dueTick for a block of this level (ServerLevelMixin.createTick). */
     public static long dueTick(Level level, BlockPos pos, int delay) {
         long now = level.getGameTime();
-        if (delay <= 0 || !stops(level)) return now + delay;
+        if (delay <= 0) return now + delay;
+        // an acceleration field: the delay shrinks by its speed, never below one tick (λ-Nero: a 1-tick chain stays one
+        // step a tick)
+        double speed = speedAt(level, pos);
+        if (speed > 1.0) return now + Math.max(1, (long) Math.ceil(delay / speed - 1e-9));
+        if (!stops(level)) return now + delay;
         return dueTick(rateAt(level, pos), now, delay);
     }
 
@@ -362,6 +443,15 @@ public final class Stasis {
      * near a tower used to be here too, as their FE push into the tower ran in their block-entity tick; it runs in EA's
      * simulation now, which NodeFreezer keeps going near towers (NodeFreezer.infrastructure).
      */
+    /**
+     * Block entities an acceleration field doesn't tick faster: towers, lances and querns (their power and state run on
+     * the server's clock), and EA's (its simulation runs on its own clock; the EA hook will scale its machines).
+     */
+    public static boolean multiTickExempt(net.minecraft.world.level.block.entity.BlockEntity be) {
+        return be instanceof TowerBlockEntity || be instanceof TowerCellBlockEntity || be instanceof LanceBlockEntity
+            || be instanceof QuernBlockEntity || be.getClass().getName().startsWith("mods.eln.");
+    }
+
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
         var be = level.getBlockEntity(pos);
         if (be instanceof TowerBlockEntity t && t.isMaster()) return true;

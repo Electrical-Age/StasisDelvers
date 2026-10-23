@@ -71,6 +71,6 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 - `docs/fauna.md`: rift fauna: dread, the field wall, the spawner, Static (and later the Puppeteer).
 - `docs/client-rendering.md`: the post chain, data-texture slot layout, `MAX_FIELDS`, frozen textures, tower meshes.
 - `docs/networking.md`: the `StasisNet` payloads both ways, the protocol version, size limits.
-- `docs/mixins.md`: each of the 28 mixins (target, why no event), the required and cosmetic configs, `CosmeticPlugin`.
+- `docs/mixins.md`: each of the 30 mixins (target, why no event), the required and cosmetic configs, `CosmeticPlugin`.
 - `docs/bug-reports.md`: the F7 pipeline, `Redactor`, `ReportResponder`, retention.
 - `docs/testing.md`: unit, property and GameTests, flaky and soft tests, gaps, how to run them.

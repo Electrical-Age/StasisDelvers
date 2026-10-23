@@ -3147,7 +3147,99 @@ public final class StasisGameTests {
             c.check("in neither: stopped", Stasis.rateAt(level, h.absolutePos(new BlockPos(15, 1, 0))) == 0.0);
             FieldData.get(level).update(level, a.id(), f -> f.withRate(0.9));
             c.check("raised the 0.3 field to 0.9: now the fastest", Stasis.rateAt(level, h.absolutePos(new BlockPos(12, 1, 4))) == 0.9);
-            c.check("rates clamp into (0, 1]", b.withRate(5).rate() == 1.0 && b.withRate(0).rate() > 0);
+            c.check("rates clamp into (0, MAX_RATE]", b.withRate(50).rate() == Field.MAX_RATE && b.withRate(0).rate() > 0);
+        }));
+        // acceleration fields (λ-Nero; notes/timestop/ACCEL-PART1.md): rate above 1 counts as 1 for the rule, and its
+        // blocks get speedAt ticks: scheduled delays shrink (never below 1), and the speed shows nowhere else
+        CASES.put("accel_rule_and_scheduled", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            Field f = halfField(h, c, 3.0);
+            BlockPos in = h.absolutePos(new BlockPos(12, 1, 4)), full = h.absolutePos(new BlockPos(3, 1, 4)), out = h.absolutePos(new BlockPos(15, 1, 0));
+            c.check("the rule: a 3x field runs its blocks at rate 1", Stasis.rateAt(level, in) == 1.0, "" + Stasis.rateAt(level, in));
+            c.check("speedAt: 3 inside, 1 in a normal field, 1 outside", Stasis.speedAt(level, in) == 3.0 && Stasis.speedAt(level, full) == 1.0
+                && Stasis.speedAt(level, out) == 1.0, Stasis.speedAt(level, in) + " " + Stasis.speedAt(level, full) + " " + Stasis.speedAt(level, out));
+            long d10 = level.createTick(in, Blocks.STONE, 10).triggerTick() - level.getGameTime();
+            long d1 = level.createTick(in, Blocks.STONE, 1).triggerTick() - level.getGameTime();
+            long dFull = level.createTick(full, Blocks.STONE, 10).triggerTick() - level.getGameTime();
+            c.check("scheduled: delay 10 -> 4 at 3x", d10 == 4, "delay " + d10);
+            c.check("scheduled: a 1-tick delay stays 1 (λ-Nero: the redstone limit)", d1 == 1, "delay " + d1);
+            c.check("scheduled: delay 10 in a normal field", dFull == 10, "delay " + dFull);
+            boolean ok = true;
+            String bad = "";
+            for (double sp : new double[]{1, 1.5, 2, 2.5, 3, 7.3, 10}) {
+                long n = 0;
+                for (long t = 987654321L; t < 987654321L + 1000; t++) n += Stasis.ticksThisTurn(sp, t);
+                if (n != Math.round(sp * 1000)) {
+                    ok = false;
+                    bad = "speed " + sp + ": " + n + " ticks in 1000";
+                }
+            }
+            c.check("ticksThisTurn: speed x 1000 ticks in 1000 game ticks", ok, bad);
+            c.check("ticksThisTurn: 1 at speed 1 or below", Stasis.ticksThisTurn(1, 5) == 1 && Stasis.ticksThisTurn(0.5, 5) == 1);
+        }));
+        // furnaces in a 3x field smelt three times as fast; items in it age three times as fast
+        CASES.put("accel_furnace_and_items", new Spec(100, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            halfField(h, c, 3.0);
+            FurnaceBlockEntity fast = furnace(h, new BlockPos(12, 1, 4)), slow = furnace(h, new BlockPos(3, 1, 4));
+            var itemFast = new net.minecraft.world.entity.item.ItemEntity(level, h.absoluteVec(new Vec3(12.5, 1.2, 4.5)).x, h.absoluteVec(new Vec3(12.5, 1.2, 4.5)).y,
+                h.absoluteVec(new Vec3(12.5, 1.2, 4.5)).z, new ItemStack(Items.STICK));
+            var itemSlow = new net.minecraft.world.entity.item.ItemEntity(level, h.absoluteVec(new Vec3(3.5, 1.2, 3.5)).x, h.absoluteVec(new Vec3(3.5, 1.2, 3.5)).y,
+                h.absoluteVec(new Vec3(3.5, 1.2, 3.5)).z, new ItemStack(Items.STICK));
+            itemFast.setDeltaMovement(Vec3.ZERO);   // (a spawned item's random toss, three times as fast, takes it out of the field)
+            itemSlow.setDeltaMovement(Vec3.ZERO);
+            level.addFreshEntity(itemFast);
+            level.addFreshEntity(itemSlow);
+            c.cleanup.add(() -> {
+                itemFast.discard();
+                itemSlow.discard();
+            });
+            return () -> {
+                // 100 ticks: a normal furnace is half way through its first ingot (200 ticks); a 3x one has one done
+                c.check("3x: the furnace smelted an ingot", fast.getItem(2).getCount() >= 1, fast.getItem(2) + ", raw left " + fast.getItem(0));
+                c.check("1x: not yet", slow.getItem(2).isEmpty(), slow.getItem(2).toString());
+                int af = itemFast.getAge(), as = itemSlow.getAge();
+                c.check("3x: an item ages ~3x as fast", as > 0 && af >= 2.6 * as && af <= 3.2 * as, "ages " + af + " / " + as);
+            };
+        }));
+        // the budget: a field holding more than accelBudget allows runs slower than its rate (Speeds)
+        CASES.put("accel_budget", new Spec(1, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Field f = halfField(h, c, 3.0);
+            for (int x = 11; x <= 13; x++) furnace(h, new BlockPos(x, 1, 4));
+            furnace(h, new BlockPos(12, 1, 3));
+            return () -> {
+                int old = org.erisia.stasis.StasisConfig.setAccelBudgetForTests(2);
+                try {
+                    org.erisia.stasis.Speeds.recount(level.getServer());
+                    double held = org.erisia.stasis.Speeds.held(level, f), a = org.erisia.stasis.Speeds.achieved(level, f);
+                    c.check("it counts its 4 furnaces", held == 4, "held " + held);
+                    c.check("budget 2 extra ticks for 4: 1.5x", Math.abs(a - 1.5) < 1e-9, "achieved " + a);
+                    c.check("speedAt follows the achieved rate", Math.abs(Stasis.speedAt(level, h.absolutePos(new BlockPos(12, 1, 4))) - 1.5) < 1e-9);
+                } finally {
+                    org.erisia.stasis.StasisConfig.setAccelBudgetForTests(old);
+                    org.erisia.stasis.Speeds.recount(level.getServer());
+                }
+                c.check("back to the default budget: 3x", Math.abs(org.erisia.stasis.Speeds.achieved(level, f) - 3.0) < 1e-9);
+            };
+        }));
+        // an acceleration field works where time isn't stopped at all (spreading mode's running land, the Nether)
+        CASES.put("accel_in_running_land", new Spec(1, (h, c) -> () -> {
+            // a level whose time doesn't stop (the Nether, unless the test config stops it)
+            ServerLevel lv = null;
+            for (ServerLevel l : h.getLevel().getServer().getAllLevels()) if (!Stasis.stops(l)) lv = l;
+            if (lv == null) {
+                c.check("a level that doesn't stop (skipped: none)", true);
+                return;
+            }
+            final BlockPos q = new BlockPos(1000, 80, 1000);
+            final ServerLevel lvl = lv;
+            Field f = FieldData.get(lvl).add(lvl, q.getX() + 0.5, q.getY() + 0.5, q.getZ() + 0.5, 3, false, 2.0);
+            c.cleanup.add(() -> FieldData.get(lvl).remove(lvl, f.id()));
+            c.check("running land: speedAt 2 inside, rateAt 1", Stasis.speedAt(lvl, q) == 2.0 && Stasis.rateAt(lvl, q) == 1.0,
+                Stasis.speedAt(lvl, q) + " " + Stasis.rateAt(lvl, q));
+            long d = lvl.createTick(q, Blocks.STONE, 10).triggerTick() - lvl.getGameTime();
+            c.check("running land: delay 10 -> 5 at 2x", d == 5, "delay " + d);
         }));
         // spreading mode (Baughn 2026-10-19; Spread): a column the stillness hasn't reached runs at rate 1 with or without
         // a field; a stilled one follows the base rules (stopped, or its field's rate); P moving on changes the answer
@@ -4245,9 +4337,11 @@ public final class StasisGameTests {
             int id = added.get(0).id();
             server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 0.5");
             c.check("field rate <id> 0.5", FieldData.get(level).get(id).map(Field::rate).orElse(-1.0) == 0.5);
-            server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 1.5");
+            server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 11");
             server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 0");
-            c.check("rates above 1 or at 0 are refused", FieldData.get(level).get(id).map(Field::rate).orElse(-1.0) == 0.5);
+            c.check("rates above MAX_RATE (10) or at 0 are refused", FieldData.get(level).get(id).map(Field::rate).orElse(-1.0) == 0.5);
+            server.getCommands().performPrefixedCommand(src, "stasis field rate " + id + " 2.5");
+            c.check("an acceleration field: field rate <id> 2.5", FieldData.get(level).get(id).map(Field::rate).orElse(-1.0) == 2.5);
         }));
         // players: in a 0.5 field the client is sent 10 TPS, and eating (32 ticks for bread), mining progress
         // (gameTicks) and the attack cooldown count at half speed

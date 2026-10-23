@@ -11,9 +11,10 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
  * after the tower's store ran out, the share of the field that has stopped again; outer blocks go first on average,
  * in noise patches, and at 1 nothing is left.
  * <p>
- * rate (0..1]: how fast time runs inside, as a share of the server's 20 TPS (Stasis.rateAt: where fields overlap the
+ * rate (0..MAX_RATE]: how fast time runs inside, as a share of the server's 20 TPS (Stasis.rateAt: where fields overlap the
  * fastest wins). 1 = full speed (the default, and what fields saved before rates existed load as); towers start their
- * field at StasisConfig.towerFieldRate.
+ * field at StasisConfig.towerFieldRate. Above 1 an acceleration field: the rule counts it as 1, and Stasis.speedAt gives
+ * the blocks inside extra ticks (λ-Nero).
  */
 public record Field(int id, double x, double y, double z, double radius, double failing, double collapse, boolean column,
                     double rate, int seed, long formedAt, double amber, double dropout, double side, Stretch stretch) {
@@ -60,6 +61,10 @@ public record Field(int id, double x, double y, double z, double radius, double 
         Codec.DOUBLE.optionalFieldOf("side", 0.0).forGetter(Field::side),
         Stretch.CODEC.optionalFieldOf("stretch", Stretch.ONE).forGetter(Field::stretch)
     ).apply(i, Field::new));
+
+    public Field {
+        if (rate > 1) Stasis.noteFast();
+    }
 
     public Field(int id, double x, double y, double z, double radius) {
         this(id, x, y, z, radius, 0, 0, false, 1.0, 0, 0, 0, 0, 0, Stretch.ONE);
@@ -195,9 +200,20 @@ public record Field(int id, double x, double y, double z, double radius, double 
         return axis == 0 ? ax(d) : axis == 1 ? radius : az(d);
     }
 
-    /** Field rates live in (0, 1]: a field never stops time (that's the land outside) and never speeds it up. */
+    /** The fastest a field may run (λ-Nero: "cap at 10× for now"). */
+    public static final double MAX_RATE = 10;
+
+    /**
+     * Field rates live in (0, MAX_RATE]: a field never stops time (that's the land outside). Above 1 it is an
+     * acceleration field (Stasis.speedAt); for the rule (Stasis.rateAt) it counts as 1.
+     */
     public static double clampRate(double r) {
-        return Math.max(0.001, Math.min(1.0, r));
+        return Math.max(0.001, Math.min(MAX_RATE, r));
+    }
+
+    /** An acceleration field (rate above 1)? Constructing one tells Stasis.speedAt to look (Stasis.noteFast). */
+    public boolean fast() {
+        return rate > 1;
     }
 
     /** True if the whole block at (bx, by, bz) lies inside the field (and hasn't stopped in a collapse). */

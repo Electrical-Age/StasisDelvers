@@ -1,6 +1,7 @@
 package org.erisia.stasis.mixin;
 
-import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -21,7 +22,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Block time by rate (Stasis.rateAt; stopped = 0): scheduled block and fluid ticks are delayed by the rate and only
  * run in game ticks their rate runs in; random ticks are skipped in the ticks it skips. Where time is stopped: no
- * scheduled ticks, no random ticks, no snow or ice.
+ * scheduled ticks, no random ticks, no snow or ice. In an acceleration field (Stasis.speedAt) scheduled delays shrink
+ * and random ticks run several times.
  */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
@@ -79,15 +81,32 @@ public abstract class ServerLevelMixin {
         if (!Stasis.mayRunInColumn(self(), chunk.getPos().pack())) ci.cancel();
     }
 
-    @WrapWithCondition(method = "tickChunk", at = @At(value = "INVOKE",
+    /** Random ticks run only when the block's rate says so; in an acceleration field, that many times (λ-Nero). */
+    @WrapOperation(method = "tickChunk", at = @At(value = "INVOKE",
         target = "Lnet/minecraft/world/level/block/state/BlockState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
-    private boolean stasis$randomTickBlock(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        return Stasis.ticksNow(level, pos);
+    private void stasis$randomTickBlock(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, Operation<Void> op) {
+        if (!Stasis.ticksNow(level, pos)) return;
+        op.call(state, level, pos, random);
+        if (!Stasis.hasFast(level)) return;
+        int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
+        for (int i = 1; i < k; i++) {
+            BlockState now = level.getBlockState(pos);   // (a crop that grew is the next stage now)
+            if (!now.isRandomlyTicking()) return;
+            op.call(now, level, pos, random);
+        }
     }
 
-    @WrapWithCondition(method = "tickChunk", at = @At(value = "INVOKE",
+    @WrapOperation(method = "tickChunk", at = @At(value = "INVOKE",
         target = "Lnet/minecraft/world/level/material/FluidState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
-    private boolean stasis$randomTickFluid(FluidState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        return Stasis.ticksNow(level, pos);
+    private void stasis$randomTickFluid(FluidState state, ServerLevel level, BlockPos pos, RandomSource random, Operation<Void> op) {
+        if (!Stasis.ticksNow(level, pos)) return;
+        op.call(state, level, pos, random);
+        if (!Stasis.hasFast(level)) return;
+        int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
+        for (int i = 1; i < k; i++) {
+            FluidState now = level.getFluidState(pos);
+            if (!now.isRandomlyTicking()) return;
+            op.call(now, level, pos, random);
+        }
     }
 }

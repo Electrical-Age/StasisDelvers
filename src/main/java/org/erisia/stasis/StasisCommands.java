@@ -31,7 +31,7 @@ final class StasisCommands {
     }
 
     static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, Double> rateArg() {
-        return Commands.argument("rate", DoubleArgumentType.doubleArg(0.001, 1.0));
+        return Commands.argument("rate", DoubleArgumentType.doubleArg(0.001, Field.MAX_RATE));
     }
 
     static int exempt(com.mojang.brigadier.context.CommandContext<CommandSourceStack> c, boolean on) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
@@ -118,7 +118,8 @@ final class StasisCommands {
                     c.getSource().sendSuccess(() -> Component.literal(fields.size() + " field(s)"), false);
                     for (Field f : fields)
                         c.getSource().sendSuccess(() -> Component.literal(String.format("  %d: %.1f %.1f %.1f r %.1f rate %.3f%s%s", f.id(), f.x(), f.y(), f.z(), f.radius(), f.rate(), f.column() ? " column" : "",
-                            f.stretch().isOne() ? "" : String.format(" stretch E%.2f S%.2f W%.2f N%.2f", f.stretch().e(), f.stretch().s(), f.stretch().w(), f.stretch().n()))), false);
+                            f.stretch().isOne() ? "" : String.format(" stretch E%.2f S%.2f W%.2f N%.2f", f.stretch().e(), f.stretch().s(), f.stretch().w(), f.stretch().n()))
+                            + (f.fast() ? String.format(" achieved %.2f, holds %.0f", Speeds.achieved(c.getSource().getLevel(), f), Speeds.held(c.getSource().getLevel(), f)) : "")), false);
                     return fields.size();
                 })))
             .then(Commands.literal("deeps").executes(c -> {
@@ -399,10 +400,11 @@ final class StasisCommands {
                 }))))
             .then(Commands.literal("at").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
                 BlockPos p = BlockPosArgument.getBlockPos(c, "pos");
-                double rate = Stasis.rateAt(c.getSource().getLevel(), p);
+                double rate = Stasis.rateAt(c.getSource().getLevel(), p), speed = Stasis.speedAt(c.getSource().getLevel(), p);
                 c.getSource().sendSuccess(() -> Component.literal(p.toShortString() + ": time " + (rate <= 0 ? "is stopped"
+                    : speed > 1 ? String.format("runs %.2fx fast (an acceleration field)", speed)
                     : rate >= 1 ? "runs" : String.format("runs at %.3f (%.1f TPS)", rate, 20 * rate))), false);
-                return (int) Math.round(rate * 1000);
+                return (int) Math.round(rate * speed * 1000);
             }))));
     }
 }
