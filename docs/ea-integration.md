@@ -19,6 +19,10 @@ locally at `/var/lib/mclab/agent/eln/port26`.
 ## EA hooks that exist for Stasis (in EA's code)
 - `mods.eln.node.NodeBase.simulationVeto`: a predicate EA asks before a node joins the simulation.
   `NodeFreezer.install()` sets it to `n -> !runs(n)`, so a frozen node never slips back in.
+- `mods.eln.node.NodeBase.timeScale` (EA 01102ad9): how fast time runs at a node. `NodeFreezer.install()` sets it to
+  `Stasis.speedAt` at the node, so EA's processing machines (`ElectricalMachineElement`) in an acceleration field draw
+  that much more power and finish that much sooner (λ-Nero). EA's block entities are never multi-ticked
+  (`Stasis.multiTickExempt`). Test: `ea_time_scale_hook` (and EA's own macerator test).
 - `mods.eln.item.electricalitem.LampItem.clientBeam`: set in `StasisDelvers` so that EA lights only the
   holder's block. `client/FlashlightPost.java` draws the beam as a post effect, turned off under Iris.
 

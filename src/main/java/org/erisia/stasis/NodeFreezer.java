@@ -71,6 +71,8 @@ public final class NodeFreezer {
     /** EA asks before it puts a node into the simulation, so a frozen node never slips back in (Baughn). */
     static void install() {
         NodeBase.simulationVeto = n -> !runs(n);
+        // acceleration fields (λ-Nero): EA's machines process that much faster, on that much more power
+        NodeBase.timeScale = n -> n.coordonate.world() instanceof ServerLevel level ? Stasis.speedAt(level, n.coordonate.pos()) : 1.0;
     }
 
     /** Is the node only cables, a battery or an EA-to-FE exporter? */

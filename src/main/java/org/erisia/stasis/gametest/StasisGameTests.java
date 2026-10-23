@@ -2200,6 +2200,14 @@ public final class StasisGameTests {
             return () -> c.check("a field arrived: the source runs again", !org.erisia.stasis.NodeFreezer.isFrozen(outSrc.sixNode)
                 && outSrc.electricalLoadList.get(0).getSubSystem() != null);
         }, true, true));
+        // acceleration fields: EA's time-scale hook (NodeBase.timeScale) reads Stasis.speedAt at the node
+        CASES.put("ea_time_scale_hook", new Spec(1, (h, c) -> {
+            halfField(h, c, 3.0);
+            var fast = eaSix(h, new BlockPos(12, 1, 4), 0 + (3 << 6));
+            var normal = eaSix(h, new BlockPos(3, 1, 4), 0 + (3 << 6));
+            return () -> c.check("EA nodes: time scale 3 in a 3x field, 1 in a normal one",
+                fast.sixNode.timeScale() == 3.0 && normal.sixNode.timeScale() == 1.0, fast.sixNode.timeScale() + " / " + normal.sixNode.timeScale());
+        }));
         // frozen cables still show their connections (Baughn: they looked cut), while staying out of the simulation
         CASES.put("ea_frozen_cables_look_connected", new Spec(20, (h, c) -> {
             var a = eaSix(h, new BlockPos(12, 1, 2), 4 + (32 << 6));
