@@ -233,7 +233,7 @@ public final class Stasis {
         // a lull (Lulls: rare running-time weather; Baughn 2026-10-21), or the fastest field there
         double rate = Lulls.rateAt(level, x, z);
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
-        if (fs == null && rate <= 0) return 0.0;
+        if (fs == null && rate <= 0 && !Rooms.inColumn(level, ChunkPos.pack(cx, cz))) return 0.0;
         if (fs != null)
             for (Field f : fs) {
                 double fr = Math.min(1.0, f.rate());   // (an acceleration field runs its blocks: speedAt has the rest)
@@ -242,6 +242,8 @@ public final class Stasis {
                     if (rate >= 1.0) break;
                 }
             }
+        // a working riftstone room runs (Rooms; λ-Nero), in stopped land too
+        if (rate < 1.0 && Rooms.at(level, x, y, z) != null) rate = 1.0;
         // no field holds a rift (Baughn): a stopped, dark hole through it
         if (rate > 0 && StaticDeeps.inRift(level, x, y, z)) return 0.0;
         return rate;
@@ -257,7 +259,7 @@ public final class Stasis {
 
     static boolean heldOff(Level level, int x, int y, int z, int except) {
         int cx = x >> 4, cz = z >> 4;
-        if (inSpawn(level, cx, cz) || Lulls.rateAt(level, x, z) > 0) return true;
+        if (inSpawn(level, cx, cz) || Lulls.rateAt(level, x, z) > 0 || Rooms.at(level, x, y, z) != null) return true;
         Field[] fs = index(level).columns.get(ChunkPos.pack(cx, cz));
         if (fs == null) return false;
         for (Field f : fs) if (f.id() != except && f.containsBlock(x, y, z)) return true;
@@ -272,13 +274,15 @@ public final class Stasis {
      */
     public static double speedAt(Level level, int x, int y, int z) {
         if (!anyFast || !StasisConfig.enabled) return 1.0;
-        Field[] fs = index(level).fast.get(ChunkPos.pack(x >> 4, z >> 4));
-        if (fs == null) return 1.0;
         double s = 1.0;
-        for (Field f : fs) {
-            double a = Speeds.achieved(level, f);
-            if (a > s && f.containsBlock(x, y, z)) s = a;
-        }
+        Field[] fs = index(level).fast.get(ChunkPos.pack(x >> 4, z >> 4));
+        if (fs != null)
+            for (Field f : fs) {
+                double a = Speeds.achieved(level, f);
+                if (a > s && f.containsBlock(x, y, z)) s = a;
+            }
+        Rooms.Room room = Rooms.at(level, x, y, z);   // (a riftstone room: its own rate)
+        if (room != null && room.rate() > s) s = room.rate();
         return s > 1.0 && StaticDeeps.inRift(level, x, y, z) ? 1.0 : s;
     }
 
@@ -288,7 +292,7 @@ public final class Stasis {
 
     /** Does this level have an acceleration field at all (a cheap test before per-block speedAt)? */
     public static boolean hasFast(Level level) {
-        return anyFast && StasisConfig.enabled && !index(level).fast.isEmpty();
+        return anyFast && StasisConfig.enabled && (!index(level).fast.isEmpty() || Rooms.anyFast(level));
     }
 
     /** The acceleration fields touching a chunk column (none: an empty array). */
@@ -359,6 +363,7 @@ public final class Stasis {
                 if (seed == 0 || !StaticDeeps.sectionMayHave(seed, sx, sy, sz)) return SECTION_RUNNING;
             }
         }
+        if (Rooms.touchesSection(level, sx, sy, sz)) touched = true;   // (a riftstone room: its cells run)
         if (fs == null) return touched ? SECTION_MIXED : SECTION_STOPPED;
         for (Field f : fs) {
             // nearest and farthest point of the section's box, in the field's unit-sphere space (Field.norm: the
@@ -447,7 +452,8 @@ public final class Stasis {
         if (!stops(level)) return true;
         int cx = ChunkPos.getX(chunkKey), cz = ChunkPos.getZ(chunkKey);
         if (Spread.active(level) && Spread.chunk(level, cx, cz) != 0) return true;
-        return inSpawn(level, cx, cz) || NewChunkGrace.active(level, chunkKey) || index(level).columns.containsKey(chunkKey);
+        return inSpawn(level, cx, cz) || NewChunkGrace.active(level, chunkKey) || index(level).columns.containsKey(chunkKey)
+            || Rooms.inColumn(level, chunkKey);
     }
 
     /**
@@ -462,7 +468,7 @@ public final class Stasis {
      */
     public static boolean multiTickExempt(net.minecraft.world.level.block.entity.BlockEntity be) {
         return be instanceof TowerBlockEntity || be instanceof TowerCellBlockEntity || be instanceof LanceBlockEntity
-            || be instanceof QuernBlockEntity || be.getClass().getName().startsWith("mods.eln.");
+            || be instanceof QuernBlockEntity || be instanceof ChronalAcceleratorBlockEntity || be.getClass().getName().startsWith("mods.eln.");
     }
 
     public static boolean exemptBlockEntity(ServerLevel level, BlockPos pos) {
@@ -472,6 +478,8 @@ public final class Stasis {
         if (be instanceof LanceBlockEntity) return true;
         // a rift quern grinds (and so makes its field) in stopped land
         if (be instanceof QuernBlockEntity) return true;
+        // a chronal accelerator finds and powers its room in stopped land (Rooms)
+        if (be instanceof ChronalAcceleratorBlockEntity) return true;
         // an End gateway's cooldown counts down in its tick: frozen, a gateway would work once (softlock audit 3)
         if (be instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity) return true;
         // EA's light blocks (lamps, flashlights) time out in their tick: frozen, a flashlight sweep would leave its

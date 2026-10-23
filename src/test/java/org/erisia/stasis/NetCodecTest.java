@@ -145,6 +145,19 @@ class NetCodecTest {
         assertEquals(new StasisNet.FieldSpeeds(fieldTimes), trip(StasisNet.FieldSpeeds.CODEC, new StasisNet.FieldSpeeds(fieldTimes)));
     }
 
+    @Property(tries = 100)
+    void roomsRoundTrip(@ForAll long key, @ForAll int x0, @ForAll int y0, @ForAll @net.jqwik.api.constraints.IntRange(min = 1, max = 16) int sx,
+                        @ForAll @Size(max = 64) java.util.List<Long> bits, @ForAll double rate) {
+        var r = new Rooms.Room(key, x0, y0, -x0, sx, 3, 2, bits.stream().mapToLong(Long::longValue).toArray(), rate);
+        var back = trip(StasisNet.RoomsSync.CODEC, new StasisNet.RoomsSync(java.util.List.of(r, r))).rooms();
+        assertEquals(2, back.size());
+        for (var b : back) {
+            assertEquals(java.util.List.of(r.key(), r.x0(), r.y0(), r.z0(), r.sx(), r.sy(), r.sz()), java.util.List.of(b.key(), b.x0(), b.y0(), b.z0(), b.sx(), b.sy(), b.sz()));
+            assertArrayEquals(r.bits(), b.bits());
+            assertEquals(r.rate(), b.rate());
+        }
+    }
+
     @Property(tries = 200)
     void boltRoundTrips(@ForAll("anyDouble") double fx, @ForAll("anyDouble") double fy, @ForAll("anyDouble") double fz,
                         @ForAll("anyDouble") double tx, @ForAll("anyDouble") double ty, @ForAll("anyDouble") double tz, @ForAll int seed) {

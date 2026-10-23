@@ -976,6 +976,50 @@ public final class StasisGameTests {
                 c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 40.0));
             };
         }, false, true));
+        // λ-Nero, variant B: a chronal accelerator in the wall of a sealed riftstone room runs it (in stopped land too) at
+        // its setting while it has power; a hole in the wall ends it; no power, no room
+        CASES.put("chronal_room", new Spec(100, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            // a riftstone box x 9..13, y 1..4, z 1..5 (inside: x 10..12, y 2..3, z 2..4: 18 blocks), outside the test's field
+            for (int x = 9; x <= 13; x++)
+                for (int y = 1; y <= 4; y++)
+                    for (int z = 1; z <= 5; z++) {
+                        boolean wall = x == 9 || x == 13 || y == 1 || y == 4 || z == 1 || z == 5;
+                        h.setBlock(new BlockPos(x, y, z), wall ? org.erisia.stasis.StasisRegistry.RIFTSTONE.get().defaultBlockState() : Blocks.AIR.defaultBlockState());
+                    }
+            h.setBlock(new BlockPos(9, 2, 3), org.erisia.stasis.StasisRegistry.CHRONAL_ACCELERATOR.get().defaultBlockState()
+                .setValue(org.erisia.stasis.ChronalAcceleratorBlock.STEP, 2));   // (2x)
+            var acc = (org.erisia.stasis.ChronalAcceleratorBlockEntity) level.getBlockEntity(h.absolutePos(new BlockPos(9, 2, 3)));
+            BlockPos in = h.absolutePos(new BlockPos(11, 2, 3)), out = h.absolutePos(new BlockPos(15, 2, 3));
+            boolean[] unpowered = new boolean[1];
+            double[] seen = new double[4];
+            h.runAfterDelay(5, () -> {
+                unpowered[0] = org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ()) == null && Stasis.rateAt(level, in) == 0.0;
+                try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                    acc.energy().insert(2_000_000, tx);
+                    tx.commit();
+                }
+            });
+            h.runAfterDelay(50, () -> {
+                var room = org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ());
+                seen[0] = room == null ? -1 : room.volume();
+                seen[1] = Stasis.rateAt(level, in);
+                seen[2] = Stasis.speedAt(level, in);
+                seen[3] = Stasis.rateAt(level, out);
+                h.setBlock(new BlockPos(13, 3, 3), Blocks.AIR);   // (a hole in the far wall)
+            });
+            return () -> {
+                c.check("no power: no room, stopped inside", unpowered[0]);
+                c.check("powered: an 18-block room", seen[0] == 18, "volume " + seen[0] + "; " + acc.status());
+                c.check("time runs inside (rateAt 1) at 2x (speedAt), stopped outside", seen[1] == 1.0 && seen[2] == 2.0 && seen[3] == 0.0,
+                    seen[1] + " " + seen[2] + " " + seen[3]);
+                c.check("a hole in the wall: the room is gone", org.erisia.stasis.Rooms.at(level, in.getX(), in.getY(), in.getZ()) == null
+                    && Stasis.rateAt(level, in) == 0.0, acc.status());
+                c.check("max volume: 512 plain walls, 1728 all refined", org.erisia.stasis.ChronalAcceleratorBlockEntity.maxVolumeForTests(0) == 512
+                    && org.erisia.stasis.ChronalAcceleratorBlockEntity.maxVolumeForTests(1) == 1728);
+                level.setBlock(h.absolutePos(new BlockPos(9, 2, 3)), Blocks.AIR.defaultBlockState(), 3);
+            };
+        }));
         // λ-Nero: a temporal accelerator against the core runs the tower's field at its setting, for the rate squared in
         // power; with nothing coming in, the rate the power carries is 1x; taking it away puts the field back
         CASES.put("tower_temporal_accelerator", new Spec(70, (h, c) -> {

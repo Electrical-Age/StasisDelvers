@@ -322,6 +322,47 @@ public final class StasisNet {
     /** Client side: the latest freeze progress, for the screen effect. */
     public static volatile float clientFreeze;
 
+    /** The level's working riftstone rooms (Rooms), whole, whenever one forms, changes or stops, and on joining. */
+    public record RoomsSync(List<Rooms.Room> rooms) implements CustomPacketPayload {
+        public static final Type<RoomsSync> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "rooms"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, RoomsSync> CODEC = StreamCodec.of(
+            (buf, p) -> {
+                buf.writeVarInt(p.rooms().size());
+                for (Rooms.Room r : p.rooms()) {
+                    buf.writeLong(r.key());
+                    buf.writeInt(r.x0());
+                    buf.writeInt(r.y0());
+                    buf.writeInt(r.z0());
+                    buf.writeVarInt(r.sx());
+                    buf.writeVarInt(r.sy());
+                    buf.writeVarInt(r.sz());
+                    buf.writeLongArray(r.bits());
+                    buf.writeDouble(r.rate());
+                }
+            },
+            buf -> {
+                int n = buf.readVarInt();
+                List<Rooms.Room> l = new java.util.ArrayList<>();
+                for (int i = 0; i < n; i++) {
+                    long key = buf.readLong();
+                    int x0 = buf.readInt(), y0 = buf.readInt(), z0 = buf.readInt(), sx = buf.readVarInt(), sy = buf.readVarInt(), sz = buf.readVarInt();
+                    long[] bits = buf.readLongArray();
+                    l.add(new Rooms.Room(key, x0, y0, z0, sx, sy, sz, bits, buf.readDouble()));
+                }
+                return new RoomsSync(l);
+            });
+
+        @Override
+        public Type<RoomsSync> type() {
+            return TYPE;
+        }
+    }
+
+    static void sendRooms(ServerLevel level, List<Rooms.Room> rooms) {
+        RoomsSync r = new RoomsSync(rooms);
+        for (ServerPlayer p : level.players()) send(p, r);
+    }
+
     /** Acceleration fields' achieved rates (Speeds: field id -> rate the budget allows), for the client's extra ticks. */
     public record FieldSpeeds(java.util.Map<Integer, Double> achieved) implements CustomPacketPayload {
         public static final Type<FieldSpeeds> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "field_speeds"));
@@ -406,7 +447,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("16");   // 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar("17");   // 17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -452,6 +493,7 @@ public final class StasisNet {
             r.playToClient(FieldClocks.TYPE, FieldClocks.CODEC, (p, ctx) -> LocalTime.Client.fieldClocks(p.clocks(), ctx.player().level()));
             r.playToClient(Gutters.TYPE, Gutters.CODEC, (p, ctx) -> Flames.clientGutters(p.lights(), ctx.player().level()));
             r.playToClient(FieldSpeeds.TYPE, FieldSpeeds.CODEC, (p, ctx) -> Speeds.clientAchieved(p.achieved()));
+            r.playToClient(RoomsSync.TYPE, RoomsSync.CODEC, (p, ctx) -> Rooms.clientSet(ctx.player().level(), p.rooms()));
             r.playToClient(Bolt.TYPE, Bolt.CODEC, (p, ctx) -> boltSink.accept(p));
             r.playToClient(SpreadState.TYPE, SpreadState.CODEC, (p, ctx) ->
                 Spread.clientState(p.reset(), p.map(), p.count(), p.p(), p.hard(), p.complete(), p.endStill(), p.endEvent(), p.stormOrigin()));
@@ -477,6 +519,7 @@ public final class StasisNet {
     public static void sendFields(ServerPlayer player) {
         FieldData d = FieldData.get(player.level());
         send(player, new Fields(d.fields(), d.deepSeed()));
+        send(player, new RoomsSync(Rooms.all(player.level())));
         sendGates(player);
     }
 

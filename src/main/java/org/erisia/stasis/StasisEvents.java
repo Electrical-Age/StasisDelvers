@@ -164,7 +164,10 @@ public final class StasisEvents {
     }
 
     static void levelUnload(LevelEvent.Unload e) {
-        if (e.getLevel() instanceof ServerLevel level) Stasis.invalidate(level);
+        if (e.getLevel() instanceof ServerLevel level) {
+            Stasis.invalidate(level);
+            Rooms.unload(level);
+        }
     }
 
     /**

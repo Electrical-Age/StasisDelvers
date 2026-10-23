@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "R": "stasisdelvers:riftstone",
+    "S": "stasisdelvers:rift_shard"
+  },
+  "pattern": [
+    "RR",
+    "SR"
+  ],
+  "result": {
+    "count": 4,
+    "id": "stasisdelvers:refined_riftstone"
+  }
+}

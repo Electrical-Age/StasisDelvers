@@ -298,6 +298,31 @@ public final class FrozenSprites {
         PENDING.addAll(Field.changedShapes(old, now));
     }
 
+    /** Rooms.clientOnChange (main thread): re-mesh and relight round the riftstone rooms that formed, changed or went. */
+    static void roomsChanged(List<org.erisia.stasis.Rooms.Room> old, List<org.erisia.stasis.Rooms.Room> now) {
+        Minecraft mc = Minecraft.getInstance();
+        ClientLevel level = mc.level;
+        if (level == null) return;
+        java.util.Map<Long, org.erisia.stasis.Rooms.Room> before = new java.util.HashMap<>();
+        for (var r : old) before.put(r.key(), r);
+        List<org.erisia.stasis.Rooms.Room> dirty = new ArrayList<>();
+        for (var r : now) {
+            var b = before.remove(r.key());
+            if (b == null || !java.util.Arrays.equals(b.bits(), r.bits()) || b.x0() != r.x0() || b.y0() != r.y0() || b.z0() != r.z0() || b.sx() != r.sx()) {
+                dirty.add(r);
+                if (b != null) dirty.add(b);
+            }
+        }
+        dirty.addAll(before.values());
+        for (var r : dirty) {
+            int cx0 = r.x0() >> 4, cx1 = (r.x0() + r.sx() - 1) >> 4, cz0 = r.z0() >> 4, cz1 = (r.z0() + r.sz() - 1) >> 4;
+            int sy0 = (r.y0() - 1) >> 4, sy1 = (r.y0() + r.sy()) >> 4;
+            level.setSectionRangeDirty(cx0, sy0, cz0, cx1, sy1, cz1);
+            for (int cx = cx0; cx <= cx1; cx++)
+                for (int cz = cz0; cz <= cz1; cz++) org.erisia.stasis.Flames.relightChunk(level, cx, cz, new int[]{r.y0(), r.y0() + r.sy() - 1});
+        }
+    }
+
     /** The lanced rifts' strengths last seen (seed -> id -> share), and the rifts whose step changed since the last flush. */
     private static final java.util.Map<Integer, java.util.Map<Integer, Float>> RIFT_STRENGTHS = new java.util.HashMap<>();
     private static final List<StaticDeeps.Deep> PENDING_RIFTS = new ArrayList<>();

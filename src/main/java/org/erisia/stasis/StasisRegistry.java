@@ -160,6 +160,19 @@ public final class StasisRegistry {
         TemporalAcceleratorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.GOLD).strength(3f, 9f)
             .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> 4 + st.getValue(TemporalAcceleratorBlock.STEP) / 3));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TEMPORAL_ACCELERATOR = ITEMS.registerSimpleBlockItem(TEMPORAL_ACCELERATOR_BLOCK);
+    /** Refined riftstone (λ-Nero): chronal casing that lets a riftstone room grow bigger and cost less (ChronalAcceleratorBlockEntity). */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> REFINED_RIFTSTONE = BLOCKS.registerSimpleBlock("refined_riftstone",
+        p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(3f, 12f).requiresCorrectToolForDrops()
+            .sound(net.minecraft.world.level.block.SoundType.DEEPSLATE_BRICKS));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> REFINED_RIFTSTONE_ITEM = ITEMS.registerSimpleBlockItem(REFINED_RIFTSTONE);
+    /** The chronal accelerator (λ-Nero, variant B): set in the wall of a sealed riftstone room, it runs the room fast. */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<ChronalAcceleratorBlock> CHRONAL_ACCELERATOR = BLOCKS.registerBlock("chronal_accelerator",
+        ChronalAcceleratorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.GOLD).strength(3f, 12f)
+            .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.METAL)
+            .lightLevel(st -> st.getValue(ChronalAcceleratorBlock.LIT) ? 10 : 2));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> CHRONAL_ACCELERATOR_ITEM = ITEMS.registerSimpleBlockItem(CHRONAL_ACCELERATOR);
+    public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<ChronalAcceleratorBlockEntity>> CHRONAL_ACCELERATOR_ENTITY =
+        BLOCK_ENTITIES.register("chronal_accelerator", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(ChronalAcceleratorBlockEntity::new, CHRONAL_ACCELERATOR.get()));
     /** The chronal anchor (λ-Nero: "or a bauble"): worn as a Curios charm or held in the off hand, it keeps its wearer at
      *  1x in an acceleration field, as a whole time suit does (PlayerRates). No protection in stopped land. */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHRONAL_ANCHOR = ITEMS.registerSimpleItem("chronal_anchor",
@@ -298,6 +311,9 @@ public final class StasisRegistry {
         modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->
             e.registerBlock(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, (level, pos, state, be, side) ->
                 be instanceof LanceBlockEntity l ? l.energy() : null, LANCE.get()));
+        modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->
+            e.registerBlock(net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK, (level, pos, state, be, side) ->
+                be instanceof ChronalAcceleratorBlockEntity a ? a.energy() : null, CHRONAL_ACCELERATOR.get()));
         modBus.addListener(LanceTickets::register);
         modBus.addListener(Tickets::register);
         modBus.addListener(EndRift::registerTickets);

@@ -1,0 +1,118 @@
+{
+  "variants": {
+    "lit=false,step=0": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=1": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=2": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=3": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=4": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=5": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=6": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=7": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=8": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=9": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=10": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=11": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=12": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=13": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=14": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=15": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=16": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=17": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=false,step=18": {
+      "model": "stasisdelvers:block/chronal_accelerator"
+    },
+    "lit=true,step=0": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=1": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=2": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=3": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=4": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=5": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=6": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=7": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=8": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=9": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=10": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=11": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=12": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=13": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=14": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=15": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=16": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=17": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    },
+    "lit=true,step=18": {
+      "model": "stasisdelvers:block/chronal_accelerator_lit"
+    }
+  }
+}

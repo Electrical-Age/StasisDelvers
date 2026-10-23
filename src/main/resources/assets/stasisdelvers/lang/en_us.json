@@ -50,6 +50,8 @@
   "block.stasisdelvers.rift_barometer": "Rift Barometer",
   "block.stasisdelvers.temporal_accelerator": "Temporal Accelerator",
   "item.stasisdelvers.chronal_anchor": "Chronal Anchor",
+  "block.stasisdelvers.refined_riftstone": "Refined Riftstone",
+  "block.stasisdelvers.chronal_accelerator": "Chronal Accelerator",
   "item.stasisdelvers.scrap": "Scrap",
   "block.stasisdelvers.surveyors_desk": "Surveyor's Desk",
   "key.stasisdelvers.bug_report": "Send bug report",
