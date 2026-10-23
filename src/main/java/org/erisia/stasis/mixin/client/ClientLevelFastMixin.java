@@ -32,6 +32,10 @@ public abstract class ClientLevelFastMixin {
         int k = Stasis.ticksThisTurn(Stasis.clientSpeedAt(self, entity.blockPosition()), self.getGameTime());   // (over the client's own tick rate)
         if (k <= 1) return;
         stasis$extra = true;
+        // the frame's interpolation runs from the old position: keep the one from before this tick's first pass, or it
+        // would only span the last pass and jump the rest (AdventurAgent: items fell in bursts)
+        double xo = entity.xo, yo = entity.yo, zo = entity.zo;
+        float yRotO = entity.yRotO, xRotO = entity.xRotO;
         try {
             for (int i = 1; i < k; i++) {
                 if (entity.isRemoved() || entity.isPassenger() || Stasis.speedAt(self, entity.blockPosition()) <= 1) break;
@@ -39,6 +43,11 @@ public abstract class ClientLevelFastMixin {
             }
         } finally {
             stasis$extra = false;
+            entity.xo = xo;
+            entity.yo = yo;
+            entity.zo = zo;
+            entity.yRotO = yRotO;
+            entity.xRotO = xRotO;
         }
     }
 }
