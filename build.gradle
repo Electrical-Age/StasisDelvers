@@ -68,6 +68,7 @@ dependencies {
     compileOnly files(elnJar)
     compileOnly 'maven.modrinth:xaeros-minimap:j2Xo3Dhc'   // xaerominimap-neoforge-26.3-26.6.0
     compileOnly 'maven.modrinth:xaeros-world-map:p5t2Xn8F' // xaeroworldmap-neoforge-26.3-1.47.0
+    compileOnly 'maven.modrinth:distanthorizons:TGgEbP9A' // DistantHorizons-3.3.4-26.3 (compat/dh: its depth for the grey)
     compileOnly 'maven.modrinth:curios:17.0.0-beta.3+26.3'   // the pendants' necklace slot (optional at runtime)
 
     // the mod requires eln, so the unit-test game loads it too

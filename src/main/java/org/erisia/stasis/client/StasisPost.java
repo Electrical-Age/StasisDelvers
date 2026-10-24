@@ -86,7 +86,12 @@ public final class StasisPost {
         spreadTexture = new DynamicTexture(() -> "stasisdelvers spread ranks", SPREAD_WINDOW, SPREAD_WINDOW, true);
         Minecraft.getInstance().getTextureManager().register(SPREAD, spreadTexture);
         StrataMask.init();
+        Minecraft.getInstance().getTextureManager().register(DH_DEPTH, new DhDepthTexture());
+        if (DhDepthTexture.DH) org.erisia.stasis.compat.dh.DhDepth.init();
     }
+
+    /** Distant Horizons' depth for the passes (DhDepthTexture; Nero: the grey followed the camera over DH's LODs). */
+    static final Identifier DH_DEPTH = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "dh_depth");
 
     static void tick(ClientTickEvent.Post e) {
         var mc = Minecraft.getInstance();
@@ -144,6 +149,7 @@ public final class StasisPost {
         float[] d = new float[SLOTS];
         Matrix4f vp = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix).invert();
         vp.get(d, 0);   // column-major
+        if (DhDepthTexture.DH) org.erisia.stasis.compat.dh.DhDepth.fill(d, new Matrix4f(camState.viewRotationMatrix));
         var cam = camState.pos;
         double fx = Math.floor(cam.x), fy = Math.floor(cam.y), fz = Math.floor(cam.z);
         d[16] = (float) fx;

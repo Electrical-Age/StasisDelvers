@@ -21,6 +21,12 @@
                     "use_depth_buffer": true
                 },
                 {
+                    "sampler_name": "DhDepth",
+                    "location": "stasisdelvers:dh_depth",
+                    "width": 1,
+                    "height": 1
+                },
+                {
                     "sampler_name": "Data",
                     "location": "stasisdelvers:fielddata",
                     "width": 1024,
@@ -44,6 +50,12 @@
                     "sampler_name": "Depth",
                     "target": "minecraft:main",
                     "use_depth_buffer": true
+                },
+                {
+                    "sampler_name": "DhDepth",
+                    "location": "stasisdelvers:dh_depth",
+                    "width": 1,
+                    "height": 1
                 },
                 {
                     "sampler_name": "Data",
@@ -79,6 +91,12 @@
                     "sampler_name": "Depth",
                     "target": "minecraft:main",
                     "use_depth_buffer": true
+                },
+                {
+                    "sampler_name": "DhDepth",
+                    "location": "stasisdelvers:dh_depth",
+                    "width": 1,
+                    "height": 1
                 },
                 {
                     "sampler_name": "Data",

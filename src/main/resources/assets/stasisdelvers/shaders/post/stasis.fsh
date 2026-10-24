@@ -46,6 +46,7 @@
 uniform sampler2D InSampler;
 #endif
 uniform sampler2D DepthSampler;
+uniform sampler2D DhDepthSampler;
 uniform sampler2D DataSampler;
 uniform sampler2D MistSampler;
 #ifdef FULL_PASS
@@ -731,6 +732,21 @@ void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout fl
     }
 }
 
+// Distant Horizons (optional): its depth texture and projection ([1700] on, [1701] far depth, [1702] depth -1..1,
+// [1703..1718] inverse(DH projection * view rotation)). The world position (minus the camera) of a LOD pixel.
+bool dhPos(vec2 uv, out vec3 rel) {
+    rel = vec3(0.0);
+    if (data(1700) < 0.5) return false;
+    float dd = texture(DhDepthSampler, uv).r;
+    if (abs(dd - data(1701)) < 1e-6) return false;
+    float z = data(1702) > 0.5 ? dd * 2.0 - 1.0 : dd;
+    mat4 dinv = mat4(data(1703), data(1704), data(1705), data(1706), data(1707), data(1708), data(1709), data(1710),
+                     data(1711), data(1712), data(1713), data(1714), data(1715), data(1716), data(1717), data(1718));
+    vec4 h = dinv * vec4(uv * 2.0 - 1.0, z, 1.0);
+    rel = h.xyz / h.w;
+    return true;
+}
+
 // The strata pass (post_effect/stasis.json; this file with STRATA_PASS): the strata weather along the view ray, at
 // the mist target's resolution. The strata mask (StrataSampler, client/StrataMask.java) is 64^3 cells of 4 blocks
 // around the camera, 8 x 8 tiles of 64 x 64 (x across, y down, a tile per z), each texel the deep id (rgb) and
@@ -739,18 +755,22 @@ void main() {
     fragColor = vec4(0.0);
     if (data(22) < 0.5 || (data(187) < 0.5 && data(1312) <= 0.0)) return;
     float depth = texture(DepthSampler, texCoord).r;
+    // (Distant Horizons: where vanilla's depth is sky, its LODs' depth; compat/dh/DhDepth, Nero)
+    vec3 dhRel = vec3(0.0);
+    bool dhHit = depth <= 0.0 && dhPos(texCoord, dhRel);
+    bool hit = depth > 0.0 || dhHit;
     mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                     data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
     vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
-    vec3 rel = depth > 0.0 ? h.xyz / h.w : vec3(0.0);
+    vec3 rel = dhHit ? dhRel : depth > 0.0 ? h.xyz / h.w : vec3(0.0);
     vec3 o = vec3(data(19), data(20), data(21));
     ivec3 camI = ivec3(data(16), data(17), data(18));
     vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
-    vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
-    float tEnd = depth > 0.0 ? min(length(rel), 180.0) : 180.0;
+    vec3 dir = hit ? normalize(rel) : normalize(hs.xyz / hs.w);
+    float tEnd = hit ? min(length(rel), 180.0) : 180.0;
     float T = 1.0, L = 0.0, V = 0.0;
     float jit = ign(gl_FragCoord.xy + 31.0);
-    stormMarch(o, dir, depth > 0.0 ? min(length(rel), 200.0) : 200.0, jit, T, L, V);
+    stormMarch(o, dir, hit ? min(length(rel), 200.0) : 200.0, jit, T, L, V);
     if (data(187) < 0.5) {
         fragColor = vec4(1.0 - T, L, clamp(V, 0.0, 1.0), 1.0);
         return;
@@ -818,17 +838,21 @@ void main() {
     // (with only strata about, still the scene distance: the strata pass's upsample uses it)
     if (data(22) < 0.5 || (data(31) <= 0.0 && data(218) <= 0.0 && data(187) < 0.5 && data(1312) <= 0.0)) return;
     float depth = texture(DepthSampler, texCoord).r;
+    // (Distant Horizons: where vanilla's depth is sky, its LODs' depth; compat/dh/DhDepth, Nero)
+    vec3 dhRel = vec3(0.0);
+    bool dhHit = depth <= 0.0 && dhPos(texCoord, dhRel);
+    bool hit = depth > 0.0 || dhHit;
     mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                     data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
     vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
-    vec3 rel = depth > 0.0 ? h.xyz / h.w : vec3(0.0);
+    vec3 rel = dhHit ? dhRel : depth > 0.0 ? h.xyz / h.w : vec3(0.0);
     vec3 camFrac = vec3(data(19), data(20), data(21));
     vec3 camInt = vec3(data(16), data(17), data(18));
     float rd = max(data(216), 32.0);
     vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
-    vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
-    float tScene = depth > 0.0 ? length(rel) : -1.0;
-    float tEnd = depth > 0.0 ? min(tScene, rd * 1.415) : rd * 1.415;
+    vec3 dir = hit ? normalize(rel) : normalize(hs.xyz / hs.w);
+    float tScene = hit ? length(rel) : -1.0;
+    float tEnd = hit ? min(tScene, rd * 1.415) : rd * 1.415;
     float dc = floor(mistDepthCode(tScene, rd) * 65535.0 + 0.5);
     float hi = floor(dc / 256.0);
     vec2 m = vec2(0.0);
@@ -1053,19 +1077,23 @@ void main() {
     float stops = data(22);
     float warn = data(23);
     float depth = texture(DepthSampler, texCoord).r;
+    // (Distant Horizons: where vanilla's depth is sky, its LODs' depth; compat/dh/DhDepth, Nero)
+    vec3 dhRel = vec3(0.0);
+    bool dhHit = depth <= 0.0 && dhPos(texCoord, dhRel);
+    bool hit = depth > 0.0 || dhHit;
     // 26.3 renders with reversed Z in [0, 1]: the far plane (sky) is 0, and NDC z is the depth value itself
     // the sky (depth 0) takes the camera's place: grey while you stand in stopped land, in colour inside a field (λ-Nero)
     if (stops > 0.5) {
         mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                         data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
         vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth, 1.0);
-        vec3 rel = depth > 0.0 ? h.xyz / h.w : vec3(0.0);         // world position minus the camera
+        vec3 rel = dhHit ? dhRel : depth > 0.0 ? h.xyz / h.w : vec3(0.0);         // world position minus the camera
         vec3 camFrac = vec3(data(19), data(20), data(21));
         vec3 p = rel + camFrac;                                    // world position minus floor(camera)
         vec3 camInt = vec3(data(16), data(17), data(18));
         // the block a pixel belongs to: a hair past the surface along the view ray, so a face on a block boundary is its
         // own block's and doesn't flicker between the two (Baughn: stopped and running columns z-fought at their border)
-        vec3 pBlk = p + (depth > 0.0 ? normalize(rel) * 0.01 : vec3(0.0));
+        vec3 pBlk = p + (hit ? normalize(rel) * 0.01 : vec3(0.0));
         // how much time runs here: 1 inside a field (soft at the edge: the border shouldn't look blocky), 0 outside
         float run = 0.0, vivid = 0.0;
         vec3 w = p + camInt;
@@ -1119,9 +1147,9 @@ void main() {
         // drifting deeps along the view ray, up to the scene or as far as terrain renders (cylindrical: rd sqrt 2)
         float rd = max(data(216), 32.0);
         vec4 hs = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
-        vec3 dir = depth > 0.0 ? normalize(rel) : normalize(hs.xyz / hs.w);
-        float tScene = depth > 0.0 ? length(rel) : 0.0;     // the sky: where the camera is
-        float tEnd = depth > 0.0 ? min(tScene, rd * 1.415) : rd * 1.415;
+        vec3 dir = hit ? normalize(rel) : normalize(hs.xyz / hs.w);
+        float tScene = hit ? length(rel) : 0.0;     // the sky: where the camera is
+        float tEnd = hit ? min(tScene, rd * 1.415) : rd * 1.415;
         if (data(31) > 0.0 || data(218) > 0.0) findDeeps(camFrac, dir, tEnd, camInt);
         // a drifting deep (outside fields; fields hold against it): deeper grey, darker, a cold violet cast; fades
         // with distance like the mist
@@ -1131,11 +1159,11 @@ void main() {
             if (hits[i].kind == 0 && hitSpan[i].x <= tScene + 0.05 && hitSpan[i].y >= tScene - 0.05) {
                 // the ground band from the deep's ground grid under this point (not one height for the whole deep)
                 Deep dp = loadDeep(hits[i].idx);
-                vec3 q = depth > 0.0 ? p : camFrac;
+                vec3 q = hit ? p : camFrac;
                 dp.yb = groundAt(GROUND_BASE + 64 * hits[i].idx, hits[i].g, q.xz);
                 deep = max(deep, deepShape(dp, q, camInt));
                 // over running spread land a drifting deep stops time (Baughn 2026-10-19), unless a field holds it off
-                if (spreadRun > 0.0 && !deepStop) deepStop = deepStops(dp, floor(depth > 0.0 ? pBlk : q), camInt, dp.yb);
+                if (spreadRun > 0.0 && !deepStop) deepStop = deepStops(dp, floor(hit ? pBlk : q), camInt, dp.yb);
             }
         // the spread's running land joins the fields' (a field or the spawn area holds a deep off: run stays theirs)
         run = max(run, deepStop ? 0.0 : spreadRun);
@@ -1145,7 +1173,7 @@ void main() {
         for (int i = 0; i < nsd && i < 4; i++) {
             vec3 sc = vec3(data(220 + 5 * i), data(221 + 5 * i), data(222 + 5 * i));
             float sR = data(223 + 5 * i);
-            vec3 q = depth > 0.0 ? p : camFrac;
+            vec3 q = hit ? p : camFrac;
             if (length(q - sc) > sR * 1.6 + 20.0) continue;
             float sh = staticShape(i, q + camInt, camInt);
             deep = max(deep, (1.0 - smoothstep(0.8, 1.05, sh)) * (1.0 - run));
@@ -1159,7 +1187,7 @@ void main() {
         for (int i = 0; i < nsd && i < 4; i++) {
             vec3 cc = vec3(data(204 + 3 * i), data(205 + 3 * i), data(206 + 3 * i));
             float sR = data(223 + 5 * i) * data(240 + i);
-            vec3 q = depth > 0.0 ? p : camFrac + dir * 200.0;
+            vec3 q = hit ? p : camFrac + dir * 200.0;
             strainHere = max(strainHere, 1.0 - smoothstep(sR * 0.5, sR * 2.2 + 16.0, length(q - cc)));
         }
         float strain = max(strainAll * 0.6, strainHere) * (1.0 - run);
@@ -1168,12 +1196,12 @@ void main() {
         if (data(31) > 0.0 || data(218) > 0.0) {
             // deep mist along the view ray, out to the render distance (fading with the terrain there): marched at a
             // reduced resolution by the mist pass, upsampled here
-            vec2 mist = mistUp(depth > 0.0 ? tScene : -1.0, rd);
+            vec2 mist = mistUp(hit ? tScene : -1.0, rd);
             c = c * (1.0 - 0.85 * mist.x) + 0.85 * ((mist.x - mist.y) * MIST_THIN + mist.y * MIST_DENSE);
         }
         if (data(187) > 0.5 || data(1312) > 0.0) {
             // strata weather and storms (the strata pass): mist, the violet warning and black rift pockets in the strata caves
-            vec3 sm = strataUp(depth > 0.0 ? tScene : -1.0, rd);
+            vec3 sm = strataUp(hit ? tScene : -1.0, rd);
             c = c * (1.0 - sm.r) + STRATA_MIST * sm.g + STRATA_VIOLET * sm.b;
         }
         if (nsd > 0) {
@@ -1182,9 +1210,9 @@ void main() {
             c += vec3(0.25, 0.1, 0.4) * fringe * 0.6;
             // (on the sky out to the rift range: 200, or ReportConfig.distantRifts over Distant Horizons' terrain, which
             // the depth buffer doesn't hold, so it reads as sky; Baughn: rifts shrank away at the vanilla fog line)
-            float tEnd = depth > 0.0 ? length(rel) : max(data(251), 200.0);
+            float tEnd = hit ? length(rel) : max(data(251), 200.0);
             vec4 hs2 = inv * vec4(texCoord * 2.0 - 1.0, 0.5, 1.0);
-            vec3 dir2 = depth > 0.0 ? normalize(rel) : normalize(hs2.xyz / hs2.w);
+            vec3 dir2 = hit ? normalize(rel) : normalize(hs2.xyz / hs2.w);
             // in open air the rift is a dark body that tapers off through a violet border (Baughn: the hard black blob
             // looked wrong floating in the air; as a hole in the ground it works): absorption falls off from the core
             // (shape 0.22) to the rift's edge (0.36), and the border glows violet out to ~0.5
@@ -1254,7 +1282,7 @@ void main() {
             float facing = max(0.0, dot(hd, up));
             float low = exp(-max(0.0, dir.y + 0.05) * 6.0) * smoothstep(-0.35, -0.05, dir.y);
             // on the sky and, like fog, on far terrain (a sky-only glow cut hard along the skyline: AdventurAgent)
-            float far = depth > 0.0 ? smoothstep(rd * 0.35, rd * 1.0, length(rel)) : 1.0;
+            float far = hit ? smoothstep(rd * 0.35, rd * 1.0, length(rel)) : 1.0;
             c += vec3(0.45, 0.2, 0.75) * data(1313) * pow(facing, 2.0) * low * 0.5 * far;
         }
         // a lance's beam (LanceBlockEntity; slots 244-250): violet, from the boom's tip into the rift's eye while the lance
@@ -1264,7 +1292,7 @@ void main() {
             float L = length(B - A);
             vec3 u = (B - A) / max(L, 1e-4);
             // the closest points of the view ray (0..tLim along dir, from the camera) and the segment A + s u
-            float tLim = depth > 0.0 ? tScene : 1e4;
+            float tLim = hit ? tScene : 1e4;
             float bb = dot(dir, u), dA = dot(dir, A), uA = dot(u, A), den = 1.0 - bb * bb;
             float sB = den > 1e-5 ? clamp((bb * dA - uA) / den, 0.0, L) : 0.0;
             float tB = clamp(dA + sB * bb, 0.0, tLim);
@@ -1281,7 +1309,7 @@ void main() {
         for (int i = 0; i < ne && i < 16; i++) {
             vec3 P = vec3(data(1601 + 3 * i), data(1602 + 3 * i), data(1603 + 3 * i)) - camFrac;
             float t = dot(dir, P);
-            if (t <= 0.0 || (depth > 0.0 && t > tScene + 0.35)) continue;
+            if (t <= 0.0 || (hit && t > tScene + 0.35)) continue;
             float dist = length(dir * t - P);
             c += vec3(0.78, 0.22, 1.0) * (exp(-dist * dist / 0.0012) + 0.3 * exp(-dist * dist / 0.012));
         }
@@ -1292,9 +1320,9 @@ void main() {
         mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                         data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
         vec4 h = inv * vec4(texCoord * 2.0 - 1.0, depth > 0.0 ? depth : 0.5, 1.0);
-        vec3 rel = h.xyz / h.w;
+        vec3 rel = dhHit ? dhRel : h.xyz / h.w;
         vec3 v = normalize(rel);
-        float tmax = depth > 0.0 ? length(rel) : 1e6;
+        float tmax = hit ? length(rel) : 1e6;
         vec3 o = vec3(data(19), data(20), data(21));
         float time = data(29);
         int n = int(data(24));
