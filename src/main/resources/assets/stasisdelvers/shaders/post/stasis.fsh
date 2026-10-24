@@ -1177,17 +1177,31 @@ void main() {
                 // over running spread land a drifting deep stops time (Baughn 2026-10-19), unless a field holds it off
                 if (spreadRun > 0.0 && !deepStop) deepStop = deepStops(dp, floor(hit ? pBlk : q), camInt, dp.yb);
             }
+        // Distant Horizons' far terrain, past the deeps the ray march sees: the far deeps ([1900]; StasisPost), across
+        // the band (no ground grid out there)
+        if (dhHit && spreadRun > 0.0 && !deepStop) {
+            int nf = int(data(1900));
+            for (int i = 0; i < nf && i < 24; i++) {
+                int o = 1901 + 5 * i;
+                float st = data(o + 3);
+                Deep dp = Deep(vec2(data(o), data(o + 1)), data(o + 2), st > 1.5 ? st - 2.0 : st, floor(pBlk.y), int(data(o + 4)));
+                if (deepStops(dp, floor(pBlk), camInt, dp.yb)) {
+                    deepStop = true;
+                    break;
+                }
+            }
+        }
         // the spread's running land joins the fields' (a field or the spawn area holds a deep off: run stays theirs)
         run = max(run, deepStop ? 0.0 : spreadRun);
-        // (DH debug: the world grid where a pixel lands: r = lines x = 100k, g = lines z = 100k (x = -500 bright), b = spread
-        // running; grey 0.25 on DH pixels so they show)
+        // (DH debug: the world grid where a pixel lands: r = lines x = 100k, g = lines z = 100k (x = -500 bright), b = time
+        // runs here (fields, spread, deeps); grey 0.25 on DH pixels so they show)
         if (data(1704) > 0.5) {
             vec2 wxz = floor(pBlk.xz) + camInt.xz;
             float lx = abs(wxz.x - 100.0 * floor(wxz.x / 100.0 + 0.5)) < 3.0 ? 1.0 : 0.0;
             float lz = abs(wxz.y - 100.0 * floor(wxz.y / 100.0 + 0.5)) < 3.0 ? 1.0 : 0.0;
             if (abs(wxz.x + 500.0) < 4.0) lx = lz = 1.0;
             vec3 base = dhHit ? vec3(0.25) : vec3(0.0);
-            fragColor = vec4(max(base, vec3(lx, lz, spreadRun * 0.8)), 1.0);
+            fragColor = vec4(max(base, vec3(lx, lz, run * 0.8)), 1.0);
             if (!hit) fragColor = vec4(0.0, 0.0, 0.3, 1.0);
             return;
         }

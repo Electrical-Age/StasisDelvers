@@ -318,6 +318,27 @@ public final class StasisPost {
             }
         }
         d[31] = nd;
+        // Distant Horizons' far terrain: the drifting deeps out to its distance (horizontal only: no ground grid that far),
+        // for the spread's "a deep stops running land" there (AdventurAgent: a lake under one read running): [1900] count,
+        // [1901 + 5i ..] centre - floor(camera) (x, z), radius, strength (+2 a puff), id; nearest first, at most 24
+        d[1900] = 0;
+        if (d[1700] > 0.5 && Stasis.stops(mc.level)) {
+            float far = Math.min(8192f, org.erisia.stasis.compat.dh.DhDepth.farBlocks());
+            var all = new ArrayList<>(org.erisia.stasis.Deeps.calmed(mc.level, org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, far, wclock, ClientFields.deepSeed())));
+            all.removeIf(dp -> dp.strength() <= 0);
+            all.sort(java.util.Comparator.comparingDouble(dp -> Math.hypot(dp.x() - cam.x, dp.z() - cam.z) - dp.radius()));
+            int nf = Math.min(24, all.size());
+            d[1900] = nf;
+            for (int i = 0; i < nf; i++) {
+                var dp = all.get(i);
+                int o = 1901 + 5 * i;
+                d[o] = (float) (dp.x() - fx);
+                d[o + 1] = (float) (dp.z() - fz);
+                d[o + 2] = dp.radius();
+                d[o + 3] = dp.strength() + (dp.puff() ? 2 : 0);
+                d[o + 4] = dp.id() & 0xFFFFFF;
+            }
+        }
         // the mist's clocks (stasis.fsh mistWind ..), wrapped here in double where each is seamless
         double mt = wclock;
         d[176] = (float) ((0.4 * mt) % 96.0);

@@ -35,6 +35,12 @@ public final class DhDepth {
         });
     }
 
+    /** DH's far plane (blocks), 0 before its first render pass. */
+    public static float farBlocks() {
+        float f = far;
+        return Float.isNaN(f) ? 0 : f;
+    }
+
     static GpuTextureView view(Supplier<DhApiResult<IDhApiBlazeTextureWrapper>> get) {
         try {
             if (DhApi.Delayed.renderProxy == null) return null;
