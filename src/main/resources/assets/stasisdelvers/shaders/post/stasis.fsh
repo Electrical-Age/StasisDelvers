@@ -47,6 +47,7 @@ uniform sampler2D InSampler;
 #endif
 uniform sampler2D DepthSampler;
 uniform sampler2D DhDepthSampler;
+uniform sampler2D DhColorSampler;
 uniform sampler2D DataSampler;
 uniform sampler2D MistSampler;
 #ifdef FULL_PASS
@@ -74,13 +75,13 @@ float data(int i) {
     return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
 }
 
-// Distant Horizons (optional): its depth texture and projection ([1700] on, [1701] far depth, [1702] depth -1..1,
-// [1703..1718] inverse(DH projection * view rotation)). The world position (minus the camera) of a LOD pixel.
+// Distant Horizons (optional): its colour (alpha: drawn), depth texture and matrices ([1700] on, [1702] depth -1..1,
+// [1703..1718] inverse(DH projection * DH model-view), DH's vanilla-fade math). The world position (minus the camera) of a LOD pixel.
 bool dhPos(vec2 uv, out vec3 rel) {
     rel = vec3(0.0);
     if (data(1700) < 0.5) return false;
+    if (texture(DhColorSampler, uv).a <= 0.0) return false;   // (where DH drew nothing: as its own fade pass decides)
     float dd = texture(DhDepthSampler, uv).r;
-    if (abs(dd - data(1701)) < 1e-6) return false;
     float z = data(1702) > 0.5 ? dd * 2.0 - 1.0 : dd;
     mat4 dinv = mat4(data(1703), data(1704), data(1705), data(1706), data(1707), data(1708), data(1709), data(1710),
                      data(1711), data(1712), data(1713), data(1714), data(1715), data(1716), data(1717), data(1718));
