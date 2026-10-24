@@ -145,15 +145,16 @@ public final class StasisConfig {
         DELVER_SUIT_MINUTES = b.comment("Minutes a fully charged Delver suit lasts in stopped land (Baughn: 30). Its store scales with it",
                 "(10 W per piece: 18 kJ at 30 minutes).").defineInRange("delverSuitMinutes", 30.0, 1.0, 600.0);
         STARTER_SUIT = b.comment("Give each player a full, charged Delver suit on their first join.").define("starterSuit", true);
-        MODE = b.comment("Game mode (Baughn 2026-10-19; docs/spreading-mode.md). \"stopped\": time stands still outside fields from the",
+        MODE = b.comment("Game mode (Baughn 2026-10-19; docs/spreading-mode.md; the default since 2026-10-24, with 24 h timers: Baughn,",
+                "for single-player). \"stopped\": time stands still outside fields from the",
                 "start (the base mod). \"spreading\": the world starts running and the stillness spreads from the rifts over",
                 "spreadHours of online time; no spawn cottage, no starter suit, no storms until hard mode (the dragon's death);",
                 "the Nether runs until the spread is complete, the End until hard mode; then everything behaves as \"stopped\".")
-            .define("mode", "stopped", o -> "stopped".equals(o) || "spreading".equals(o));
+            .define("mode", "spreading", o -> "stopped".equals(o) || "spreading".equals(o));
         SPREAD_HOURS = b.comment("Spreading mode: hours of online time (at least one player on) for the stillness to cover spreadCap",
-                "of the land within spreadRadius.").defineInRange("spreadHours", 48.0, 0.01, 10000.0);
+                "of the land within spreadRadius.").defineInRange("spreadHours", 24.0, 0.01, 10000.0);
         HARD_SPREAD_HOURS = b.comment("Spreading mode: hours of online time after hard mode starts for the stillness to go from",
-                "spreadCap to all of the land.").defineInRange("hardSpreadHours", 48.0, 0.01, 10000.0);
+                "spreadCap to all of the land.").defineInRange("hardSpreadHours", 24.0, 0.01, 10000.0);
         SPREAD_CAP = b.comment("Spreading mode: the share of the land the stillness covers before hard mode.")
             .defineInRange("spreadCap", 0.8, 0.0, 1.0);
         SPREAD_RADIUS = b.comment("Spreading mode: radius in blocks around world spawn that the spread map covers (and keeps",
@@ -231,8 +232,8 @@ public final class StasisConfig {
     static volatile double delverSuitMinutes = 30;
     static volatile boolean starterSuit = true;
     /** mode = "spreading" (Spread). */
-    static volatile boolean spreading = false;
-    static volatile double spreadHours = 48, hardSpreadHours = 48, spreadCap = 0.8;
+    static volatile boolean spreading = true;
+    static volatile double spreadHours = 24, hardSpreadHours = 24, spreadCap = 0.8;
     static volatile int spreadRadius = 8000;
     static volatile double spreadConnectedUntil = SpreadMap.CONNECTED_UNTIL;
     static volatile boolean endBarrier = true;
@@ -378,7 +379,8 @@ public final class StasisConfig {
         Gates.configure(RIFT_DESTINATIONS.get(), RIFT_SCATTER.get());
         riftScatterRate = RIFT_SCATTER_RATE.get();
         endPortalRifts = END_PORTAL_RIFTS.get();
-        spreading = "spreading".equals(MODE.get());
+        // (GameTests: -Dstasisdelvers.mode=stopped, whatever the config says)
+        spreading = "spreading".equals(System.getProperty("stasisdelvers.mode", MODE.get()));
         // (spreading mode: no storms until hard mode, whose instant is the storm schedule's origin: Storms.origin)
         storms = STORMS.get();
         timeScars = TIME_SCARS.get();

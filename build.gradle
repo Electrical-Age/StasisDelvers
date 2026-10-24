@@ -36,6 +36,9 @@ neoForge {
             type = "gameTestServer"
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             systemProperty 'stasisdelvers.noSpawnArea', 'true'
+            // the tests are written for the stopped mode (they install spreading where they want it: Spread.testInstall);
+            // the config's default is spreading since 2026-10-24
+            systemProperty 'stasisdelvers.mode', 'stopped'
             // only this mod's tests (Electrical Age's own tests are registered too, and can't run in stopped time)
             programArguments.addAll '--tests', project.mod_id + ':*'
         }

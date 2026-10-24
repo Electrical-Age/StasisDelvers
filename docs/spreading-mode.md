@@ -7,7 +7,8 @@ warnings) too, step 4a (hard mode's entry: the dragon's death, the End before an
 rewrite) and 5 (the island's breaking up into the End rift, as the crystals fall and at the dragon's death).
 
 ## What it is
-- Config `mode = "spreading"` (default `"stopped"`, the base mod). The world starts running; the stillness spreads
+- Config `mode = "spreading"` (the default since 2026-10-24, with `spreadHours` and `hardSpreadHours` 24: Baughn, for
+  single-player; `"stopped"` is the base mod). The world starts running; the stillness spreads
   from the rifts over `spreadHours` of online time to `spreadCap` (80 %) of the land within `spreadRadius` of spawn.
   Hard mode (the ender dragon's death, or `/stasis spread hardmode`) takes it on from where it stood to 100 % over
   `hardSpreadHours`.
