@@ -75,18 +75,28 @@ float data(int i) {
     return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
 }
 
-// Distant Horizons (optional): its colour (alpha: drawn), depth texture and matrices ([1700] on, [1702] depth -1..1,
-// [1703..1718] inverse(DH projection * DH model-view), DH's vanilla-fade math). The world position (minus the camera) of a LOD pixel.
+// Distant Horizons (optional; compat/dh/DhDepth): where it drew (its colour's alpha), the world position (minus the
+// camera) of its LOD: the ray from vanilla's matrices ([0..15]), the view distance from DH's depth with its planes
+// ([1700] on, [1701] near, [1702] far, [1703] depth convention: +1 for -1..1, +2 for reversed). Its far plane: none.
 bool dhPos(vec2 uv, out vec3 rel) {
     rel = vec3(0.0);
     if (data(1700) < 0.5) return false;
-    if (texture(DhColorSampler, uv).a <= 0.0) return false;   // (where DH drew nothing: as its own fade pass decides)
+    if (texture(DhColorSampler, uv).a <= 0.0) return false;
     float dd = texture(DhDepthSampler, uv).r;
-    float z = data(1702) > 0.5 ? dd * 2.0 - 1.0 : dd;
-    mat4 dinv = mat4(data(1703), data(1704), data(1705), data(1706), data(1707), data(1708), data(1709), data(1710),
-                     data(1711), data(1712), data(1713), data(1714), data(1715), data(1716), data(1717), data(1718));
-    vec4 h = dinv * vec4(uv * 2.0 - 1.0, z, 1.0);
-    rel = h.xyz / h.w;
+    float n = data(1701), f = data(1702);
+    int mode = int(data(1703) + 0.5);
+    float z;
+    if (mode == 0) z = f * n / (f - dd * (f - n));                    // 0..1 forward
+    else if (mode == 1) { float c = dd * 2.0 - 1.0; z = 2.0 * f * n / ((f + n) - c * (f - n)); }   // -1..1 forward
+    else if (mode == 2) z = f * n / (n + dd * (f - n));               // 0..1 reversed
+    else { float c = dd * 2.0 - 1.0; z = 2.0 * f * n / ((f + n) + c * (f - n)); }                  // -1..1 reversed
+    if (!(z > 0.0) || z >= f * 0.995) return false;
+    mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
+                    data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
+    vec4 hs = inv * vec4(uv * 2.0 - 1.0, 0.5, 1.0);
+    vec4 hc = inv * vec4(0.0, 0.0, 0.5, 1.0);
+    vec3 dir = normalize(hs.xyz / hs.w), fwd = normalize(hc.xyz / hc.w);
+    rel = dir * (z / max(dot(dir, fwd), 1e-4));
     return true;
 }
 
