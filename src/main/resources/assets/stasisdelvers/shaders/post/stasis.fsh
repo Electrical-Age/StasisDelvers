@@ -74,6 +74,21 @@ float data(int i) {
     return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
 }
 
+// Distant Horizons (optional): its depth texture and projection ([1700] on, [1701] far depth, [1702] depth -1..1,
+// [1703..1718] inverse(DH projection * view rotation)). The world position (minus the camera) of a LOD pixel.
+bool dhPos(vec2 uv, out vec3 rel) {
+    rel = vec3(0.0);
+    if (data(1700) < 0.5) return false;
+    float dd = texture(DhDepthSampler, uv).r;
+    if (abs(dd - data(1701)) < 1e-6) return false;
+    float z = data(1702) > 0.5 ? dd * 2.0 - 1.0 : dd;
+    mat4 dinv = mat4(data(1703), data(1704), data(1705), data(1706), data(1707), data(1708), data(1709), data(1710),
+                     data(1711), data(1712), data(1713), data(1714), data(1715), data(1716), data(1717), data(1718));
+    vec4 h = dinv * vec4(uv * 2.0 - 1.0, z, 1.0);
+    rel = h.xyz / h.w;
+    return true;
+}
+
 float hash13(vec3 p) {
     p = fract(p * 0.1031);
     p += dot(p, p.zyx + 31.32);
@@ -732,20 +747,6 @@ void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout fl
     }
 }
 
-// Distant Horizons (optional): its depth texture and projection ([1700] on, [1701] far depth, [1702] depth -1..1,
-// [1703..1718] inverse(DH projection * view rotation)). The world position (minus the camera) of a LOD pixel.
-bool dhPos(vec2 uv, out vec3 rel) {
-    rel = vec3(0.0);
-    if (data(1700) < 0.5) return false;
-    float dd = texture(DhDepthSampler, uv).r;
-    if (abs(dd - data(1701)) < 1e-6) return false;
-    float z = data(1702) > 0.5 ? dd * 2.0 - 1.0 : dd;
-    mat4 dinv = mat4(data(1703), data(1704), data(1705), data(1706), data(1707), data(1708), data(1709), data(1710),
-                     data(1711), data(1712), data(1713), data(1714), data(1715), data(1716), data(1717), data(1718));
-    vec4 h = dinv * vec4(uv * 2.0 - 1.0, z, 1.0);
-    rel = h.xyz / h.w;
-    return true;
-}
 
 // The strata pass (post_effect/stasis.json; this file with STRATA_PASS): the strata weather along the view ray, at
 // the mist target's resolution. The strata mask (StrataSampler, client/StrataMask.java) is 64^3 cells of 4 blocks
