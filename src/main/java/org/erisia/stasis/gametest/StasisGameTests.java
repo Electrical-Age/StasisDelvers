@@ -4068,7 +4068,7 @@ public final class StasisGameTests {
         // spreading mode's client sync (SpreadSync): the server sends the rank tiles round an overworld player out to its
         // range, nearest first, and forgets the far ones when the player moves away (a mock player gets no packets, but
         // the server's list of what it sent is what a client would hold)
-        CASES.put("spread_tiles_follow_player", new Spec(40, (h, c) -> {
+        CASES.put("spread_tiles_follow_player", new Spec(90, (h, c) -> {
             ServerLevel level = h.getLevel();
             BlockPos spawn = h.absolutePos(new BlockPos(3, 1, 4));
             org.erisia.stasis.SpreadMap m = org.erisia.stasis.SpreadMap.build(11, spawn.getX(), spawn.getZ(), 3000);
@@ -4083,7 +4083,7 @@ public final class StasisGameTests {
                 return (tx[1] - tx[0] + 1) * (tz[1] - tz[0] + 1);
             };
             int[] seen = new int[3];
-            h.runAfterDelay(15, () -> {
+            h.runAfterDelay(40, () -> {   // (~90 tiles at SpreadSync.PER_TICK a tick)
                 seen[0] = org.erisia.stasis.SpreadSync.tilesSent(p);
                 seen[1] = want.getAsInt();
                 // (setPos: the server's tile choice reads the position; no chunk loading needed out there. Far enough that

@@ -26,15 +26,15 @@ public final class SpreadSync {
 
     /**
      * The blocks round a player whose columns the client must answer: the view distance plus a chunk and a margin, and
-     * at least the shader's rank window (2048 blocks square, re-centred 384 blocks off; StasisPost.SPREAD_WINDOW), so the
-     * grey over Distant Horizons' far terrain has its ranks (Nero; without them it showed running: AdventurAgent).
-     * 1-4 more tiles of ~3 KB a player.
+     * at least the shader's rank window (8192 blocks square, re-centred 384 blocks off; StasisPost.SPREAD_WINDOW), so the
+     * grey over Distant Horizons' far terrain has its ranks (Nero; without them it showed running: AdventurAgent). About
+     * 80 tiles of ~3 KB a player, sent 4 a tick.
      */
     public static int range(MinecraftServer srv) {
         return Math.max((srv.getPlayerList().getViewDistance() + 1) * 16 + 32, DISTANT);
     }
 
-    static final int DISTANT = 1024 + 384;
+    static final int DISTANT = 4096 + 384;
 
     /** Tiles beyond the needed ones by this many are dropped (so walking along a tile edge doesn't resend it). */
     static final int KEEP_MARGIN = 1;

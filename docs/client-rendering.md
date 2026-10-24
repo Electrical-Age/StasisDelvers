@@ -93,7 +93,7 @@ through hooks set in `StasisClient`.
   client's spread state under `basics.spread`). Keep it in step too.
 
 ## Spreading mode in the shader (docs/spreading-mode.md)
-- `StasisPost.spreadFrame` uploads a 64x64-cell rank window (`SPREAD_WINDOW`, 2048 blocks square) from the client's
+- `StasisPost.spreadFrame` uploads a 256x256-cell rank window (`SPREAD_WINDOW`, 8192 blocks square: Distant Horizons' far terrain) from the client's
   `SpreadTiles`, one rank per texel as int bits (`setPixelABGR`, decoded like the data slots; MISSING =
   `Integer.MAX_VALUE` where no tile came). Re-centred when the camera is 12 cells off centre, refilled when the
   tiles change (`SpreadTiles.generation`). Slot 196 is 0 outside spreading mode, off the overworld and once complete.

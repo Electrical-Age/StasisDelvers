@@ -11,7 +11,7 @@
 // mask's corner - floor(camera); [187] strata mask valid (0/1); [188..191] the weather clock mod each pocket epoch
 // length (600, 900, 1200, 1800 s); [192..195] floor(clock / that length); [196] spreading mode decides the
 // columns here (0/1: Spread.active), [197] its progress P (exact), [198, 199] the first cell (x, z, global cell
-// indices) of the rank window in SpreadSampler (64 x 64 cells, one rank per texel as int bits in r..a, MISSING =
+// indices) of the rank window in SpreadSampler (256 x 256 cells, one rank per texel as int bits in r..a, MISSING =
 // 2147483647 where no tile came: runs); [200..203] static deep
 // i's eye: facing yaw (radians, turned by saccades) + 10 x destination (0 the End, 1 the Nether, 2 other); [204 + 3i ..]
 // static deep i's eye centre (the warped core) - floor(camera); [1808 + i] its pitch (radians, up +); [1580 + 4i] its NDC x, y, distance, in front (0/1);
@@ -1028,7 +1028,7 @@ vec4 eyePattern(vec2 x, float time, int id, float W, vec3 dir, int dest) {
 
 // ---- spreading mode (Spread, docs/spreading-mode.md): the server's rule per block column, in exact integers
 
-const int SPREAD_WINDOW = 64, SPREAD_MISSING = 2147483647;
+const int SPREAD_WINDOW = 256, SPREAD_MISSING = 2147483647;
 
 // The rank of global cell c (SpreadTiles.rank): the window's texel, MISSING outside it
 int spreadRank(ivec2 c) {
@@ -1179,6 +1179,18 @@ void main() {
             }
         // the spread's running land joins the fields' (a field or the spawn area holds a deep off: run stays theirs)
         run = max(run, deepStop ? 0.0 : spreadRun);
+        // (DH debug: the world grid where a pixel lands: r = lines x = 100k, g = lines z = 100k (x = -500 bright), b = spread
+        // running; grey 0.25 on DH pixels so they show)
+        if (data(1704) > 0.5) {
+            vec2 wxz = floor(pBlk.xz) + camInt.xz;
+            float lx = abs(wxz.x - 100.0 * floor(wxz.x / 100.0 + 0.5)) < 3.0 ? 1.0 : 0.0;
+            float lz = abs(wxz.y - 100.0 * floor(wxz.y / 100.0 + 0.5)) < 3.0 ? 1.0 : 0.0;
+            if (abs(wxz.x + 500.0) < 4.0) lx = lz = 1.0;
+            vec3 base = dhHit ? vec3(0.25) : vec3(0.0);
+            fragColor = vec4(max(base, vec3(lx, lz, spreadRun * 0.8)), 1.0);
+            if (!hit) fragColor = vec4(0.0, 0.0, 0.3, 1.0);
+            return;
+        }
         deep *= (1.0 - run) * viewFade(rel, rd);
         int nsd = int(data(218));
         float riftHere = 0.0, fringe = 0.0;

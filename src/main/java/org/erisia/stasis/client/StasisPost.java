@@ -70,7 +70,7 @@ public final class StasisPost {
      * (one rank per texel, int bits in rgba; stasis.fsh spreadRank), its first cell in slots 198, 199, P in 197.
      */
     static final Identifier SPREAD = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/spreadranks.png");
-    static final int SPREAD_WINDOW = 64;
+    static final int SPREAD_WINDOW = 256;   // (8192 blocks: Distant Horizons' far terrain; 64 was the vanilla view, Nero)
     /** Re-centred once the camera is this many cells off the window's centre (64 cells = 2048 blocks; terrain <= 512 + a cell). */
     static final int SPREAD_RECENTRE = 12;
     static DynamicTexture spreadTexture;
