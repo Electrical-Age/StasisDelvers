@@ -92,8 +92,8 @@ public final class StasisPost {
     }
 
     /** Distant Horizons' depth for the passes (DhDepthTexture; Nero: the grey followed the camera over DH's LODs). */
-    static final Identifier DH_DEPTH = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "dh_depth"),
-        DH_COLOR = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "dh_color");
+    static final Identifier DH_DEPTH = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/dh_depth.png"),
+        DH_COLOR = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/dh_color.png");   // (the chain's "location" is textures/effect/<name>.png: AdventurAgent's debug showed the missing texture)
 
     static void tick(ClientTickEvent.Post e) {
         var mc = Minecraft.getInstance();

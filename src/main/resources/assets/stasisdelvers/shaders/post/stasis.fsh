@@ -75,13 +75,13 @@ float data(int i) {
     return uintBitsToFloat(b.r | (b.g << 8) | (b.b << 16) | (b.a << 24));
 }
 
-// Distant Horizons (optional; compat/dh/DhDepth): where it drew (its colour's alpha), the world position (minus the
-// camera) of its LOD: the ray from vanilla's matrices ([0..15]), the view distance from DH's depth with its planes
+// Distant Horizons (optional; compat/dh/DhDepth): where it drew (its depth short of its far plane), the world position
+// (minus the camera) of its LOD: the ray from vanilla's matrices ([0..15]), the view distance from DH's depth with its planes
 // ([1700] on, [1701] near, [1702] far, [1703] depth convention: +1 for -1..1, +2 for reversed). Its far plane: none.
 bool dhPos(vec2 uv, out vec3 rel) {
     rel = vec3(0.0);
     if (data(1700) < 0.5) return false;
-    if (texture(DhColorSampler, uv).a <= 0.0) return false;
+    // (DH's colour has alpha in the sky too, so where it drew is where its depth isn't the far plane)
     float dd = texture(DhDepthSampler, uv).r;
     float n = data(1701), f = data(1702);
     int mode = int(data(1703) + 0.5);
@@ -1456,5 +1456,20 @@ void main() {
         c = mix(c, vec3(l) * 0.8 + vec3(0.03, 0.04, 0.06) + speck * 0.05, e);
     }
     fragColor = vec4(c, 1.0);
+    // DH debug (slot 1704, a file config/stasisdelvers-dhdebug): g = DH's raw depth x 20; the strip: vanilla depth
+    if (data(1704) > 0.5) {
+        vec3 dbgRel;
+        bool dbgHit = dhPos(texCoord, dbgRel);
+        float dd = texture(DhDepthSampler, texCoord).r;
+        // b: the distance, vanilla's where it drew else DH's (stripes every 64 blocks: they should run on unbroken
+        // across the line where DH takes over); r: DH's (1) or vanilla's (0.4) or none
+        float vd = texture(DepthSampler, texCoord).r;
+        mat4 vinv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
+                         data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
+        vec4 vh = vinv * vec4(texCoord * 2.0 - 1.0, vd, 1.0);
+        float dist = vd > 0.0 ? length(vh.xyz / vh.w) : dbgHit ? length(dbgRel) : -1.0;
+        fragColor = vec4(vd > 0.0 ? 0.4 : dbgHit ? 1.0 : 0.0, dd * 20.0, dist < 0.0 ? 0.0 : fract(dist / 64.0), 1.0);
+        if (texCoord.y > 0.9 && texCoord.x < 0.25) fragColor = vec4(vec3(texture(DepthSampler, texCoord).r * 20.0), 1.0);
+    }
 }
 #endif

@@ -59,10 +59,13 @@ public final class DhDepth {
 
     /**
      * The slots for stasis.fsh: [1700] DH on, [1701] its near plane, [1702] its far plane (blocks), [1703] its depth
-     * convention (0: 0..1 forward, 1: -1..1 forward, 2: 0..1 reversed, 3: -1..1 reversed). The shader takes the ray from
-     * vanilla's matrices and only the distance along it from DH's depth: DH's own matrices, read as DH's fade pass
-     * reads them, put the picture's halves on the wrong sides (AdventurAgent saw a seam down the middle).
+     * convention (0: 0..1 forward, 1: -1..1 forward, 2: 0..1 reversed, 3: -1..1 reversed), [1704] the debug picture.
+     * The shader takes the ray from vanilla's matrices and only the distance along it from DH's depth (AdventurAgent:
+     * continuous with vanilla's across the line where DH takes over; DH's own matrices weren't).
      */
+    static int debugCheck;
+    static boolean debug;
+
     public static void fill(float[] d) {
         float n = near, f = far;
         if (Float.isNaN(n) || Float.isNaN(f) || f <= n || depth() == null || color() == null) return;
@@ -74,6 +77,12 @@ public final class DhDepth {
             d[1701] = n;
             d[1702] = f;
             d[1703] = (reversed ? 2 : 0) + (neg ? 1 : 0);
+            // (a debug picture while the file config/stasisdelvers-dhdebug exists: stasis.fsh)
+            if ((debugCheck++ & 63) == 0) {
+                var file = net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve("stasisdelvers-dhdebug");
+                debug = java.nio.file.Files.exists(file);
+            }
+            d[1704] = debug ? 1 : 0;
         } catch (Throwable t) {
             d[1700] = 0;
         }

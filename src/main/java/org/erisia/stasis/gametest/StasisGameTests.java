@@ -4086,8 +4086,9 @@ public final class StasisGameTests {
             h.runAfterDelay(15, () -> {
                 seen[0] = org.erisia.stasis.SpreadSync.tilesSent(p);
                 seen[1] = want.getAsInt();
-                // (setPos: the server's tile choice reads the position; no chunk loading needed out there)
-                p.setPos(p.getX() + 3000, p.getY(), p.getZ());
+                // (setPos: the server's tile choice reads the position; no chunk loading needed out there. Far enough that
+                // no old tile is within the new range plus the keep margin: the range is at least SpreadSync.DISTANT)
+                p.setPos(p.getX() + 2 * range + 3 * org.erisia.stasis.SpreadTiles.TILE * 32, p.getY(), p.getZ());
             });
             return () -> {
                 c.check("every tile round the player was sent", seen[0] == seen[1], seen[0] + " of " + seen[1]);
