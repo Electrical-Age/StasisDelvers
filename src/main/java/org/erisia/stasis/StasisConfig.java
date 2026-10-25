@@ -269,6 +269,13 @@ public final class StasisConfig {
         return old;
     }
 
+    /** Tests: set stoppedLandEndermen (neighbouring tests' endermen share cells); returns the old value. */
+    public static int testUnboundCap(int cap) {
+        int old = stoppedUnboundCap;
+        stoppedUnboundCap = cap;
+        return old;
+    }
+
     /** stoppedLandEndermen (GameTests). */
     public static int stoppedLandEndermenForTests() {
         return stoppedUnboundCap;

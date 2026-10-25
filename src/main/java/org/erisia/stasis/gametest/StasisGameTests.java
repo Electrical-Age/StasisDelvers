@@ -2655,6 +2655,38 @@ public final class StasisGameTests {
 
         // ---- rift fauna (notes/fauna/PLAN.md, F1) ----
         // dread: 0 where time runs, the pocket's weight in strata mist, a storm's in storm rift; nothing in plain stopped land
+        // λ-Nero: endermen near rifts ignore the light rule (a rift stopped at noon); elsewhere in stopped land vanilla's
+        // rules (dark only). A violet pocket (dread 0.7) in daylight, open sky over the test floor
+        CASES.put("enderman_ignores_light_near_rifts", new Spec(2, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            AABB violet = new AABB(h.absoluteVec(new Vec3(10, 1, 0)), h.absoluteVec(new Vec3(14, 4, 4)));
+            org.erisia.stasis.Pockets.TEST.put(violet, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.VIOLET, 0.6f, 1000));
+            c.cleanup.add(() -> org.erisia.stasis.Pockets.TEST.remove(violet));
+            return () -> {
+                java.util.function.BiFunction<Vec3, Boolean, net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck.Result> check = (at, light) -> {
+                    var ender = EntityTypes.ENDERMAN.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+                    ender.snapTo(at.x, at.y, at.z, 0, 0);
+                    var ev = new net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck(ender, level,
+                        net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(ev);
+                    ender.discard();
+                    return ev.getResult();
+                };
+                Vec3 near = h.absoluteVec(new Vec3(12.5, 1.0, 2.5)), plain = h.absoluteVec(new Vec3(6.5, 1.0, 6.5));
+                BlockPos np = BlockPos.containing(near);
+                c.check("the pocket is dread >= 0.5", org.erisia.stasis.Dread.at(level, np.getX(), np.getY(), np.getZ()) >= 0.5f,
+                    "" + org.erisia.stasis.Dread.at(level, np.getX(), np.getY(), np.getZ()));
+                // (a neighbouring test's endermen may share the 32-block cell and fill its count: room for these two)
+                int cap = org.erisia.stasis.StasisConfig.testUnboundCap(1000);
+                org.erisia.stasis.StasisEvents.testForgetUnboundCounts();
+                var r = check.apply(near, true);
+                c.check("near the rift: an enderman spawns whatever the light", r == net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck.Result.SUCCEED, "" + r);
+                var r2 = check.apply(plain, true);
+                c.check("plain stopped land: vanilla's rules (not forced)", r2 != net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck.Result.SUCCEED, "" + r2);
+                org.erisia.stasis.StasisConfig.testUnboundCap(cap);
+                org.erisia.stasis.StasisEvents.testForgetUnboundCounts();
+            };
+        }));
         CASES.put("fauna_dread", new Spec(2, (h, c) -> {
             ServerLevel level = h.getLevel();
             AABB mist = new AABB(h.absoluteVec(new Vec3(10, 1, 0)), h.absoluteVec(new Vec3(12, 3, 3)));

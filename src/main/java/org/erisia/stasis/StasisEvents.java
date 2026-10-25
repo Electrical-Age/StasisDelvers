@@ -66,14 +66,21 @@ public final class StasisEvents {
 
     /**
      * No natural spawns where time is stopped (chunk generation still places its animals). Unbound types (endermen) spawn
-     * by vanilla's rules: time doesn't stop for them (Baughn).
+     * by vanilla's rules: time doesn't stop for them (Baughn); near rifts (dread at least RIFT_DREAD: a rift's outer zone,
+     * violet pockets, storms) endermen ignore the light rule, so a rift that stopped at noon has them too (λ-Nero).
      */
     static void spawnCheck(MobSpawnEvent.PositionCheck e) {
         if (e.getSpawnType() == EntitySpawnReason.CHUNK_GENERATION) return;
         if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) {
-            if (e.getLevel().getLevel() instanceof ServerLevel level && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ()))
-                && !unboundRoom(level, e.getX(), e.getZ()))
-                e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
+            var pos = net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ());
+            if (e.getLevel().getLevel() instanceof ServerLevel level && !Stasis.spawnsHere(level, pos)) {
+                if (!unboundRoom(level, e.getX(), e.getZ())) e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
+                else if (e.getEntity().getType() == net.minecraft.world.entity.EntityTypes.ENDERMAN
+                    && Dread.at(level, pos.getX(), pos.getY(), pos.getZ()) >= RIFT_DREAD
+                    && e.getEntity().checkSpawnObstruction(level)
+                    && net.minecraft.world.entity.SpawnPlacements.isSpawnPositionOk(e.getEntity().getType(), level, pos))
+                    e.setResult(MobSpawnEvent.PositionCheck.Result.SUCCEED);   // (the placement still checked: solid ground, room)
+            }
             return;
         }
         if (e.getLevel().getLevel() instanceof ServerLevel level
@@ -98,6 +105,9 @@ public final class StasisEvents {
             e.setSpawnCancelled(true);
     }
 
+    /** How strong the dread must be for endermen to spawn whatever the light (Dread.OUTER: a rift's outer zone). */
+    static final float RIFT_DREAD = 0.5f;
+
     /** Unbound mobs counted per 32-block cell (key: level + cell), refreshed every 40 ticks: spawn checks come often. */
     private static final java.util.Map<Long, long[]> UNBOUND_COUNT = new java.util.HashMap<>();
 
@@ -105,6 +115,11 @@ public final class StasisEvents {
      * May another unbound mob spawn here in stopped land: fewer than {@code stoppedLandEndermen} within 64 blocks? Nothing
      * else spawns in stopped land, so endermen would fill the monster cap (AdventurAgent, 2026-10-20: 70 in 2 minutes).
      */
+    /** Tests: forget the unbound counts (a neighbouring test's endermen in the same cell). */
+    public static void testForgetUnboundCounts() {
+        UNBOUND_COUNT.clear();
+    }
+
     static boolean unboundRoom(ServerLevel level, double x, double z) {
         int cap = StasisConfig.stoppedUnboundCap;
         if (cap <= 0) return false;
