@@ -98,6 +98,12 @@ public final class StasisEvents {
         if (why != EntitySpawnReason.NATURAL && why != EntitySpawnReason.PATROL && why != EntitySpawnReason.EVENT
             && why != EntitySpawnReason.REINFORCEMENT && why != EntitySpawnReason.JOCKEY && why != EntitySpawnReason.SPAWNER
             && why != EntitySpawnReason.TRIAL_SPAWNER) return;
+        // phantoms only in stopped land (Phantoms; Baughn)
+        if (e.getEntity() instanceof net.minecraft.world.entity.monster.Phantom && e.getLevel().getLevel() instanceof ServerLevel pl
+            && Phantoms.refused(pl, e.getX(), e.getY(), e.getZ())) {
+            e.setSpawnCancelled(true);
+            return;
+        }
         if (e.getLevel().getLevel() instanceof ServerLevel level && Stasis.stops(level)
             && !Stasis.spawnsHere(level, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ()))
             && (!e.getEntity().typeHolder().is(Stasis.UNBOUND)

@@ -2655,6 +2655,58 @@ public final class StasisGameTests {
             zombie.discard();
         }));
 
+        // Baughn: phantoms belong to stopped time: unbound, spawned only over players out in stopped land, they never
+        // target anyone in a field and turn away from it
+        CASES.put("phantoms_belong_to_stopped_land", new Spec(100, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            Vec3 out = h.absoluteVec(new Vec3(13.5, 2.0, 4.5)), in = h.absoluteVec(new Vec3(3.5, 2.0, 4.5));
+            var diff = level.getCurrentDifficultyAt(BlockPos.containing(out));
+            var a = EntityTypes.PHANTOM.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+            var b = EntityTypes.PHANTOM.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+            a.snapTo(out.x, out.y, out.z, 0, 0);
+            b.snapTo(in.x, in.y, in.z, 0, 0);
+            org.erisia.stasis.StasisEvents.testForgetUnboundCounts();
+            net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(a, level, diff, net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+            net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(b, level, diff, net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+            c.check("a phantom may spawn in stopped land", !a.isSpawnCancelled());
+            c.check("not in a field", b.isSpawnCancelled());
+            c.check("it is unbound (never frozen)", !Stasis.isFrozen(a));
+            a.discard();
+            b.discard();
+            ServerPlayer inside = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
+            ServerPlayer outside = survivalPlayer(h, new Vec3(13.5, 1.0, 6.5), true);
+            var evIn = new net.neoforged.neoforge.event.entity.player.PlayerSpawnPhantomsEvent(inside, 1);
+            var evOut = new net.neoforged.neoforge.event.entity.player.PlayerSpawnPhantomsEvent(outside, 1);
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(evIn);
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(evOut);
+            c.check("no phantoms for a player in a field", evIn.getResult() == net.neoforged.neoforge.event.entity.player.PlayerSpawnPhantomsEvent.Result.DENY);
+            c.check("vanilla's rules for one out in stopped land", evOut.getResult() == net.neoforged.neoforge.event.entity.player.PlayerSpawnPhantomsEvent.Result.DEFAULT);
+            // one flying at the field from outside: it never gets in, and can't target the player inside
+            var ph = h.spawn(EntityTypes.PHANTOM, new Vec3(14.5, 2.5, 4.5));
+            ph.setDeltaMovement(-0.8, 0, 0);
+            ph.anchorPoint = h.absolutePos(new BlockPos(3, 3, 4));   // (it circles a point inside the field)
+            ph.moveTargetPoint = h.absoluteVec(new Vec3(3.5, 3, 4.5));
+            ph.setTarget(inside);
+            c.check("it can't target a player in the field", ph.getTarget() == null);
+            boolean[] got = {false};
+            double[] minX = {Double.MAX_VALUE};
+            int[] ticks = {0};
+            Vec3 start = ph.position();
+            h.onEachTick(() -> {
+                ticks[0]++;
+                if (ph.isRemoved()) return;
+                minX[0] = Math.min(minX[0], ph.getX() - h.absoluteVec(Vec3.ZERO).x);
+                if (Stasis.isRunning(level, ph.blockPosition())) got[0] = true;
+            });
+            return () -> {
+                c.check("it flew (it isn't frozen) toward the field", minX[0] < 12, String.format("%.2f blocks in %d ticks, nearest x %.2f", ph.position().distanceTo(start), ticks[0], minX[0]));
+                c.check("it never flew into the field", !got[0], String.format("nearest x %.2f (local; the field ends near 7.7)", minX[0]));
+                ph.discard();
+                remove(h, inside);
+                remove(h, outside);
+            };
+        }, true, true));
+
         // ---- rift fauna (notes/fauna/PLAN.md, F1) ----
         // dread: 0 where time runs, the pocket's weight in strata mist, a storm's in storm rift; nothing in plain stopped land
         // λ-Nero: endermen near rifts ignore the light rule (a rift stopped at noon); elsewhere in stopped land vanilla's

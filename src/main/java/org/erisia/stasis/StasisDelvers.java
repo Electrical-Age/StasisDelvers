@@ -31,6 +31,9 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::finalizeSpawn);
         NeoForge.EVENT_BUS.addListener(StasisEvents::griefing);
+        NeoForge.EVENT_BUS.addListener(Phantoms::spawn);
+        NeoForge.EVENT_BUS.addListener(Phantoms::target);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Post.class, Phantoms::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, FaunaSpawner::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, FrozenMobCap::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Speeds::tick);

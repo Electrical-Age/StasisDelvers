@@ -25,10 +25,13 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
     use it).
   - `exemptBlockEntity`: tower master, End gateway, EA `LightBlockEntity`.
   - `nearTower` (the `TOWER_YARD` of 6 blocks); `isFrozen(Entity)` (never players, never `#stasisdelvers:unbound`).
-    Unbound types (endermen, the dragon, the warden): never frozen on the client either (`FrozenEntities`: they never get
+    Unbound types (endermen, the dragon, the warden, phantoms): never frozen on the client either (`FrozenEntities`: they never get
     a FROZEN sync, so the client mustn't guess from the block); they skip the stopped-land spawn vetoes, up to `stoppedLandEndermen` (2) unbound mobs within 64 blocks
     (`StasisEvents.unboundRoom`, counted per 32-block cell every 40 ticks; else they filled the monster cap); endermen
     don't take or place blocks in stopped land (`StasisEvents.griefing`). Test: `enderman_spawns_and_doesnt_grief_in_stopped_land`.
+    Phantoms (`Phantoms`, Baughn 2026-10-25: nobody likes them) spawn only over a player out in stopped land (vanilla's
+    insomnia and night rules still apply), never target anyone where time runs, and turn away from running land ahead
+    of them (their circling anchor moved away from the field; a wall behind that). Test: `phantoms_belong_to_stopped_land`.
 - `Field.java`: immutable record (id, centre, radius, failing, collapse, column, rate, seed, formedAt, amber,
   dropout, side, `Stretch`).
   - Geometry: `norm`, `normSpan`, `containsBlock` (the whole block must be inside: the far face on each axis),
