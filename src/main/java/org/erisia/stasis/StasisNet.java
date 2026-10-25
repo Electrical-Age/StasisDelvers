@@ -447,7 +447,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar("17");   // 17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar(BuildInfo.channelVersion("17"));   // (+ the build commit: a mismatched pack is refused at login)  17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });

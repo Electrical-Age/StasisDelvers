@@ -5,7 +5,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 (`RegisterPayloadHandlersEvent`).
 
 ## Protocol version
-- `e.registrar("17")` (17: `rooms`; 16: `field_speeds`; 15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+- `e.registrar(BuildInfo.channelVersion("17"))`: "17+<build commit>" (the commit baked in by build.gradle: a client jar built from another commit is refused at login instead of joining with shifted block states; Baughn 2026-10-25) (17: `rooms`; 16: `field_speeds`; 15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
   are then refused at login instead of failing mid-game.
   - 9 added `dig_stilled`.
   - 10 removed the unused `chunk_clocks`.
