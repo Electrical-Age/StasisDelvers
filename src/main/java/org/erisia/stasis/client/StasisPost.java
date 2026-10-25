@@ -70,6 +70,9 @@ public final class StasisPost {
      * (one rank per texel, int bits in rgba; stasis.fsh spreadRank), its first cell in slots 198, 199, P in 197.
      */
     static final Identifier SPREAD = Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "textures/effect/spreadranks.png");
+    /** The far drifting deeps for Distant Horizons' terrain, refreshed once a second (spreadFrame's caller). */
+    static List<org.erisia.stasis.Deeps.Deep> farDeeps;
+    static long farDeepsAt;
     static final int SPREAD_WINDOW = 256;   // (8192 blocks: Distant Horizons' far terrain; 64 was the vanilla view, Nero)
     /** Re-centred once the camera is this many cells off the window's centre (64 cells = 2048 blocks; terrain <= 512 + a cell). */
     static final int SPREAD_RECENTRE = 12;
@@ -323,10 +326,18 @@ public final class StasisPost {
         // [1901 + 5i ..] centre - floor(camera) (x, z), radius, strength (+2 a puff), id; nearest first, at most 24
         d[1900] = 0;
         if (d[1700] > 0.5 && Stasis.stops(mc.level)) {
-            float far = Math.min(8192f, org.erisia.stasis.compat.dh.DhDepth.farBlocks());
-            var all = new ArrayList<>(org.erisia.stasis.Deeps.calmed(mc.level, org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, far, wclock, ClientFields.deepSeed())));
-            all.removeIf(dp -> dp.strength() <= 0);
-            all.sort(java.util.Comparator.comparingDouble(dp -> Math.hypot(dp.x() - cam.x, dp.z() - cam.z) - dp.radius()));
+            // (once a second, not every frame: over DH's 8 km the search cost ~6 ms a frame, AdventurAgent; the deeps
+            // drift slowly, and their positions are made relative to the camera below each frame)
+            long nowMs = net.minecraft.util.Util.getMillis();
+            if (farDeeps == null || nowMs - farDeepsAt > 1000) {
+                float far = Math.min(8192f, org.erisia.stasis.compat.dh.DhDepth.farBlocks());
+                var found = new ArrayList<>(org.erisia.stasis.Deeps.calmed(mc.level, org.erisia.stasis.Deeps.within((float) cam.x, (float) cam.z, far, wclock, ClientFields.deepSeed())));
+                found.removeIf(dp -> dp.strength() <= 0);
+                found.sort(java.util.Comparator.comparingDouble(dp -> Math.hypot(dp.x() - cam.x, dp.z() - cam.z) - dp.radius()));
+                farDeeps = found.subList(0, Math.min(24, found.size()));
+                farDeepsAt = nowMs;
+            }
+            var all = farDeeps;
             int nf = Math.min(24, all.size());
             d[1900] = nf;
             for (int i = 0; i < nf; i++) {
