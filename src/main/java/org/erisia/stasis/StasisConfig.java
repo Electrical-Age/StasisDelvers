@@ -23,7 +23,7 @@ public final class StasisConfig {
     static final ModConfigSpec.IntValue FREEZE_TICKS;
     static final ModConfigSpec.IntValue GRACE_TICKS;
     static final ModConfigSpec.DoubleValue TOWER_DRAW_K;
-    static final ModConfigSpec.DoubleValue TOWER_STORE_C;
+    static final ModConfigSpec.IntValue TOWER_STORE_BATTERIES;
     static final ModConfigSpec.IntValue TOWER_MAX_SEGMENTS;
     static final ModConfigSpec.DoubleValue TOWER_BOOM_STRETCH;
     static final ModConfigSpec.DoubleValue TOWER_FIELD_RATE;
@@ -85,9 +85,9 @@ public final class StasisConfig {
         TOWER_DRAW_K = b.comment("Tower draw P = k * r^1.5 W (r = field radius). Default: r 48 draws about 590 W (Baughn "
             + "2026-10-14: twice the radius at half the power of the old k 10).")
             .defineInRange("towerDrawK", 1.77, 0.0, 1e6);
-        TOWER_STORE_C = b.comment("Tower store E = c * r^2 J. Default (Baughn 2026-10-14: a quarter of the old 1225, so the "
-            + "doubled radius keeps the old energy): a full store runs an r 48 field for about 20 minutes.")
-            .defineInRange("towerStoreC", 306.25, 1.0, 1e9);
+        TOWER_STORE_BATTERIES = b.comment("Tower store, in EA Cost Oriented Batteries' worth of energy, whatever the tower's size "
+            + "(Baughn 2026-10-25: the batteries in its recipe; it had too much store, and resizing it clipped energy).")
+            .defineInRange("towerStoreBatteries", 2, 1, 1000);
         TOWER_MAX_SEGMENTS = b.comment("Most segments a tower counts (radius = 8 * (segments + 2)).")
             .defineInRange("towerMaxSegments", 30, 0, 254);
         TOWER_BOOM_STRETCH = b.comment("How far a tower's booms stretch its field towards their side: that side reaches",
@@ -207,7 +207,22 @@ public final class StasisConfig {
     static volatile int freezeTicks = 100;
     static volatile int graceTicks = 200;
     static volatile double towerDrawK = 1.77;
-    static volatile double towerStoreC = 306.25;
+    static volatile int towerStoreBatteries = 2;
+    /** GameTests: a fixed store (J) instead of the batteries' worth; <= 0: off. */
+    static volatile double testStoreJ = -1;
+    private static double batteryJ = -1;
+
+    /** The tower's store (J): towerStoreBatteries x one EA Cost Oriented Battery's energy (60 kJ with EA's defaults). */
+    public static double towerStoreJ() {
+        if (testStoreJ > 0) return testStoreJ;
+        if (batteryJ < 0) {
+            double j = 60_000;
+            for (var d : mods.eln.Eln.transparentNodeItem.all().values())
+                if (d instanceof mods.eln.transparentnode.battery.BatteryDescriptor b && "Cost Oriented Battery".equals(b.name)) j = b.electricalStdEnergy;
+            batteryJ = j;
+        }
+        return towerStoreBatteries * batteryJ;
+    }
     static volatile int towerMaxSegments = 30;
     static volatile double towerBoomStretch = 0.5;
     static volatile double towerFieldRate = 0.6;
@@ -259,13 +274,14 @@ public final class StasisConfig {
     }
 
     /**
-     * GameTests: set the tower constants (towerDrawK, towerStoreC) and return the old ones. Two tower tests were written
-     * against the dev run's config (10, 1225) and failed with the defaults (1.77, 306.25); they pin them now.
+     * GameTests: set the tower constants (towerDrawK, a fixed store in J; <= 0: the batteries' worth) and return the old
+     * ones. Two tower tests were written against the dev run's config (10, and 1225 r^2 J at r 16) and failed with the
+     * defaults; they pin them now.
      */
-    public static double[] testTowerConstants(double drawK, double storeC) {
-        double[] old = {towerDrawK, towerStoreC};
+    public static double[] testTowerConstants(double drawK, double storeJ) {
+        double[] old = {towerDrawK, testStoreJ};
         towerDrawK = drawK;
-        towerStoreC = storeC;
+        testStoreJ = storeJ;
         return old;
     }
 
@@ -311,7 +327,7 @@ public final class StasisConfig {
         m.put("freezeTicks", freezeTicks);
         m.put("graceTicks", graceTicks);
         m.put("towerDrawK", towerDrawK);
-        m.put("towerStoreC", towerStoreC);
+        m.put("towerStoreBatteries", towerStoreBatteries);
         m.put("towerMaxSegments", towerMaxSegments);
         m.put("towerFieldRate", towerFieldRate);
         m.put("gutterChance", gutterChance);
@@ -368,7 +384,7 @@ public final class StasisConfig {
         freezeTicks = FREEZE_TICKS.get();
         graceTicks = GRACE_TICKS.get();
         towerDrawK = TOWER_DRAW_K.get();
-        towerStoreC = TOWER_STORE_C.get();
+        towerStoreBatteries = TOWER_STORE_BATTERIES.get();
         towerMaxSegments = TOWER_MAX_SEGMENTS.get();
         towerBoomStretch = TOWER_BOOM_STRETCH.get();
         towerFieldRate = TOWER_FIELD_RATE.get();

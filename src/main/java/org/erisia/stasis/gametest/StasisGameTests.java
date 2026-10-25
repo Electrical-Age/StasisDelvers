@@ -954,13 +954,13 @@ public final class StasisGameTests {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(40) * 0.4 * 4 / 3), tx);
+                store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.4 * 4 / 3), tx);
                 tx.commit();
             }
             h.runAfterDelay(3, () -> c.check("40% charged: still off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name()));
             h.runAfterDelay(4, () -> {
                 try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(40) * 0.3 * 4 / 3), tx);   // (70%: over the safety's 60%)
+                    store.insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.3 * 4 / 3), tx);   // (70%: over the safety's 60%)
                     tx.commit();
                 }
             });
@@ -1072,11 +1072,11 @@ public final class StasisGameTests {
         // λ-Nero: a temporal accelerator against the core runs the tower's field at its setting, for the rate squared in
         // power; with nothing coming in, the rate the power carries is 1x; taking it away puts the field back
         CASES.put("tower_temporal_accelerator", new Spec(70, (h, c) -> {
-            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225);
+            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225 * 16 * 16);
             c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.9 * 4 / 3), tx);
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.9 * 4 / 3), tx);
                 tx.commit();
             }
             h.setBlock(new BlockPos(4, 2, 4), org.erisia.stasis.StasisRegistry.TEMPORAL_ACCELERATOR_BLOCK.get().defaultBlockState()
@@ -1162,7 +1162,9 @@ public final class StasisGameTests {
                 t.setControls(Double.NaN, true);
                 t.testSafety(0, 0.7);
                 c.check("OVERRIDE holds the full range", !t.retreating() && t.goalRadius() == 40, String.valueOf(t.goalRadius()));
-                c.check("the store never shrinks with the target", t.storeMaxJ() == org.erisia.stasis.TowerBlockEntity.storeFor(40));
+                c.check("the store never shrinks with the target", t.storeMaxJ() == org.erisia.stasis.TowerBlockEntity.storeJ());
+                // Baughn 2026-10-25: the two Cost Oriented Batteries of its recipe (60 kJ each), whatever its size
+                c.check("the store is its recipe's two batteries", Math.abs(t.storeMaxJ() - 120_000) < 1, String.format("%.0f J", t.storeMaxJ()));
                 t.setControls(Double.NaN, false);
                 t.setRemoved();   // (its 40-block field would reach the next tests)
             };
@@ -1327,7 +1329,7 @@ public final class StasisGameTests {
         }, false, true));
         // a locked tower (the spawn tower) keeps its settings; anyone can feed a tower from their suit (a jump-start)
         CASES.put("tower_lock_and_feed", new Spec(200, (h, c) -> {
-            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225);   // (the values it was written for)
+            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225 * 16 * 16);   // (the values it was written for)
             c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             ServerPlayer p = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), false);
@@ -1362,7 +1364,7 @@ public final class StasisGameTests {
         CASES.put("tower_shield_shows_drain", new Spec(120, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.6 * 4 / 3), tx);
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.6 * 4 / 3), tx);
                 tx.commit();
             }
             double[] early = {-1};
@@ -2160,11 +2162,11 @@ public final class StasisGameTests {
         // weather (Baughn): a deep over a field raises the tower's draw (+50% at full drifting overlap); the overlap
         // measure sees a deep at its centre and nothing far from any
         CASES.put("tower_weather_raises_draw", new Spec(45, (h, c) -> {
-            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225);   // (the values it was written for)
+            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225 * 16 * 16);   // (the values it was written for)
             c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.9 * 4 / 3), tx);
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.9 * 4 / 3), tx);
                 tx.commit();
             }
             double[] at = new double[2];
@@ -2246,7 +2248,7 @@ public final class StasisGameTests {
         CASES.put("tower_collapses_when_empty", new Spec(560, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 0);
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
-                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeFor(16) * 0.6 * 4 / 3), tx);
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.6 * 4 / 3), tx);
                 tx.commit();
             }
             int[] fid = {0};

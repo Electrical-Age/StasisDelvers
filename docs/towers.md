@@ -52,16 +52,16 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
   - `maxRadius` = 1.25·design (`MAX_EXPAND`).
 - `drawFor(r)` = `towerDrawK`·r^1.5 W.
   `drawAt(r)` = drawFor(r·`volumeScale()`)·`drawPenalty(r)`, where the penalty is (r/design)^6 above design.
-- `storeFor(r)` = `towerStoreC`·r² J. The store is sized by the *design* radius, so the console target never
-  clips energy. FE = J·`FE_PER_J` (4/3).
+- `storeJ()` = `towerStoreBatteries` (2, the recipe's) × one EA Cost Oriented Battery's energy (60 kJ by default, read
+  from EA's descriptor), whatever the size (Baughn 2026-10-25: it had too much store, and resizing clipped energy). FE = J·`FE_PER_J` (4/3).
 - `weatherFactor()` = 1 + w + 2·staticWeather.
   - In a storm, w = stormMist + 2·stormRift; otherwise w = 0.5·drifting deep overlap.
   - Overlaps are sampled at 27 points at 0.7 r (`Deeps.overlap`, `staticOverlap`, `Storms.overlap`).
 - `stretchFor(layout)`: each side reaches 1 + `towerBoomStretch`·(longest boom / (H - y)). Draw follows the
-  volume (`volumeScale`); the store stays on r.
+  volume (`volumeScale`).
 - Feeding (`toggleFeed`/`feed`): 2 kW from the player's suit and batteries (`Suits.drain`). Feeding a running
   tower leaves 25% in each piece (`FEED_RESERVE`).
-- Config: `towerDrawK`, `towerStoreC`, `towerMaxSegments`, `towerBoomStretch`, `towerFieldRate` (`StasisConfig`).
+- Config: `towerDrawK`, `towerStoreBatteries`, `towerMaxSegments`, `towerBoomStretch`, `towerFieldRate` (`StasisConfig`).
 
 ## Temporal accelerator (`TemporalAcceleratorBlock`; λ-Nero, notes/timestop/ACCEL-DESIGN.md)
 - A block against either core cell (any side), set by its lever (`AcceleratorLevers`: a right-click raises `STEP` 1..18,

@@ -185,9 +185,9 @@ public class TowerBlockEntity extends BlockEntity {
         resize();
     }
 
-    /** The store's capacity in FE, for the design radius. */
+    /** The store's capacity in FE: the same for every size, so adding or removing segments never clips energy. */
     private int storeCapacity() {
-        return (int) (storeFor(designRadius()) * FE_PER_J);
+        return (int) (storeJ() * FE_PER_J);
     }
 
     public State state() {
@@ -474,18 +474,18 @@ public class TowerBlockEntity extends BlockEntity {
     /** Tests: multiply this tower's draw (to empty it quickly). */
     public double testDrawFactor = 1;
 
-    /** Store in J. */
-    public static double storeFor(double r) {
-        return StasisConfig.towerStoreC * r * r;
+    /** Store in J (Baughn 2026-10-25): the Cost Oriented Batteries in its recipe, whatever its size (StasisConfig.towerStoreJ). */
+    public static double storeJ() {
+        return StasisConfig.towerStoreJ();
     }
 
     public double storedJ() {
         return store.amount() / FE_PER_J;
     }
 
-    /** The store is sized by the preferred range, so changing the target never clips energy. */
+    /** The store doesn't depend on the size or the target, so neither changing them clips energy. */
     public double storeMaxJ() {
-        return storeFor(designRadius());
+        return storeJ();
     }
 
     int countSegments() {
