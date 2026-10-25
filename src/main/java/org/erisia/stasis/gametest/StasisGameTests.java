@@ -2657,6 +2657,36 @@ public final class StasisGameTests {
         // dread: 0 where time runs, the pocket's weight in strata mist, a storm's in storm rift; nothing in plain stopped land
         // λ-Nero: endermen near rifts ignore the light rule (a rift stopped at noon); elsewhere in stopped land vanilla's
         // rules (dark only). A violet pocket (dread 0.7) in daylight, open sky over the test floor
+        // Baughn: frozen mobs take at most half the mob cap; the extra go, farthest from players first, none near one
+        CASES.put("frozen_mobs_trimmed_far_from_players", new Spec(2, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            // (as natural spawns: the test helper's spawn makes them persistent, which vanilla doesn't count either)
+            java.util.function.Function<Vec3, net.minecraft.world.entity.Mob> zombie = at -> {
+                var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+                Vec3 w = h.absoluteVec(at);
+                z.snapTo(w.x, w.y, w.z, 0, 0);
+                level.addFreshEntity(z);
+                return z;
+            };
+            net.minecraft.world.entity.Mob near = zombie.apply(new Vec3(13.5, 1.0, 2.5));
+            net.minecraft.world.entity.Mob far1 = zombie.apply(new Vec3(14.5, 1.0, 6.5));
+            net.minecraft.world.entity.Mob named = zombie.apply(new Vec3(12.5, 1.0, 6.5));
+            named.setCustomName(net.minecraft.network.chat.Component.literal("Kept"));
+            // far from any real player: move far1 well away (no chunk needed for the check); a test player beside "near"
+            ServerPlayer p = survivalPlayer(h, new Vec3(13.5, 1.0, 1.5), true);
+            c.cleanup.add(() -> remove(h, p));
+            c.cleanup.add(() -> { near.discard(); far1.discard(); named.discard(); });
+            return () -> {
+                c.check("all three frozen", org.erisia.stasis.Stasis.isFrozen(near) && org.erisia.stasis.Stasis.isFrozen(far1),
+                    org.erisia.stasis.Stasis.isFrozen(near) + " " + org.erisia.stasis.Stasis.isFrozen(far1));
+                c.check("a named one doesn't count", !org.erisia.stasis.FrozenMobCap.counts(named) && org.erisia.stasis.FrozenMobCap.counts(far1));
+                far1.setPos(far1.getX() + 200, far1.getY(), far1.getZ());   // (out of the player's reach)
+                // keep none of this test's two (only these: other tests' frozen mobs are left out)
+                int gone = org.erisia.stasis.FrozenMobCap.trim(java.util.List.of(near, far1), 0, java.util.List.of(p));
+                c.check("the far one went", far1.isRemoved() && gone == 1, "" + gone);
+                c.check("the one near a player stays", !near.isRemoved());
+            };
+        }));
         CASES.put("enderman_ignores_light_near_rifts", new Spec(2, (h, c) -> {
             ServerLevel level = h.getLevel();
             AABB violet = new AABB(h.absoluteVec(new Vec3(10, 1, 0)), h.absoluteVec(new Vec3(14, 4, 4)));
