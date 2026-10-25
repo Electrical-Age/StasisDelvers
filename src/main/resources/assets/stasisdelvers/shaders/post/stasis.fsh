@@ -83,13 +83,16 @@ bool dhPos(vec2 uv, out vec3 rel) {
     if (data(1700) < 0.5) return false;
     // (DH's colour has alpha in the sky too, so where it drew is where its depth isn't the far plane)
     float dd = texture(DhDepthSampler, uv).r;
-    float n = data(1701), f = data(1702);
+    float f = data(1702);
     int mode = int(data(1703) + 0.5);
-    float z;
-    if (mode == 0) z = f * n / (f - dd * (f - n));                    // 0..1 forward
-    else if (mode == 1) { float c = dd * 2.0 - 1.0; z = 2.0 * f * n / ((f + n) - c * (f - n)); }   // -1..1 forward
-    else if (mode == 2) z = f * n / (n + dd * (f - n));               // 0..1 reversed
-    else { float c = dd * 2.0 - 1.0; z = 2.0 * f * n / ((f + n) + c * (f - n)); }                  // -1..1 reversed
+    if ((mode & 2) == 2 ? dd <= 0.0 : dd >= 1.0) return false;   // (its far plane: nothing drawn)
+    // the view distance from DH's own inverse projection ([1706..1721]), the depth mapped as its fade pass maps it (its
+    // projection isn't the plain near/far one: DH's z row put a 250-block lake ~7 times too far, AdventurAgent's matrices)
+    float zn = (mode & 1) == 1 ? dd * 2.0 - 1.0 : dd;
+    mat4 ip = mat4(data(1706), data(1707), data(1708), data(1709), data(1710), data(1711), data(1712), data(1713),
+                   data(1714), data(1715), data(1716), data(1717), data(1718), data(1719), data(1720), data(1721));
+    vec4 v = ip * vec4(uv * 2.0 - 1.0, zn, 1.0);
+    float z = abs(v.z / v.w);
     if (!(z > 0.0) || z >= f * 0.995) return false;
     mat4 inv = mat4(data(0), data(1), data(2), data(3), data(4), data(5), data(6), data(7),
                     data(8), data(9), data(10), data(11), data(12), data(13), data(14), data(15));
@@ -1191,10 +1194,18 @@ void main() {
                 }
             }
         }
+        float baseRun = run;   // (debug: the fields', spawn's and rooms' share, before the spread)
         // the spread's running land joins the fields' (a field or the spawn area holds a deep off: run stays theirs)
         run = max(run, deepStop ? 0.0 : spreadRun);
         // (DH debug: the world grid where a pixel lands: r = lines x = 100k, g = lines z = 100k (x = -500 bright), b = time
         // runs here (fields, spread, deeps); grey 0.25 on DH pixels so they show)
+        if (data(1704) > 1.5) {
+            // (parts: r = spread running, g = fields/spawn/rooms running, b = a deep stops it; grey base on DH pixels)
+            vec3 base = dhHit ? vec3(0.2) : vec3(0.0);
+            fragColor = vec4(max(base, vec3(spreadRun, baseRun, deepStop ? 1.0 : 0.0)), 1.0);
+            if (!hit) fragColor = vec4(0.0, 0.0, 0.3, 1.0);
+            return;
+        }
         if (data(1704) > 0.5) {
             vec2 wxz = floor(pBlk.xz) + camInt.xz;
             float lx = abs(wxz.x - 100.0 * floor(wxz.x / 100.0 + 0.5)) < 3.0 ? 1.0 : 0.0;
