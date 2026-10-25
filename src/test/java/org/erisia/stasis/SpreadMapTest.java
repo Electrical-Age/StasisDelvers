@@ -187,7 +187,7 @@ class SpreadMapTest {
                                  @ForAll @IntRange(min = -900, max = 900) int z, @ForAll @DoubleRange(min = 0, max = 1.05) double share) {
         SpreadMap m = map(seed, 10, -20, 700);
         int min = (int) Math.ceil(share * m.count);
-        int[] t = SpreadMap.nearestAtLeast(m, x, z, min, m.n);
+        int[] t = SpreadMap.nearestAtLeast(m, x, z, min, 2 * m.n);   // (as the callers: points outside the map need more rings)
         long best = Long.MAX_VALUE;
         for (int c = 0; c < m.ranks.length; c++) {
             if (m.ranks[c] < min) continue;
