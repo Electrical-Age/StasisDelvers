@@ -47,6 +47,8 @@ public final class Remains {
 
     /** Per dying player: their inventory's stacks (by identity: the drops are the same objects) and slots. */
     static final java.util.Map<java.util.UUID, java.util.Map<ItemStack, Integer>> SLOTS = new java.util.HashMap<>();
+    /** Per dying player: their worn accessories (Curios) and slots ("identifier#index"). */
+    static final java.util.Map<java.util.UUID, java.util.Map<ItemStack, String>> CURIOS = new java.util.HashMap<>();
 
     /** Just before the death drops: where each stack sat. */
     static void dying(net.neoforged.neoforge.event.entity.living.LivingDeathEvent e) {
@@ -55,6 +57,7 @@ public final class Remains {
         var inv = p.getInventory();
         for (int i = 0; i < inv.getContainerSize(); i++) if (!inv.getItem(i).isEmpty()) m.put(inv.getItem(i), i);
         SLOTS.put(p.getUUID(), m);
+        CURIOS.put(p.getUUID(), CuriosCompat.slots(p));
     }
 
     static void drops(LivingDropsEvent e) {
@@ -71,11 +74,26 @@ public final class Remains {
             p.experienceProgress = 0;
         }
         java.util.Map<ItemStack, Integer> where = SLOTS.remove(p.getUUID());
+        java.util.Map<ItemStack, String> worn = CURIOS.remove(p.getUUID());
+        java.util.List<java.util.Map.Entry<ItemStack, String>> unmatched = worn == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(worn.entrySet());
         for (ItemEntity item : e.getDrops()) {
             ItemStack st = item.getItem();
-            // (each item's inventory slot, from just before the death, so it goes back there: Statue.crumble)
+            if (st.isEmpty()) continue;
+            // (each item's inventory slot, from just before the death, so it goes back there: Statue.crumble; an
+            // accessory its Curios slot, Baughn: the pendant and the backpack ended up in the main inventory)
             Integer slot = where == null ? null : where.get(st);
-            if (!st.isEmpty()) statue.add(st.copy(), slot == null ? -1 : slot);
+            String curio = null;
+            if (slot == null) {
+                for (var it = unmatched.iterator(); it.hasNext(); ) {
+                    var w = it.next();
+                    if (w.getKey() == st || ItemStack.matches(w.getKey(), st)) {
+                        curio = w.getValue();
+                        it.remove();
+                        break;
+                    }
+                }
+            }
+            statue.add(st.copy(), slot == null ? -1 : slot, curio);
         }
         e.getDrops().clear();
         if (fresh) {

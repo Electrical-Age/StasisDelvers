@@ -49,6 +49,8 @@ public class Statue extends Entity {
     /** Each item's slot in its owner's inventory when it was taken (-1: not known), so it goes back there (Baughn
      *  2026-10-22: like the Corpse mod). Parallel to items. */
     private final java.util.List<Integer> slots = new java.util.ArrayList<>();
+    /** Each item's accessory slot (Curios "identifier#index"; "" if none), parallel to items. */
+    private final java.util.List<String> curios = new java.util.ArrayList<>();
     private int xp;
 
     public Statue(EntityType<? extends Statue> type, Level level) {
@@ -198,13 +200,24 @@ public class Statue extends Entity {
 
     /** Add an item that came from inventory slot slot (-1: unknown). */
     public void add(ItemStack st, int slot) {
+        add(st, slot, null);
+    }
+
+    /** The same, from accessory slot curio (Curios "identifier#index") if not null. */
+    public void add(ItemStack st, int slot, String curio) {
         items.add(st);
         while (slots.size() < items.size() - 1) slots.add(-1);
         slots.add(slot);
+        while (curios.size() < items.size() - 1) curios.add("");
+        curios.add(curio == null ? "" : curio);
     }
 
     int slotOf(int i) {
         return i < slots.size() ? slots.get(i) : -1;
+    }
+
+    String curioOf(int i) {
+        return i < curios.size() ? curios.get(i) : "";
     }
 
     public List<ItemStack> items() {
@@ -292,11 +305,12 @@ public class Statue extends Entity {
             ItemStack st = items.get(i);
             int slot = slotOf(i);
             if (slot >= 0 && slot < inv.getContainerSize() && inv.getItem(slot).isEmpty()) inv.setItem(slot, st.copy());
-            else rest.add(st);
+            else if (!CuriosCompat.put(player, curioOf(i), st.copy())) rest.add(st);
         }
         for (ItemStack st : rest) inv.placeItemBackInInventory(st.copy(), net.minecraft.util.Prediction.SERVER_ONLY);
         items.clear();
         slots.clear();
+        curios.clear();
         if (xp > 0) player.giveExperiencePoints(xp);
         xp = 0;
         discard();
@@ -308,14 +322,20 @@ public class Statue extends Entity {
         int n = Math.min(54, items.size());
         net.minecraft.world.SimpleContainer box = new net.minecraft.world.SimpleContainer(54);
         int[] from = new int[54];
+        String[] fromCurio = new String[54];
         java.util.Arrays.fill(from, -1);
         for (int i = 0; i < n; i++) {
             box.setItem(i, items.get(i));
             from[i] = slotOf(i);
+            fromCurio[i] = curioOf(i);
         }
         List<ItemStack> hidden = new java.util.ArrayList<>(items.subList(n, items.size()));
         List<Integer> hiddenSlots = new java.util.ArrayList<>();
-        for (int i = n; i < items.size(); i++) hiddenSlots.add(slotOf(i));
+        List<String> hiddenCurios = new java.util.ArrayList<>();
+        for (int i = n; i < items.size(); i++) {
+            hiddenSlots.add(slotOf(i));
+            hiddenCurios.add(curioOf(i));
+        }
         if (xp > 0) {
             player.giveExperiencePoints(xp);
             xp = 0;
@@ -330,12 +350,14 @@ public class Statue extends Entity {
                 List<ItemStack> was = List.copyOf(self.items);
                 self.items.clear();
                 self.slots.clear();
+                self.curios.clear();
                 for (int i = 0; i < 54; i++) {
                     ItemStack st = box.getItem(i);
                     if (st.isEmpty()) continue;
-                    self.add(st, i < n && i < was.size() && st == was.get(i) ? from[i] : -1);
+                    boolean same = i < n && i < was.size() && st == was.get(i);
+                    self.add(st, same ? from[i] : -1, same ? fromCurio[i] : null);
                 }
-                for (int i = 0; i < hidden.size(); i++) self.add(hidden.get(i), hiddenSlots.get(i));
+                for (int i = 0; i < hidden.size(); i++) self.add(hidden.get(i), hiddenSlots.get(i), hiddenCurios.get(i));
                 if (self.items.isEmpty() && !self.isRemoved()) self.discard();
             }
 
@@ -355,6 +377,7 @@ public class Statue extends Entity {
         }
         items.clear();
         slots.clear();
+        curios.clear();
         if (xp > 0) ExperienceOrb.award(level, position(), xp);
         xp = 0;
         discard();
@@ -369,6 +392,8 @@ public class Statue extends Entity {
         list.ifPresent(items::addAll);
         slots.clear();
         in.read("slots", com.mojang.serialization.Codec.INT.listOf()).ifPresent(slots::addAll);   // (older statues: none)
+        curios.clear();
+        in.read("curios", com.mojang.serialization.Codec.STRING.listOf()).ifPresent(curios::addAll);
         xp = in.getIntOr("xp", 0);
         setFallen(in.getBooleanOr("fallen", false));
         syncOwner();
@@ -382,6 +407,9 @@ public class Statue extends Entity {
         List<Integer> sl = new java.util.ArrayList<>();
         for (int i = 0; i < items.size(); i++) sl.add(slotOf(i));
         out.store("slots", com.mojang.serialization.Codec.INT.listOf(), sl);
+        List<String> cl = new java.util.ArrayList<>();
+        for (int i = 0; i < items.size(); i++) cl.add(curioOf(i));
+        out.store("curios", com.mojang.serialization.Codec.STRING.listOf(), cl);
         out.putInt("xp", xp);
         out.putBoolean("fallen", fallen());
     }

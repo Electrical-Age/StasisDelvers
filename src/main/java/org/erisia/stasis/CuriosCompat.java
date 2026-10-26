@@ -29,6 +29,16 @@ final class CuriosCompat {
         if (LOADED) modBus.addListener(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent.class, e -> e.enqueueWork(Impl::register));
     }
 
+    /** Each worn accessory's stack and its slot ("identifier#index"), for the remains (none without Curios). */
+    static java.util.Map<ItemStack, String> slots(ServerPlayer p) {
+        return LOADED ? Impl.slots(p) : java.util.Map.of();
+    }
+
+    /** Put a stack back into its accessory slot ("identifier#index") if that slot is there and empty. */
+    static boolean put(net.minecraft.world.entity.player.Player p, String key, ItemStack st) {
+        return LOADED && key != null && !key.isEmpty() && Impl.put(p, key, st);
+    }
+
     /** A spent pendant crumbles: the crystal is gone, the string stays in the slot. */
     static void crumble(ServerPlayer p) {
         if (LOADED) Impl.crumble(p);
@@ -56,6 +66,33 @@ final class CuriosCompat {
         static boolean anchor(ServerPlayer p) {
             return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p)
                 .flatMap(h -> h.findFirstCurio(StasisRegistry.CHRONAL_ANCHOR.get())).isPresent();
+        }
+
+        static java.util.Map<ItemStack, String> slots(ServerPlayer p) {
+            java.util.Map<ItemStack, String> m = new java.util.IdentityHashMap<>();
+            top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p).ifPresent(h -> h.getCurios().forEach((id, sh) -> {
+                var stacks = sh.getStacks();
+                for (int i = 0; i < stacks.getSlots(); i++) if (!stacks.getStackInSlot(i).isEmpty()) m.put(stacks.getStackInSlot(i), id + "#" + i);
+            }));
+            return m;
+        }
+
+        static boolean put(net.minecraft.world.entity.player.Player p, String key, ItemStack st) {
+            int hash = key.lastIndexOf('#');
+            if (hash <= 0) return false;
+            String id = key.substring(0, hash);
+            int index;
+            try {
+                index = Integer.parseInt(key.substring(hash + 1));
+            } catch (NumberFormatException e) {
+                return false;
+            }
+            var h = top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p).orElse(null);
+            if (h == null) return false;
+            var sh = h.getStacksHandler(id).orElse(null);
+            if (sh == null || index < 0 || index >= sh.getStacks().getSlots() || !sh.getStacks().getStackInSlot(index).isEmpty()) return false;
+            sh.getStacks().setStackInSlot(index, st);
+            return true;
         }
 
         static void crumble(ServerPlayer p) {
