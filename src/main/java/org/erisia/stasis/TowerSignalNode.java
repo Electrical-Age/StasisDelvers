@@ -106,9 +106,18 @@ public final class TowerSignalNode extends NodeBase {
         return n;
     }
 
-    /** Is something EA beside the input face (so the input means something; an undriven net reads 0 V)? */
+    /**
+     * Does something beside the input face connect to it as a signal (so the input means something; an undriven net reads
+     * 0 V)? By EA's own rule for neighbours (NodeBase.connect: the masks must match). Any EA node there used to count, so
+     * an energy exporter powering the tower from that side set the radius from a signal of 0 V (a player's report).
+     */
     boolean inputAttached(ServerLevel level, BlockPos master, net.minecraft.core.Direction facing) {
-        return NodeManager.instance != null
-            && NodeManager.instance.getNodeFromCoordonate(new Coordonate(master.relative(facing.getClockWise()), level)) != null;
+        if (NodeManager.instance == null) return false;
+        NodeBase other = NodeManager.instance.getNodeFromCoordonate(new Coordonate(master.relative(facing.getClockWise()), level));
+        if (other == null) return false;
+        for (LRDU l : LRDU.values())
+            if (compareConnectionMask(getSideConnectionMask(inFace, l), other.getSideConnectionMask(inFace.getInverse(), l.inverseIfLR())))
+                return true;
+        return false;
     }
 }

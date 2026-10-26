@@ -2552,6 +2552,39 @@ public final class StasisGameTests {
                 c.check("8 blocks away a cable is stopped", org.erisia.stasis.NodeFreezer.isFrozen(far.sixNode));
             };
         }, false, true));
+        // a player's report: an energy exporter powering the tower from its signal-input side set the radius by signal (any
+        // EA node there counted as a signal); only a real signal connection does now: an EA Signal Source there does
+        CASES.put("ea_tower_signal_input_only_by_signal", new Spec(30, (h, c) -> {
+            BlockPos base = new BlockPos(6, 1, 6);
+            var tower = tower(h, base, 0);
+            ServerLevel level = h.getLevel();
+            BlockPos core = h.absolutePos(base), in = core.relative(tower.facing().getClockWise());
+            var d = mods.eln.registry.batch.Wp11Content.elnToOtherLvu;
+            var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+            var towards = net.minecraft.core.Direction.getApproximateNearest(core.getX() - in.getX(), 0, core.getZ() - in.getZ());
+            float yaw = player.getYRot(), pitch = player.getXRot();
+            player.setYRot(towards.toYRot());
+            player.setXRot(0f);
+            try {
+                if (((mods.eln.node.transparent.TransparentNodeItem) d.parentItem).placeAt(d.newItemStack(), player, level, in, mods.eln.misc.Direction.YN) == null)
+                    throw new IllegalStateException("placing the exporter failed");
+            } finally {
+                player.setYRot(yaw);
+                player.setXRot(pitch);
+            }
+            boolean[] exporterSets = {true};
+            h.runAtTickTime(12, () -> {
+                exporterSets[0] = tower.signalSetForTests();
+                level.removeBlock(in, false);
+                var n = mods.eln.node.NodeManager.instance.getNodeFromCoordonate(new mods.eln.misc.Coordonate(in, level));
+                if (n != null) n.onBreakBlock();
+                eaSix(h, h.relativePos(in), 1 + (3 << 6));   // (a Signal Source)
+            });
+            return () -> {
+                c.check("an energy exporter on the input side doesn't set the radius", !exporterSets[0]);
+                c.check("a signal source there does", tower.signalSetForTests());
+            };
+        }));
         // an EA-to-FE exporter beside the core feeds the tower in stopped land (its push runs in EA's simulation, which
         // NodeFreezer keeps going in the tower yard; it used to be a block-entity tick, exempted in Stasis)
         CASES.put("ea_tower_yard_exporter_feeds_the_tower", new Spec(30, (h, c) -> {

@@ -927,6 +927,11 @@ public class TowerBlockEntity extends BlockEntity {
 
     /** Set while a signal cable feeds the input side (the console's target buttons yield to it). */
     boolean signalSet;
+
+    /** Tests: does the radius follow the signal input? */
+    public boolean signalSetForTests() {
+        return signalSet;
+    }
     /** The console's side (Baughn: input on its left, output on its right); set when the core forms. */
     net.minecraft.core.Direction facing = net.minecraft.core.Direction.SOUTH;
     TowerSignalNode node;
