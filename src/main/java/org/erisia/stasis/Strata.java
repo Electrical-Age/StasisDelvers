@@ -193,18 +193,47 @@ public final class Strata {
             if (r < (2.5 + 0.03 * R) * Math.pow(1 - ts, 0.7) + 0.6) return BODY;
         }
         // the crown: N spires around the rim, leaning out as they rise
+        double[] sp = crown(d, lx, ly, lz, R);
+        if (sp != null && sp[1] < 1) return SPIRE;
+        return OUT;
+    }
+
+    /**
+     * Where a splash crown spire is at world block (x, y, z): {t, q, base}, or null outside every spire's height range
+     * (and for other shapes). t is the height along the spire (0 at the saucer's rim, 1 at its tip), q the distance from
+     * its axis over its radius there (inside below 1), base the world y of its foot. DeepFeature uses it to taper spires
+     * that hang in the air and to root those just above the ground (λ-Nero: a sky rift's spires stood on its saucer's
+     * rim, 140 blocks over the land, as if that were the ground).
+     */
+    public static double[] spire(StaticDeeps.Deep d, int x, int y, int z) {
+        if (shapeOf(d) != Shape.SPLASH) return null;
+        double dx = x + 0.5 - d.x(), dz = z + 0.5 - d.z(), ly = y + 0.5 - d.y();
+        double a = Noise.hash32(d.id(), 78, 0, 0x57A7A) * 2 * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+        double[] c = crown(d, dx * ca + dz * sa, ly, -dx * sa + dz * ca, d.radius());
+        if (c == null) return null;
+        c[2] += d.y();
+        return c;
+    }
+
+    /** The world y of a splash crown spire's foot (the same for all its spires). */
+    public static double spireFoot(StaticDeeps.Deep d) {
+        double R = d.radius();
+        return d.y() + (-0.95 + 0.22) * R - (3.5 + 0.03 * R);
+    }
+
+    /** The crown spire nearest in angle at local (lx, ly, lz): {t, q, base (local y)}, or null off its height range. */
+    private static double[] crown(StaticDeeps.Deep d, double lx, double ly, double lz, double R) {
+        double RB = 1.7 * R, yb0 = -0.95 * R, T = 3.5 + 0.03 * R;
         int N = 11;
         double th = Math.atan2(lz, lx), step = 2 * Math.PI / N;
         int i = Math.floorMod((int) Math.floor((th + 0.3) / step + 0.5), N);
         double ang = i * step - 0.3, yrim = yb0 + 0.22 * R;
         double top = yrim + (0.6 + 1.6 * Noise.hash32(i, 5, d.id(), 0x5B1)) * R;
-        if (ly >= yrim - T && ly <= top) {
-            double t = clamp((ly - yrim) / Math.max(top - yrim, 1), 0, 1);
-            double ax = (RB + 6 * t) * Math.cos(ang), az = (RB + 6 * t) * Math.sin(ang);
-            double sr = (4.5 + 0.05 * R) * Math.pow(1 - t, 0.9);
-            if (Math.hypot(lx - ax, lz - az) < sr + 0.4) return SPIRE;
-        }
-        return OUT;
+        if (ly < yrim - T || ly > top) return null;
+        double t = clamp((ly - yrim) / Math.max(top - yrim, 1), 0, 1);
+        double ax = (RB + 6 * t) * Math.cos(ang), az = (RB + 6 * t) * Math.sin(ang);
+        double sr = (4.5 + 0.05 * R) * Math.pow(1 - t, 0.9);
+        return new double[]{t, Math.hypot(lx - ax, lz - az) / (sr + 0.4), yrim - T};
     }
 
     // ---- PODS: Chladni-like lens chambers (three interfering sine waves) in a flattened envelope under the rift,

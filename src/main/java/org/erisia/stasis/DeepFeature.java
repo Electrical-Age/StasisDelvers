@@ -295,6 +295,15 @@ public record DeepFeature() implements Feature {
         return false;
     }
 
+    /** A splash spire whose foot is at most this far above the ground is rooted down into it; higher, it hangs. */
+    public static final int SPIRE_ROOT = 20;
+
+    /** A hanging spire's radius, as a share of a standing one's at height t: a point at the foot, full from 40 % up
+     *  (λ-Nero: thin at the top and the bottom when airborne; the top already narrows). */
+    static double hangingTaper(double t) {
+        return 0.15 + 0.85 * Math.pow(Math.min(1, t / 0.4), 0.8);
+    }
+
     private static boolean strata(WorldGenLevel level, Writer w, Heightmap.Types surfaceType, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
         Strata.Bounds b = Strata.bounds(d);
         int yLo = Math.max(minY + 1, b.minY()), yHi = Math.min(maxY - 1, b.maxY());
@@ -308,9 +317,33 @@ public record DeepFeature() implements Feature {
             for (int z = z0; z < z0 + 16; z++) {
                 if (Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) > b.radius()) continue;
                 int surface = level.getHeight(surfaceType, x, z);
+                // a splash crown whose foot is above this column's ground (λ-Nero: a sky rift's spires stood on the
+                // saucer's rim, 140 blocks over the land): just above it, the spire is rooted down into the ground;
+                // higher up, it hangs in the air thin at both ends
+                int footY = (int) Math.ceil(Strata.spireFoot(d) - 0.5), gap = footY - surface;
+                boolean rooted = false, hanging = false;
+                if (gap > 0) {
+                    double[] f = Strata.spire(d, x, footY, z);
+                    boolean under = f != null && f[1] < 1;
+                    rooted = under && gap <= SPIRE_ROOT;
+                    hanging = gap > SPIRE_ROOT;
+                }
+                if (rooted)
+                    for (int y = Math.max(yLo, surface - 3); y < footY && y <= yHi; y++) {
+                        p.set(x, y, z);
+                        BlockState st = level.getBlockState(p);
+                        if ((st.isAir() || st.canBeReplaced() || replaceable(st)) && st.getFluidState().isEmpty()) {
+                            w.set(p, rock);
+                            changed = true;
+                        }
+                    }
                 for (int y = yLo; y <= yHi; y++) {
                     int k = Strata.at(d, x, y, z);
                     if (k == Strata.OUT) continue;
+                    if (k == Strata.SPIRE && hanging) {
+                        double[] sp = Strata.spire(d, x, y, z);
+                        if (sp == null || sp[1] >= hangingTaper(sp[0])) continue;
+                    }
                     p.set(x, y, z);
                     BlockState st = level.getBlockState(p);
                     switch (k) {

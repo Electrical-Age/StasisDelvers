@@ -2130,6 +2130,90 @@ public final class StasisGameTests {
             c.check("the test rifts grew crystals", present > 20, present + " crystals, shapes " + shapes);
             c.check("every crystal has its support", floating == 0, floating + " of " + present + " floating: " + bad);
         }, false));
+        // a splash rift's crown spires (λ-Nero: a sky rift's spires stood on the saucer's rim, 140 blocks over the land):
+        // high in the sky they hang thin at the foot; with the foot just above the ground they're rooted down into it
+        CASES.put("splash_spires_grounded_or_hanging", new Spec(1, (h, c) -> () -> {
+            var level = h.getLevel();
+            java.util.Map<BlockPos, net.minecraft.world.level.block.state.BlockState> before = new java.util.HashMap<>();
+            java.util.Set<BlockPos> written = new java.util.HashSet<>();
+            org.erisia.stasis.DeepFeature.Writer w = (p, st) -> {
+                BlockPos k = p.immutable();
+                before.putIfAbsent(k, level.getBlockState(k));
+                written.add(k);
+                level.setBlock(k, st, 2 | 16);
+            };
+            var rock = org.erisia.stasis.StasisRegistry.RIFTSTONE.get();
+            try {
+                for (int i = 0; i < 2; i++) {
+                    boolean high = i == 0;
+                    int bx = 60000 + 600 * i, bz = 60000;
+                    level.getChunk(bx >> 4, bz >> 4);
+                    int ground = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, bx, bz);
+                    float r = 20;
+                    // a splash deep: the shape is a hash of the id
+                    org.erisia.stasis.StaticDeeps.Deep d = null;
+                    for (int id = 0x5B000; d == null; id++) {
+                        var t = new org.erisia.stasis.StaticDeeps.Deep(bx + 0.5f, 0, bz + 0.5f, r, id);
+                        if (org.erisia.stasis.Strata.shapeOf(t) == org.erisia.stasis.Strata.Shape.SPLASH) d = t;
+                    }
+                    // the foot at ~100 above the ground (the live case), or ~10 above it
+                    double foot0 = org.erisia.stasis.Strata.spireFoot(d) - d.y();
+                    d = new org.erisia.stasis.StaticDeeps.Deep(d.x(), (float) (ground + (high ? 100 : 10) - foot0), d.z(), r, d.id());
+                    int footY = (int) Math.ceil(org.erisia.stasis.Strata.spireFoot(d) - 0.5);
+                    double reach = org.erisia.stasis.Strata.bounds(d).radius() + 2;
+                    java.util.Map<Long, Integer> surface = new java.util.HashMap<>();
+                    java.util.List<int[]> chunks = new java.util.ArrayList<>();
+                    for (int cx = (int) Math.floor((d.x() - reach) / 16); cx <= (int) Math.floor((d.x() + reach) / 16); cx++)
+                        for (int cz = (int) Math.floor((d.z() - reach) / 16); cz <= (int) Math.floor((d.z() + reach) / 16); cz++)
+                            if (org.erisia.stasis.DeepFeature.reaches(d, cx << 4, cz << 4, true)) chunks.add(new int[]{cx, cz});
+                    for (int[] ch : chunks) {
+                        level.getChunk(ch[0], ch[1]);
+                        for (int x = ch[0] << 4; x < (ch[0] << 4) + 16; x++)
+                            for (int z = ch[1] << 4; z < (ch[1] << 4) + 16; z++)
+                                surface.put(BlockPos.asLong(x, 0, z), level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z));
+                    }
+                    java.util.Collections.shuffle(chunks, new java.util.Random(i));
+                    for (int[] ch : chunks)
+                        org.erisia.stasis.DeepFeature.apply(level, w, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, d, ch[0] << 4, ch[1] << 4, true);
+                    int spire = 0, fatFoot = 0, footCols = 0, gaps = 0;
+                    StringBuilder bad = new StringBuilder();
+                    for (BlockPos p : written) {
+                        if (!level.getBlockState(p).is(rock) && !level.getBlockState(p).is(org.erisia.stasis.StasisRegistry.RIFTSTONE_VEIN.get())) continue;
+                        if (org.erisia.stasis.Strata.at(d, p.getX(), p.getY(), p.getZ()) != org.erisia.stasis.Strata.SPIRE) continue;
+                        double[] sp = org.erisia.stasis.Strata.spire(d, p.getX(), p.getY(), p.getZ());
+                        if (sp == null) continue;
+                        spire++;
+                        if (high && sp[0] < 0.05 && sp[1] > 0.35) {
+                            fatFoot++;
+                            if (bad.length() < 200) bad.append(p.toShortString()).append(String.format(" q %.2f; ", sp[1]));
+                        }
+                        if (!high && p.getY() == footY) {
+                            int g = surface.getOrDefault(BlockPos.asLong(p.getX(), 0, p.getZ()), footY);
+                            if (footY - g <= 0 || footY - g > org.erisia.stasis.DeepFeature.SPIRE_ROOT) continue;
+                            footCols++;
+                            for (int y = g; y < footY; y++)
+                                if (level.getBlockState(new BlockPos(p.getX(), y, p.getZ())).isAir()) {
+                                    gaps++;
+                                    if (bad.length() < 200) bad.append(p.getX()).append(' ').append(y).append(' ').append(p.getZ()).append("; ");
+                                    break;
+                                }
+                        }
+                    }
+                    if (high) {
+                        c.check("a hanging splash rift has spires", spire > 100, spire + " spire blocks");
+                        c.check("hanging spires are thin at the foot", fatFoot == 0, fatFoot + " wide foot blocks: " + bad);
+                    } else {
+                        c.check("a low splash rift's spire feet over the ground", footCols > 10, footCols + " columns");
+                        c.check("its spires are rooted in the ground", gaps == 0, gaps + " columns with air under the foot: " + bad);
+                    }
+                    written.clear();
+                    before.forEach((p, st) -> level.setBlock(p, st, 2 | 16));
+                    before.clear();
+                }
+            } finally {
+                before.forEach((p, st) -> level.setBlock(p, st, 2 | 16));
+            }
+        }, false));
         // the drifting deeps' clock never wraps: a deep moves smoothly (< 0.2 blocks in 0.05 s, but it moves) across the
         // old 14.5 h wrap of Eddies.time and weeks or a year into a world
         CASES.put("deeps_clock_continuous", new Spec(1, (h, c) -> () -> {
