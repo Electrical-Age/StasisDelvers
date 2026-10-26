@@ -122,6 +122,39 @@ public final class BoltRenderer {
         return n;
     }
 
+    /** Segments per group: the shader skips a whole group whose box (with the glow) misses the pixel. */
+    static final int GROUP = 8;
+    /** Data slots: [GROUPS_AT] group count, then [GROUPS_AT + 1 + 4g ..] group g's NDC box: min x, min y, max x, max y. */
+    static final int GROUPS_AT = 4799, MAX_GROUPS = 40;
+
+    /**
+     * The screen boxes of the bolt's segment groups, glow included (5 half widths: past that the halo adds under 3 %),
+     * so the post shader tests a pixel against a few boxes instead of every segment (a player on a laptop got 10 FPS at
+     * 1440p beside a paused tower's frozen bolts: every pixel walked all 149 segments). Points with intensity 0 (line
+     * breaks, behind the camera) don't count.
+     */
+    static void groups(float[] d, int base, int n) {
+        int groups = Math.min(MAX_GROUPS, (Math.max(0, n - 1) + GROUP - 1) / GROUP);
+        for (int g = 0; g < groups; g++) {
+            float x0 = Float.MAX_VALUE, y0 = Float.MAX_VALUE, x1 = -Float.MAX_VALUE, y1 = -Float.MAX_VALUE;
+            for (int i = g * GROUP; i <= Math.min(n - 1, g * GROUP + GROUP); i++) {
+                int o = base + 5 * i;
+                if (d[o + 4] <= 0) continue;
+                float m = 5 * d[o + 3];
+                x0 = Math.min(x0, d[o] - m);
+                y0 = Math.min(y0, d[o + 1] - m);
+                x1 = Math.max(x1, d[o] + m);
+                y1 = Math.max(y1, d[o + 1] + m);
+            }
+            int o = GROUPS_AT + 1 + 4 * g;
+            d[o] = x0;
+            d[o + 1] = y0;
+            d[o + 2] = x1;
+            d[o + 3] = y1;
+        }
+        d[GROUPS_AT] = groups;
+    }
+
     static void init() {
         StasisNet.boltSink = BoltRenderer::receive;
     }

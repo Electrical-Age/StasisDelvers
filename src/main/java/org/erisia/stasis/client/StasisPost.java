@@ -509,6 +509,7 @@ public final class StasisPost {
         // lightning bolts (BoltRenderer), projected to the screen
         Matrix4f fwd = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
         d[256] = BoltRenderer.fill(d, 260, 150, fwd, cam);
+        BoltRenderer.groups(d, 260, (int) d[256]);
         var img = texture.getPixels();
         if (img == null) return;
         for (int i = 0; i < SLOTS; i++) img.setPixelABGR(i % WIDTH, i / WIDTH, Float.floatToRawIntBits(d[i]));
