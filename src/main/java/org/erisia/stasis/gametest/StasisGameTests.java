@@ -73,6 +73,26 @@ public final class StasisGameTests {
     static final Map<String, Spec> CASES = new LinkedHashMap<>();
 
     static {
+        // Nero: every item has a name (the riftstone door showed its key): each of our items' and blocks' names is in en_us
+        CASES.put("every_item_has_a_name", new Spec(1, (h, c) -> () -> {
+            com.google.gson.JsonObject lang;
+            try (var in = StasisGameTests.class.getResourceAsStream("/assets/stasisdelvers/lang/en_us.json")) {
+                lang = com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            java.util.List<String> missing = new java.util.ArrayList<>();
+            for (var e : net.minecraft.core.registries.BuiltInRegistries.ITEM.entrySet())
+                if (e.getKey().identifier().getNamespace().equals(org.erisia.stasis.StasisDelvers.MODID) && !lang.has(e.getValue().getDescriptionId()))
+                    missing.add(e.getValue().getDescriptionId());
+            for (var e : net.minecraft.core.registries.BuiltInRegistries.BLOCK.entrySet())
+                if (e.getKey().identifier().getNamespace().equals(org.erisia.stasis.StasisDelvers.MODID) && !lang.has(e.getValue().getDescriptionId()))
+                    missing.add(e.getValue().getDescriptionId());
+            for (var e : net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.entrySet())
+                if (e.getKey().identifier().getNamespace().equals(org.erisia.stasis.StasisDelvers.MODID) && !lang.has(e.getValue().getDescriptionId()))
+                    missing.add(e.getValue().getDescriptionId());
+            c.check("every item, block and entity of ours has an English name; missing: " + missing, missing.isEmpty());
+        }));
         CASES.put("rule_whole_block", new Spec(1, (h, c) -> () -> {
             Field f = new Field(0, 3.5, 2.5, 4.5, R);
             c.check("block at the centre inside", f.containsBlock(3, 2, 4));

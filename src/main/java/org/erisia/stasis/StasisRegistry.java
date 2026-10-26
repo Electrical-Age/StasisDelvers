@@ -179,7 +179,7 @@ public final class StasisRegistry {
         p -> new net.minecraft.world.level.block.DoorBlock(RIFTSTONE_SET, p), p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE)
             .strength(3f, 12f).requiresCorrectToolForDrops().noOcclusion().pushReaction(net.minecraft.world.level.material.PushReaction.POPPED));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> RIFTSTONE_DOOR_ITEM = ITEMS.registerItem("riftstone_door",
-        p -> new net.minecraft.world.item.DoubleHighBlockItem(RIFTSTONE_DOOR.get(), p));
+        p -> new net.minecraft.world.item.DoubleHighBlockItem(RIFTSTONE_DOOR.get(), p), p -> p.useBlockDescriptionPrefix());   // (named as the block: Nero saw its key)
     /** Riftstone glass (Baughn: sand and macerated riftstone, 3 to 1, smelted): chronal casing you can see through. */
     public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.TransparentBlock> RIFTSTONE_GLASS = BLOCKS.registerBlock("riftstone_glass",
         net.minecraft.world.level.block.TransparentBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(1.5f, 9f)
