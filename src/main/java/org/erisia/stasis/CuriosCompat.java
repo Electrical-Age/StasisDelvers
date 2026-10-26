@@ -47,9 +47,18 @@ final class CuriosCompat {
     private static final class Impl {
         static void register() {
             top.theillusivec4.curios.api.type.capability.ICurioItem curio = new top.theillusivec4.curios.api.type.capability.ICurioItem() {
+                /**
+                 * Only into an empty slot. Curios 17.0.0-beta.3 opens a root transaction to swap with an occupied slot
+                 * (CuriosCommonEvents.curioRightClick: Transaction.open(null) passed to extract, never closed), and the
+                 * next transaction anyone opens on the server thread then throws: Incognito crashed twice on 10-26
+                 * (a pendant right-clicked while one was worn; the next solar panel tick died).
+                 */
                 @Override
                 public boolean canEquipFromUse(top.theillusivec4.curios.api.SlotContext ctx, ItemStack stack) {
-                    return true;
+                    return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(ctx.entity())
+                        .flatMap(h -> h.getStacksHandler(ctx.identifier()))
+                        .map(sh -> ctx.index() < sh.getStacks().getSlots() && sh.getStacks().getStackInSlot(ctx.index()).isEmpty())
+                        .orElse(false);
                 }
             };
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.RIFT_PENDANT.get(), curio);
