@@ -21,7 +21,11 @@ public final class StasisDelvers {
         container.registerConfig(ModConfig.Type.SYNCED, StasisConfig.SPEC);
         CuriosCompat.register(modBus);
         // EA's handbook, the Electrical Engineer's Ledger, opens on our contents page (pages: assets/stasisdelvers/guides/eln/handbook)
-        mods.eln.handbook.Handbook.setStartPage(net.minecraft.resources.Identifier.fromNamespaceAndPath(MODID, "index.md"));
+        try {
+            mods.eln.handbook.Handbook.setStartPage(net.minecraft.resources.Identifier.fromNamespaceAndPath(MODID, "index.md"));
+        } catch (NoClassDefFoundError e) {
+            LOG.info("This EA has no handbook (the Ledger); its pages stay unused");
+        }
         // (only our synced config: the client config's Loading came first on clients and crashed refresh, AdventurAgent)
         modBus.addListener(ModConfigEvent.Loading.class, e -> {
             if (e.getConfig().getSpec() == StasisConfig.SPEC) StasisConfig.refresh();
