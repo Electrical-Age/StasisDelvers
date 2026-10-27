@@ -69,7 +69,14 @@ final class CuriosCompat {
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHARGED_RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHRONAL_ANCHOR.get(), curio);
-            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.BATTERY_BELT.get(), curio);
+            // the battery belt: a right-click opens its pockets, a sneak-right-click puts it on (AdventurAgent: Curios'
+            // equip-on-use took every right-click, so the pockets never opened)
+            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.BATTERY_BELT.get(), new top.theillusivec4.curios.api.type.capability.ICurioItem() {
+                @Override
+                public boolean canEquipFromUse(top.theillusivec4.curios.api.SlotContext ctx, ItemStack stack) {
+                    return ctx.entity().isShiftKeyDown() && curio.canEquipFromUse(ctx, stack);
+                }
+            });
         }
 
         static ItemStack pendant(ServerPlayer p) {

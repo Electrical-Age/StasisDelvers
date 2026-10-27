@@ -177,6 +177,7 @@ public class BatteryBeltItem extends Item implements IItemEnergyBattery {
 
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
+        if (player.isShiftKeyDown()) return InteractionResult.PASS;   // (sneaking: Curios puts it on)
         if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer sp) BeltMenu.open(sp, hand);
         return InteractionResult.SUCCESS;
     }
@@ -190,7 +191,7 @@ public class BatteryBeltItem extends Item implements IItemEnergyBattery {
         out.accept(Component.literal(String.format("%d of %d pockets used%s", n, SLOTS,
             Double.isNaN(share) ? "" : String.format("; batteries %.0f%%", share * 100))).withStyle(net.minecraft.ChatFormatting.GRAY));
         out.accept(Component.literal("Worn as a belt: its batteries feed your suit, its capacitors take the weather").withStyle(net.minecraft.ChatFormatting.GRAY));
-        out.accept(Component.literal("Right-click to open; an EA charger charges what's inside").withStyle(net.minecraft.ChatFormatting.GRAY));
+        out.accept(Component.literal("Right-click to open, sneak-right-click to put on; an EA charger charges what's inside").withStyle(net.minecraft.ChatFormatting.GRAY));
     }
 
     @Override
