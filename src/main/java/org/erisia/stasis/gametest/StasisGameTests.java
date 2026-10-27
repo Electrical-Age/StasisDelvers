@@ -1626,6 +1626,87 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }, false, true));
+        // the battery belt (Baughn 2026-10-27): its pockets, as an EA item battery, feeding a suit, a capacitor in it
+        CASES.put("battery_belt_pockets_and_charge", new Spec(5, (h, c) -> {
+            var beltItem = org.erisia.stasis.StasisRegistry.BATTERY_BELT.get();
+            ItemStack belt = new ItemStack(beltItem);
+            ItemStack bat = new ItemStack(mods.eln.Eln.itemsByName.get("Portable Battery"));
+            ItemStack cap = new ItemStack(org.erisia.stasis.StasisRegistry.RIFT_CAPACITOR.get());
+            var bb = (mods.eln.item.electricalinterface.IItemEnergyBattery) mods.eln.misc.Utils.getItemObject(bat);
+            var cb = (org.erisia.stasis.CapacitorItem) cap.getItem();
+            bb.setEnergy(bat, 0);
+            cb.setEnergy(cap, cb.getEnergyMax(cap) / 2);
+            boolean accepts = org.erisia.stasis.BatteryBeltItem.accepts(bat) && org.erisia.stasis.BatteryBeltItem.accepts(cap)
+                && !org.erisia.stasis.BatteryBeltItem.accepts(new ItemStack(Items.DIRT)) && !org.erisia.stasis.BatteryBeltItem.accepts(belt.copy())
+                && !org.erisia.stasis.BatteryBeltItem.accepts(new ItemStack(org.erisia.stasis.StasisRegistry.DELVER_CHEST.get()));
+            org.erisia.stasis.BatteryBeltItem.setContents(belt, java.util.List.of(bat, cap, ItemStack.EMPTY, ItemStack.EMPTY));
+            double max = beltItem.getEnergyMax(belt), before = beltItem.getEnergy(belt);
+            beltItem.setEnergy(belt, max);   // (an EA charger filling it)
+            var full = org.erisia.stasis.BatteryBeltItem.contents(belt);
+            boolean charged = Math.abs(bb.getEnergy(full.get(0)) - bb.getEnergyMax(full.get(0))) < 1 && Math.abs(cb.getEnergy(full.get(1)) - cb.getEnergyMax(full.get(1))) < 1;
+            beltItem.setEnergy(belt, beltItem.getEnergy(belt) - 1000);   // (something drawing on it)
+            var drawn = org.erisia.stasis.BatteryBeltItem.contents(belt);
+            boolean fromBattery = Math.abs(cb.getEnergy(drawn.get(1)) - cb.getEnergyMax(drawn.get(1))) < 1 && bb.getEnergy(drawn.get(0)) < bb.getEnergyMax(drawn.get(0)) - 999;
+            return () -> {
+                c.check("the belt takes EA portable batteries and rift capacitors, nothing else", accepts);
+                c.check("charged as an EA item battery, it fills its battery and vents its capacitor", charged, before + " -> " + max);
+                c.check("drawn on, it gives from its battery, never its capacitor", fromBattery);
+            };
+        }, true));
+        CASES.put("battery_belt_feeds_the_suit", new Spec(60, (h, c) -> {
+            ServerPlayer p = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true);
+            wear(p, false, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            ItemStack belt = new ItemStack(org.erisia.stasis.StasisRegistry.BATTERY_BELT.get());
+            ItemStack bat = new ItemStack(mods.eln.Eln.itemsByName.get("Portable Battery"));
+            var bb = (mods.eln.item.electricalinterface.IItemEnergyBattery) mods.eln.misc.Utils.getItemObject(bat);
+            bb.setEnergy(bat, bb.getEnergyMax(bat));
+            double batFull = bb.getEnergyMax(bat);
+            org.erisia.stasis.BatteryBeltItem.setContents(belt, java.util.List.of(bat, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY));
+            org.erisia.stasis.BatteryBeltItem.TEST_WORN.put(p.getUUID(), belt);
+            // and one carried, not worn, must not count
+            ItemStack loose = belt.copy();
+            p.getInventory().add(loose);
+            return () -> {
+                org.erisia.stasis.BatteryBeltItem.TEST_WORN.remove(p.getUUID());
+                var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
+                double e = ((org.erisia.stasis.DelverSuitItem) head.getItem()).getEnergy(head);
+                double left = bb.getEnergy(org.erisia.stasis.BatteryBeltItem.contents(belt).get(0));
+                ItemStack carried = ItemStack.EMPTY;
+                for (int i = 0; i < p.getInventory().getContainerSize(); i++)
+                    if (p.getInventory().getItem(i).getItem() instanceof org.erisia.stasis.BatteryBeltItem) carried = p.getInventory().getItem(i);
+                double looseLeft = carried.isEmpty() ? -1 : bb.getEnergy(org.erisia.stasis.BatteryBeltItem.contents(carried).get(0));
+                c.check("a worn belt's battery charges the suit", e > 0 && left < batFull - 1, String.format("suit %.0f J, belt battery %.0f of %.0f", e, left, batFull));
+                c.check("a belt only carried doesn't", Math.abs(looseLeft - batFull) < 1, String.format("%.0f", looseLeft));
+                remove(h, p);
+            };
+        }, true));
+        CASES.put("battery_belt_capacitor_takes_mist", new Spec(130, (h, c) -> {
+            var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
+            org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            wear(p, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
+                org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            ItemStack cap = new ItemStack(org.erisia.stasis.StasisRegistry.RIFT_CAPACITOR.get());
+            var ci = (org.erisia.stasis.CapacitorItem) cap.getItem();
+            ci.setEnergy(cap, ci.getEnergyMax(cap));
+            double capFull = ci.getEnergyMax(cap);
+            ItemStack belt = new ItemStack(org.erisia.stasis.StasisRegistry.BATTERY_BELT.get());
+            org.erisia.stasis.BatteryBeltItem.setContents(belt, java.util.List.of(cap, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY));
+            org.erisia.stasis.BatteryBeltItem.TEST_WORN.put(p.getUUID(), belt);
+            return () -> {
+                org.erisia.stasis.Pockets.TEST.remove(box);
+                org.erisia.stasis.BatteryBeltItem.TEST_WORN.remove(p.getUUID());
+                var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
+                double e = ((org.erisia.stasis.DelverSuitItem) head.getItem()).getEnergy(head);
+                double full = org.erisia.stasis.StasisRegistry.DELVER_HELMET.get().getEnergyMax(head);
+                double left = ci.getEnergy(org.erisia.stasis.BatteryBeltItem.contents(belt).get(0));
+                c.check("with a capacitor in the worn belt the Delver suit doesn't freeze in mist", p.isAlive() && Freezing.ticks(p) == 0, "ticks " + Freezing.ticks(p));
+                c.check("and drains only at the plain rate", e > full - 10 * 135 / 20.0 - 1, String.format("%.1f J of %.0f", e, full));
+                c.check("the belt's capacitor took it", left < capFull - 1000, String.format("%.0f of %.0f J", left, capFull));
+                remove(h, p);
+            };
+        }, false, true));
         CASES.put("strata_mist_pocket", new Spec(130, (h, c) -> {
             var box = new AABB(h.absolutePos(new BlockPos(0, 0, 0))).expandTowards(16, 6, 9);
             org.erisia.stasis.Pockets.TEST.put(box, new org.erisia.stasis.Pockets.Weather(org.erisia.stasis.Pockets.State.MIST, 0.6f, 1000));

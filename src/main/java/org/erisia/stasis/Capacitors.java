@@ -40,6 +40,17 @@ public final class Capacitors {
                 return 1;
             }
         }
+        // the worn battery belt's pockets (Baughn 2026-10-27)
+        ItemStack belt = BatteryBeltItem.worn(p);
+        if (!belt.isEmpty()) {
+            var all = BatteryBeltItem.contents(belt);
+            for (ItemStack s : all)
+                if (s.getItem() instanceof CapacitorItem c && c.getEnergy(s) >= need) {
+                    c.setEnergy(s, c.getEnergy(s) - need);
+                    BatteryBeltItem.setContents(belt, all);
+                    return 1;
+                }
+        }
         for (int i = 0; i < inv.getContainerSize(); i++) {
             ItemStack s = inv.getItem(i);
             if (!s.is(StasisRegistry.RIFT_SHARD.get())) continue;

@@ -10,7 +10,8 @@ import org.erisia.stasis.TimeSuit;
 
 /**
  * The suit's charge on the HUD (λ-Nero's "Stasis HUD elements"): a small gauge above the hotbar's right end while you
- * wear a time suit in a stopping dimension, showing its emptiest piece. Near a rift core it flickers purple, more
+ * wear a time suit in a stopping dimension, showing its emptiest piece; under it, green, the worn battery belt's
+ * batteries (the two bars slimmer when both show). Near a rift core it flickers purple, more
  * the nearer (the strain on reality, StasisPost slot 1596).
  */
 public final class SuitGauge {
@@ -39,16 +40,32 @@ public final class SuitGauge {
         double[] sp = share(mc.player);
         double share = sp[0];
         int pieces = (int) sp[1];
-        if (pieces == 0) return;
+        // the worn battery belt's batteries (Baughn 2026-10-27): a second bar, the two stacked and slimmer
+        ItemStack belt = org.erisia.stasis.BatteryBeltItem.worn(mc.player);
+        double beltShare = belt.isEmpty() ? Double.NaN : org.erisia.stasis.BatteryBeltItem.batteryShare(belt);
+        boolean suit = pieces > 0, beltBar = !Double.isNaN(beltShare);
+        if (!suit && !beltBar) return;
         int w = g.guiWidth(), h = g.guiHeight();
-        int x = w / 2 + 96, y = h - 22, bw = 40;
+        int x = w / 2 + 96, bw = 40;
+        boolean both = suit && beltBar;
+        int bh = both ? 3 : 5;
         float strain = StasisPost.lastStrain;
         boolean flick = strain > 0.05f && Math.random() < strain * 0.6;
-        int frame = flick ? 0xFF8030C0 : 0xFF303038;
-        g.fill(x - 1, y - 1, x + bw + 1, y + 6, frame);
-        g.fill(x, y, x + bw, y + 5, 0xFF101014);
-        int col = flick ? 0xFFB060FF : share < 0.15 ? 0xFFD05030 : share < 0.4 ? 0xFFD0A030 : 0xFF50A0D0;
-        g.fill(x, y, x + (int) (bw * Math.max(0, Math.min(1, share))), y + 5, col);
-        if (pieces < 4) g.text(mc.font, "!", x + bw + 3, y - 2, 0xFFFF5050);   // an incomplete suit doesn't protect
+        if (suit) {
+            int y = both ? h - 26 : h - 22;
+            bar(g, x, y, bw, bh, share, flick, flick ? 0xFFB060FF : colour(share));
+            if (pieces < 4) g.text(mc.font, "!", x + bw + 3, y - 2, 0xFFFF5050);   // an incomplete suit doesn't protect
+        }
+        if (beltBar) bar(g, x, both ? h - 21 : h - 22, bw, bh, beltShare, flick, 0xFF60C080);
+    }
+
+    static int colour(double share) {
+        return share < 0.15 ? 0xFFD05030 : share < 0.4 ? 0xFFD0A030 : 0xFF50A0D0;
+    }
+
+    static void bar(GuiGraphicsExtractor g, int x, int y, int bw, int bh, double share, boolean flick, int col) {
+        g.fill(x - 1, y - 1, x + bw + 1, y + bh + 1, flick ? 0xFF8030C0 : 0xFF303038);
+        g.fill(x, y, x + bw, y + bh, 0xFF101014);
+        g.fill(x, y, x + (int) (bw * Math.max(0, Math.min(1, share))), y + bh, col);
     }
 }

@@ -236,6 +236,13 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredItem<CapacitorItem> CHARGED_RIFT_CAPACITOR = ITEMS.registerItem("charged_rift_capacitor",
         p -> new CapacitorItem(p, Capacitors.CHARGED_SECONDS), p -> p.stacksTo(1).rarity(net.minecraft.world.item.Rarity.UNCOMMON));
 
+    /** The battery belt (Baughn 2026-10-27): four pockets for batteries and capacitors, a Curios belt. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<BatteryBeltItem> BATTERY_BELT = ITEMS.registerItem("battery_belt",
+        BatteryBeltItem::new, p -> p.stacksTo(1));
+    static final DeferredRegister<net.minecraft.world.inventory.MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, StasisDelvers.MODID);
+    public static final java.util.function.Supplier<net.minecraft.world.inventory.MenuType<BeltMenu>> BELT_MENU = MENUS.register("battery_belt",
+        () -> new net.minecraft.world.inventory.MenuType<>(BeltMenu::new, net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS));
+
     static final DeferredRegister<net.minecraft.world.item.crafting.RecipeSerializer<?>> RECIPE_SERIALIZERS =
         DeferredRegister.create(Registries.RECIPE_SERIALIZER, StasisDelvers.MODID);
     static {
@@ -327,6 +334,7 @@ public final class StasisRegistry {
         LOOT_CONDITIONS.register(modBus);
         RECIPE_SERIALIZERS.register(modBus);
         ITEMS.register(modBus);
+        MENUS.register(modBus);
         BLOCKS.register(modBus);
         BLOCK_ENTITIES.register(modBus);
         modBus.addListener(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent.class, e ->

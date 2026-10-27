@@ -154,8 +154,16 @@ final class Suits {
         void set(double energy);
     }
 
+    /** The item battery behind a stack: the item itself (suit pieces, capacitors, the belt), or an EA item's descriptor
+     *  (EA's portable batteries are ElnItems whose descriptor is the battery); null if none. */
+    static IItemEnergyBattery battery(ItemStack s) {
+        if (s.isEmpty()) return null;
+        if (s.getItem() instanceof IItemEnergyBattery b) return b;
+        return mods.eln.misc.Utils.getItemObject(s) instanceof IItemEnergyBattery b ? b : null;
+    }
+
     static Cell cell(ItemStack s) {
-        IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
+        IItemEnergyBattery b = battery(s);
         return new Cell() {
             public double energy() { return b.getEnergy(s); }
             public double max() { return b.getEnergyMax(s); }
@@ -164,14 +172,19 @@ final class Suits {
         };
     }
 
-    /** Batteries carried in the main inventory (not suit pieces). */
+    /** Batteries carried in the main inventory (not suit pieces; a battery belt counts only worn), then those in the
+     *  worn battery belt's pockets (Baughn 2026-10-27). */
     static java.util.List<Cell> carried(ServerPlayer p) {
         java.util.List<Cell> out = new java.util.ArrayList<>();
         var inv = p.getInventory();
         for (int i = 0; i < 36; i++) {
             ItemStack src = inv.getItem(i);
-            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && src.getItem() instanceof IItemEnergyBattery) out.add(cell(src));
+            // (an EA portable battery's battery is its descriptor: carried ones never counted before; the belt test found it)
+            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && !(src.getItem() instanceof BatteryBeltItem)
+                && battery(src) != null) out.add(cell(src));
         }
+        ItemStack belt = BatteryBeltItem.worn(p);
+        if (!belt.isEmpty()) out.addAll(BatteryBeltItem.batteryCells(belt));
         return out;
     }
 

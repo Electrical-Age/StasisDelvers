@@ -19,6 +19,11 @@ final class CuriosCompat {
         return Impl.pendant(p);
     }
 
+    /** The battery belt worn in Curios' belt slot, or EMPTY (both sides: the HUD reads it too). */
+    static ItemStack belt(net.minecraft.world.entity.player.Player p) {
+        return LOADED ? Impl.belt(p) : ItemStack.EMPTY;
+    }
+
     /** A chronal anchor worn in a Curios slot (charm). */
     static boolean anchor(ServerPlayer p) {
         return LOADED && Impl.anchor(p);
@@ -64,11 +69,18 @@ final class CuriosCompat {
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHARGED_RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHRONAL_ANCHOR.get(), curio);
+            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.BATTERY_BELT.get(), curio);
         }
 
         static ItemStack pendant(ServerPlayer p) {
             return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p)
                 .flatMap(h -> h.findFirstCurio(s -> s.getItem() instanceof RiftPendantItem pi && pi.getEnergy(s) > 0))
+                .map(top.theillusivec4.curios.api.SlotResult::stack).orElse(ItemStack.EMPTY);
+        }
+
+        static ItemStack belt(net.minecraft.world.entity.player.Player p) {
+            return top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p)
+                .flatMap(h -> h.findFirstCurio(StasisRegistry.BATTERY_BELT.get()))
                 .map(top.theillusivec4.curios.api.SlotResult::stack).orElse(ItemStack.EMPTY);
         }
 

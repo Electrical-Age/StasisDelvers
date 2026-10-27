@@ -56,6 +56,14 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   `SuitUpgradeRecipe.java`: Delver to stasis piece, keeping the charge (recipe type `stasisdelvers:suit_upgrade`).
 - `Capacitors.java` / `CapacitorItem.java`: rift capacitors absorb the mist surcharge and the Delver creep
   (`absorb`, `drawFactor`). A raw shard takes half and crumbles after `SHARD_SECONDS`. EA chargers vent them.
+- `BatteryBeltItem.java` / `BeltMenu.java` (client `BeltScreen`): the battery belt (Baughn 2026-10-27), a Curios belt with
+  four pockets (data component `minecraft:container`) for EA portable batteries/condensators and rift capacitors. Worn
+  (`CuriosCompat.belt`), its batteries join `Suits.carried` and its capacitors `Capacitors.absorb`; carried, it does
+  nothing for the suit. As an `IItemEnergyBattery` it stands for its contents, so EA chargers charge it. The HUD
+  (`SuitGauge`) stacks a green bar for its batteries under the suit bar. GameTests `battery_belt_*` (a test hook,
+  `TEST_WORN`, stands in for Curios, which the test server doesn't load).
+- `Suits.battery(stack)`: the item battery behind a stack, the item or an EA item's descriptor. EA portable batteries
+  are `ElnItem`s whose descriptor is the battery, so carried ones never fed a suit before it (2026-10-27).
 - `StarterKit.java`: a full charged Delver suit + EA flashlight on first join (player NBT `stasisdelvers_starter_suit`). None in spreading mode.
 - `PlayerRates.java`: per-player tick rate in a slow or acceleration field.
   - Sends vanilla's ticking-state packet at 20·rate.

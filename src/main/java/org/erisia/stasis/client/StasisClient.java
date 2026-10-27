@@ -23,6 +23,7 @@ public final class StasisClient {
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterGuiLayersEvent.class, e -> e.registerAbove(
             net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "suit_gauge"),
             SuitGauge::render));
+        modBus.addListener(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent.class, e -> e.register(StasisRegistry.BELT_MENU.get(), BeltScreen::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerBlockEntityRenderer(StasisRegistry.QUERN_ENTITY.get(), QuernRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> {
