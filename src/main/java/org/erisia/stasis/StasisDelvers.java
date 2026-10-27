@@ -20,6 +20,8 @@ public final class StasisDelvers {
     public StasisDelvers(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.SYNCED, StasisConfig.SPEC);
         CuriosCompat.register(modBus);
+        // EA's handbook, the Electrical Engineer's Ledger, opens on our contents page (pages: assets/stasisdelvers/guides/eln/handbook)
+        mods.eln.handbook.Handbook.setStartPage(net.minecraft.resources.Identifier.fromNamespaceAndPath(MODID, "index.md"));
         // (only our synced config: the client config's Loading came first on clients and crashed refresh, AdventurAgent)
         modBus.addListener(ModConfigEvent.Loading.class, e -> {
             if (e.getConfig().getSpec() == StasisConfig.SPEC) StasisConfig.refresh();
