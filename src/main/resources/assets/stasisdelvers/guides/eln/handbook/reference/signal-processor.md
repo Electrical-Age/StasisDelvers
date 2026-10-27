@@ -89,9 +89,8 @@ Your slot must contain **at least the sum of the Redstone costs** of every opera
 
 ### The daytime clock
 
-The built-in variable `daytime` equals `totalWorldTicks / 23999`. Because it never resets at midnight (`0.25` = Day 1 noon, `5.25` = Day 6 noon), **never write `daytime>0.5`**. Always wrap it in a periodic trig function: **`sin(2*pi*daytime)`** is `> 0` during the day and `< 0` at night on every day (drifting by ~1 game hour every 1,000 days because of the `23999` divisor).
+The built-in variable `daytime` is the time of day as a fraction of the day: `0` at sunrise, `0.25` at noon, `0.5` at sunset, `0.75` at midnight, and back to `0` at the next sunrise. It repeats every day, so `daytime>0.5` is true from sunset to sunrise.
 
-{/* TODO: daytime fix ships -> remove this */}
 
 ## Cookbook formulas
 
@@ -101,10 +100,9 @@ Ten verified cookbook formulas. Every formula below has been tested against the 
    * **Formula:** `rs(A>0.8,A<0.6)` *(Cost: **5 Redstone**)*
    * **How it works:** Wire a **Thermal Probe** into **A**, and Output to your heater/furnace control. Because `reset` comes first, when temperature **A** climbs above `0.8` (40 V), the latch **resets to 0 V** (heat OFF). It stays off until **A** cools below `0.6` (30 V), which **sets it to 50 V** (heat ON).
 2. **Automatic Night-Time Yard Lamp Switch**
-   * **Formula:** `sin(2*pi*daytime)<0` *(Cost: **5 Redstone**)*
-   * **How it works:** Outputs **50 V** from sunset to sunrise every day, and **0 V** during daylight. (Use `sin(2*pi*daytime)<0.2` to switch lamps on slightly before dusk, or use an **Electrical Daylight Sensor** to track actual sky light.)
+   * **Formula:** `daytime>0.5` *(Cost: **1 Redstone**)*
+   * **How it works:** Outputs **50 V** from sunset to sunrise every day, and **0 V** during daylight. (Use `daytime>0.48` to switch the lamps on a little before dusk, or an **Electrical Daylight Sensor** to follow the actual sky light.)
 
-   {/* TODO: daytime fix ships -> remove this */}
 3. **Proportional-Integral (PI) Temperature / Flow Controller**
    * **Formula:** `pid(0.7,A,4,0.5,0,0,1)` *(Cost: **14 Redstone**)*
    * **How it works:** Holds sensor **A** at `0.7` (35 V) using proportional gain `P=4`, integral gain `I=0.5/s`, `D=0`, clamped `0..1`. Ideal for driving a **Pipe Control Valve** or **Submersible Pump** speed input.
