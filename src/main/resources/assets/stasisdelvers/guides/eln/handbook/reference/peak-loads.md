@@ -54,13 +54,14 @@ The workshop answer: one bank carries one 20 kJ burst.
 
 ## Charging the bank
 
-Put a **Large Rheostat** set to about **300 Ω** between the plant and the bank, and leave it there.
+Put a **Large Rheostat** between the plant and the bank. Start it high, and turn it down as the bank fills.
 
-* From empty it peaks at about 2.7 A (2.1 kW), well inside the rheostat's 4 kW cooling. The bank settles at about 755 V, and the desk starts there on its 744 V rule.
-* The rheostat runs hot for the first few minutes. Charging any capacitor through a resistor heats the resistor by about as much energy as the capacitor ends up holding: some 115 kJ for an empty bank.
-* During welds the same rheostat stops the desk from dragging on the plant. An inductor in series with it smooths the plant's draw further.
-* **Not 1 kΩ:** the bank's own 5 kΩ leak then holds it at about 667 V, below the desk's 720 V, so it never welds. A Power Resistor (about 1 kW) can take 1 kΩ, but only for a slow first fill.
-* **Not 100 Ω from empty:** that peaks at 8 A. It's fine for topping up a bank that's already near 800 V.
+* **From empty: about 330 Ω.** It peaks at about 2.4 A (under 2 kW), inside the rheostat's 4 kW cooling. The bank is at about 500 V after 2 minutes and 720 V after 6.
+* **Past about 600 V: turn it down to about 100 Ω** (2 A at most from there). Left at 330 Ω, the bank's own 5 kΩ leak parks it at about 750 V, barely over the desk's 744 V start. Then it welds a one-second bite every two minutes. At 100 Ω it settles near 784 V and welds a bite every 20 s or so, even on a weak plant.
+* **Automate it:** a voltage probe on the bank drives the rheostat's control signal, high resistance when the bank is low and low when it's high.
+* The rheostat runs hot while it fills an empty bank (it reached 281 °C in testing and survived). Charging any capacitor through a resistor heats the resistor by about as much energy as the capacitor ends up holding: some 115 kJ for an empty bank.
+* **Never 100 Ω from empty:** that peaks at 8 A. **Never 1 kΩ to run on:** the leak then holds the bank at about 667 V, below the desk's 720 V, so it never welds.
+* An inductor in series with the rheostat smooths the plant's draw while the bank refills after a weld.
 
 ## The Power Capacitor
 
@@ -74,7 +75,7 @@ The small, older wall capacitor.
 
 ## Sizing
 
-* **One Capacitor Bank per desk** carries a burst. How fast it refills depends on the plant and the rheostat: through 300 Ω it gets back about 2 A at a time, so expect a rest of tens of seconds between bursts.
+* **One Capacitor Bank per desk** carries a burst. How fast it refills depends on the plant and the rheostat (see [charging the bank](peak-loads.md#charging-the-bank)).
 * **A weak plant** (a few hundred watts) still works: the desk welds in short bites as the line recovers. It takes minutes per unit, but it gets there. The plant must give more than the bank's leak.
 * **No bank:** a plant has to hold 720 V or more under the full 5 kW.
 
