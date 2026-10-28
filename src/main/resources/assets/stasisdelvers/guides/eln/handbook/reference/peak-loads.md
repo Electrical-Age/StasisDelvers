@@ -40,7 +40,7 @@ Energy is power × time. A 1 kW plant makes 40 kJ in 40 s, which is plenty for o
 ## The Power Capacitor
 
 * **Redstone** (1-13) sets the capacity. Each **Dielectric** adds 50 V of rating, but the capacity is divided by the square of their count. So the energy at full rating is the same whatever the rating: at most **12.5 kJ** per capacitor (13 redstone).
-* For an 800 V line use exactly **16 Dielectrics**. With fewer it pops, since it pops above 1.3 × its rating. With more it holds less at 800 V.
+* For an 800 V line use **16 Dielectrics**: rated 800 V, it pops only above 1040 V (1.3 × its rating). With fewer it holds a little more at 800 V, but it pops sooner, and a line that overshoots after a sag can kill it. With more it holds less.
 * Energy stored: `E = ½ × C × U²`. One leg goes on the line, the other to a **Ground Cable**.
 * It leaks very slowly, so a charged bank keeps for hours.
 
