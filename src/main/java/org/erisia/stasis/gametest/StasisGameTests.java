@@ -1420,7 +1420,11 @@ public final class StasisGameTests {
         // frozen textures mesh per section where they can: a section said to be all stopped / all running must be
         for (boolean stretched : new boolean[]{false, true})
         CASES.put(stretched ? "section_state_matches_stretched" : "section_state_matches_blocks", new Spec(1, (h, c) -> {
-            Field f0 = field(h, c, new Vec3(3.5, 2.5, 4.5), stretched ? 22 : 30, 1.0);
+            // centred on the middle of a chunk section (within the padding round the test, at most 8 blocks out), so one
+            // whole section always lies inside: where the test sat in the section grid decided whether any did
+            BlockPos sc = h.absolutePos(new BlockPos(3, 2, 4));
+            Vec3 mid = h.relativeVec(new Vec3((sc.getX() & ~15) + 8, (sc.getY() & ~15) + 8, (sc.getZ() & ~15) + 8));
+            Field f0 = field(h, c, mid, stretched ? 22 : 30, 1.0);
             if (stretched) FieldData.get(h.getLevel()).update(h.getLevel(), f0.id(), x -> x.withStretch(new Field.Stretch(1.5, 1.2, 1, 1.4)));
             Field f = FieldData.get(h.getLevel()).get(f0.id()).orElse(f0);
             return () -> {
@@ -2923,17 +2927,20 @@ public final class StasisGameTests {
             ph.setTarget(inside);
             c.check("it can't target a player in the field", ph.getTarget() == null);
             boolean[] got = {false};
-            double[] minX = {Double.MAX_VALUE};
+            double[] minX = {Double.MAX_VALUE}, moved = {0};
             int[] ticks = {0};
             Vec3 start = ph.position();
             h.onEachTick(() -> {
                 ticks[0]++;
                 if (ph.isRemoved()) return;
                 minX[0] = Math.min(minX[0], ph.getX() - h.absoluteVec(Vec3.ZERO).x);
+                moved[0] = Math.max(moved[0], ph.position().distanceTo(start));
                 if (Stasis.isRunning(level, ph.blockPosition())) got[0] = true;
             });
             return () -> {
-                c.check("it flew (it isn't frozen) toward the field", minX[0] < 12, String.format("%.2f blocks in %d ticks, nearest x %.2f", ph.position().distanceTo(start), ticks[0], minX[0]));
+                // (where it flies is its AI's random circling round an anchor that Stasis moves away from the field: so
+                // "toward the field" was a coin toss; that it flies at all is what says it isn't frozen)
+                c.check("it flew (it isn't frozen)", moved[0] > 1, String.format("at most %.2f blocks from its start in %d ticks, nearest x %.2f", moved[0], ticks[0], minX[0]));
                 c.check("it never flew into the field", !got[0], String.format("nearest x %.2f (local; the field ends near 7.7)", minX[0]));
                 ph.discard();
                 remove(h, inside);
@@ -3055,7 +3062,7 @@ public final class StasisGameTests {
                 c.check("inside the failing field it stays", !f.isRemoved() && f.position().distanceTo(at) < 3, f.position().toString());
                 f.discard();
             };
-        }));
+        }, true, true));   // (isolated: a player freezing in a neighbouring test, within 48 blocks, dissolves it)
         // a field growing over them: they escape outward or dissolve, never stay where time runs (Baughn)
         CASES.put("fauna_field_grows_over_them", new Spec(30, (h, c) -> {
             ServerLevel level = h.getLevel();
@@ -3117,7 +3124,7 @@ public final class StasisGameTests {
                 c.check("two by the shield: +1.0", Math.abs(pr - 1.0) < 1e-9, "" + pr);
                 a.discard(); b.discard(); far.discard();
             };
-        }));
+        }, true, true));   // (isolated: a player freezing in a neighbouring test, within 48 blocks, dissolves them)
         // Static feeds on suits: one within 4 blocks doubles the draw (F2); a player out of its reach draws the plain rate
         CASES.put("static_drains_suits", new Spec(60, (h, c) -> {
             ServerPlayer a = survivalPlayer(h, new Vec3(10.5, 1.0, 1.5), true), b = survivalPlayer(h, new Vec3(15.5, 1.0, 6.5), true);
@@ -5756,8 +5763,27 @@ public final class StasisGameTests {
         }
     }
 
+    /**
+     * Empty blocks round every test structure. The test server lays every batch's structures out in one grid and
+     * keeps the old ones, 5 blocks apart: a neighbour's torch lit this test's lantern (flames_dark_in_the_grey, an
+     * isolated test, beside the last batch's), and the outcome hung on which tests ran beside it. 2 x 8 + 5 = 21
+     * blocks is past a light's reach (15). Baughn: the order of the tests must not matter.
+     */
+    static final int PADDING = 8;
+
     static void run(GameTestHelper h, String id, Spec spec) {
         ServerLevel level = h.getLevel();
+        // the padding's chunks stay loaded too (the server forces only the structure's; the runner releases every
+        // forced chunk after the batch)
+        var pb = h.getBoundsWithPadding();
+        for (int cx = (int) Math.floor(pb.minX) >> 4; cx <= (int) Math.floor(pb.maxX) >> 4; cx++)
+            for (int cz = (int) Math.floor(pb.minZ) >> 4; cz <= (int) Math.floor(pb.maxZ) >> 4; cz++) level.setChunkForced(cx, cz, true);
+        // the padding is on every side, below too, and the server clears it all to air: fill the part under the
+        // structure with stone again, so the test stands on ground (as without padding), not on a floating floor
+        int floorY = (int) Math.floor(h.getBounds().minY);
+        for (BlockPos q : BlockPos.betweenClosed((int) Math.floor(pb.minX), (int) Math.floor(pb.minY), (int) Math.floor(pb.minZ),
+            (int) Math.ceil(pb.maxX) - 1, floorY - 1, (int) Math.ceil(pb.maxZ) - 1))
+            level.setBlock(q, Blocks.STONE.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         // test areas are new chunks: no grace for them (new_chunk_grace grants its own)
         org.erisia.stasis.NewChunkGrace.testsStarted(level);
         // the stone floor (the structure template only gives the empty box)
@@ -5805,8 +5831,9 @@ public final class StasisGameTests {
             Holder<TestEnvironmentDefinition<?>> testEnv = !e.getValue().isolated() ? env : event.registerEnvironment(
                 Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "alone_" + e.getKey()), new TestEnvironmentDefinition.AllOf(List.of()));
             ResourceKey<Consumer<GameTestHelper>> fn = ResourceKey.create(Registries.TEST_FUNCTION, id);
-            event.registerTest(id, new FunctionGameTestInstance(fn,
-                new TestData<>(testEnv, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "floor_16x6x8"), e.getValue().ticks() + 40, 0, true)));
+            event.registerTest(id, new FunctionGameTestInstance(fn, new TestData<>(testEnv, net.minecraft.world.level.Level.OVERWORLD,
+                Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "floor_16x6x8"), e.getValue().ticks() + 40, 0, true,
+                net.minecraft.world.level.block.Rotation.NONE, false, 1, 1, false, PADDING)));
         }
     }
 }

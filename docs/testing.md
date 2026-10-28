@@ -52,6 +52,13 @@ There are three layers. All of them run through Gradle; the wrapper script below
     made by `script/gen_test_structures.py`) and `maxTicks = ticks + 40`.
   - `isolated` tests (towers, big fields) get their own environment `alone_<name>`, so they run in a batch
     of their own.
+  - Every test has `PADDING` (8) empty blocks round its structure (`TestData` padding). The test server keeps every
+    batch's structures in one grid, 5 blocks apart, so a neighbour's light and mobs reached in; with the padding they are 21
+    blocks apart (past a light's 15). `run()` force-loads the padding's chunks and fills the padding under the
+    structure with stone (the server clears all of it to air, which left the floor floating). Padding is on every
+    side, so the floor sits 8 blocks higher than without it. Baughn (2026-10-28): test order must not matter.
+  - What padding can't cover goes isolated: a player freezing dissolves fauna within 48 blocks, so the fauna tests
+    with a player-free check (`fauna_failing_field_lets_in`, `fauna_press_on_the_shield`) run alone.
 - Harness: `run()` lays the floor and, unless `field` is false, adds the default field (`R` = 4.2 at local
   3.5, 2.5, 4.5). Local x 0..6 is inside; x ≥ 9 is outside. `Checks` logs PASS/FAIL lines and runs cleanups.
   - Helpers: `survivalPlayer` (a real `ServerPlayer` on an EmbeddedChannel; `send` skips it), `wear`,
@@ -69,6 +76,10 @@ There are three layers. All of them run through Gradle; the wrapper script below
 - Which test guards what: see the "Invariants" section of each subsystem page.
 
 ## Flaky or soft tests
+Fixed 2026-10-28 (#116): `flames_dark_in_the_grey` (an isolated test, but next to the previous batch's torches: the
+padding), `phantoms_belong_to_stopped_land` (it asserted where the phantom's AI flew; now that it flew at all),
+`section_state_matches_stretched` (its field now centres on a chunk section, so one whole section lies inside wherever
+the test lands), and the two fauna tests above (isolated).
 These have failed intermittently before. Each was hardened, so a single failure is worth a rerun before
 debugging:
 - `furnace_cart_pushes_frozen_cart` (9164234: client position sync)
