@@ -1681,6 +1681,16 @@ public final class StasisGameTests {
                     if (p.getInventory().getItem(i).getItem() instanceof mods.eln.item.belt.BatteryBeltItem) carried = p.getInventory().getItem(i);
                 double looseLeft = carried.isEmpty() ? -1 : bb.getEnergy(mods.eln.item.belt.BatteryBeltItem.contents(carried).get(0));
                 c.check("a worn belt's battery charges the suit", e > 0 && left < batFull - 1, String.format("suit %.0f J, belt battery %.0f of %.0f", e, left, batFull));
+                // every piece at once (AdventurAgent: with EA's item energy in charge, one piece at a time)
+                double lo = Double.MAX_VALUE, hi = 0;
+                for (var slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+                    net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+                    var st = p.getItemBySlot(slot);
+                    double pe = ((org.erisia.stasis.DelverSuitItem) st.getItem()).getEnergy(st);
+                    lo = Math.min(lo, pe);
+                    hi = Math.max(hi, pe);
+                }
+                c.check("the suit's pieces charge together", lo > 0 && lo > 0.8 * hi, String.format("%.0f-%.0f J", lo, hi));
                 // (since the belt is EA's, EA's item energy treats a carried belt as a battery pack, as a carried Portable
                 // Battery: it may feed the suit too; only check it stays sane)
                 c.check("a carried belt is a battery pack: sane", looseLeft >= 0 && looseLeft <= batFull + 1, String.format("%.0f", looseLeft));
