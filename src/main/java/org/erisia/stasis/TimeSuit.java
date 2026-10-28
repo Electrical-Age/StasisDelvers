@@ -9,7 +9,7 @@ import net.minecraft.world.item.component.CustomData;
  * A suit piece that keeps its wearer going in stopped land, on stored energy (J). Energy lives in the stack's custom
  * data, so Electrical Age chargers (IItemEnergyBattery) and the suit share one number.
  */
-public interface TimeSuit {
+public interface TimeSuit extends mods.eln.item.electricalinterface.IItemEnergySelfManaged {   // (Suits.tick shares charge evenly; EA's item energy filled one piece at a time: AdventurAgent)
     /** Power the piece draws while it protects its wearer (W). */
     double stasisDraw(ItemStack stack);
 
