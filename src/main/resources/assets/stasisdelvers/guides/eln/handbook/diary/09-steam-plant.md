@@ -73,6 +73,6 @@ For ten minutes I just stood there with my hands in my pockets, listening to the
 
 ---
 
-Previous: [The Signal Processor: Sixty-Four Grains of Red Dust](07-signal-processor.md) · Next: none yet
+Previous: [The Signal Processor: Sixty-Four Grains of Red Dust](07-signal-processor.md) · Next: [Peak Loads: The Desk That Eats a Plant](12-peak-loads.md)
 
 [Back to the contents](../index.md)

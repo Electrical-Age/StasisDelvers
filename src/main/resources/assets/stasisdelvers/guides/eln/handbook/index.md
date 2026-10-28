@@ -24,6 +24,7 @@ wherever a number or a rule comes up, and every Reference page links back to the
 3. [Fire and the Kettle: A Kettle with a Dynamo](diary/02-fire-and-kettle.md)
 4. [The Signal Processor: Sixty-Four Grains of Red Dust](diary/07-signal-processor.md)
 5. [The Real Steam Plant: The Day the Valve Sang](diary/09-steam-plant.md)
+6. [Peak Loads: The Desk That Eats a Plant](diary/12-peak-loads.md)
 
 ## Reference
 
@@ -31,6 +32,7 @@ wherever a number or a rule comes up, and every Reference page links back to the
 * [Early Heat and the 50V Compact Steam Turbine](reference/early-heat.md)
 * [Boilers, Pressure, Condensers and the Regulator](reference/steam.md)
 * [The Signal Processor: Complete Manual](reference/signal-processor.md)
+* [Peak Loads and the Electrical Anvil](reference/peak-loads.md)
 
 ## Pages not yet written
 
