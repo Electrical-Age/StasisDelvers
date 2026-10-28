@@ -58,7 +58,8 @@ Put a **Large Rheostat** between the plant and the bank. Start it high, and turn
 
 * **From empty: about 330 Ω.** It peaks at about 2.4 A (under 2 kW), inside the rheostat's 4 kW cooling. The bank is at about 500 V after 2 minutes and 720 V after 6.
 * **Past about 600 V: turn it down to about 100 Ω** (2 A at most from there). Left at 330 Ω, the bank's own 5 kΩ leak parks it at about 750 V, barely over the desk's 744 V start. Then it welds a one-second bite every two minutes. At 100 Ω it settles near 784 V and welds a bite every 20 s or so, even on a weak plant.
-* **Setting it:** Coal Dust sets the rheostat's top value and its control signal scales it linearly. **30 Coal Dust** gives about 330 Ω at a full 50 V signal and about 100 Ω at 15 V.
+* **Setting it:** Coal Dust sets the rheostat's top value and its control signal scales it linearly. **30 Coal Dust** gives about 330 Ω at a full 50 V signal and about 100 Ω at 15 V. Turn it down by lowering the signal, not by taking dust out.
+* **Wire the signal first.** With no signal the rheostat sits at 1% of its value (about 3 Ω with 30 Coal Dust). That's a stiff line, and it burns the cable on an empty bank.
 * **Automate it:** a voltage probe on the bank drives the rheostat's control signal, high resistance when the bank is low and low when it's high.
 * The rheostat runs hot while it fills an empty bank (it reached 281 °C in testing and survived). Charging any capacitor through a resistor heats the resistor by about as much energy as the capacitor ends up holding: some 115 kJ for an empty bank.
 * **Never 100 Ω from empty:** that peaks at 8 A. **Never 1 kΩ to run on:** the leak then holds the bank at about 667 V, below the desk's 720 V, so it never welds.
