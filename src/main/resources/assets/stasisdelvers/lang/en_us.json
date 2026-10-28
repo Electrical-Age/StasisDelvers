@@ -125,6 +125,8 @@
   "item.stasisdelvers.charged_rift_pendant": "Charged Rift Pendant",
   "item.stasisdelvers.rift_pendant.tooltip": "Holds off the stillness: %s:%s left",
   "message.stasisdelvers.pendant_crumbled": "The crystal on your pendant crumbles to dust",
+  "tooltip.stasisdelvers.flame.0": "Flames gutter now and then, dimming and smoking.",
+  "tooltip.stasisdelvers.flame.1": "Nothing burns where time stands still: no light.",
   "book.stasisdelvers.pamphlet.title": "Rift Safety",
   "book.stasisdelvers.pamphlet.author": "The Government",
   "book.stasisdelvers.pamphlet.page1": "§lWARNING!§0\nTemporal stability is falling in your region.\n\nRest assured the government has your back! Your priority should be to keep yourself safe and maintain productivity until rescue can be arranged.",
@@ -133,6 +135,7 @@
   "book.stasisdelvers.pamphlet.page4": "§o3. Shelter in a government-approved temporal stasis field if possible.§0 The safeguard towers, and their stasis fields, should be clearly visible from a distance.",
   "book.stasisdelvers.pamphlet.page5": "§o4. Do not enter the wandering clouds!§0 They will freeze you, albeit only temporarily. If you must wander through the Deeps, seek protective equipment beforehand.",
   "book.stasisdelvers.pamphlet.page6": "A government-issue delver suit will keep you safe for up to thirty minutes, more with batteries.\n\n§o5. If your child wanders into a Deep and is frozen,§0 then you can extract them with a leash.",
-  "book.stasisdelvers.pamphlet.page7": "There have been reports of citizens utilising rift crystals to create bootleg, unstable stasis fields and pendants. The government disavows this practice.",
-  "book.stasisdelvers.pamphlet.page8": "Such bootleg equipment lasts barely half an hour at most, and cannot be used to speed up work.\n\nExclusion Zone STRHLD has been established at the Bypass site. Do not approach without a permit and the prescribed defensive measures."
+  "book.stasisdelvers.pamphlet.page7": "§o6. Stasis is not a wall.§0 Endermen and phantoms are not held by it: they cross stopped land freely and hunt in it. Do not rely on stilled ground to keep them away.",
+  "book.stasisdelvers.pamphlet.page8": "There have been reports of citizens utilising rift crystals to create bootleg, unstable stasis fields and pendants. The government disavows this practice.",
+  "book.stasisdelvers.pamphlet.page9": "Such bootleg equipment lasts barely half an hour at most, and cannot be used to speed up work.\n\nExclusion Zone STRHLD has been established at the Bypass site. Do not approach without a permit and the prescribed defensive measures."
 }

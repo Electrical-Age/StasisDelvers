@@ -132,6 +132,15 @@ public final class StasisClient {
             for (int i = 0; i < 3; i++)
                 e.getToolTip().add(net.minecraft.network.chat.Component.translatable(key + "." + i).withStyle(net.minecraft.ChatFormatting.GRAY));
         });
+        // torches, lanterns, candles, campfires: say that Stasis Flames gutter and go dark in stopped land, by design
+        // (Baughn: two players took it for a bug)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent.class, e -> {
+            if (!(e.getItemStack().getItem() instanceof net.minecraft.world.item.BlockItem b)
+                || !org.erisia.stasis.Flames.isFlame(b.getBlock().defaultBlockState())) return;
+            for (int i = 0; i < 2; i++)
+                e.getToolTip().add(net.minecraft.network.chat.Component.translatable("tooltip.stasisdelvers.flame." + i)
+                    .withStyle(net.minecraft.ChatFormatting.GRAY));
+        });
         // still textures in stopped land (Baughn: lava, water and campfires kept animating)
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterSpriteSourcesEvent.class, FrozenSprites::registerSource);
         // stilled water looks like the water it froze from (λ-Nero: it looked like ice): the biome's water tint

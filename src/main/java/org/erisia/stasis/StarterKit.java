@@ -25,7 +25,7 @@ public final class StarterKit {
     public static final String TAG = "stasisdelvers_starter_suit";
     public static final String COMPASS_TAG = "stasisdelvers_starter_compass";
     public static final String PAMPHLET_TAG = "stasisdelvers_pamphlet";
-    static final int PAMPHLET_PAGES = 8;
+    static final int PAMPHLET_PAGES = 9;
     static final net.minecraft.resources.Identifier PAMPHLET_MODEL = net.minecraft.resources.Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "pamphlet");
 
     /** "Rift Safety", the government's pamphlet (Baughn's text, en_us book.stasisdelvers.pamphlet.*): a written book. */
@@ -43,16 +43,23 @@ public final class StarterKit {
         return b;
     }
 
+    /** The government's pamphlet, any edition. */
+    static boolean isPamphlet(ItemStack st) {
+        var wb = st.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+        return st.is(net.minecraft.world.item.Items.WRITTEN_BOOK) && wb != null && "The Government".equals(wb.author())
+            && "Rift Safety".equals(wb.title().raw());
+    }
+
     public static void login(PlayerEvent.PlayerLoggedInEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         CompoundTag persisted = p.getPersistentData().getCompoundOrEmpty(Player.PERSISTED_NBT_TAG);
-        // pamphlets handed out before it had its icon get it (Baughn)
+        // pamphlets handed out before it had its icon, or before a page was added, are brought up to date (Baughn: the
+        // pamphlet must stay updatable; the pages' text is translated, so only the page count needs this)
         for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
             ItemStack st = p.getInventory().getItem(i);
-            var wb = st.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
-            if (st.is(net.minecraft.world.item.Items.WRITTEN_BOOK) && wb != null && "The Government".equals(wb.author())
-                && "Rift Safety".equals(wb.title().raw()) && !PAMPHLET_MODEL.equals(st.get(net.minecraft.core.component.DataComponents.ITEM_MODEL)))
-                st.set(net.minecraft.core.component.DataComponents.ITEM_MODEL, PAMPHLET_MODEL);
+            if (isPamphlet(st) && (!PAMPHLET_MODEL.equals(st.get(net.minecraft.core.component.DataComponents.ITEM_MODEL))
+                || st.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT).pages().size() != PAMPHLET_PAGES))
+                p.getInventory().setItem(i, pamphlet().copyWithCount(st.getCount()));
         }
         if (StasisConfig.spreading) {
             // the rift-safety pamphlet (Baughn 2026-10-22), to everyone who hasn't had it, old players included

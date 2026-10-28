@@ -233,7 +233,7 @@ public final class Flames {
         clientLevel(level);
         m.forEach((k, v) -> {
             if (v == 0) CLIENT.remove(k);
-            else CLIENT.put(k, v);
+            else if (CLIENT.put(k, v) == null && level != null) smoke(level, BlockPos.of(k), 5);   // (it gutters: a puff)
             if (level != null) {
                 level.getChunkSource().getLightEngine().checkBlock(BlockPos.of(k));
                 RECHECK.put(k, level.getGameTime() + 5);   // again once the chunk's light is surely in
@@ -254,10 +254,34 @@ public final class Flames {
             if (ChunkPos.containing(BlockPos.of(k)).equals(cp)) RECHECK.put(k, due);
     }
 
+    /**
+     * Client: smoke from a guttering flame, so a dip in the light reads as the flame failing, not a glitch (Baughn: two
+     * players took guttering torches for a bug). Where the flame burns: a wall torch leans out from its wall.
+     */
+    static void smoke(Level level, BlockPos pos, int puffs) {
+        if (level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4) == null) return;
+        BlockState state = level.getBlockState(pos);
+        if (!isFlame(state)) return;
+        double x = pos.getX() + 0.5, y = pos.getY() + 0.7, z = pos.getZ() + 0.5;
+        if (state.getBlock() instanceof net.minecraft.world.level.block.WallTorchBlock) {
+            var f = state.getValue(net.minecraft.world.level.block.WallTorchBlock.FACING).getOpposite();
+            x += 0.27 * f.getStepX();
+            z += 0.27 * f.getStepZ();
+            y += 0.22;
+        }
+        var r = level.getRandom();
+        for (int i = 0; i < puffs; i++)
+            level.addParticle(net.minecraft.core.particles.ParticleTypes.SMOKE, x + (r.nextDouble() - 0.5) * 0.1, y,
+                z + (r.nextDouble() - 0.5) * 0.1, 0, 0.02 + r.nextDouble() * 0.02, 0);
+    }
+
     /** Client tick. */
     public static void clientTick(Level level) {
-        if (level == null || RECHECK.isEmpty()) return;
+        if (level == null) return;
         long now = level.getGameTime();
+        // a guttering flame keeps smoking now and then
+        if (now % 10 == 0) for (long k : CLIENT.keySet()) if (level.getRandom().nextInt(3) == 0) smoke(level, BlockPos.of(k), 1);
+        if (RECHECK.isEmpty()) return;
         var it = RECHECK.entrySet().iterator();
         while (it.hasNext()) {
             var e = it.next();

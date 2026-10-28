@@ -4801,6 +4801,16 @@ public final class StasisGameTests {
             org.erisia.stasis.StarterKit.login(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p));
             var om = p.getInventory().getItem(20).get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
             c.check("an old pamphlet gets the icon at login", om != null && om.getPath().equals("pamphlet"), String.valueOf(om));
+            // one from before a page was added (rule 6, endermen and phantoms: Baughn) gets the new edition
+            ItemStack eight = org.erisia.stasis.StarterKit.pamphlet();
+            var wb = eight.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+            eight.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
+                wb.title(), wb.author(), 0, wb.pages().subList(0, 8), true));
+            p.getInventory().setItem(21, eight);
+            org.erisia.stasis.StarterKit.login(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p));
+            var nb = p.getInventory().getItem(21).get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+            c.check("an old 8-page pamphlet gets all 9 pages at login", nb != null && nb.pages().size() == 9,
+                nb == null ? "no book" : nb.pages().size() + " pages");
             c.check("nothing else", other == 0, other + " other stacks");
         }, false, true));
         // the commands: add with a rate (and column), set a rate, refuse rates out of range
