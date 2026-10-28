@@ -40,14 +40,14 @@ public final class Capacitors {
                 return 1;
             }
         }
-        // the worn battery belt's pockets (Baughn 2026-10-27)
-        ItemStack belt = BatteryBeltItem.worn(p);
+        // the worn battery belt's pockets (EA's; Baughn 2026-10-27; our capacitors are tagged #eln:battery_belt_items)
+        ItemStack belt = mods.eln.item.belt.BatteryBeltItem.worn(p);
         if (!belt.isEmpty()) {
-            var all = BatteryBeltItem.contents(belt);
+            var all = mods.eln.item.belt.BatteryBeltItem.contents(belt);
             for (ItemStack s : all)
                 if (s.getItem() instanceof CapacitorItem c && c.getEnergy(s) >= need) {
                     c.setEnergy(s, c.getEnergy(s) - need);
-                    BatteryBeltItem.setContents(belt, all);
+                    mods.eln.item.belt.BatteryBeltItem.setContents(belt, all);
                     return 1;
                 }
         }

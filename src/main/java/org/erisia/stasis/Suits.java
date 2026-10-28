@@ -173,19 +173,54 @@ final class Suits {
     }
 
     /** Batteries carried in the main inventory (not suit pieces; a battery belt counts only worn), then those in the
-     *  worn battery belt's pockets (Baughn 2026-10-27). */
+     *  worn battery belt's pockets (EA's; Baughn 2026-10-27). */
     static java.util.List<Cell> carried(ServerPlayer p) {
         java.util.List<Cell> out = new java.util.ArrayList<>();
         var inv = p.getInventory();
         for (int i = 0; i < 36; i++) {
             ItemStack src = inv.getItem(i);
             // (an EA portable battery's battery is its descriptor: carried ones never counted before; the belt test found it)
-            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && !(src.getItem() instanceof BatteryBeltItem)
+            if (!src.isEmpty() && !(src.getItem() instanceof TimeSuit) && !(src.getItem() instanceof mods.eln.item.belt.BatteryBeltItem)
                 && battery(src) != null) out.add(cell(src));
         }
-        ItemStack belt = BatteryBeltItem.worn(p);
-        if (!belt.isEmpty()) out.addAll(BatteryBeltItem.batteryCells(belt));
+        ItemStack belt = mods.eln.item.belt.BatteryBeltItem.worn(p);
+        if (!belt.isEmpty()) {
+            var all = mods.eln.item.belt.BatteryBeltItem.contents(belt);
+            for (int k = 0; k < all.size(); k++) if (mods.eln.item.belt.BatteryBeltItem.isBattery(all.get(k))) out.add(beltCell(belt, k));
+        }
         return out;
+    }
+
+    /** One pocket of EA's battery belt as a cell: reads and writes through the belt's contents. */
+    static Cell beltCell(ItemStack belt, int k) {
+        return new Cell() {
+            ItemStack item() {
+                return mods.eln.item.belt.BatteryBeltItem.contents(belt).get(k);
+            }
+
+            public double energy() {
+                ItemStack s = item();
+                return battery(s) instanceof IItemEnergyBattery b ? b.getEnergy(s) : 0;
+            }
+
+            public double max() {
+                ItemStack s = item();
+                return battery(s) instanceof IItemEnergyBattery b ? b.getEnergyMax(s) : 0;
+            }
+
+            public double discharge() {
+                ItemStack s = item();
+                return battery(s) instanceof IItemEnergyBattery b ? b.getDischagePower(s) : 0;
+            }
+
+            public void set(double energy) {
+                var all = mods.eln.item.belt.BatteryBeltItem.contents(belt);
+                ItemStack s = all.get(k);
+                if (!(battery(s) instanceof IItemEnergyBattery b)) return;
+                b.setEnergy(s, energy);
+                mods.eln.item.belt.BatteryBeltItem.setContents(belt, all);
+            }
+        };
     }
 
     /** The worn suit pieces. */

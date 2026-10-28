@@ -10,8 +10,8 @@ import org.erisia.stasis.TimeSuit;
 
 /**
  * The suit's charge on the HUD (λ-Nero's "Stasis HUD elements"): a small gauge above the hotbar's right end while you
- * wear a time suit in a stopping dimension, showing its emptiest piece; under it, green, the worn battery belt's
- * batteries (the two bars slimmer when both show). Near a rift core it flickers purple, more
+ * wear a time suit in a stopping dimension, showing its emptiest piece. EA draws the worn battery belt's bar under it
+ * (the two slimmer when both show). Near a rift core it flickers purple, more
  * the nearer (the strain on reality, StasisPost slot 1596).
  */
 public final class SuitGauge {
@@ -34,29 +34,27 @@ public final class SuitGauge {
         return new double[]{share, pieces};
     }
 
-    static void render(GuiGraphicsExtractor g, DeltaTracker dt) {
+    /** The suit gauge shows now (EA's battery belt bar then sits under it: BatteryBeltItem.hudAbove). */
+    public static boolean showing() {
         var mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || !Stasis.stops(mc.level)) return;
+        return mc.player != null && mc.level != null && Stasis.stops(mc.level) && share(mc.player)[1] > 0;
+    }
+
+    static void render(GuiGraphicsExtractor g, DeltaTracker dt) {
+        if (!showing()) return;
+        var mc = Minecraft.getInstance();
         double[] sp = share(mc.player);
         double share = sp[0];
         int pieces = (int) sp[1];
-        // the worn battery belt's batteries (Baughn 2026-10-27): a second bar, the two stacked and slimmer
-        ItemStack belt = org.erisia.stasis.BatteryBeltItem.worn(mc.player);
-        double beltShare = belt.isEmpty() ? Double.NaN : org.erisia.stasis.BatteryBeltItem.batteryShare(belt);
-        boolean suit = pieces > 0, beltBar = !Double.isNaN(beltShare);
-        if (!suit && !beltBar) return;
+        // EA's battery belt bar under it (client BeltHud; Baughn 2026-10-27: the two stacked, slimmer)
+        var belt = mods.eln.item.belt.BatteryBeltItem.worn(mc.player);
+        boolean both = !belt.isEmpty() && !Double.isNaN(mods.eln.item.belt.BatteryBeltItem.batteryShare(belt));
         int w = g.guiWidth(), h = g.guiHeight();
-        int x = w / 2 + 96, bw = 40;
-        boolean both = suit && beltBar;
-        int bh = both ? 3 : 5;
+        int x = w / 2 + 96, bw = 40, bh = both ? 3 : 5, y = both ? h - 26 : h - 22;
         float strain = StasisPost.lastStrain;
         boolean flick = strain > 0.05f && Math.random() < strain * 0.6;
-        if (suit) {
-            int y = both ? h - 26 : h - 22;
-            bar(g, x, y, bw, bh, share, flick, flick ? 0xFFB060FF : colour(share));
-            if (pieces < 4) g.text(mc.font, "!", x + bw + 3, y - 2, 0xFFFF5050);   // an incomplete suit doesn't protect
-        }
-        if (beltBar) bar(g, x, both ? h - 21 : h - 22, bw, bh, beltShare, flick, 0xFF60C080);
+        bar(g, x, y, bw, bh, share, flick, flick ? 0xFFB060FF : colour(share));
+        if (pieces < 4) g.text(mc.font, "!", x + bw + 3, y - 2, 0xFFFF5050);   // an incomplete suit doesn't protect
     }
 
     static int colour(double share) {
