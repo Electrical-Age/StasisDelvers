@@ -47,10 +47,20 @@ The workshop answer: one bank carries one 20 kJ burst.
 
 * **0.36 F**, rated **1000 V**; it pops above 1300 V. At 800 V it holds 115 kJ, of which **21.9 kJ** lies between 800 V and 720 V, where the desk can use it.
 * **Polar.** **+** is low on the left flank of its front (the HV-coloured band), **−** on the right (black band). Put + on the 800 V line and − to a **Ground Cable**.
-* **Charges at 3 A at most** (2.4 kW at 800 V), so an empty bank doesn't burn its cable. A burst's 20 kJ comes back in about 8 s. It gives back any current you ask for.
-* **Leaks:** it loses about 128 W at 800 V, and has only 2% left after an hour. It's for bursts, not for keeping a night's power. Keep the plant connected.
+* **Inrush:** an empty bank on a stiff 800 V line pulls a huge current and **burns the cable**. It takes and gives any current; nothing inside limits it. See [charging the bank](peak-loads.md#charging-the-bank).
+* **Leaks** through about 5 kΩ: about 128 W at 800 V, and only 2% left after an hour. It's for bursts, not for keeping a night's power. Keep the plant connected.
 * Jade shows its voltage, energy and capacitance.
 * **Recipe:** six **Capacitor Cells** (each: 6 Dielectrics, 2 copper plates, a redstone block) over 2 iron plates and a High Voltage Cable. The compressor makes **4 Dielectrics** from a sand.
+
+## Charging the bank
+
+Put a **Large Rheostat** set to about **300 Ω** between the plant and the bank, and leave it there.
+
+* From empty it peaks at about 2.7 A (2.1 kW), well inside the rheostat's 4 kW cooling. The bank settles at about 755 V, and the desk starts there on its 744 V rule.
+* The rheostat runs hot for the first few minutes. Charging any capacitor through a resistor heats the resistor by about as much energy as the capacitor ends up holding: some 115 kJ for an empty bank.
+* During welds the same rheostat stops the desk from dragging on the plant. An inductor in series with it smooths the plant's draw further.
+* **Not 1 kΩ:** the bank's own 5 kΩ leak then holds it at about 667 V, below the desk's 720 V, so it never welds. A Power Resistor (about 1 kW) can take 1 kΩ, but only for a slow first fill.
+* **Not 100 Ω from empty:** that peaks at 8 A. It's fine for topping up a bank that's already near 800 V.
 
 ## The Power Capacitor
 
@@ -64,7 +74,7 @@ The small, older wall capacitor.
 
 ## Sizing
 
-* **One Capacitor Bank per desk** is enough for any plant that can refill it between bursts. With the 3 s rests, a bank and a modest plant mend a unit in about 25 s.
+* **One Capacitor Bank per desk** carries a burst. How fast it refills depends on the plant and the rheostat: through 300 Ω it gets back about 2 A at a time, so expect a rest of tens of seconds between bursts.
 * **A weak plant** (a few hundred watts) still works: the desk welds in short bites as the line recovers. It takes minutes per unit, but it gets there. The plant must give more than the bank's leak.
 * **No bank:** a plant has to hold 720 V or more under the full 5 kW.
 
@@ -73,7 +83,8 @@ Energy stored: `E = ½ × C × U²`. The desk's draw falls as the voltage sags (
 ## The Power Inductor
 
 * **Copper Cable** (1-19) sets the inductance (0.1-100 H). It needs a **Ferromagnetic Core**; without one it is an open circuit. It can't burn.
-* An inductor stores almost nothing; it resists *changes* in current. In series between the generator and the bank, it lets the bank take the shock of each weld while the generator sees a steady draw as the bank refills.
+* An inductor stores almost nothing; it resists *changes* in current. In series with the charging rheostat, between the plant and the bank, it lets the bank take the shock of each weld while the plant sees a steady draw as the bank refills.
+* It can't tame an empty bank on its own: even the largest one (100 H) lets the current swing up to some 48 A, and the voltage rings up past the bank's 1300 V limit. Use resistance as well.
 * An inductor alone, with no capacitor, makes a pulse load *worse*: it holds the current back just when the desk wants more.
 
 [Reference index](../reference.md) · [Back to the contents](../index.md)
