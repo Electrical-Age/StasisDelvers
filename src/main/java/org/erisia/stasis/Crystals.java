@@ -233,6 +233,31 @@ public final class Crystals {
         }
     }
 
+    /** For /stasis crystal: the budding block at p, each registered bud on it and what its growth sees now. */
+    static String explain(ServerLevel level, BlockPos p) {
+        if (!level.getBlockState(p).is(StasisRegistry.BUDDING_RIFT_CRYSTAL.get())) return p.toShortString() + ": not a budding rift crystal";
+        Data data = Data.get(level);
+        double t = Deeps.realTime(level);
+        StringBuilder sb = new StringBuilder(p.toShortString() + ": chunk swept " + data.swept.contains(ChunkPos.containing(p).pack()) + "; ");
+        for (Direction dir : Direction.values()) {
+            BlockPos q = p.relative(dir);
+            var m = data.buds.get(ChunkPos.containing(q).pack());
+            Bud b = m == null ? null : m.get(q.asLong());
+            if (b == null || b.dir != dir.get3DDataValue()) {
+                sb.append(dir.getName()).append(": no bud; ");
+                continue;
+            }
+            BlockState here = level.getBlockState(q);
+            int id = Pockets.strataIdAnyHeight(level, q.getX(), q.getY(), q.getZ());
+            double hour = id < 0 ? 0 : Pockets.exposure(id, Math.floorDiv(q.getX(), Pockets.POCKET), Math.floorDiv(q.getY(), Pockets.POCKET),
+                Math.floorDiv(q.getZ(), Pockets.POCKET), t - 3600, t);
+            sb.append(String.format("%s: stage %d, exposure %.0f s (next stage at %d), last %.0f s ago, open %s, stopped %s, strata %d, exposure in the last hour %.0f s; ",
+                dir.getName(), b.stage, b.e, (b.stage + 2) * StasisConfig.crystalStageSeconds, t - b.t, here.isAir() || stageOf(here, dir) >= 0,
+                !Stasis.isRunning(level, q), id, hour));
+        }
+        return sb.toString();
+    }
+
     /** Tests: forget that chunk cp was stamped, and its buds. */
     public static void testForget(ServerLevel level, ChunkPos cp) {
         Data d = Data.get(level);

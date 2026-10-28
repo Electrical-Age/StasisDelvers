@@ -409,6 +409,12 @@ final class StasisCommands {
                     t.testBolt();
                     return 1;
                 }))))
+            .then(Commands.literal("crystal").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
+                // the buds on a budding block and why each grows or not (Baughn 2026-10-28: "is crystal growth working?")
+                BlockPos p = BlockPosArgument.getBlockPos(c, "pos");
+                c.getSource().sendSuccess(() -> Component.literal(Crystals.explain(c.getSource().getLevel(), p)), false);
+                return 1;
+            })))
             .then(Commands.literal("at").then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(c -> {
                 BlockPos p = BlockPosArgument.getBlockPos(c, "pos");
                 double rate = Stasis.rateAt(c.getSource().getLevel(), p), speed = Stasis.speedAt(c.getSource().getLevel(), p);
