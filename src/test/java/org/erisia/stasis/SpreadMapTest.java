@@ -458,7 +458,7 @@ class SpreadMapTest {
         }
         assertTrue(left >= 0);
         long k = r / SpreadMap.SCALE + 1;
-        if (!hard && k > cap * n + 1e-9) {
+        if (!hard && k > Spread.progress(cap, n)) {
             assertTrue(Double.isInfinite(left), "above the cap before hard mode: " + left);
             // hard mode now: P moves again, so it stills in finite time
             assertTrue(Double.isFinite(Spread.secondsUntilStill(r, n, t, true, t, Spread.coverage(t, false, 0, 0, hours, hardHours, cap), hours, hardHours, cap)));

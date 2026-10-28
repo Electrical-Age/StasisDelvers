@@ -182,7 +182,8 @@ public final class Spread {
         if (k <= progress(coverage(t, hard, tHard, cHard, hours, hardHours, cap), n)) return 0;
         double cAt = k / (double) n;
         double tAt;
-        if (cAt <= cap && !hard) tAt = cap <= 0 ? 0 : cAt / cap * hours * 3600;
+        // (whether P reaches k before hard mode: with progress's own rounding, as cap * n can fall a hair below k)
+        if (k <= progress(cap, n) && !hard) tAt = cap <= 0 ? 0 : cAt / cap * hours * 3600;
         else if (!hard) return Double.POSITIVE_INFINITY;
         else tAt = tHard + (cHard >= 1 ? 0 : Math.max(0, cAt - cHard) / (1 - cHard) * hardHours * 3600);
         return Math.max(0, tAt - t);
