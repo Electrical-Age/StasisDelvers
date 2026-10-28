@@ -174,6 +174,20 @@ public final class Pockets {
     /** GameTests: boxes that count as strata of the given deep id. */
     public static final java.util.Map<net.minecraft.world.phys.AABB, Integer> TEST_STRATA = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** As strataId, without the "not above the ground" rule (that one is for the look: a sky rift's cavities drew as
+     *  black blobs). Crystal growth uses it: a budding block dug out to the open sky grows on its pocket's weather too
+     *  (Baughn 2026-10-28: his crystal at -26 177 154 never grew, its faces counted as above ground). */
+    public static int strataIdAnyHeight(Level level, int x, int y, int z) {
+        if (!TEST_STRATA.isEmpty())
+            for (var e : TEST_STRATA.entrySet())
+                if (e.getKey().contains(x + 0.5, y + 0.5, z + 0.5)) return e.getValue();
+        if (!Stasis.stops(level)) return -1;
+        int seed = Deeps.seed(level);
+        if (seed == 0) return -1;
+        StaticDeeps.Deep d = strataAt(seed, x, y, z);
+        return d == null ? -1 : d.id();
+    }
+
     /** The id of the deep whose strata mask covers block (x, y, z), or -1. */
     public static int strataId(Level level, int x, int y, int z) {
         if (!TEST_STRATA.isEmpty())

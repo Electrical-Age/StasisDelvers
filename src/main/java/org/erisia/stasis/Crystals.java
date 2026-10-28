@@ -215,7 +215,7 @@ public final class Crystals {
             }
             boolean open = here.isAir() || now >= 0;
             if (open && !Stasis.isRunning(level, pos)) {
-                int id = Pockets.strataId(level, pos.getX(), pos.getY(), pos.getZ());
+                int id = Pockets.strataIdAnyHeight(level, pos.getX(), pos.getY(), pos.getZ());
                 if (id >= 0) {
                     int px = Math.floorDiv(pos.getX(), Pockets.POCKET), py = Math.floorDiv(pos.getY(), Pockets.POCKET), pz = Math.floorDiv(pos.getZ(), Pockets.POCKET);
                     b.e += Pockets.exposure(id, px, py, pz, b.t, t);
@@ -299,7 +299,13 @@ public final class Crystals {
             BlockPos pos = BlockPos.containing(o);
             ServerLevel level = ctx.getLevel();
             if (Stasis.isRunning(level, pos)) return false;
-            Pockets.Weather w = Pockets.at(level, pos.getX(), pos.getY(), pos.getZ());
+            // (as growth: any height, a crystal dug out to the sky is still in its pocket)
+            Pockets.Weather w = Pockets.TEST.isEmpty() ? null : Pockets.at(level, pos.getX(), pos.getY(), pos.getZ());
+            if (w == null) {
+                int id = Pockets.strataIdAnyHeight(level, pos.getX(), pos.getY(), pos.getZ());
+                if (id >= 0) w = Pockets.weather(id, Math.floorDiv(pos.getX(), Pockets.POCKET), Math.floorDiv(pos.getY(), Pockets.POCKET),
+                    Math.floorDiv(pos.getZ(), Pockets.POCKET), Deeps.realTime(level));
+            }
             return w != null && w.state() == Pockets.State.VIOLET;
         }
     }
