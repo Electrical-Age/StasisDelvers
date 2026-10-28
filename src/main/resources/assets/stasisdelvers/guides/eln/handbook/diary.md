@@ -15,6 +15,6 @@ links to the tidied-up [Reference](reference.md) notes where the numbers live.
 3. [Fire and the Kettle: A Kettle with a Dynamo](diary/02-fire-and-kettle.md): heat versus temperature, and the Compact Steam Turbine.
 4. [The Signal Processor: Sixty-Four Grains of Red Dust](diary/07-signal-processor.md): one line of mathematics instead of a wall of chips.
 5. [The Real Steam Plant: The Day the Valve Sang](diary/09-steam-plant.md): boilers, pressure, the turbine regulator and the condenser.
-6. [Peak Loads: The Desk That Eats a Plant](diary/12-peak-loads.md): the electrical anvil, and storing energy for a short heavy pull.
+6. [Peak Loads: The Desk That Eats a Plant](diary/12-peak-loads.md): the electrical anvil, the capacitor bank, and storing energy for a short heavy pull.
 
 [Back to the contents](index.md)
