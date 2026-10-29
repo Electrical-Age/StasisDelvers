@@ -2863,6 +2863,17 @@ public final class StasisGameTests {
                 // Baughn 2026-10-29: stilled EA reservoir cells weren't walkable: any stopped fluid cell without a shape of its own
                 c.check("stopped seagrass is solid to entities", level.getBlockState(grass).getCollisionShape(level, grass, ctx).equals(full));
                 c.check("running seagrass isn't", level.getBlockState(grassIn).getCollisionShape(level, grassIn, ctx).isEmpty());
+                // the reported block: an EA reservoir's partial surface cell (only in EA builds with reservoirs)
+                var res = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(net.minecraft.resources.Identifier.parse("eln:reservoir_water"));
+                if (res.isPresent()) {
+                    BlockPos cell = h.absolutePos(new BlockPos(13, 1, 4));
+                    net.minecraft.world.level.block.state.BlockState st = res.get().defaultBlockState();
+                    if (st.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LEVEL_FLOWING))
+                        st = st.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LEVEL_FLOWING, 4);
+                    level.setBlock(cell, st, 2);
+                    c.check("a stopped EA reservoir surface cell is solid to entities", level.getBlockState(cell).getCollisionShape(level, cell, ctx).equals(full),
+                        level.getBlockState(cell).toString());
+                }
                 float before = pig.getHealth();
                 level.getBlockState(lava).getBlock().stepOn(level, lava, level.getBlockState(lava), pig);
                 c.check("standing on stopped lava hurts like magma", pig.getHealth() < before, before + " -> " + pig.getHealth());
