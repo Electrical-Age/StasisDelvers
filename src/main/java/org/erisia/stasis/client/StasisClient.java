@@ -141,6 +141,15 @@ public final class StasisClient {
                 e.getToolTip().add(net.minecraft.network.chat.Component.translatable("tooltip.stasisdelvers.flame." + i)
                     .withStyle(net.minecraft.ChatFormatting.GRAY));
         });
+        // what the shards are for (Baughn 2026-10-29: a player tried to charge raw shards in an EA charger)
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent.class, e -> {
+            var it = e.getItemStack().getItem();
+            String key = it == org.erisia.stasis.StasisRegistry.RIFT_SHARD.get() ? "tooltip.stasisdelvers.rift_shard"
+                : it == org.erisia.stasis.StasisRegistry.CHARGED_RIFT_SHARD.get() ? "tooltip.stasisdelvers.charged_rift_shard" : null;
+            if (key == null) return;
+            for (int i = 0; i < 2; i++)
+                e.getToolTip().add(net.minecraft.network.chat.Component.translatable(key + "." + i).withStyle(net.minecraft.ChatFormatting.GRAY));
+        });
         // still textures in stopped land (Baughn: lava, water and campfires kept animating)
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterSpriteSourcesEvent.class, FrozenSprites::registerSource);
         // stilled water looks like the water it froze from (λ-Nero: it looked like ice): the biome's water tint

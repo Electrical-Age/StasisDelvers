@@ -208,6 +208,25 @@ public final class StasisGameTests {
                 c.check("the server marks it frozen for the client", cart.getData(org.erisia.stasis.StasisRegistry.FROZEN.get()), "");
             };
         }));
+        // Baughn 2026-10-29: bumping a stilled pillager let it walk and shoot. A push slides a frozen mob; its AI stays off
+        CASES.put("pushed_frozen_mob_runs_no_ai", new Spec(60, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var pill = (net.minecraft.world.entity.monster.illager.Pillager) h.spawn(EntityTypes.PILLAGER, new Vec3(12.5, 1.0, 4.5));
+            pill.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.CROSSBOW));
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 1.5), false);
+            double x0 = pill.getX();
+            h.onEachTick(() -> pill.push(0.02, 0, 0));
+            return () -> {
+                c.check("it is frozen", Stasis.isFrozen(pill));
+                c.check("the pushes slid it east", pill.getX() > x0 + 0.3, String.format("%.2f -> %.2f", x0, pill.getX()));
+                c.check("it took no target", pill.getTarget() == null, String.valueOf(pill.getTarget()));
+                c.check("it didn't load its crossbow", !pill.isChargingCrossbow() && !pill.isUsingItem());
+                c.check("no arrows", level.getEntitiesOfClass(net.minecraft.world.entity.projectile.arrow.AbstractArrow.class,
+                    new AABB(h.absolutePos(new BlockPos(8, 0, 0))).inflate(16)).isEmpty());
+                pill.discard();
+                p.discard();
+            };
+        }));
         // Baughn: mobs avoid stopped land: a step into it costs (a running mob's path), inside it doesn't
         // λ-Nero: blocks go against stopped water (the crosshair passes through it), so a hole in it isn't a trap
         CASES.put("place_against_stopped_water", new Spec(2, (h, c) -> {
@@ -2828,16 +2847,22 @@ public final class StasisGameTests {
             h.setBlock(new BlockPos(12, 1, 2), Blocks.WATER);
             h.setBlock(new BlockPos(12, 1, 6), Blocks.LAVA);
             h.setBlock(new BlockPos(3, 1, 2), Blocks.WATER);
+            h.setBlock(new BlockPos(12, 1, 4), Blocks.SEAGRASS);
+            h.setBlock(new BlockPos(3, 1, 4), Blocks.SEAGRASS);
             var pig = (net.minecraft.world.entity.LivingEntity) h.spawn(EntityTypes.PIG, new Vec3(12.5, 2.0, 6.5));
             return () -> {
                 ServerLevel level = h.getLevel();
                 var ctx = net.minecraft.world.phys.shapes.CollisionContext.of(pig);
                 BlockPos water = h.absolutePos(new BlockPos(12, 1, 2)), lava = h.absolutePos(new BlockPos(12, 1, 6));
                 BlockPos waterIn = h.absolutePos(new BlockPos(3, 1, 2));
+                BlockPos grass = h.absolutePos(new BlockPos(12, 1, 4)), grassIn = h.absolutePos(new BlockPos(3, 1, 4));
                 var full = net.minecraft.world.phys.shapes.Shapes.block();
                 c.check("stopped water is solid to entities", level.getBlockState(water).getCollisionShape(level, water, ctx).equals(full));
                 c.check("stopped lava is solid to entities", level.getBlockState(lava).getCollisionShape(level, lava, ctx).equals(full));
                 c.check("running water isn't", level.getBlockState(waterIn).getCollisionShape(level, waterIn, ctx).isEmpty());
+                // Baughn 2026-10-29: stilled EA reservoir cells weren't walkable: any stopped fluid cell without a shape of its own
+                c.check("stopped seagrass is solid to entities", level.getBlockState(grass).getCollisionShape(level, grass, ctx).equals(full));
+                c.check("running seagrass isn't", level.getBlockState(grassIn).getCollisionShape(level, grassIn, ctx).isEmpty());
                 float before = pig.getHealth();
                 level.getBlockState(lava).getBlock().stepOn(level, lava, level.getBlockState(lava), pig);
                 c.check("standing on stopped lava hurts like magma", pig.getHealth() < before, before + " -> " + pig.getHealth());

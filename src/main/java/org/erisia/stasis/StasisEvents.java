@@ -39,7 +39,13 @@ public final class StasisEvents {
         try {
             en.setDeltaMovement(x, y, z);
             en.setOldPosAndRot();   // (as Level.tickNonPassenger does: a cart turns by where it was, and one that never ran had 0 0 0)
-            en.tick();
+            if (en instanceof net.minecraft.world.entity.vehicle.VehicleEntity) {
+                en.tick();   // (a cart follows its rails only in its own tick)
+            } else {
+                // a mob only slides: its tick would run its AI too (Baughn: bumped pillagers walked and shot)
+                en.move(net.minecraft.world.entity.MoverType.SELF, en.getDeltaMovement());
+                en.needsSync = true;
+            }
             en.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         } finally {
             PUSHING.set(false);
