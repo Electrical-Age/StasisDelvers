@@ -1124,7 +1124,7 @@ public final class StasisGameTests {
             double[] rate = new double[2];
             h.runAfterDelay(30, () -> {
                 at[0] = t.storedJ();
-                rate[0] = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0).mapToDouble(Field::rate).max().orElse(-1);
+                rate[0] = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0 && Math.abs(f.x() - t.getBlockPos().getX() - 0.5) < 2 && Math.abs(f.z() - t.getBlockPos().getZ() - 0.5) < 2).mapToDouble(Field::rate).max().orElse(-1);
             });
             h.runAfterDelay(50, () -> {
                 at[1] = t.storedJ();
@@ -1139,7 +1139,7 @@ public final class StasisGameTests {
                 double cr = t.carryRate(16, 10), in = t.inAvgW();
                 boolean carryOk = (cr <= org.erisia.stasis.StasisConfig.towerFieldRate() + 1e-9 || t.drawAt(16, cr) <= 0.9 * in + 1e-6) && (cr == 10 || t.drawAt(16, cr + 0.5) > 0.9 * in - 1e-6);
                 c.check("the power carries the highest rate it can", carryOk, String.format("carry %.1f at %.0f W in", cr, in));
-                double now = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0).mapToDouble(Field::rate).max().orElse(-1);
+                double now = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0 && Math.abs(f.x() - t.getBlockPos().getX() - 0.5) < 2 && Math.abs(f.z() - t.getBlockPos().getZ() - 0.5) < 2).mapToDouble(Field::rate).max().orElse(-1);
                 c.check("accelerator gone: back to the tower's rate", now == org.erisia.stasis.StasisConfig.towerFieldRate(), "rate " + now);
                 c.check("rate steps: 1 + step / 2", org.erisia.stasis.TemporalAcceleratorBlock.rate(1) == 1.5 && org.erisia.stasis.TemporalAcceleratorBlock.rate(18) == 10.0);
             };
@@ -1166,7 +1166,7 @@ public final class StasisGameTests {
             double[] rate = new double[1], draw = new double[1];
             java.util.List<Double>[] one = new java.util.List[1];
             h.runAfterDelay(30, () -> {
-                rate[0] = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0).mapToDouble(Field::rate).max().orElse(-1);
+                rate[0] = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0 && Math.abs(f.x() - t.getBlockPos().getX() - 0.5) < 2 && Math.abs(f.z() - t.getBlockPos().getZ() - 0.5) < 2).mapToDouble(Field::rate).max().orElse(-1);
                 draw[0] = t.drawAt(16);
                 one[0] = t.consoleState().v();
                 t.setAccelStep(4);
