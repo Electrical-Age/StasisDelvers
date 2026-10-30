@@ -234,17 +234,39 @@ final class Hull3 {
                 : q[x][1] != q[y][1] ? Double.compare(q[x][1], q[y][1]) : Integer.compare(x, y));
         int[] h = new int[2 * n + 1];
         int k = 0;
-        for (int i = 0; i < n; i++) {                       // Andrew's monotone chain (counter-clockwise in (u, v))
-            while (k >= 2 && cross2(q[h[k - 2]], q[h[k - 1]], q[ord[i]]) <= eps * eps) k--;
+        // Andrew's monotone chain (counter-clockwise in (u, v)). A corner within eps of the chord past it is dropped:
+        // the same distance rule as the 3D faces. (It was cross2 <= eps * eps, an area against a squared length, so the
+        // rounding of the frame, which depends on the input order, decided whether a collinear point stayed. Todo #122.)
+        for (int i = 0; i < n; i++) {
+            while (k >= 2 && notCounterClockwise(q[h[k - 2]], q[h[k - 1]], q[ord[i]])) k--;
             h[k++] = ord[i];
         }
         for (int i = n - 2, t = k + 1; i >= 0; i--) {
-            while (k >= t && cross2(q[h[k - 2]], q[h[k - 1]], q[ord[i]]) <= eps * eps) k--;
+            while (k >= t && notCounterClockwise(q[h[k - 2]], q[h[k - 1]], q[ord[i]])) k--;
             h[k++] = ord[i];
         }
-        poly = java.util.Arrays.copyOf(h, Math.max(0, k - 1));
+        // The chain never tests its two ends (the first and last in (u, v) order). On a run of collinear points across
+        // u (a side perpendicular to the u axis) rounding can sort a middle point first, so drop such corners here too.
+        int m = Math.max(0, k - 1);
+        for (boolean again = true; again && m >= 3; ) {
+            again = false;
+            for (int j = 0; m >= 3 && j < m; j++)
+                if (notCounterClockwise(q[h[(j + m - 1) % m]], q[h[j]], q[h[(j + 1) % m]])) {
+                    System.arraycopy(h, j + 1, h, j, m - j - 1);
+                    m--;
+                    j--;
+                    again = true;
+                }
+        }
+        poly = java.util.Arrays.copyOf(h, m);
         if (poly.length < 3) dim = 1;
         // (u, v, nrm) is right-handed (v = nrm x u), so counter-clockwise in (u, v) is counter-clockwise about nrm
+    }
+
+    /** Does o -> a -> b fail to turn counter-clockwise by more than eps (a's distance from the line o b, like {@link #dist})? */
+    private boolean notCounterClockwise(double[] o, double[] a, double[] b) {
+        double dx = b[0] - o[0], dy = b[1] - o[1];
+        return cross2(o, a, b) <= eps * Math.sqrt(dx * dx + dy * dy);
     }
 
     private static double cross2(double[] o, double[] a, double[] b) {

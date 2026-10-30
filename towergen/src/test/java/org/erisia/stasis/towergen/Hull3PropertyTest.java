@@ -2,6 +2,7 @@ package org.erisia.stasis.towergen;
 
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
+import net.jqwik.api.Example;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
@@ -91,6 +92,44 @@ class Hull3PropertyTest {
         assertEquals(volume(a), volume(b), 1e-9);
         if (a.dim == 3) assertTrue(volume(a) > 0, "outward winding");
         if (a.dim == 2) assertEquals(a.poly.length, b.poly.length, "polygon corners");
+    }
+
+    /** A flat cloud: the given points, plus the origin repeated (as jqwik shrank them), in the given order. */
+    static double[] flat(int zeros, double... pts) {
+        double[] a = new double[3 * zeros + pts.length];
+        System.arraycopy(pts, 0, a, 3 * zeros, pts.length);
+        return a;
+    }
+
+    /**
+     * Todo #122 (Baughn: "take a look at the ... property test"): orderOfThePointsDoesNotMatter failed for seed
+     * 6958958309186360505 (and -4300465104733893565), "polygon corners expected 4 was 3". Flat clouds with three collinear
+     * points on one side of the polygon: depending on the input order the middle one stayed a corner. The planar chain
+     * compared an area to eps squared, and never tested the first point in (u, v) order, which rounding could pick
+     * from the middle of a side across u. The exact corner count is asserted, for both orders.
+     */
+    @Example
+    void collinearSideCornersDoNotDependOnOrder() {
+        // seed 6958958309186360505, first shrink: origin on the side (0.01, 0, 0.005) .. (-0.02, 0, -0.01)
+        corners(flat(14, 0.01, 0, 0.005, -0.02, 0, -0.01, -0.02, 0.01, -0.02), 1, 3);
+        // the same seed after the chain fix: (-0.02, 0.01, -0.02) in the middle of a side across u
+        corners(flat(14, -0.02, 0, -0.01, -0.02, 0.01, -0.02, -0.02, 0.02, -0.03), 1, 3);
+        // seed -4300465104733893565: (0, 0.01, -0.01) on the side from the origin to (0, 0.07, -0.07)
+        corners(flat(2, -0.01, 0, -0.005, 0, 0.01, -0.01, 0, 0.07, -0.07, -0.01, 0.01, -0.015), 2, 4);
+    }
+
+    static void corners(double[] in, long seed, int expected) {
+        int m = in.length / 3;
+        Integer[] perm = new Integer[m];
+        for (int i = 0; i < m; i++) perm[i] = i;
+        java.util.Collections.shuffle(java.util.Arrays.asList(perm), new java.util.Random(seed));
+        double[] sh = new double[in.length];
+        for (int i = 0; i < m; i++) System.arraycopy(in, 3 * perm[i], sh, 3 * i, 3);
+        Hull3 a = Hull3.of(in, m), b = Hull3.of(sh, m);
+        assertEquals(2, a.dim);
+        assertEquals(2, b.dim);
+        assertEquals(expected, a.poly.length, "corners in the given order");
+        assertEquals(expected, b.poly.length, "corners shuffled");
     }
 
     @Property(tries = 300)
