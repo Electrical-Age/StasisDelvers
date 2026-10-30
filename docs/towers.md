@@ -64,16 +64,21 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
 - Config: `towerDrawK`, `towerStoreBatteries`, `towerMaxSegments`, `towerBoomStretch`, `towerFieldRate` (`StasisConfig`).
 
 ## Temporal accelerator (`TemporalAcceleratorBlock`; λ-Nero, notes/timestop/ACCEL-DESIGN.md)
-- A block against either core cell (any side), set by its lever (`AcceleratorLevers`: a right-click raises `STEP` 1..18,
+- A block against either core cell (any side), set by its lever (`AcceleratorLevers`: a right-click raises `STEP` 0..18,
   round from the top; a sneak-right-click lowers it, with anything in hand; `AcceleratorLeverRenderer` draws the
-  lever on the face last clicked, swinging with the setting): rate = 1 + step / 2 (1.5x..10x). `want(level, master)`: the highest setting against the core.
-- `TowerBlockEntity.accelerate` (once a second while running, after `safety`): the field runs at `accelRate`
-  (saved), or at `towerFieldRate` when it's 1. `drawAt(r)` includes `(accelRate / towerFieldRate)²` (Baughn: priced by
-  the speed-up, 0.6 to 1.5 is 2.5²).
+  lever on the face last clicked, swinging with the setting) or by the console's rate slider (`ConsoleRate`,
+  `TowerBlockEntity.setAccelStep`: sets every accelerator against the core; greyed out with a tooltip without one):
+  rate = 1 + step / 2 (1x..10x; 1x lifts the field's slowness, Baughn 2026-10-30). `want(level, master)`: the
+  highest setting against the core, or `towerFieldRate` without one; `step(level, master)`: -1 without one.
+- `TowerBlockEntity.accelerate` (once a second while running, after `safety`): the field runs at `accelRate` (saved;
+  `towerFieldRate` without an accelerator). `drawAt(r)` includes `(accelRate / towerFieldRate)²` above the tower's own
+  rate (Baughn: priced by the speed-up, 0.6 to 1.5 is 2.5²).
 - Short of power (`failing > 0.5`), `safety` sets `accelRetreat` and returns before any radius retreat: the rate falls
-  to `carryRate` (the highest half step whose draw the input carries at 90%), at least half a step a second while the
-  shield fails, and comes back once the store is 80% full. Override turns this off with the rest of the safety.
-- Test: `tower_temporal_accelerator`.
+  to `carryRate` (the highest half step whose draw the input carries at 90%, at least `towerFieldRate`), at least half
+  a step a second while the shield fails, and comes back once the store is 80% full. Override turns this off with the
+  rest of the safety.
+- Console readout values 20-22: accelerator step (-1: none), the rate it asks for, the rate running.
+- Tests: `tower_temporal_accelerator`, `tower_accelerator_1x_and_console`.
 
 ## Chunk tickets (`Tickets.java`)
 - `update(level, tower)` forces the rectangle of chunks covering max(radius, target)·stretch per side, while the
