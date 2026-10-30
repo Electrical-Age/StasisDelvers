@@ -1109,7 +1109,7 @@ public final class StasisGameTests {
             level.setBlock(abs, Blocks.AIR.defaultBlockState(), 3);
         }));
         // λ-Nero: a temporal accelerator against the core runs the tower's field at its setting, for the rate squared in
-        // power; with nothing coming in, the rate the power carries is 1x; taking it away puts the field back
+        // power; with nothing coming in, the power carries only the tower's own rate; taking it away puts the field back
         CASES.put("tower_temporal_accelerator", new Spec(70, (h, c) -> {
             double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225 * 16 * 16);
             c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
@@ -1137,11 +1137,49 @@ public final class StasisGameTests {
                 c.check("2x draws (2 / the tower's own rate)² (Baughn: 0.6 -> 1.5 is 2.5²)", Math.abs(used - expect) < 0.05 * expect, String.format("%.0f J vs %.0f J", used, expect));
                 // the carried rate: the highest half step whose draw (x weather) is within 90% of the input
                 double cr = t.carryRate(16, 10), in = t.inAvgW();
-                boolean carryOk = (cr == 1 || t.drawAt(16, cr) <= 0.9 * in + 1e-6) && (cr == 10 || t.drawAt(16, cr + 0.5) > 0.9 * in - 1e-6);
+                boolean carryOk = (cr <= org.erisia.stasis.StasisConfig.towerFieldRate() + 1e-9 || t.drawAt(16, cr) <= 0.9 * in + 1e-6) && (cr == 10 || t.drawAt(16, cr + 0.5) > 0.9 * in - 1e-6);
                 c.check("the power carries the highest rate it can", carryOk, String.format("carry %.1f at %.0f W in", cr, in));
                 double now = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0).mapToDouble(Field::rate).max().orElse(-1);
                 c.check("accelerator gone: back to the tower's rate", now == org.erisia.stasis.StasisConfig.towerFieldRate(), "rate " + now);
                 c.check("rate steps: 1 + step / 2", org.erisia.stasis.TemporalAcceleratorBlock.rate(1) == 1.5 && org.erisia.stasis.TemporalAcceleratorBlock.rate(18) == 10.0);
+            };
+        }, false, true));
+        // Baughn 2026-10-30: an accelerator at its lowest setting runs the field at 1x (no slowness inside), for
+        // (1 / the tower's own rate)² in power; the console reads and sets it, and says when there is none
+        CASES.put("tower_accelerator_1x_and_console", new Spec(50, (h, c) -> {
+            double[] k0 = org.erisia.stasis.StasisConfig.testTowerConstants(10, 1225 * 16 * 16);
+            c.cleanup.add(() -> org.erisia.stasis.StasisConfig.testTowerConstants(k0[0], k0[1]));
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.9 * 4 / 3), tx);
+                tx.commit();
+            }
+            java.util.List<Double>[] none = new java.util.List[1];
+            boolean[] noop = new boolean[1];
+            h.runAfterDelay(5, () -> {
+                none[0] = t.consoleState().v();
+                t.setAccelStep(4);   // (no accelerator: nothing to set)
+                noop[0] = !(h.getBlockState(new BlockPos(4, 2, 4)).getBlock() instanceof org.erisia.stasis.TemporalAcceleratorBlock);
+                h.setBlock(new BlockPos(4, 2, 4), org.erisia.stasis.StasisRegistry.TEMPORAL_ACCELERATOR_BLOCK.get().defaultBlockState()
+                    .setValue(org.erisia.stasis.TemporalAcceleratorBlock.STEP, 0));
+            });
+            double[] rate = new double[1], draw = new double[1];
+            java.util.List<Double>[] one = new java.util.List[1];
+            h.runAfterDelay(30, () -> {
+                rate[0] = FieldData.get(h.getLevel()).fields().stream().filter(f -> f.radius() == 16.0).mapToDouble(Field::rate).max().orElse(-1);
+                draw[0] = t.drawAt(16);
+                one[0] = t.consoleState().v();
+                t.setAccelStep(4);
+            });
+            return () -> {
+                double base = org.erisia.stasis.StasisConfig.towerFieldRate();
+                c.check("without an accelerator the console says so (step -1, the tower's own rate)", none[0].get(20) == -1 && none[0].get(21) == base, none[0].subList(20, 23).toString());
+                c.check("the console's slider sets nothing without an accelerator", noop[0]);
+                c.check("an accelerator at its lowest setting runs the field at 1x", rate[0] == 1.0, "rate " + rate[0]);
+                double expect = org.erisia.stasis.TowerBlockEntity.drawFor(16) / (base * base);
+                c.check("1x draws (1 / the tower's own rate)²", Math.abs(draw[0] - expect) < 0.01 * expect, String.format("%.0f W vs %.0f W", draw[0], expect));
+                c.check("the console reads step 0, 1x asked, 1x running", one[0].get(20) == 0 && one[0].get(21) == 1.0 && one[0].get(22) == 1.0, one[0].subList(20, 23).toString());
+                c.check("the console's slider sets the accelerator", h.getBlockState(new BlockPos(4, 2, 4)).getValue(org.erisia.stasis.TemporalAcceleratorBlock.STEP) == 4);
             };
         }, false, true));
         // Baughn: booms stretch the running tower's field their way, and the draw follows the volume

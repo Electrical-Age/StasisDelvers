@@ -40,7 +40,7 @@ public final class AcceleratorLevers {
         int step;
         if (temporal) {
             int s = st.getValue(TemporalAcceleratorBlock.STEP);
-            step = down ? Math.max(1, s - 1) : s % 18 + 1;
+            step = down ? Math.max(0, s - 1) : (s + 1) % 19;
             sl.setBlock(pos, st.setValue(TemporalAcceleratorBlock.STEP, step), Block.UPDATE_ALL);
         } else {
             int s = st.getValue(ChronalAcceleratorBlock.STEP);

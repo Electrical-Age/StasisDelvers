@@ -101,6 +101,8 @@ class NetCodecTest {
                                   @ForAll @Size(max = 16) List<@net.jqwik.api.From("anyDouble") Double> v, @ForAll String text) {
         assertEquals(new StasisNet.ConsoleQuery(pos), trip(StasisNet.ConsoleQuery.CODEC, new StasisNet.ConsoleQuery(pos)));
         assertEquals(new StasisNet.ConsoleFeed(pos), trip(StasisNet.ConsoleFeed.CODEC, new StasisNet.ConsoleFeed(pos)));
+        int step = (int) (Math.abs(Double.isNaN(target) ? 0 : target) % 19);
+        assertEquals(new StasisNet.ConsoleRate(pos, step), trip(StasisNet.ConsoleRate.CODEC, new StasisNet.ConsoleRate(pos, step)));
         // (a NaN target means "the preferred range": it must survive)
         assertEquals(new StasisNet.ConsoleSet(pos, target, override), trip(StasisNet.ConsoleSet.CODEC, new StasisNet.ConsoleSet(pos, target, override)));
         var st = new StasisNet.ConsoleState(pos, v, text);

@@ -220,6 +220,18 @@ public final class StasisNet {
 
     /** The console's readout: v = the values TowerBlockEntity.CONSOLE_NAMES names (20: state, store, power, radii,
      *  switches, and for the asker locked / feeding / kJ fed); text = the structure line. */
+    /** The console's rate slider: the temporal accelerators' step (TowerBlockEntity.setAccelStep). */
+    public record ConsoleRate(net.minecraft.core.BlockPos pos, int step) implements CustomPacketPayload {
+        public static final Type<ConsoleRate> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_rate"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleRate> CODEC = StreamCodec.composite(
+            net.minecraft.core.BlockPos.STREAM_CODEC, ConsoleRate::pos, ByteBufCodecs.VAR_INT, ConsoleRate::step, ConsoleRate::new);
+
+        @Override
+        public Type<ConsoleRate> type() {
+            return TYPE;
+        }
+    }
+
     public record ConsoleState(net.minecraft.core.BlockPos pos, List<Double> v, String text) implements CustomPacketPayload {
         public static final Type<ConsoleState> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "console_state"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ConsoleState> CODEC = StreamCodec.composite(
@@ -447,7 +459,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar(BuildInfo.channelVersion("17"));   // (+ the build commit: a mismatched pack is refused at login)  17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar(BuildInfo.channelVersion("18"));   // (+ the build commit: a mismatched pack is refused at login)  18: console_rate (the accelerator slider); 17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -472,6 +484,14 @@ public final class StasisNet {
                     if (!t.locked && p.override() != t.override())
                         StasisDelvers.LOG.info("{} turned the tower at {} OVERRIDE {}", sp.getName().getString(), p.pos().toShortString(), p.override() ? "ON" : "off");
                     t.setControls(p.target(), p.override());
+                    send(sp, t.consoleState(sp));
+                }
+            });
+            r.playToServer(ConsoleRate.TYPE, ConsoleRate.CODEC, (p, ctx) -> {
+                if (ctx.player() instanceof ServerPlayer sp) {
+                    TowerBlockEntity t = consoleTower(sp, p.pos());
+                    if (t == null) return;
+                    t.setAccelStep(p.step());
                     send(sp, t.consoleState(sp));
                 }
             });

@@ -21,6 +21,10 @@ public final class ConsoleScreen extends Screen {
     int ticks;
     long armedUntil;
     Button overrideButton, feedButton;
+    RateSlider rateSlider;
+    /** The step we last sent, until the server's readout shows it (the slider mustn't jump back meanwhile). */
+    int pendingStep = -2;
+    long pendingStepUntil;
     final java.util.List<Button> targetButtons = new java.util.ArrayList<>();
     /** The last target we asked for, until the server's readout catches up (a quick second +5 was lost). */
     double pending = Double.NaN;
@@ -76,6 +80,56 @@ public final class ConsoleScreen extends Screen {
         // (Baughn: charging a tower from your suit, e.g. to start a dead one)
         feedButton = addRenderableWidget(Button.builder(Component.literal("Feed from your suit"),
             b -> ClientPacketDistributor.sendToServer(new StasisNet.ConsoleFeed(pos))).bounds(x, y + 52, 300, 20).build());
+        // the field's rate (Baughn 2026-10-30: players didn't know about the accelerator; 1x lifts the slowness)
+        rateSlider = addRenderableWidget(new RateSlider(x, y + 76, 300));
+    }
+
+    /** The accelerators' step shown: ours while the server catches up, else the server's (-1: no accelerator). */
+    int step() {
+        if (System.currentTimeMillis() < pendingStepUntil) return pendingStep;
+        return st == null || st.v().size() <= 20 ? -1 : (int) v(20);
+    }
+
+    /** The temporal accelerators' setting, 1x .. 10x in half steps; greyed out without an accelerator. */
+    final class RateSlider extends net.minecraft.client.gui.components.AbstractSliderButton {
+        RateSlider(int x, int y, int w) {
+            super(x, y, w, 20, Component.empty(), 0);
+            updateMessage();
+        }
+
+        int sliderStep() {
+            return (int) Math.round(value * 18);
+        }
+
+        void sync() {
+            int s = step();
+            active = s >= 0 && !(st != null && st.v().size() > 17 && v(17) > 0);
+            setTooltip(s >= 0 ? null : net.minecraft.client.gui.components.Tooltip.create(Component.literal(
+                "Place a Temporal Accelerator against the tower core to set its field's rate. At 1x the field no longer slows you.")));
+            if (!dragging && s >= 0) value = s / 18.0;
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            int s = step();
+            if (s < 0) {
+                setMessage(Component.literal(String.format("Field rate %.1fx: needs a Temporal Accelerator", v(21))));
+                return;
+            }
+            double want = org.erisia.stasis.TemporalAcceleratorBlock.rate(dragging ? sliderStep() : s), now = st.v().size() > 22 ? v(22) : 0;
+            String held = v(0) == 1 && now > 0 && now < want - 1e-6 ? String.format(", held at %.1fx: not enough power", now) : "";
+            setMessage(Component.literal(String.format("Field rate %.1fx%s", want, held)));
+        }
+
+        @Override
+        protected void applyValue() {
+            int s = sliderStep();
+            if (s == step()) return;
+            pendingStep = s;
+            pendingStepUntil = System.currentTimeMillis() + 1500;
+            ClientPacketDistributor.sendToServer(new StasisNet.ConsoleRate(pos, s));
+        }
     }
 
     void pressOverride() {
@@ -104,6 +158,7 @@ public final class ConsoleScreen extends Screen {
         boolean locked = st != null && st.v().size() > 17 && v(17) > 0;
         for (Button b : targetButtons) b.active = v(13) <= 0 && !locked;
         if (overrideButton != null) overrideButton.active = !locked;
+        if (rateSlider != null) rateSlider.sync();
         if (feedButton != null) {
             boolean feeding = st != null && st.v().size() > 18 && v(18) > 0;
             feedButton.setMessage(Component.literal(feeding ? String.format("FEEDING: %.1f kJ so far - press to stop", v(19))
@@ -120,7 +175,7 @@ public final class ConsoleScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
         int x = width / 2 - 150, y = height / 2 - 92;
         // the panel first, then the buttons on it (drawn after, it greyed them out: AdventurAgent's stills)
-        g.fill(x - 8, y - 8, x + 308, height / 2 + 126, 0xD0101018);
+        g.fill(x - 8, y - 8, x + 308, height / 2 + 150, 0xD0101018);
         super.extractRenderState(g, mouseX, mouseY, a);
         g.text(font, "STASIS TOWER", x, y, 0xFFB8A8E8);
         if (st == null) {

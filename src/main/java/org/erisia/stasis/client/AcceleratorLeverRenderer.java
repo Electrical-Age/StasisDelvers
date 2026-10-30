@@ -47,7 +47,7 @@ public class AcceleratorLeverRenderer<T extends BlockEntity & AcceleratorLevers.
     static final java.util.Map<BlockPos, float[]> SHOWN = new java.util.concurrent.ConcurrentHashMap<>();
 
     static float target(BlockState st) {
-        if (st.getBlock() instanceof TemporalAcceleratorBlock) return -45 + 90 * (st.getValue(TemporalAcceleratorBlock.STEP) - 1) / 17f;
+        if (st.getBlock() instanceof TemporalAcceleratorBlock) return -45 + 90 * st.getValue(TemporalAcceleratorBlock.STEP) / 18f;
         if (st.getBlock() instanceof ChronalAcceleratorBlock) return -45 + 90 * st.getValue(ChronalAcceleratorBlock.STEP) / 18f;
         return 0;
     }

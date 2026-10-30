@@ -311,6 +311,12 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     /** Console: set the target radius (NaN: the preferred range) and OVERRIDE (ignored on a locked tower). */
+    /** The console's rate slider (Baughn 2026-10-30): sets the accelerators against the core; nothing without one. */
+    public void setAccelStep(int step) {
+        if (locked || level == null) return;
+        TemporalAcceleratorBlock.setStep(level, worldPosition, step);
+    }
+
     public void setControls(double target, boolean override) {
         if (locked) return;
         this.targetRadius = Double.isNaN(target) ? Double.NaN : Math.max(minRadius(), Math.min(maxRadius(), target));
@@ -327,10 +333,11 @@ public class TowerBlockEntity extends BlockEntity {
     boolean retreating;
     double retreatRadius;
     /**
-     * The rate a temporal accelerator against the core has the field run at (1: none; TemporalAcceleratorBlock), and
+     * The rate a temporal accelerator against the core has the field run at (the tower's own field rate, 0.6, without
+     * one; TemporalAcceleratorBlock), and
      * whether the tower has dropped it for want of power (it goes back up once the store is 80% full again).
      */
-    double accelRate = 1;
+    double accelRate = StasisConfig.towerFieldRate();
     boolean accelRetreat;
 
     public boolean retreating() {
@@ -359,7 +366,7 @@ public class TowerBlockEntity extends BlockEntity {
         }
         // an accelerated field drops its rate (towards 1x) before it gives up radius (λ-Nero: not off, the rate the
         // power carries)
-        if (accelRate > 1 && failing > 0.5) {
+        if (accelRate > StasisConfig.towerFieldRate() + 1e-9 && failing > 0.5) {
             accelRetreat = true;
             return;
         }
@@ -420,17 +427,18 @@ public class TowerBlockEntity extends BlockEntity {
      * field (λ-Nero: 2x for 4x the power; Baughn: from 0.6 to 1.5 is 2.5², from 1.0 less).
      */
     public double drawAt(double r, double rate) {
-        double up = rate > 1 ? rate / Math.min(1, Math.max(0.001, StasisConfig.towerFieldRate)) : 1;
+        double base = Math.min(1, Math.max(0.001, StasisConfig.towerFieldRate));
+        double up = rate > base ? rate / base : 1;
         return drawFor(r * volumeScale()) * drawPenalty(r) * up * up;
     }
 
     /** The highest rate (in the accelerator's half steps, at most want) whose draw the input carries with a margin at
-     *  radius r; at least 1. */
+     *  radius r; at least the tower's own field rate. */
     public double carryRate(double r, double want) {
-        double w = weatherFactor();
-        for (double rate = want; rate > 1; rate -= 0.5)
+        double w = weatherFactor(), base = StasisConfig.towerFieldRate();
+        for (double rate = want; rate > base + 1e-9; rate -= 0.5)
             if (drawAt(r, rate) * w <= 0.9 * inAvgW) return rate;
-        return 1;
+        return base;
     }
 
     /** The averaged input (W). */
@@ -447,11 +455,11 @@ public class TowerBlockEntity extends BlockEntity {
             // and not back up until the store has refilled (safety)
             next = Math.min(want, carryRate(effRadius, want));
             if (failing > 0.5) next = Math.min(next, accelRate - 0.5);
-            next = Math.max(1, Math.min(next, accelRate));
+            next = Math.max(StasisConfig.towerFieldRate(), Math.min(next, accelRate));
         }
         if (next == accelRate) return;
         accelRate = next;
-        double fieldRate = next > 1 ? next : StasisConfig.towerFieldRate;
+        double fieldRate = next;
         FieldData.get(sl).update(sl, fieldId, f -> f.withRate(fieldRate));
         setChanged();
     }
@@ -738,7 +746,7 @@ public class TowerBlockEntity extends BlockEntity {
         startedAt = now;
         sl.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.BEACON_ACTIVATE, net.minecraft.sounds.SoundSource.BLOCKS, 2.0F, 0.6F);
         state = State.RUNNING;
-        accelRate = 1;   // (the accelerators speed it up from the next second)
+        accelRate = StasisConfig.towerFieldRate();   // (the accelerators speed it up from the next second)
         accelRetreat = false;
         failing = amber = dropout = 0;
         netAvg = 0;
@@ -754,7 +762,7 @@ public class TowerBlockEntity extends BlockEntity {
         state = State.OFF;
         effRadius = 0;
         retreating = false;
-        accelRate = 1;   // (a stopped tower draws nothing extra)
+        accelRate = StasisConfig.towerFieldRate();   // (a stopped tower draws nothing extra)
         accelRetreat = false;
         collapseTicks = 0;
         failing = amber = dropout = 0;
@@ -869,7 +877,7 @@ public class TowerBlockEntity extends BlockEntity {
         facing = fd != null && fd.getAxis().isHorizontal() ? fd : net.minecraft.core.Direction.SOUTH;
         retreating = in.getBooleanOr("retreating", false);
         retreatRadius = in.getDoubleOr("retreatRadius", 0);
-        accelRate = Math.max(1, in.getDoubleOr("accelRate", 1));
+        accelRate = Math.max(StasisConfig.towerFieldRate(), in.getDoubleOr("accelRate", StasisConfig.towerFieldRate()));
         accelRetreat = in.getBooleanOr("accelRetreat", false);
         double rr = in.getDoubleOr("remnantRadius", 0);
         remnant = rr <= 0 ? null : new Remnant(rr, in.getIntOr("remnantSeed", 0), in.getDoubleOr("remnantCollapse", 0.5),
@@ -908,20 +916,27 @@ public class TowerBlockEntity extends BlockEntity {
     /** What each value of consoleState's v is (bug reports name them with this; keep it in step with consoleState). */
     public static final java.util.List<String> CONSOLE_NAMES = java.util.List.of("state", "stored_J", "max_J", "in_W", "draw_W",
         "weather_factor", "preferred_radius", "min_radius", "max_radius", "target_radius", "radius_now", "goal_radius", "override",
-        "target_by_signal", "retreating", "carry_radius", "failing", "locked", "feeding_from_asker", "kJ_fed");
+        "target_by_signal", "retreating", "carry_radius", "failing", "locked", "feeding_from_asker", "kJ_fed", "accelerator_step",
+        "accelerator_rate", "field_rate");
 
     /** The console's readout (StasisNet.ConsoleState). */
     public StasisNet.ConsoleState consoleState() {
         return consoleState(null);
     }
 
-    /** ... plus, for the player asking: locked (17), feeding from them (18), kJ fed so far (19). */
+    /** ... plus, for the player asking: locked (17), feeding from them (18), kJ fed so far (19); then the accelerators'
+     *  setting (20: step, -1 without one), the rate it asks for (21) and the rate the field runs at (22). */
     public StasisNet.ConsoleState consoleState(@org.jspecify.annotations.Nullable ServerPlayer asker) {
         double r = radius();
         java.util.List<Double> v = java.util.List.of((double) state.ordinal(), storedJ(), storeMaxJ(), inAvgW,
             drawAt(r) * weatherFactor(), weatherFactor(), designRadius(), minRadius(), maxRadius(), target(),
             state == State.OFF ? 0 : r, goalRadius(), override ? 1.0 : 0.0, signalSet ? 1.0 : 0.0, retreating ? 1.0 : 0.0, carryRadius(),
             failing, locked ? 1.0 : 0.0, asker != null && asker.getUUID().equals(feeder) ? 1.0 : 0.0, fed / 1000);
+        int step = level == null ? -1 : TemporalAcceleratorBlock.step(level, worldPosition);
+        v = new java.util.ArrayList<>(v);
+        v.add((double) step);
+        v.add(step < 0 ? StasisConfig.towerFieldRate() : TemporalAcceleratorBlock.rate(step));
+        v.add(state == State.RUNNING ? accelRate : 0.0);
         return new StasisNet.ConsoleState(worldPosition, v, structureLine());
     }
 
