@@ -12,7 +12,7 @@ There are three layers. All of them run through Gradle; the wrapper script below
 - `stasis-build.sh test`: unit and property tests of the mod only.
 - `stasis-build.sh :towergen:test`, and `./gradlew :towergen:slowTest [-Dtowergen.random=N -Dtowergen.seed=S]`.
 - `stasis-build.sh runGameTestServer`: every GameTest, headless. It exits non-zero if a required test fails.
-  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 163 at HEAD).
+  The results are at the end of `run/logs/latest.log` ("All N required tests passed"; 186 at HEAD).
 - One GameTest by hand: `./gradlew runServer` (or `runClient`), then `/test run stasisdelvers:<name>`.
   `neoforge.enabledGameTestNamespaces` is set for every run config.
 
@@ -89,10 +89,16 @@ debugging:
   owner (the test outlasts the login grace)
 - `eddies_stop_mobs`, `flames_*`, `tower_collapses_when_empty` (a15602d)
 - `rift_crystals_grow` (5907f24: cross-chunk keys)
-- `eddies_in_a_weak_field` (once over its 60 % pocket share, 3568 of 5457, when test positions moved; passed on rerun)
+- `eddies_in_a_weak_field` (fixed 2026-10-30: over its 60 % pocket share twice, 3568 and 3294 of 5457. The share aimed at
+  is 40 %, but the box holds only ~85 noise cells, so where the test lands moves it: 10-74 % over 20000 random places,
+  0.9 % at or over 60 %. The bound is 80 % now)
 - `remains_*` (2026-10-20: ran beside `remains_not_with_keep_inventory`, whose world-wide keepInventory left them no drops;
   that test is isolated now)
-- `spread_hard_mode_entry` (2026-10-20, and twice on 2026-10-23: "the flash removes a dragon still alive": removed false; passed on reruns)
+- `spread_hard_mode_entry` (fixed 2026-10-30; failed 2026-10-20, twice on 2026-10-23 and once in five runs on 2026-10-30:
+  "the flash removes a dragon still alive": removed false, 1 dragons. The test server ticks as fast as it can, so the
+  fresh End chunk could still be loading at the flash; the dragon added to it was hidden from `getEntities` until the
+  chunk's full promotion, after the flash. The test now waits, at most 10 s, for the chunk's entities to tick before it
+  adds the dragon, and checks the dragon is in the level's lookups)
 - `lance_multiblock_binds` (once, 2026-10-20: "a boom away from the rift: unbound"; like `lance_breach_hold_relax`, a
   lance test whose geometry meets the test's random world position; passed on rerun)
 - `spread_rates` (fixed 2026-10-20: the spawn column is a bilinear blend of its cell, ranked only >= split - 1, and lower
@@ -101,7 +107,7 @@ debugging:
 - `time_resumes` (new_chunk_grace's chunk grace reached its sand when the grid put both in one chunk;
   new_chunk_grace is isolated now)
 - `spread_hard_mode_gate_rooms` (2026-10-20: about 1 run in 3; waits up to 1200 ticks now, 1 in 20; was: 29 of 30 chunks shattered, the last "loaded, no entities ticking";
-  passed on rerun; not looked into)
+  passed on rerun; not looked into. Once on 2026-10-30, another way: "the rift's core is carved hollow: 52 of 56")
 - Lance tests, fixed 2026-10-20 (they had flaked since the remains work; the bisect pointed at chance, not remains):
   `lance_breach_hold_relax` picked a probe whose shape could lie past the breached quarter (now 0.095..0.24, six
   directions; one failure in ~30 runs since, with diagnostics in the message); `lance_multiblock_binds`' west boom could

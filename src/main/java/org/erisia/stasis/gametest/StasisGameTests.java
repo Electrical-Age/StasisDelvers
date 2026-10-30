@@ -480,7 +480,10 @@ public final class StasisGameTests {
                 FieldData.get(level).update(level, f.id(), x -> x.withFailing(0.95));
                 pocket[0] = null;
                 count.run();
-                c.check("a weak field: 5-60% of it in stopped pockets", counts[1] > 0.05 * counts[0] && counts[1] < 0.6 * counts[0], counts[1] + " of " + counts[0]);
+                // the share aimed at is 40% (Eddies.share at failing 0.95), but this box holds only ~85 four-block cells of a
+                // noise whose blobs span several cells, so where the test lands moves it: over 20000 random places, seeds
+                // and times it was 10-74% (mean 38%, 0.9% at or over 60%, the old bound, which failed 1 in 5 on 2026-10-30)
+                c.check("a weak field: 5-80% of it in stopped pockets", counts[1] > 0.05 * counts[0] && counts[1] < 0.8 * counts[0], counts[1] + " of " + counts[0]);
                 c.check("the steady rule (flames, EA) ignores them", counts[2] == counts[1], counts[2] + " vs " + counts[1]);
                 if (pocket[0] != null) {
                     ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 1.0, 4.5), true);
@@ -4063,11 +4066,21 @@ public final class StasisGameTests {
             if (dragon != null) {
                 // (above the players, its chunk held loaded: a dragon added to an unloaded chunk isn't in the level's lookups)
                 if (end.setChunkForced(300 >> 4, 0, true)) c.cleanup.add(() -> end.setChunkForced(300 >> 4, 0, false));
+                // Wait (here, at most 10 s) until the chunk's entities are tracked. The test server runs ticks as fast as it
+                // can, so a fresh End chunk could still be generating at the flash 6 s of game time later: a dragon added
+                // before the chunk's full promotion is hidden from getEntities, the flash missed it, and it showed up
+                // after (failed 1 in 5 on 2026-10-30, "removed false, 1 dragons"; 185 ms in setChunkForced that run).
+                var dragonChunk = new net.minecraft.world.level.ChunkPos(300 >> 4, 0);
+                long until = System.nanoTime() + 10_000_000_000L;
+                while (!end.areEntitiesActuallyLoadedAndTicking(dragonChunk) && System.nanoTime() < until)
+                    if (!end.getChunkSource().pollTask()) java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
                 dragon.setPos(300.5, 30, 5.5);
                 dragon.setNoAi(true);   // (it would fly about the test End for the 6 s)
                 boolean added = end.addFreshEntity(dragon);
                 c.cleanup.add(dragon::discard);
-                c.check("a dragon is alive in the End at the entry", added && !dragon.isRemoved());
+                boolean seen = end.getEntities(net.minecraft.world.entity.EntityTypes.ENDER_DRAGON, x -> x == dragon).size() == 1;
+                c.check("a dragon is alive in the End at the entry, in the level's lookups", added && !dragon.isRemoved() && seen,
+                    "added " + added + ", seen " + seen);
             }
             boolean first = org.erisia.stasis.HardMode.enter(server, "test"), again = org.erisia.stasis.HardMode.enter(server, "test again");
             c.check("the entry point enters once", first && !again && org.erisia.stasis.Spread.hard(server), first + " " + again);
