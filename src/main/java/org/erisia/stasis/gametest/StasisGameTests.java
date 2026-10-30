@@ -1004,15 +1004,15 @@ public final class StasisGameTests {
                 }
             });
             return () -> {
-                c.check("three segments: radius 40", t.radius() == 40.0, "r " + t.radius());
+                c.check("three segments: radius " + org.erisia.stasis.TowerBlockEntity.radiusFor(3), t.radius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3), "r " + t.radius());
                 c.check("over half charged: running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name()
                     + " stored " + t.storedJ() + " of " + t.storeMaxJ() + " J, ticks " + t.ticks + ", same BE " + (h.getLevel().getBlockEntity(h.absolutePos(new BlockPos(3, 1, 4))) == t));
                 var fields = FieldData.get(h.getLevel()).fields();
-                c.check("its field is up, r 40", fields.stream().anyMatch(f -> f.radius() == 40.0
+                c.check("its field is up, r " + org.erisia.stasis.TowerBlockEntity.radiusFor(3), fields.stream().anyMatch(f -> f.radius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3)
                     && f.containsPoint(h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).x, h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).y, h.absoluteVec(new Vec3(3.5, 1.5, 4.5)).z)), fields.toString());
                 c.check("time runs next to the tower", Stasis.isRunning(h.getLevel(), h.absolutePos(new BlockPos(6, 1, 4))));
                 t.setRemoved();   // breaking the tower takes its field down
-                c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == 40.0));
+                c.check("tower gone: field gone", FieldData.get(h.getLevel()).fields().stream().noneMatch(f -> f.radius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3)));
             };
         }, false, true));
         // λ-Nero, variant B: a chronal accelerator in the wall of a sealed riftstone room runs it (in stopped land too) at
@@ -1187,7 +1187,7 @@ public final class StasisGameTests {
             org.erisia.stasis.TowerStructure.syncBuild = true;
             c.cleanup.add(() -> org.erisia.stasis.TowerStructure.syncBuild = false);
             BlockPos base = new BlockPos(3, 1, 4);
-            var t = tower(h, base, 3);                                             // H 5, r 40
+            var t = tower(h, base, 3);                                             // H 5, r 32
             var boomPole = org.erisia.stasis.StasisRegistry.TOWER_SEGMENT.get().defaultBlockState()
                 .setValue(org.erisia.stasis.TowerPoleBlock.AXIS, net.minecraft.core.Direction.Axis.X);
             h.setBlock(base.above().west(1), boomPole);
@@ -1200,9 +1200,10 @@ public final class StasisGameTests {
                 c.check("its field reaches further west", f != null && Math.abs(f.stretch().w() - want) < 1e-9 && f.stretch().e() == 1
                     && f.stretch().n() == 1 && f.stretch().s() == 1, String.valueOf(f));
                 Vec3 cp = h.absoluteVec(new Vec3(3.5, 1.5, 4.5));
-                c.check("a point 45 west is inside, 45 east isn't", f != null && f.containsPoint(cp.x - 45, cp.y, cp.z) && !f.containsPoint(cp.x + 45, cp.y, cp.z));
+                double far = t.designRadius() * (1 + want) / 2;   // (past its radius east, inside its stretched reach west)
+                c.check("a point " + Math.round(far) + " west is inside, as far east isn't", f != null && f.containsPoint(cp.x - far, cp.y, cp.z) && !f.containsPoint(cp.x + far, cp.y, cp.z));
                 double vs = Math.cbrt((1 + want + want + 1) / 4);
-                c.check("draw by volume", Math.abs(t.volumeScale() - vs) < 1e-9 && Math.abs(t.drawAt(40) - org.erisia.stasis.TowerBlockEntity.drawFor(40 * vs)) < 1e-6,
+                c.check("draw by volume", Math.abs(t.volumeScale() - vs) < 1e-9 && Math.abs(t.drawAt(t.designRadius()) - org.erisia.stasis.TowerBlockEntity.drawFor(t.designRadius() * vs)) < 1e-6,
                     t.volumeScale() + " vs " + vs);
                 t.setRemoved();
             };
@@ -1213,11 +1214,11 @@ public final class StasisGameTests {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             t.testCharge(1.0);
             return () -> {
-                c.check("preferred range 40", t.designRadius() == 40 && t.goalRadius() == 40, t.designRadius() + " / " + t.goalRadius());
+                c.check("preferred range " + org.erisia.stasis.TowerBlockEntity.radiusFor(3), t.designRadius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3) && t.goalRadius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3), t.designRadius() + " / " + t.goalRadius());
                 c.check("the minimum covers the tower", t.minRadius() == 7, String.valueOf(t.minRadius()));
                 t.setControls(1000, false);
-                c.check("expansion stops at +25%", t.target() == 50, String.valueOf(t.target()));
-                c.check("at +25% the draw is ~3.8x", Math.abs(t.drawPenalty(50) - Math.pow(1.25, 6)) < 1e-9, String.valueOf(t.drawPenalty(50)));
+                c.check("expansion stops at +25%", Math.abs(t.target() - 1.25 * org.erisia.stasis.TowerBlockEntity.radiusFor(3)) < 1e-9, String.valueOf(t.target()));
+                c.check("at +25% the draw is ~3.8x", Math.abs(t.drawPenalty(1.25 * org.erisia.stasis.TowerBlockEntity.radiusFor(3)) - Math.pow(1.25, 6)) < 1e-9, String.valueOf(t.drawPenalty(1.25 * org.erisia.stasis.TowerBlockEntity.radiusFor(3))));
                 c.check("below the preferred range, no penalty", t.drawPenalty(30) == 1);
                 t.setControls(20, false);
                 c.check("a smaller target", t.goalRadius() == 20, String.valueOf(t.goalRadius()));
@@ -1225,20 +1226,20 @@ public final class StasisGameTests {
                 // the failure cycle: no input, half charge, failing: no retreat (nothing would carry it)
                 t.testCharge(0.5);
                 t.testSafety(0, 0.6);
-                c.check("no input: it holds on at full size", !t.retreating() && t.goalRadius() == 40, t.goalRadius() + "");
+                c.check("no input: it holds on at full size", !t.retreating() && t.goalRadius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3), t.goalRadius() + "");
                 // some input: it retreats to what the input carries
                 double w = org.erisia.stasis.TowerBlockEntity.drawFor(24) / 0.9 + 1;
                 t.testSafety(w, 0.6);
                 c.check("with input: it retreats to what the input carries", t.retreating() && Math.abs(t.goalRadius() - 24) <= 1, t.goalRadius() + "");
                 t.testCharge(0.85);
                 t.testSafety(w, 0.3);
-                c.check("recharged past 80%: it grows back", !t.retreating() && t.goalRadius() == 40);
+                c.check("recharged past 80%: it grows back", !t.retreating() && t.goalRadius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3));
                 t.testCharge(0.1);
                 t.testSafety(0, 0.7);
                 c.check("the last ditch below 15%: down to the minimum", t.retreating() && t.goalRadius() == t.minRadius(), t.goalRadius() + "");
                 t.setControls(Double.NaN, true);
                 t.testSafety(0, 0.7);
-                c.check("OVERRIDE holds the full range", !t.retreating() && t.goalRadius() == 40, String.valueOf(t.goalRadius()));
+                c.check("OVERRIDE holds the full range", !t.retreating() && t.goalRadius() == org.erisia.stasis.TowerBlockEntity.radiusFor(3), String.valueOf(t.goalRadius()));
                 c.check("the store never shrinks with the target", t.storeMaxJ() == org.erisia.stasis.TowerBlockEntity.storeJ());
                 // Baughn 2026-10-25: the two Cost Oriented Batteries of its recipe (60 kJ each), whatever its size
                 c.check("the store is its recipe's two batteries", Math.abs(t.storeMaxJ() - 120_000) < 1, String.format("%.0f J", t.storeMaxJ()));
@@ -1255,7 +1256,7 @@ public final class StasisGameTests {
                 c.check("near: the console answers", org.erisia.stasis.StasisNet.consoleTower(near, t.getBlockPos()) == t);
                 c.check("20 blocks off: refused", org.erisia.stasis.StasisNet.consoleTower(far, t.getBlockPos()) == null);
                 var st = t.consoleState();
-                c.check("the readout has the preferred range", st.v().get(6) == 32.0, st.v().toString());
+                c.check("the readout has the preferred range", st.v().get(6) == org.erisia.stasis.TowerBlockEntity.radiusFor(2), st.v().toString());
                 remove(h, near);
                 remove(h, far);
                 t.setRemoved();

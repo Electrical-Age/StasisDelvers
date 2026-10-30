@@ -47,7 +47,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
   - `override` (the console's OVERRIDE) turns the safety off.
 
 ## Formulas
-- `radiusFor(segments)` = 8·(segments + 2). `designRadius` uses it.
+- `radiusFor(segments)` = 16·√(segments + 1) (Baughn 2026-10-30; 16, 23, 32, 39, 48, 64 at 0, 1, 3, 5, 8, 15 poles; it was 8·(segments + 2)). `designRadius` uses it.
   - `minRadius` = min(design, max(6, segments + 4)).
   - `maxRadius` = 1.25·design (`MAX_EXPAND`).
 - `drawFor(r)` = `towerDrawK`·r^1.5 W.
