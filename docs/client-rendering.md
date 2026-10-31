@@ -128,6 +128,8 @@ through hooks set in `StasisClient`.
   the view bob, the hurt tilt and the nausea warp into it, and `CameraRenderState.projectionMatrix` has none of them
   (`GameRendererMixin` captures it; `StasisPost.viewProjection`, used by the flashlight and the bolts too). Without it
   the fields swayed as the camera bobbed (Baughn, 2026-10-30).
+- Shell fragments past the render distance are cut only over the sky (no terrain there); in front of drawn terrain,
+  Distant Horizons' included, they stay (Baughn: a big field's shell had holes that moved with the camera).
 - Order: flashlight, then stasis, then the suited hand. `GameRendererMixin` skips the hand pass in
   `render3dHud` and redraws it after `applyPostEffects`, but only once its late hook has proven it runs
   (otherwise the hand would vanish).
