@@ -40,6 +40,9 @@ through hooks set in `StasisClient`.
   `SoundManager.soundEngine`, `Channel.source`, `SoundEngine.instanceToChannel`). `SoundEngineMixin` adds pitch sag.
 - `RiftHum.java`, `LocalClock.java` (+ `LocalClockMark.java`, `ClientClock*Mixin`: the sky shows local time),
   `SuitGauge.java`, `SuitArm.java`, `StatueRenderer.java`, `ConsoleScreen.java`.
+- `WornCurios.java` (Curios loaded only): `ICurioRenderer`s draw the worn accessories on players (Baughn, todo
+  #166): the rift pendants as their sprite on the chest (cord ends at the neck), the chronal anchor as a small charm on
+  the wearer's left breast. Both 3.3 px off the body, over a chestplate. Curios' per-slot render toggle hides them.
 - `compat/xaero/` (`StoppedLand`, `MinimapHighlighter`, `WorldMapHighlighter`): the stopped-land overlay on
   Xaero's maps (mixins in `mixin/xaero/`). It reads `rateAtLand`; the world map's region hash changes with the
   fields, with P every 1/2000 of the map, and with the rank tiles.

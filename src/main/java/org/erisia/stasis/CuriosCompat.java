@@ -7,11 +7,16 @@ import net.minecraft.world.item.ItemStack;
  * The pendant in Curios' necklace slot, if Curios is loaded (no hard dependency: this class is only touched after
  * the ModList check in {@link #pendant}).
  */
-final class CuriosCompat {
+public final class CuriosCompat {
     private CuriosCompat() {
     }
 
     static final boolean LOADED = net.neoforged.fml.ModList.get() != null && net.neoforged.fml.ModList.get().isLoaded("curios");
+
+    /** Curios is loaded (client code checks this before touching Curios classes). */
+    public static boolean loaded() {
+        return LOADED;
+    }
 
     /** The worn rift pendant with charge left, or EMPTY. */
     static ItemStack pendant(ServerPlayer p) {

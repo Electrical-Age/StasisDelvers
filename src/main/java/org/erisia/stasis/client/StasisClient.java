@@ -20,6 +20,7 @@ public final class StasisClient {
         // the bug-report key (F7) and its client config (notes/bugreport/SPEC.md)
         container.registerConfig(net.neoforged.fml.config.ModConfig.Type.CLIENT, org.erisia.stasis.client.report.ReportConfig.SPEC);
         org.erisia.stasis.client.report.BugReport.init(modBus);
+        WornCurios.register(modBus);
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterGuiLayersEvent.class, e -> e.registerAbove(
             net.neoforged.neoforge.client.gui.VanillaGuiLayers.HOTBAR, net.minecraft.resources.Identifier.fromNamespaceAndPath("stasisdelvers", "suit_gauge"),
             SuitGauge::render));
