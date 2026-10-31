@@ -1,12 +1,10 @@
 package org.erisia.stasis.client;
 
 import mods.eln.item.electricalitem.LampItem;
-import mods.eln.generic.ElnItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -51,12 +49,9 @@ public final class FlashlightPost {
     static final List<Player> holders = new ArrayList<>();
     static final List<Integer> lights = new ArrayList<>();
 
-    /** The light of a lit EA flashlight in either hand, else 0. */
+    /** The light of the beam a player casts: a lit EA flashlight in either hand or a worn headlamp (EA's one rule), else 0. */
     static int beamLight(Player p) {
-        int best = 0;
-        for (ItemStack s : List.of(p.getMainHandItem(), p.getOffhandItem()))
-            if (s.getItem() instanceof ElnItem i && i.descriptor instanceof LampItem lamp) best = Math.max(best, lamp.beamLight(s));
-        return best;
+        return LampItem.beamLight(p);
     }
 
     static boolean shaderPackInUse() {
