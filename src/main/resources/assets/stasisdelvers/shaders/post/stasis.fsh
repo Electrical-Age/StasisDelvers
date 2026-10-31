@@ -101,6 +101,10 @@ bool dhPos(vec2 uv, out vec3 rel) {
     vec4 hc = inv * vec4(0.0, 0.0, 0.5, 1.0);
     vec3 dir = normalize(hs.xyz / hs.w), fwd = normalize(hc.xyz / hc.w);
     rel = dir * (z / max(dot(dir, fwd), 1e-4));
+    // inside vanilla's render distance DH's depth isn't the scene: vanilla drew there, and where vanilla shows sky a DH
+    // depth is a LOD it doesn't show (stale, or coarser than the land), which hid a field's shell behind an invisible wall
+    // ten blocks off (Baughn, a big field seen against the sky)
+    if (length(rel.xz) < data(216) - 16.0) { rel = vec3(0.0); return false; }
     return true;
 }
 
