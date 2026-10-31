@@ -13,7 +13,6 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.FrameGraphSetupEvent;
 import org.erisia.stasis.StasisDelvers;
-import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -105,7 +104,7 @@ public final class FlashlightPost {
         var cam = e.getCameraState();
         float pt = cam.cameraEntityPartialTicks;
         float[] d = new float[128];
-        new Matrix4f(cam.projectionMatrix).mul(cam.viewRotationMatrix).invert().get(d, 0);
+        StasisPost.viewProjection(cam).invert().get(d, 0);   // (the view bob included, as the level was drawn)
         d[17] = STRENGTH;
         d[18] = TINT[0];
         d[19] = TINT[1];

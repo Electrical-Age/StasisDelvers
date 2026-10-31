@@ -15,12 +15,14 @@ import net.minecraft.client.renderer.state.OptionsRenderState;
 import net.minecraft.client.renderer.state.level.PlayerRenderState;
 import org.erisia.stasis.client.StasisPost;
 import org.erisia.stasis.client.SuitArm;
+import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
@@ -33,6 +35,11 @@ import java.util.List;
  * the post shader (that depth is indistinguishable from a wall right in front of the player), so instead: when the
  * stasis effect is applied and the player wears a suit, skip the hand pass there and run it right after the post
  * chain, with the same projection, fog and lighting.
+ * <p>
+ * Also hands the post chains the projection the level is really drawn with: renderLevel multiplies the view bob, the
+ * hurt tilt and the nausea warp into it, and CameraRenderState.projectionMatrix has none of them, so the stasis and
+ * flashlight shaders rebuilt world positions from depth with the wrong matrix and the fields swayed as the camera
+ * bobbed (Baughn: "view bobbing moves fields").
  */
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin {
@@ -57,6 +64,20 @@ public abstract class GameRendererMixin {
      * and without the late pass the hand must not be skipped, or it would vanish.
      */
     @Unique private boolean stasis$lateHookLive;
+
+    /** No level projection outside renderLevel (StasisPost falls back to the camera's own). */
+    @Inject(method = "renderLevel", at = {@At("HEAD"), @At("RETURN")})
+    private void stasis$clearProjection(CallbackInfo ci) {
+        StasisPost.levelProjection(null);
+    }
+
+    /** The level's projection, bob and all, as it goes to the GPU (before FrameGraphSetupEvent packs the post data). */
+    @ModifyArg(method = "renderLevel", at = @At(value = "INVOKE",
+        target = "Lnet/minecraft/client/renderer/ProjectionMatrixBuffer;getBuffer(Lorg/joml/Matrix4f;)Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;"))
+    private Matrix4f stasis$levelProjection(Matrix4f projection) {
+        StasisPost.levelProjection(projection);
+        return projection;
+    }
 
     @Inject(method = "render3dHud", at = @At("HEAD"))
     private void stasis$decide(CameraRenderState cameraState, PlayerRenderState playerState, OptionsRenderState optionsState,

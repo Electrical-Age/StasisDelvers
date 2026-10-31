@@ -56,7 +56,7 @@ mods) has rewritten a target, only that effect is lost.
 | Mixin | Target | Effect lost without it |
 |---|---|---|
 | `ClientLevelFastMixin` | `ClientLevel.tickNonPassenger` (TAIL) | Client-moved entities (items, falling blocks, arrows; not interpolated mobs, players or what they ride) in an acceleration field ticking at the server's pace: without it they jump at each sync |
-| `GameRendererMixin` | `render3dHud` (HEAD), `renderItemInHand` (HEAD cancel), `render` after `applyPostEffects` | The suited hand drawn in colour after the post chain |
+| `GameRendererMixin` | `render3dHud` (HEAD), `renderItemInHand` (HEAD cancel), `render` after `applyPostEffects`; `renderLevel` (HEAD, RETURN, `@ModifyArg` on `ProjectionMatrixBuffer.getBuffer(Matrix4f)`) | The suited hand drawn in colour after the post chain; the level's projection with the view bob, hurt tilt and nausea for the post shaders (`StasisPost.viewProjection`; Baughn: view bobbing moved fields). Without it they fall back to the camera's projection |
 | `ClientLevelMixin` | `doAnimateTick` (3 calls), `tickWeatherEffects` (particles, rain sounds) | No ambience, drips or rain sound in stopped land; muffled rain under a shield |
 | `ClientClockManagerMixin` | `ClientClockManager.getInstance` | Marks the overworld clock (`LocalClockMark`) |
 | `ClientClockInstanceMixin` | `ClientClockInstance.totalTicks`, `partialTick` | The local sky time (frozen, or the field's clock) |

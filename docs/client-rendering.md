@@ -124,6 +124,10 @@ through hooks set in `StasisClient`.
 
 ## Invariants
 - Reversed-Z depth: the shaders reconstruct world positions accordingly (`stasis.fsh`, `flashlight.fsh`).
+- Slots 0-15 are inverse(projection x view rotation) with the projection the level was drawn with: vanilla multiplies
+  the view bob, the hurt tilt and the nausea warp into it, and `CameraRenderState.projectionMatrix` has none of them
+  (`GameRendererMixin` captures it; `StasisPost.viewProjection`, used by the flashlight and the bolts too). Without it
+  the fields swayed as the camera bobbed (Baughn, 2026-10-30).
 - Order: flashlight, then stasis, then the suited hand. `GameRendererMixin` skips the hand pass in
   `render3dHud` and redraws it after `applyPostEffects`, but only once its late hook has proven it runs
   (otherwise the hand would vanish).

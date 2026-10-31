@@ -44,6 +44,25 @@ public final class StasisPost {
         return v * v;
     }
 
+    /**
+     * The projection the level was drawn with this frame (GameRendererMixin: vanilla's projection times the view bob,
+     * the hurt tilt and the nausea warp), or null when the hook didn't run. CameraRenderState.projectionMatrix lacks
+     * all three, so world positions rebuilt from depth with it swayed as the camera bobbed (Baughn: "view bobbing
+     * moves fields").
+     */
+    private static Matrix4f levelProjection;
+
+    /** GameRendererMixin, in renderLevel: the projection the level is drawn with (null at the start of the frame). */
+    public static void levelProjection(Matrix4f m) {
+        levelProjection = m == null ? null : new Matrix4f(m);
+    }
+
+    /** projection x view rotation as the level was drawn (bob included): what the post shaders invert. */
+    static Matrix4f viewProjection(net.minecraft.client.renderer.state.level.CameraRenderState cs) {
+        Matrix4f p = levelProjection;
+        return new Matrix4f(p != null ? p : cs.projectionMatrix).mul(cs.viewRotationMatrix);
+    }
+
     static final int FIELD_BASE = 4096, FIELD_STRIDE = 19, MAX_FIELDS = 32, SHIELD_OFF = 10, STRETCH_OFF = 14, SPEED_OFF = 18;
     /** Drifting deeps: at most MAX_DEEPS (stasis.fsh MAX_DEEPS), DEEP_STRIDE slots each from DEEP_BASE. */
     static final int DEEP_BASE = 1024, DEEP_STRIDE = 12, MAX_DEEPS = 24;
@@ -152,7 +171,7 @@ public final class StasisPost {
         if (texture == null) init();
         var camState = e.getCameraState();
         float[] d = new float[SLOTS];
-        Matrix4f vp = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix).invert();
+        Matrix4f vp = viewProjection(camState).invert();
         vp.get(d, 0);   // column-major
         if (DhDepthTexture.DH) org.erisia.stasis.compat.dh.DhDepth.fill(d);
         var cam = camState.pos;
@@ -453,7 +472,7 @@ public final class StasisPost {
         d[1600] = ne;
         // rift core surroundings (λ-Nero): each core's place on screen (for the lens pull) and the strain on reality,
         // stronger nearer a core, so players can home in by following "darker and greyer"
-        Matrix4f fwd0 = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
+        Matrix4f fwd0 = viewProjection(camState);
         float strain = 0;
         for (int i = 0; i < ns; i++) {
             float cx = d[204 + 3 * i] + (float) fx, cy = d[205 + 3 * i] + (float) fy, cz = d[206 + 3 * i] + (float) fz;
@@ -507,7 +526,7 @@ public final class StasisPost {
         long now = mc.level.getGameTime();
         grids.values().removeIf(g -> now - g.made() > 200);
         // lightning bolts (BoltRenderer), projected to the screen
-        Matrix4f fwd = new Matrix4f(camState.projectionMatrix).mul(camState.viewRotationMatrix);
+        Matrix4f fwd = viewProjection(camState);
         d[256] = BoltRenderer.fill(d, 260, 150, fwd, cam);
         BoltRenderer.groups(d, 260, (int) d[256]);
         var img = texture.getPixels();
