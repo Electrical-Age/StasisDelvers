@@ -3706,6 +3706,70 @@ public final class StasisGameTests {
                 c.check("stopped: none", sums[2] == 0, "ticks " + sums[2]);
             };
         }, true, true));
+        // a plant at the field's edge doesn't grow into stopped land (Baughn: "bamboo grows slightly inside stopped
+        // land"): sugar cane's top in the field's last whole block, the block above it stopped, ticked through the
+        // random-tick bracket (Stasis.randomTicking, as ServerLevelMixin does); a cane wholly inside grows (control).
+        // Bamboo is stopped earlier, at CropGrowEvent (its top names itself; the stopped block is the one above).
+        CASES.put("no_growth_into_stopped_land", new Spec(2, (h, c) -> {
+            // (the structure's ceiling is a barrier at y 6, so a small field low down: its last whole block in column
+            // x 3 is y 2, y 3 is stopped; at x 4, y 2 still runs)
+            field(h, c, new Vec3(3.5, 1.0, 4.5), 3.0, 1.0);
+            // edge cane: sand at (3, 0, 4), water at (2, 0, 4) in a stone cup, cane at y 1 and 2
+            h.setBlock(new BlockPos(3, 0, 4), Blocks.SAND);
+            for (BlockPos q : List.of(new BlockPos(1, 0, 4), new BlockPos(2, 0, 3), new BlockPos(2, 0, 5), new BlockPos(2, -1, 4)))
+                h.setBlock(q, Blocks.STONE);
+            h.setBlock(new BlockPos(2, 0, 4), Blocks.WATER);
+            h.setBlock(new BlockPos(3, 1, 4), Blocks.SUGAR_CANE);
+            h.setBlock(new BlockPos(3, 2, 4), Blocks.SUGAR_CANE);
+            // control cane: sand at (4, 0, 4), water at (5, 0, 4) in a stone cup, cane at y 1
+            h.setBlock(new BlockPos(4, 0, 4), Blocks.SAND);
+            for (BlockPos q : List.of(new BlockPos(6, 0, 4), new BlockPos(5, 0, 3), new BlockPos(5, 0, 5), new BlockPos(5, -1, 4)))
+                h.setBlock(q, Blocks.STONE);
+            h.setBlock(new BlockPos(5, 0, 4), Blocks.WATER);
+            h.setBlock(new BlockPos(4, 1, 4), Blocks.SUGAR_CANE);
+            return () -> {
+                ServerLevel level = h.getLevel();
+                BlockPos edgeTop = h.absolutePos(new BlockPos(3, 2, 4)), inTop = h.absolutePos(new BlockPos(4, 1, 4));
+                c.check("setup: the edge cane's top runs, the block above is stopped, the control's above runs",
+                    Stasis.rateAt(level, edgeTop) == 1.0 && Stasis.rateAt(level, edgeTop.above()) == 0.0 && Stasis.rateAt(level, inTop.above()) == 1.0,
+                    Stasis.rateAt(level, edgeTop) + " " + Stasis.rateAt(level, edgeTop.above()) + " " + Stasis.rateAt(level, inTop.above()));
+                c.check("setup: both canes stand", level.getBlockState(edgeTop).is(Blocks.SUGAR_CANE) && level.getBlockState(inTop).is(Blocks.SUGAR_CANE));
+                for (BlockPos top : List.of(edgeTop, inTop))
+                    for (int i = 0; i < 20; i++) {
+                        var st = level.getBlockState(top);
+                        if (!st.is(Blocks.SUGAR_CANE)) break;
+                        Stasis.randomTicking(level, top);
+                        try {
+                            st.randomTick(level, top, level.getRandom());
+                        } finally {
+                            Stasis.randomTicking(level, null);
+                        }
+                    }
+                c.check("the cane wholly inside grew (control)", level.getBlockState(inTop.above()).is(Blocks.SUGAR_CANE),
+                    "" + level.getBlockState(inTop.above()));
+                c.check("the edge cane didn't grow into stopped land", level.getBlockState(edgeTop.above()).isAir(),
+                    "" + level.getBlockState(edgeTop.above()));
+                // the write rule itself: only while a random tick runs, only into stopped blocks
+                BlockPos out = h.absolutePos(new BlockPos(12, 2, 1)), in = h.absolutePos(new BlockPos(3, 1, 5));
+                Stasis.randomTicking(level, h.absolutePos(new BlockPos(3, 1, 3)));
+                boolean wroteOut, wroteIn;
+                try {
+                    wroteOut = level.setBlockAndUpdate(out, Blocks.STONE.defaultBlockState());
+                    wroteIn = level.setBlockAndUpdate(in, Blocks.STONE.defaultBlockState());
+                } finally {
+                    Stasis.randomTicking(level, null);
+                }
+                c.check("a random tick writes into running land, not into stopped land", wroteIn && !wroteOut && level.getBlockState(out).isAir(),
+                    wroteIn + " " + wroteOut + " " + level.getBlockState(out));
+                c.check("outside a random tick, stopped land takes writes (players, commands, the tests)",
+                    level.setBlockAndUpdate(out, Blocks.STONE.defaultBlockState()) && level.getBlockState(out).is(Blocks.STONE));
+                // bamboo: CropGrowEvent says no when the block above its top is stopped, yes inside
+                var bamboo = Blocks.BAMBOO.defaultBlockState();
+                c.check("bamboo: no growth when the block above its top is stopped, growth inside",
+                    !net.neoforged.neoforge.common.CommonHooks.canCropGrow(level, edgeTop, bamboo, true)
+                        && net.neoforged.neoforge.common.CommonHooks.canCropGrow(level, inTop, bamboo, true));
+            };
+        }, false));
         // overlapping fields: the fastest wins; changing a rate takes effect at once
         CASES.put("rate_overlap_max", new Spec(1, (h, c) -> () -> {
             ServerLevel level = h.getLevel();

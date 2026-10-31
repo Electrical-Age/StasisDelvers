@@ -402,6 +402,26 @@ public final class Stasis {
     }
 
     /** Does the block at pos get this game tick (its rate says it runs now)? */
+    /**
+     * The block whose random tick is running (server thread only; ServerLevelMixin), or null. A plant at a field's edge
+     * runs, but what it grows lands next to it: bamboo, sugar cane, cactus and kelp put their new top in the block
+     * above, vines and grass spread sideways, lava lights fires. Where that block is stopped (rate 0) the write is
+     * refused (LevelMixin), so nothing grows into stopped land (Baughn: "bamboo grows slightly inside stopped land").
+     */
+    private static Level randomTickLevel;
+    private static BlockPos randomTickPos;
+
+    /** ServerLevelMixin: the random tick of the block at pos starts (pos) or ends (null). */
+    public static void randomTicking(Level level, BlockPos pos) {
+        randomTickLevel = pos == null ? null : level;
+        randomTickPos = pos == null ? null : pos.immutable();
+    }
+
+    /** LevelMixin: does a running random tick try to write into stopped land at pos? Then the write doesn't happen. */
+    public static boolean refusesWrite(Level level, BlockPos pos) {
+        return randomTickLevel == level && !pos.equals(randomTickPos) && rateAt(level, pos) <= 0;
+    }
+
     public static boolean ticksNow(Level level, BlockPos pos) {
         return runs(rateAt(level, pos), level.getGameTime());
     }

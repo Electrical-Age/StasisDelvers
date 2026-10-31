@@ -1,6 +1,6 @@
 # Mixins
 
-There are 28 mixin classes in three configs, plus an access transformer. Mixin sources are in
+There are 35 mixin classes in three configs, plus an access transformer. Mixin sources are in
 `src/main/java/org/erisia/stasis/mixin/`; the configs are in `src/main/resources/`. All three configs are listed
 in `src/main/templates/META-INF/neoforge.mods.toml` (`[[mixins]]`), along with the AT (`[[accessTransformers]]`).
 The background audit (written before the cleanup, with 36 mixins) is
@@ -30,6 +30,7 @@ If one of these can't apply, the game stops at startup, on purpose: without them
 | Mixin | Target | What | Why no event |
 |---|---|---|---|
 | `ServerLevelMixin` | `ServerLevel.isPositionTickingWithEntitiesLoaded` (RETURN), `tickBlock`/`tickFluid` (HEAD cancel), `tickChunk` (HEAD cancel + 2 `@WrapOperation` on `randomTick`), merged `createTick` x2 | Scheduled ticks wait or are rate-delayed (`Stasis.dueTick`; shortened by `speedAt` in acceleration fields); no random ticks, snow or ice in stopped land; random ticks run `ticksThisTurn` times in acceleration fields | No scheduled-tick or random-tick event exists |
+| `LevelMixin` | `Level.setBlock(BlockPos, BlockState, int, int)` (HEAD cancel) | A random tick (bracketed by `ServerLevelMixin`, `Stasis.randomTicking`) writes nothing into stopped land (`Stasis.refusesWrite`): plants at a field's edge don't grow out into it (Baughn: bamboo); `StasisEvents.cropGrow` (`CropGrowEvent.Pre`) stops bamboo, cactus and kelp before they try | `CropGrowEvent` covers only some plants and names different blocks per plant; vines, grass and lava fire have none |
 | `LevelChunkMixin` | `LevelChunk.isTicking` (RETURN) | Block entities tick only on running ticks; `Stasis.exemptBlockEntity` is exempt | No block-entity-tick event |
 | `BoundTickingBlockEntityMixin` | `LevelChunk$BoundTickingBlockEntity.tick` (HEAD cancel; `@WrapOperation` on `BlockEntityTicker.tick`) | The time-stop gate again (Lithium's `world_border` mixin replaces `isTicking`, so `LevelChunkMixin` alone let furnaces run in stopped land on Incognito); block entities in an acceleration field tick `ticksThisTurn` times (`Stasis.multiTickExempt`: towers, lances, querns, EA) | No block-entity-tick event |
 | `ServerLevelEntityMixin` | `ServerLevel.tickNonPassenger` (TAIL) | Entities (not players or passengers) in an acceleration field get the extra ticks, through `tickNonPassenger` again under a re-entrancy guard | `EntityTickEvent.Post` can't re-run the whole tick (old position, riders) |

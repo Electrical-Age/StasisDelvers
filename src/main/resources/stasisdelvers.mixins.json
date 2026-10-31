@@ -22,7 +22,8 @@
     "EndBarrierMixin",
     "PathfindingContextMixin",
     "WalkNodeEvaluatorMixin",
-    "BoatClampMixin"
+    "BoatClampMixin",
+    "LevelMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -120,6 +120,11 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   - `tickBlock` / `tickFluid` give a tick that lands on a non-running tick back as delay 1.
   - Wholly stopped columns keep their ticks queued (`isPositionTickingWithEntitiesLoaded` returns false).
 - Random ticks run only when `ticksNow` says so. Snow and ice skip wholly stopped columns (`tickChunk` HEAD cancel).
+- A running random tick writes nothing into stopped land (rate 0): `ServerLevelMixin` brackets it (`Stasis.randomTicking`),
+  `LevelMixin` refuses `setBlock` there (`Stasis.refusesWrite`), and `StasisEvents.cropGrow` denies `CropGrowEvent.Pre`
+  when the block a plant grows into is stopped (bamboo and sugar cane name their top: the block above it). Before, bamboo,
+  sugar cane, cactus and kelp at a field's edge grew one block out into stopped land (Baughn, 2026-10-31). Not covered:
+  bonemeal (a player's use) and scheduled ticks (fire spread). Test: `no_growth_into_stopped_land`.
 
 ## Persistent state
 - `FieldData` keys: `next_id`, `fields[...]` (`Field.CODEC`), `cottage`, `deep_seed`, `clocks{id: double}`. A new level's

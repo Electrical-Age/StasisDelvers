@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Block time by rate (Stasis.rateAt; stopped = 0): scheduled block and fluid ticks are delayed by the rate and only
  * run in game ticks their rate runs in; random ticks are skipped in the ticks it skips. Where time is stopped: no
  * scheduled ticks, no random ticks, no snow or ice. In an acceleration field (Stasis.speedAt) scheduled delays shrink
- * and random ticks run several times.
+ * and random ticks run several times. A random tick at a field's edge can't write into stopped land (LevelMixin).
  */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
@@ -86,13 +86,18 @@ public abstract class ServerLevelMixin {
         target = "Lnet/minecraft/world/level/block/state/BlockState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
     private void stasis$randomTickBlock(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, Operation<Void> op) {
         if (!Stasis.ticksNow(level, pos)) return;
-        op.call(state, level, pos, random);
-        if (!Stasis.hasFast(level)) return;
-        int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
-        for (int i = 1; i < k; i++) {
-            BlockState now = level.getBlockState(pos);   // (a crop that grew is the next stage now)
-            if (!now.isRandomlyTicking()) return;
-            op.call(now, level, pos, random);
+        Stasis.randomTicking(level, pos);   // (what it writes into stopped land is refused: LevelMixin)
+        try {
+            op.call(state, level, pos, random);
+            if (!Stasis.hasFast(level)) return;
+            int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
+            for (int i = 1; i < k; i++) {
+                BlockState now = level.getBlockState(pos);   // (a crop that grew is the next stage now)
+                if (!now.isRandomlyTicking()) return;
+                op.call(now, level, pos, random);
+            }
+        } finally {
+            Stasis.randomTicking(level, null);
         }
     }
 
@@ -100,13 +105,18 @@ public abstract class ServerLevelMixin {
         target = "Lnet/minecraft/world/level/material/FluidState;randomTick(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/util/RandomSource;)V"))
     private void stasis$randomTickFluid(FluidState state, ServerLevel level, BlockPos pos, RandomSource random, Operation<Void> op) {
         if (!Stasis.ticksNow(level, pos)) return;
-        op.call(state, level, pos, random);
-        if (!Stasis.hasFast(level)) return;
-        int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
-        for (int i = 1; i < k; i++) {
-            FluidState now = level.getFluidState(pos);
-            if (!now.isRandomlyTicking()) return;
-            op.call(now, level, pos, random);
+        Stasis.randomTicking(level, pos);   // (lava lights no fires in stopped land: LevelMixin)
+        try {
+            op.call(state, level, pos, random);
+            if (!Stasis.hasFast(level)) return;
+            int k = Stasis.ticksThisTurn(Stasis.speedAt(level, pos), level.getGameTime());
+            for (int i = 1; i < k; i++) {
+                FluidState now = level.getFluidState(pos);
+                if (!now.isRandomlyTicking()) return;
+                op.call(now, level, pos, random);
+            }
+        } finally {
+            Stasis.randomTicking(level, null);
         }
     }
 }

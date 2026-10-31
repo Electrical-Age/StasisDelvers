@@ -34,6 +34,7 @@ public final class StasisDelvers {
             if (e.getConfig().getSpec() == StasisConfig.SPEC) StasisConfig.refresh();
         });
         NeoForge.EVENT_BUS.addListener(StasisEvents::entityTick);
+        NeoForge.EVENT_BUS.addListener(StasisEvents::cropGrow);
         NeoForge.EVENT_BUS.addListener(StasisEvents::spawnCheck);
         NeoForge.EVENT_BUS.addListener(StasisEvents::finalizeSpawn);
         NeoForge.EVENT_BUS.addListener(StasisEvents::griefing);

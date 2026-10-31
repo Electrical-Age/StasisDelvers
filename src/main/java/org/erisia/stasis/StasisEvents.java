@@ -11,6 +11,20 @@ public final class StasisEvents {
     private StasisEvents() {
     }
 
+    /**
+     * A plant whose growth would land in stopped land doesn't grow (Baughn: "bamboo grows slightly inside stopped
+     * land"). Bamboo and sugar cane name their own block (the top) and grow into the one above; cactus and kelp-like
+     * plants name the block they grow into. LevelMixin refuses the write anyway; this stops the try, so bamboo at a
+     * field's edge doesn't re-leaf its stalk below each time.
+     */
+    static void cropGrow(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre e) {
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
+        var b = e.getState().getBlock();
+        var target = b instanceof net.minecraft.world.level.block.BambooStalkBlock || b instanceof net.minecraft.world.level.block.SugarCaneBlock
+            ? e.getPos().above() : e.getPos();
+        if (Stasis.rateAt(level, target) <= 0) e.setResult(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.DO_NOT_GROW);
+    }
+
     static void entityTick(EntityTickEvent.Pre e) {
         // a mob killed in stopped land still finishes dying (else it lies there forever at 0 health: Baughn's pigs)
         if (e.getEntity() instanceof net.minecraft.world.entity.LivingEntity le && le.isDeadOrDying()) return;
