@@ -58,6 +58,9 @@ public final class TowerStructure {
     private Layout pendingLayout;
     /** Poles we changed from SURVEY at the last good build (to reset them when the tower changes). */
     private long[] parted = new long[0];
+    /** The pole rules the parts were set by: 2 since the ladder reaches the drawn pole's socket. */
+    static final int PARTS_VERSION = 2;
+    private int partsVersion = PARTS_VERSION;
 
     record Outcome(Status status, String message, int ladderTop) {
     }
@@ -76,6 +79,13 @@ public final class TowerStructure {
                 if (l == null) changed |= resetParts(level, List.of());
                 changed = true;
             }
+        }
+        // a tower built under older pole rules: build it again in the background and set its poles (it stays OK)
+        if (status == Status.OK && partsVersion < PARTS_VERSION && layout != null && pending == null) {
+            pendingLayout = layout;
+            int s = seed;
+            Layout pl = pendingLayout;
+            pending = syncBuild ? CompletableFuture.completedFuture(build(pl, s)) : CompletableFuture.supplyAsync(() -> build(pl, s), BUILD);
         }
         if (status == Status.WAITING && ++quietTicks >= DEBOUNCE && pending == null) {
             List<String> v = layout.violations();
@@ -98,6 +108,11 @@ public final class TowerStructure {
             if (built.equals(layout) && status == Status.BUILDING) {
                 apply(level, core, o);
                 changed = true;
+            } else if (built.equals(layout) && status == Status.OK && partsVersion < PARTS_VERSION) {
+                // (only the poles: a rebuild that no longer succeeds leaves the standing tower as it was)
+                if (o.status() == Status.OK) apply(level, core, o);
+                partsVersion = PARTS_VERSION;
+                changed = true;
             }
         }
         return changed;
@@ -118,19 +133,35 @@ public final class TowerStructure {
         }
     }
 
-    /** The bottom ring of the transition bay (where the legs meet): the ladder well ends there. */
+    /**
+     * The ladder well's top: the bottom ring of the transition bay (where the legs meet), or higher, up to the socket
+     * where the drawn pole starts. Between the two nothing is drawn in the mast column, so poles there are a ladder, not
+     * hidden (Baughn: a small tower's mast pole just above the core was invisible; its transition bay starts at the
+     * ground).
+     */
     static int ladderTop(TowerGen.Result r) {
         int[] ys = r.spine.ys;
         double[] s = r.spine.s;
-        for (int i = 0; i + 1 < ys.length; i++) if (s[i] > 0 && s[i + 1] <= 0) return ys[i];
+        int top = -1;
+        for (int i = 0; i + 1 < ys.length && top < 0; i++) if (s[i] > 0 && s[i + 1] <= 0) top = ys[i];
         // a lattice up to the top (capped): the well runs all the way
-        return s.length > 0 && s[s.length - 1] > 0 ? ys[ys.length - 1] : -1;
+        if (top < 0) top = s.length > 0 && s[s.length - 1] > 0 ? ys[ys.length - 1] : -1;
+        return Math.max(top, socket(r.tower));
+    }
+
+    /** The tower y where the drawn pole starts (its lowest node, rounded up), 0 if it stands on the ground or has none. */
+    static int socket(org.erisia.stasis.towergen.Stitch.Tower t) {
+        if (t == null || t.poleChain == null) return 0;
+        double low = Double.MAX_VALUE;
+        for (int n : t.poleChain) if (n != t.ghost) low = Math.min(low, t.P[3 * n + 1]);
+        return low == Double.MAX_VALUE ? 0 : (int) Math.ceil(low - 1e-6);
     }
 
     private void apply(Level level, BlockPos core, Outcome o) {
         status = o.status();
         message = o.message();
         ladderTop = o.ladderTop();
+        partsVersion = PARTS_VERSION;
         List<long[]> parts = new ArrayList<>();      // pos, part
         if (status == Status.OK && layout != null) {
             for (int k = 1; k <= layout.H() - TowerBlock.HEIGHT; k++)
@@ -251,6 +282,7 @@ public final class TowerStructure {
         out.putString("tmsg", message);
         out.putInt("ladder", ladderTop);
         out.putInt("seed", seed);
+        out.putInt("partsV", partsVersion);
         int[] xyz = new int[3 * parted.length];
         for (int i = 0; i < parted.length; i++) {
             BlockPos p = BlockPos.of(parted[i]);
@@ -276,6 +308,7 @@ public final class TowerStructure {
         message = in.getStringOr("tmsg", "");
         ladderTop = in.getIntOr("ladder", -1);
         seed = in.getIntOr("seed", 0);
+        partsVersion = in.getIntOr("partsV", 1);
         int[] xyz = in.getIntArray("parted").orElse(new int[0]);
         parted = new long[xyz.length / 3];
         for (int i = 0; i < parted.length; i++) parted[i] = BlockPos.asLong(xyz[3 * i], xyz[3 * i + 1], xyz[3 * i + 2]);

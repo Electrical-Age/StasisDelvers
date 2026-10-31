@@ -778,6 +778,28 @@ public final class StasisGameTests {
                 l != null && l.H() == 14 && l.booms().equals(List.of(new org.erisia.stasis.towergen.Layout.Boom(8, 0, 4),
                     new org.erisia.stasis.towergen.Layout.Boom(11, 2, 1))), String.valueOf(l));
         }, false, true));
+        // Baughn: a small tower's mast pole just above the core was invisible (its transition bay starts at the ground,
+        // so there was no ladder, and the drawn pole starts higher up): the ladder now reaches the pole's socket
+        CASES.put("small_tower_has_no_invisible_poles", new Spec(120, (h, c) -> {
+            org.erisia.stasis.TowerStructure.syncBuild = true;
+            c.cleanup.add(() -> org.erisia.stasis.TowerStructure.syncBuild = false);
+            BlockPos base = new BlockPos(3, 1, 4);
+            var t = tower(h, base, 5);
+            return () -> {
+                var s = t.structure;
+                c.check("built OK", s.status == org.erisia.stasis.TowerStructure.Status.OK, s.status + " " + s.message);
+                var first = h.getBlockState(base.above(2)).getValue(org.erisia.stasis.TowerPoleBlock.PART);
+                c.check("the pole above the core is a ladder", first == org.erisia.stasis.TowerPoleBlock.Part.LADDER,
+                    first + ", ladder top " + s.ladderTop);
+                StringBuilder sb = new StringBuilder();
+                for (int k = 1; k <= 5; k++) {
+                    var part = h.getBlockState(base.above(1 + k)).getValue(org.erisia.stasis.TowerPoleBlock.PART);
+                    var want = k + 2 <= s.ladderTop ? org.erisia.stasis.TowerPoleBlock.Part.LADDER : org.erisia.stasis.TowerPoleBlock.Part.HIDDEN;
+                    if (part != want) sb.append(k).append('=').append(part).append(' ');
+                }
+                c.check("mast poles: ladder up to the ladder top, hidden above", sb.isEmpty(), sb.toString());
+            };
+        }, false, true));
         CASES.put("tower_builds_and_parts_poles", new Spec(120, (h, c) -> {
             org.erisia.stasis.TowerStructure.syncBuild = true;
             c.cleanup.add(() -> org.erisia.stasis.TowerStructure.syncBuild = false);
