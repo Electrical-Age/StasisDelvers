@@ -73,8 +73,25 @@ public class TowerPoleBlock extends Block {
         return ctx.getItemInHand().is(asItem());
     }
 
+    /** The box ladder's outline: its model's extent. */
+    static final VoxelShape LADDER_SHAPE = Block.box(1, 0, 1, 15, 16, 15);
+
+    /**
+     * The outlines of hidden poles, from the generated tower drawn over them (Baughn: the outline of a hidden pole showed
+     * where nothing was drawn). Filled on the client by TowerRenderer when it uploads a tower's mesh (empty where its cell
+     * holds no geometry), keyed by position; empty on the server, where the plain pole shape stands in.
+     */
+    public static final java.util.Map<Long, VoxelShape> DRAWN = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
+        Part part = state.getValue(PART);
+        if (part == Part.HIDDEN) {
+            VoxelShape drawn = DRAWN.get(pos.asLong());
+            if (drawn != null) return drawn;
+        } else if (part == Part.LADDER && state.getValue(AXIS) == Direction.Axis.Y) {
+            return LADDER_SHAPE;
+        }
         return switch (state.getValue(AXIS)) {
             case X -> X_SHAPE;
             case Y -> Y_SHAPE;

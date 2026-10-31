@@ -17,8 +17,11 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
   `NONE / WAITING / BUILDING / OK / INVALID / REFUSED / FAILED`.
 - `TowerPoleBlock.java` + `PoleItem.java`: scaffolding-like survey poles. Blockstate `PART`:
   - `SURVEY`: a plain pole
-  - `LADDER`: the mast up to the ladder top
-  - `HIDDEN`: the generated tower is drawn in its place
+  - `LADDER`: the mast up to the ladder top (the drawn pole's socket, `TowerStructure.ladderTop`); outline = the box
+    ladder model
+  - `HIDDEN`: the generated tower is drawn in its place; its outline is what the mesh draws in its cell
+    (`TowerPoleBlock.DRAWN`, filled on the client by `TowerRenderer` from `towergen/CellCover`, 1/8-block sub-cells;
+    empty where nothing is drawn; the plain pole shape on the server or before the mesh lands)
 - `Tickets.java`: forced chunks for the field's reach (NeoForge `TicketController` `stasisdelvers:tower`).
 - `TowerSignalNode.java`: EA signal in/out (see ea-integration.md).
 - `TowerCellBlockEntity.java`: a deprecated stub, kept only so old saves load.

@@ -22,6 +22,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.erisia.stasis.StasisDelvers;
 import org.erisia.stasis.TowerBlockEntity;
 import org.erisia.stasis.TowerStructure;
+import org.erisia.stasis.towergen.CellCover;
 import org.erisia.stasis.towergen.Layout;
 import org.erisia.stasis.towergen.Library;
 import org.erisia.stasis.towergen.Mesh;
@@ -77,7 +78,8 @@ public final class TowerRenderer {
     });
     private static TowerGen gen;        // build thread only
 
-    record Built(String key, ByteBuffer full, int nFull, ByteBuffer lod, int nLod, AABB box) {
+    record Built(String key, ByteBuffer full, int nFull, ByteBuffer lod, int nLod, AABB box,
+                 Map<CellCover.Cell, net.minecraft.world.phys.shapes.VoxelShape> outlines) {
     }
 
     static final class Entry {
@@ -88,12 +90,15 @@ public final class TowerRenderer {
         GpuBuffer full, lod;
         int nFull, nLod;
         AABB box;                       // world space
+        java.util.List<Long> outlined = java.util.List.of();   // poles given an outline (TowerPoleBlock.DRAWN)
 
         Entry(BlockPos core) {
             this.core = core;
         }
 
         void close() {
+            for (long p : outlined) org.erisia.stasis.TowerPoleBlock.DRAWN.remove(p);
+            outlined = java.util.List.of();
             if (full != null) full.close();
             if (lod != null) lod.close();
             full = lod = null;
@@ -164,6 +169,7 @@ public final class TowerRenderer {
             e.close();
         }
         TOWERS.clear();
+        org.erisia.stasis.TowerPoleBlock.DRAWN.clear();
     }
 
     /** A build (or null) whose result will never be uploaded: free its native buffers once it finishes. */
@@ -213,11 +219,38 @@ public final class TowerRenderer {
             }
             full.flip();
             lod.flip();
-            return new Built(key, full, m.tris * 3, lod, lodTris * 3, new AABB(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]));
+            return new Built(key, full, m.tris * 3, lod, lodTris * 3, new AABB(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]),
+                outlines(m, layout));
         } catch (RuntimeException e) {
             StasisDelvers.LOG.warn("Tower mesh failed for {}", layout, e);
             return null;
         }
+    }
+
+    /**
+     * The outline of each pole cell from what the mesh draws in it (Baughn: a hidden pole's outline showed where nothing
+     * was drawn): its covered sub-cells, merged into boxes along z; empty where nothing is drawn.
+     */
+    static Map<CellCover.Cell, net.minecraft.world.phys.shapes.VoxelShape> outlines(Mesh m, Layout layout) {
+        Map<CellCover.Cell, net.minecraft.world.phys.shapes.VoxelShape> out = new HashMap<>();
+        int n = CellCover.N;
+        double u = 16.0 / n;
+        for (var e : CellCover.cover(m, CellCover.poleCells(layout, org.erisia.stasis.TowerBlock.HEIGHT)).entrySet()) {
+            java.util.BitSet b = e.getValue();
+            net.minecraft.world.phys.shapes.VoxelShape shape = net.minecraft.world.phys.shapes.Shapes.empty();
+            for (int x = 0; x < n; x++)
+                for (int y = 0; y < n; y++)
+                    for (int z = 0; z < n; z++) {
+                        if (!b.get((x * n + y) * n + z)) continue;
+                        int z1 = z;
+                        while (z1 + 1 < n && b.get((x * n + y) * n + z1 + 1)) z1++;
+                        shape = net.minecraft.world.phys.shapes.Shapes.or(shape,
+                            net.minecraft.world.level.block.Block.box(x * u, y * u, z * u, (x + 1) * u, (y + 1) * u, (z1 + 1) * u));
+                        z = z1;
+                    }
+            out.put(e.getKey(), shape.optimize());
+        }
+        return out;
     }
 
     private static void put(ByteBuffer bb, float[] pos, int o, int r, int g, int b, short block, short sky) {
@@ -255,6 +288,13 @@ public final class TowerRenderer {
             e.nLod = b.nLod();
             e.box = b.box().move(origin(e.core)).inflate(1);
             e.key = b.key();
+            java.util.List<Long> outlined = new java.util.ArrayList<>();
+            for (var o : b.outlines().entrySet()) {
+                long p = e.core.offset(o.getKey().x(), o.getKey().y(), o.getKey().z()).asLong();
+                org.erisia.stasis.TowerPoleBlock.DRAWN.put(p, o.getValue());
+                outlined.add(p);
+            }
+            e.outlined = outlined;
             free(b);
         }
     }
