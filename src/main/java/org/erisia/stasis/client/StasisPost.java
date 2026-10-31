@@ -57,9 +57,16 @@ public final class StasisPost {
         levelProjection = m == null ? null : new Matrix4f(m);
     }
 
-    /** projection x view rotation as the level was drawn (bob included): what the post shaders invert. */
+    /**
+     * Use the captured level projection (bob included)? Off: on the server it made the fields far worse than the sway it
+     * was meant to fix (Baughn 2026-10-31: the hexes jumped from frame to frame). For lab A/B checks only:
+     * -Dstasis.bobProjection=true.
+     */
+    static final boolean BOB_PROJECTION = Boolean.getBoolean("stasis.bobProjection");
+
+    /** projection x view rotation as the post shaders invert it (the level's own, bob included, only when enabled). */
     static Matrix4f viewProjection(net.minecraft.client.renderer.state.level.CameraRenderState cs) {
-        Matrix4f p = levelProjection;
+        Matrix4f p = BOB_PROJECTION ? levelProjection : null;
         return new Matrix4f(p != null ? p : cs.projectionMatrix).mul(cs.viewRotationMatrix);
     }
 
