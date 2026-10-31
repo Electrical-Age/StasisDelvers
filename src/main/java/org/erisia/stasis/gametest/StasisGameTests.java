@@ -2539,6 +2539,27 @@ public final class StasisGameTests {
                     String.valueOf(rem));
             };
         }, false, true));
+        // λ-Nero: a tower depowered where time runs anyway (here another field over it) leaves no frozen lightning
+        CASES.put("tower_collapse_in_running_land_leaves_no_remnant", new Spec(560, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            Vec3 p = h.absoluteVec(new Vec3(3.5, 1.5, 4.5));
+            Field other = FieldData.get(level).add(level, p.x, p.y, p.z, 4.0);
+            c.cleanup.add(() -> FieldData.get(level).remove(level, other.id()));
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.6 * 4 / 3), tx);
+                tx.commit();
+            }
+            h.runAfterDelay(5, () -> {
+                c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                t.testDrawFactor = 1e6;
+            });
+            return () -> {
+                c.check("collapsed: off", t.state() == org.erisia.stasis.TowerBlockEntity.State.OFF, t.state().name());
+                c.check("time runs at its foot", t.landRuns(level));
+                c.check("no frozen remnant", t.remnant() == null, String.valueOf(t.remnant()));
+            };
+        }, false, true));
         // Electrical Age: nodes in stopped land leave the simulation; inside a field they run; cables and batteries in
         // a tower's chunk run even outside its field
         CASES.put("ea_nodes_stop_outside", new Spec(30, (h, c) -> {

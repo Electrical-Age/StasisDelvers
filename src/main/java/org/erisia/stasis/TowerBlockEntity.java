@@ -569,6 +569,12 @@ public class TowerBlockEntity extends BlockEntity {
         switch (state) {
             case OFF -> {
                 if (storedJ() >= 0.5 * storeMaxJ()) start(sl);
+                else if (remnant != null && sl.getGameTime() % 20 == 10 && landRuns(sl)) {
+                    // (a remnant from before the rule above, or one a lull has drifted over: it thaws)
+                    remnant = null;
+                    setChanged();
+                    sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+                }
             }
             case RUNNING -> {
                 if (FieldData.get(sl).get(fieldId).isEmpty()) {     // removed by a command: start over
@@ -723,10 +729,17 @@ public class TowerBlockEntity extends BlockEntity {
         last.forEach(b -> StasisNet.sendBolt(sl, b));
         Remnant rem = new Remnant(radius(), collapseSeed, c, dropout, side, sl.getGameTime(), java.util.List.copyOf(last), stretch);
         stop(sl);
-        remnant = rem;
+        // where time runs without the field (the spawn area, land the stillness hasn't reached, a lull), nothing is left
+        // frozen: the bolts strike and are gone (λ-Nero: a tower depowered in a safe area still held its lightning)
+        remnant = landRuns(sl) ? null : rem;
         setChanged();
         sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         StasisDelvers.LOG.info("Stasis tower at {}: the collapse froze at {}", worldPosition.toShortString(), String.format("%.2f", c));
+    }
+
+    /** Does time run at the tower's foot with no field of its own (the one rule, Stasis.rateAtLand)? */
+    public boolean landRuns(ServerLevel sl) {
+        return Stasis.rateAtLand(sl, worldPosition.getX(), worldPosition.getY(), worldPosition.getZ()) > 0;
     }
 
     void start(ServerLevel sl) {
