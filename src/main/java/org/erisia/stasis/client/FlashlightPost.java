@@ -113,7 +113,7 @@ public final class FlashlightPost {
             float len = lights.get(i) * LENGTH_PER_LIGHT, cut = len;
             Vec3 org, dir;
             if (p == mc.getCameraEntity() && cam.isFirstPerson) {
-                org = cam.pos;
+                org = eye;   // (the bobbed eye: the beam stays fixed to the view as the camera bobs)
                 dir = Vec3.directionFromRotation(cam.xRot, cam.yRot);
             } else {
                 org = p.getEyePosition(pt);

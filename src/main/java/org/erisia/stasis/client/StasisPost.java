@@ -58,11 +58,11 @@ public final class StasisPost {
     }
 
     /**
-     * Use the captured level projection (bob included)? Off: on the server it made the fields far worse than the sway it
-     * was meant to fix (Baughn 2026-10-31: the hexes jumped from frame to frame). For lab A/B checks only:
-     * -Dstasis.bobProjection=true.
+     * Follow the view bob and hurt tilt the level was drawn with (Baughn: the fields swayed as the camera bobbed). The
+     * first try put the bob's shift inside the post matrix and made the hexes jump (7da4925); now only its turn goes
+     * there and the eye moves by the shift. -Dstasis.bobProjection=false turns it off.
      */
-    static final boolean BOB_PROJECTION = Boolean.getBoolean("stasis.bobProjection");
+    static final boolean BOB_PROJECTION = !"false".equals(System.getProperty("stasis.bobProjection"));
 
     /**
      * The bob as the level applied it this frame: B with level projection = camera projection x B (view bob, hurt tilt,
