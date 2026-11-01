@@ -99,7 +99,8 @@ public final class FlashlightPost {
         var cam = e.getCameraState();
         float pt = cam.cameraEntityPartialTicks;
         float[] d = new float[128];
-        StasisPost.viewProjection(cam).invert().get(d, 0);   // (the view bob included, as the level was drawn)
+        StasisPost.viewProjection(cam).invert().get(d, 0);   // (the view bob's turn included; its shift moves the eye)
+        Vec3 eye = StasisPost.eye(cam);
         d[17] = STRENGTH;
         d[18] = TINT[0];
         d[19] = TINT[1];
@@ -122,9 +123,9 @@ public final class FlashlightPost {
                 if (hit.getType() != HitResult.Type.MISS) cut = (float) Math.min(len, hit.getLocation().distanceTo(org) + 1.0);
             }
             int o = 24 + 9 * n++;
-            d[o] = (float) (org.x - cam.pos.x);
-            d[o + 1] = (float) (org.y - cam.pos.y);
-            d[o + 2] = (float) (org.z - cam.pos.z);
+            d[o] = (float) (org.x - eye.x);
+            d[o + 1] = (float) (org.y - eye.y);
+            d[o + 2] = (float) (org.z - eye.z);
             d[o + 3] = (float) dir.x;
             d[o + 4] = (float) dir.y;
             d[o + 5] = (float) dir.z;

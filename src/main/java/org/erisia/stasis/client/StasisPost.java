@@ -64,10 +64,40 @@ public final class StasisPost {
      */
     static final boolean BOB_PROJECTION = Boolean.getBoolean("stasis.bobProjection");
 
-    /** projection x view rotation as the post shaders invert it (the level's own, bob included, only when enabled). */
-    static Matrix4f viewProjection(net.minecraft.client.renderer.state.level.CameraRenderState cs) {
+    /**
+     * The bob as the level applied it this frame: B with level projection = camera projection x B (view bob, hurt tilt,
+     * nausea warp), or null when not in use. B is affine: a linear part and the view bob's sideways and downward shift.
+     */
+    static Matrix4f bob(net.minecraft.client.renderer.state.level.CameraRenderState cs) {
         Matrix4f p = BOB_PROJECTION ? levelProjection : null;
-        return new Matrix4f(p != null ? p : cs.projectionMatrix).mul(cs.viewRotationMatrix);
+        return p == null ? null : new Matrix4f(cs.projectionMatrix).invert().mul(p);
+    }
+
+    /**
+     * projection x view rotation as the post shaders invert it. With the bob, only its linear part goes in here; its
+     * shift moves the eye instead ({@link #eye}). The shaders cast every ray from the camera's position, so a shift
+     * inside the matrix put each ray's start a few centimetres off; rebuilt from a point near the near plane (the sky
+     * and the shells read depth there), its direction swung wildly as the camera bobbed (AdventurAgent: the hexes
+     * jumped every frame while walking, steady with the bob off or under the hurt tilt alone).
+     */
+    static Matrix4f viewProjection(net.minecraft.client.renderer.state.level.CameraRenderState cs) {
+        Matrix4f b = bob(cs);
+        Matrix4f m = new Matrix4f(cs.projectionMatrix);
+        if (b != null) m.mul(new Matrix4f(b).setTranslation(0, 0, 0));
+        return m.mul(cs.viewRotationMatrix);
+    }
+
+    /**
+     * Where the eye really is: the camera's position, moved by the view bob's shift (with B = [L | t], the bobbed view
+     * has its origin at -L^-1 t in the camera's view space, turned into the world by the view rotation's inverse).
+     */
+    static net.minecraft.world.phys.Vec3 eye(net.minecraft.client.renderer.state.level.CameraRenderState cs) {
+        Matrix4f b = bob(cs);
+        if (b == null) return cs.pos;
+        org.joml.Vector3f t = b.getTranslation(new org.joml.Vector3f());
+        org.joml.Vector3f e = new Matrix4f(b).setTranslation(0, 0, 0).invert().transformPosition(t.negate());
+        new Matrix4f(cs.viewRotationMatrix).invert().transformPosition(e);
+        return cs.pos.add(e.x, e.y, e.z);
     }
 
     static final int FIELD_BASE = 4096, FIELD_STRIDE = 19, MAX_FIELDS = 32, SHIELD_OFF = 10, STRETCH_OFF = 14, SPEED_OFF = 18;
@@ -181,7 +211,7 @@ public final class StasisPost {
         Matrix4f vp = viewProjection(camState).invert();
         vp.get(d, 0);   // column-major
         if (DhDepthTexture.DH) org.erisia.stasis.compat.dh.DhDepth.fill(d);
-        var cam = camState.pos;
+        var cam = eye(camState);
         double fx = Math.floor(cam.x), fy = Math.floor(cam.y), fz = Math.floor(cam.z);
         d[16] = (float) fx;
         d[17] = (float) fy;
