@@ -20,6 +20,8 @@ public final class StasisDelvers {
     public StasisDelvers(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.SYNCED, StasisConfig.SPEC);
         CuriosCompat.register(modBus);
+        // commit transactions other mods leak (Curios beta.3), before they crash the server (ErisiAgent, 2026-11-04)
+        TransactionGuard.register();
         // stopped land and fields on BlueMap's web map (λ-Nero; server side, optional)
         if (net.neoforged.fml.ModList.get().isLoaded("bluemap")) org.erisia.stasis.compat.bluemap.BlueMapOverlay.register();
         // EA's handbook, the Electrical Engineer's Ledger, opens on our contents page (pages: assets/stasisdelvers/guides/eln/handbook)

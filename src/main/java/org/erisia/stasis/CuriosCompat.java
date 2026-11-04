@@ -44,7 +44,7 @@ public final class CuriosCompat {
         return LOADED && key != null && !key.isEmpty() && Impl.put(p, key, st);
     }
 
-    /** A spent pendant crumbles: the crystal is gone, the string stays in the slot. */
+    /** A spent pendant crumbles: the crystal is gone, the string goes to the inventory (never into the slot: Curios trips on it). */
     static void crumble(ServerPlayer p) {
         if (LOADED) Impl.crumble(p);
     }
@@ -113,7 +113,12 @@ public final class CuriosCompat {
             top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p).ifPresent(h -> {
                 for (var r : h.findCurios(s -> s.getItem() instanceof RiftPendantItem pi && pi.getEnergy(s) <= 0)) {
                     var ctx = r.slotContext();
-                    h.getStacksHandler(ctx.identifier()).ifPresent(sh -> sh.getStacks().setStackInSlot(ctx.index(), new ItemStack(net.minecraft.world.item.Items.STRING)));
+                    // The string goes to the inventory, not into the slot: string isn't valid there, and at the next login
+                    // Curios beta.3 hands invalid stacks back through a transaction it never closes, which crashed Incognito
+                    // (2026-11-04 13:51, Nero's necklace; TransactionGuard catches any other leak)
+                    h.getStacksHandler(ctx.identifier()).ifPresent(sh -> sh.getStacks().setStackInSlot(ctx.index(), ItemStack.EMPTY));
+                    p.getInventory().placeItemBackInInventory(new ItemStack(net.minecraft.world.item.Items.STRING),
+                        net.minecraft.util.Prediction.SERVER_ONLY);   // (dropped if the inventory is full)
                     p.level().playSound(null, p.blockPosition(), net.minecraft.sounds.SoundEvents.AMETHYST_CLUSTER_BREAK, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.2f);
                     p.sendOverlayMessage(net.minecraft.network.chat.Component.translatable("message.stasisdelvers.pendant_crumbled")
                         .withStyle(net.minecraft.ChatFormatting.LIGHT_PURPLE));

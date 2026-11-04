@@ -135,6 +135,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
 - `RiftPendantItem` (Curios necklace slot, `CuriosCompat`; Curios is optional): a rift shard or charged rift shard on a
   string. It stands in for the chest piece when none with charge is worn (`Suits.piece`), so alone it is a Delver
   chest piece without armour. It holds 10 or 30 minutes of a lone piece's draw (4 x 10 W), never recharges, and
-  crumbles to its string when spent. Right-click equips it.
+  crumbles when spent: the slot empties and its string goes to the inventory (or drops). Never write an item the slot
+  doesn't accept into a Curios slot: Curios beta.3 hands it back at the next login through a transaction it never closes,
+  which crashed Incognito on 2026-11-04 (`TransactionGuard` now commits such leaks). Right-click equips it.
 - `/stasis exempt <player> on|off` (`Exempt`, SavedData `stasisdelvers:exempt`): the mechanic leaves that player
   alone: no freezing anywhere (`Freezing.tick` returns early) and full speed in slow fields (`PlayerRates.rate`).
