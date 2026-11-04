@@ -17,6 +17,7 @@ Javadocs often cite them as `notes/...`.
 | `src/main/java/org/erisia/stasis/client/report/` | The F7 bug-report tool |
 | `src/main/java/org/erisia/stasis/mixin/` | Required mixins (gameplay); `mixin/client/` holds the optional cosmetic ones; `mixin/xaero/` the Xaero overlay |
 | `src/main/java/org/erisia/stasis/compat/xaero/` | Stopped-land highlighters for Xaero's maps |
+| `src/main/java/org/erisia/stasis/compat/bluemap/` | Server side: stopped land and fields as BlueMap markers (`BlueMapOverlay`; outlines by `GridOutline`) |
 | `src/main/java/org/erisia/stasis/gametest/StasisGameTests.java` | Every GameTest (one file) |
 | `src/test/java/org/erisia/stasis/` | JUnit 5 + jqwik unit and property tests |
 | `src/main/resources/assets/stasisdelvers/shaders/post/stasis.fsh` | The main post shader (mist, strata, desaturation, shield) |

@@ -53,6 +53,11 @@ through hooks set in `StasisClient`.
 3. `stasisdelvers:post/stasis` → `swap`: bilateral upsample of mist and strata, desaturation of stopped land,
    freeze warning, shield hexes, eye, storm glow, bolts.
 4. `minecraft:post/blit` → `minecraft:main`.
+- `compat/bluemap/` (server side, not a client renderer; listed here beside Xaero's): BlueMap's web map gets a
+  toggleable "Stasis" marker set per stopped dimension (λ-Nero, Baughn OK 2026-11-04). Stopped land is Xaero's rule
+  (`rateAtLand` at each chunk centre, sea level) sampled over the world border off the main thread every 120 s, traced
+  into polygons with holes (`GridOutline`), and swapped in only when the grid changed; fields are ellipses (with their
+  stretch) every 15 s, coloured running / failing / collapsing. Current state only (Nero: no spread predictions).
 - Inputs: `minecraft:main` colour and depth, `stasisdelvers:fielddata` (1024x4 float, `textures/effect/fielddata.png`
   registered as a `DynamicTexture`), `stasisdelvers:mistnoise` (`textures/effect/mistnoise.png`), and for the full
   pass only `stasisdelvers:spreadranks` (64x64, `SpreadSampler`, see "Spreading mode" below).
