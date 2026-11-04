@@ -1,11 +1,11 @@
 # Electrical Age integration
 
-Paths are relative to `src/main/java/org/erisia/stasis/`. EA is the `ports/26.3` port of
-[Electrical-Age/ElectricalAge](https://github.com/Electrical-Age/ElectricalAge/tree/ports/26.3), checked out
-locally at `/var/lib/mclab/agent/eln/port26`.
+Paths are relative to `src/main/java/org/erisia/stasis/`. EA is the `develop` branch of
+[Electrical-Age/ElectricalAge](https://github.com/Electrical-Age/ElectricalAge/tree/develop), checked out
+locally at `/var/lib/mclab/agent/eln/develop` (EA `develop`).
 
 ## Build dependency
-- `build.gradle`: `def elnJar = file(project.findProperty('eln_jar') ?: '/var/lib/mclab/agent/eln/port26/build/libs/eln-26.3-0.1.0-port.jar')`.
+- `build.gradle`: `def elnJar = file(project.findProperty('eln_jar') ?: '/var/lib/mclab/agent/eln/develop/build/libs/eln-26.3-0.1.0-port.jar')`.
   - `compileOnly files(elnJar)` and `testImplementation files(elnJar)`: the unit-test game loads the mod,
     which requires `eln`.
   - The `copyElnToRun` task copies the jar into `run/mods`. Every `run*` task depends on it, so dev runs and

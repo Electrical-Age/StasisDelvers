@@ -403,14 +403,9 @@ public class TowerBlockEntity extends BlockEntity {
 
     /** A side reaches 1 + k * (its longest boom's share of its allowed length, H - y). */
     public static Field.Stretch stretchFor(org.erisia.stasis.towergen.Layout layout) {
-        double[] f = new double[4];
-        for (var b : layout.booms()) {
-            int room = layout.H() - b.y();
-            if (room > 0) f[b.dir()] = Math.max(f[b.dir()], Math.min(1.0, b.length() / (double) room));
-        }
-        double k = StasisConfig.towerBoomStretch;
-        return new Field.Stretch(1 + k * f[0], 1 + k * f[1], 1 + k * f[2], 1 + k * f[3]);
+        return TowerBooms.stretch(layout, StasisConfig.towerBoomStretch);
     }
+
 
     /** The radius of the sphere with the stretched field's volume, per unit radius: cbrt(mean of the four ground
      *  quarters' sx * sz). The draw follows volume (Baughn: yes); the store stays on the base radius. */
@@ -1007,8 +1002,8 @@ public class TowerBlockEntity extends BlockEntity {
             case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top (each widens the field); poles off the mast "
                 + "make booms. Feed power into any face.";
             case WAITING, BUILDING -> "Building the tower...";
-            case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
-                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ". Draw: " + drawText() + ".";
+            case OK -> "Tower: " + (s.layout == null ? "" : "mast " + s.layout.H() + " poles. " + TowerBooms.text(s.layout, StasisConfig.towerBoomStretch))
+                + (s.ladderTop > 0 ? " Ladder to y+" + s.ladderTop + "." : "") + " Draw: " + drawText() + ".";
             case INVALID -> "Tower layout not allowed: " + s.message;
             case REFUSED -> "Tower refused: " + s.message;
             case FAILED -> "Tower could not be built (see the server log).";
@@ -1033,8 +1028,8 @@ public class TowerBlockEntity extends BlockEntity {
             case NONE -> "No mast yet: stack Stasis Tower Poles on the core's top (each widens the field); poles off the mast "
                 + "make booms. Feed power into any face.";
             case WAITING, BUILDING -> "Building the tower...";
-            case OK -> "Tower: " + (s.layout == null ? "" : "height " + s.layout.H() + ", " + s.layout.booms().size() + " boom(s)")
-                + (s.ladderTop > 0 ? ", ladder to y+" + s.ladderTop : "") + ". Draw: " + drawText() + ".";
+            case OK -> "Tower: " + (s.layout == null ? "" : "mast " + s.layout.H() + " poles. " + TowerBooms.text(s.layout, StasisConfig.towerBoomStretch))
+                + (s.ladderTop > 0 ? " Ladder to y+" + s.ladderTop + "." : "") + " Draw: " + drawText() + ".";
             case INVALID -> "Tower layout not allowed: " + s.message;
             case REFUSED -> "Tower refused: " + s.message;
             case FAILED -> "Tower could not be built (see the server log).";

@@ -22,8 +22,8 @@ Stasis Delvers is a NeoForge mod for Minecraft 26.3 and a companion to Electrica
 
 ## The EA jar dependency
 - Stasis compiles against a locally built EA jar and links to EA classes directly. The path is the Gradle
-  property `eln_jar`; the default is `/var/lib/mclab/agent/eln/port26/build/libs/eln-26.3-0.1.0-port.jar`
-  (EA `ports/26.3`, checked out at `/var/lib/mclab/agent/eln/port26`).
+  property `eln_jar`; the default is `/var/lib/mclab/agent/eln/develop/build/libs/eln-26.3-0.1.0-port.jar`
+  (EA `develop`, checked out at `/var/lib/mclab/agent/eln/develop`; `ports/26.3` was dropped 2026-11-04).
   Override it with `-Peln_jar=/path/to.jar`.
 - `copyElnToRun` copies the jar into `run/mods` before every `run*` task.
 - When EA's API or its Stasis hooks change (`NodeBase.simulationVeto`, `LampItem.clientBeam`), build EA first,
