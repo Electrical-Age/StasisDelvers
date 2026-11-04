@@ -56,6 +56,7 @@ public final class BlueMapOverlay {
             api = a;
             landHash.clear();
             ticks = 0;
+            installShells(a);
         });
         BlueMapAPI.onDisable(a -> api = null);
         NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, BlueMapOverlay::tick);
@@ -91,22 +92,51 @@ public final class BlueMapOverlay {
 
     // --- fields ---
 
+    /**
+     * Writes the shell script (assets/stasisdelvers/bluemap/stasis-shells.js: the fields as hexagon-gridded spheroids, as
+     * in game; Baughn) into BlueMap's web root and registers it. The file name carries a hash of its content, since the
+     * web root is served with long cache headers.
+     */
+    private static void installShells(BlueMapAPI a) {
+        try (var in = BlueMapOverlay.class.getResourceAsStream("/assets/stasisdelvers/bluemap/stasis-shells.js")) {
+            if (in == null) return;
+            byte[] js = in.readAllBytes();
+            String hash = String.format("%08x", Arrays.hashCode(js));
+            String rel = "assets/stasisdelvers/stasis-shells-" + hash + ".js";
+            java.nio.file.Path file = a.getWebApp().getWebRoot().resolve(rel);
+            java.nio.file.Files.createDirectories(file.getParent());
+            java.nio.file.Files.write(file, js);
+            a.getWebApp().registerScript(rel);
+        } catch (java.io.IOException | RuntimeException ex) {
+            StasisDelvers.LOG.warn("BlueMap overlay: could not install the shell script: {}", ex.toString());
+        }
+    }
+
+    /** The field's shape for the shell script: x,y,z,r,e,s,w,n,column,amber,dropout,collapse,side,rate. */
+    static String shellData(Field f) {
+        var st = f.stretch();
+        return String.format(java.util.Locale.ROOT, "%.2f,%.2f,%.2f,%.2f,%.4f,%.4f,%.4f,%.4f,%d,%.4f,%.4f,%.4f,%.4f,%.3f",
+            f.x(), f.y(), f.z(), f.radius(), st.e(), st.s(), st.w(), st.n(), f.column() ? 1 : 0, f.amber(), f.dropout(),
+            f.collapse(), f.side(), f.rate());
+    }
+
     private static void drawFields(ServerLevel level, List<MarkerSet> sets) {
         Map<String, Marker> want = new HashMap<>();
         for (Field f : FieldData.get(level).fields()) {
             if (f.collapse() >= 1) continue;
             String state = f.collapse() > 0 ? "collapsing" : f.failing() > 0 ? "failing" : "running";
             Color c = switch (state) {
-                case "collapsing" -> new Color(0xE0, 0x40, 0x30, 0.25f);
-                case "failing" -> new Color(0xF0, 0xA0, 0x30, 0.25f);
-                default -> new Color(0x60, 0xC8, 0xFF, 0.2f);
+                case "collapsing" -> new Color(0xE0, 0x40, 0x30, 0.08f);   // (faint: the shell script draws the field)
+                case "failing" -> new Color(0xF0, 0xA0, 0x30, 0.08f);
+                default -> new Color(0x60, 0xC8, 0xFF, 0.06f);
             };
             Color line = new Color(c.getRed(), c.getGreen(), c.getBlue(), 0.9f);
-            String rate = f.rate() > 1 ? String.format("%.1f× (accelerated)", f.rate()) : String.format("%.1f×", f.rate());
+            String rate = String.format(java.util.Locale.ROOT, f.rate() > 1 ? "%.1f× (accelerated)" : "%.1f×", f.rate());
             want.put("field-" + f.id(), ShapeMarker.builder()
                 .label("Stasis field")
                 .detail("<b>Stasis field</b><br>Radius " + Math.round(f.radius()) + " blocks<br>Time runs at " + rate
-                    + "<br>" + state.substring(0, 1).toUpperCase() + state.substring(1))
+                    + "<br>" + state.substring(0, 1).toUpperCase() + state.substring(1)
+                    + "<span hidden data-shell=\"" + shellData(f) + "\"></span>")
                 .shape(fieldShape(f), (float) f.y())
                 .position(f.x(), f.y(), f.z())
                 .depthTestEnabled(false)

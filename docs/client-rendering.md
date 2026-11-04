@@ -58,6 +58,11 @@ through hooks set in `StasisClient`.
   (`rateAtLand` at each chunk centre, sea level) sampled over the world border off the main thread every 120 s, traced
   into polygons with holes (`GridOutline`), and swapped in only when the grid changed; fields are ellipses (with their
   stretch) every 15 s, coloured running / failing / collapsing. Current state only (Nero: no spread predictions).
+  Hex shells (Baughn 2026-11-04): `assets/stasisdelvers/bluemap/stasis-shells.js` is written into BlueMap's web root
+  (name hashed by content, the web root is cached) and registered with `WebApp.registerScript`. In the browser it draws
+  each field marker's spheroid (data in a hidden `data-shell` span of the marker's detail) with `hexCell` / `hexColumn` /
+  `shieldAt` ported from `stasis.fsh` (keep them in step). BlueMap uses a logarithmic depth buffer, so the shaders need
+  three's `logdepthbuf` chunks (and `<common>` in the vertex shader), else the shells hide behind the terrain.
 - Inputs: `minecraft:main` colour and depth, `stasisdelvers:fielddata` (1024x4 float, `textures/effect/fielddata.png`
   registered as a `DynamicTexture`), `stasisdelvers:mistnoise` (`textures/effect/mistnoise.png`), and for the full
   pass only `stasisdelvers:spreadranks` (64x64, `SpreadSampler`, see "Spreading mode" below).
