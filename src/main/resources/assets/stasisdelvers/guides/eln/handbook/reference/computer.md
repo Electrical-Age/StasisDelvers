@@ -7,7 +7,6 @@ navigation:
 item_ids:
   - eln:computer
   - eln:ram_chip
-  - eln:janet_rom_chip
   - eln:boot_rom_chip
   - eln:floppy_disk
   - eln:elevator_disk
