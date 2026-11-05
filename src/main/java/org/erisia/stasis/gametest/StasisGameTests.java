@@ -2928,6 +2928,35 @@ public final class StasisGameTests {
         }, false, true));
         // stopped water and lava are solid; stopped lava hurts like magma and doesn't ignite. An enderman (unbound,
         // so it moves) dropped onto each; outside the field both fluids are stopped
+        // Builder's report (Baughn msg 1567710882534789132): a waterlogged EA energy exporter broken in stopped time didn't
+        // drop. It did, into the block of water it left, which is solid in stopped land: frozen in there, out of reach.
+        // An item appearing inside a stopped liquid now moves to the nearest free space beside it
+        CASES.put("drop_from_a_waterlogged_block_is_reachable", new Spec(10, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos p = h.absolutePos(new BlockPos(12, 1, 4));
+            level.setBlockAndUpdate(p, Blocks.WATER.defaultBlockState());
+            var d = mods.eln.registry.batch.Wp11Content.elnToOtherLvu;
+            var fake = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+            var n = ((mods.eln.node.transparent.TransparentNodeItem) d.parentItem).placeAt(d.newItemStack(), fake, level, p, mods.eln.misc.Direction.YN);
+            if (n == null) throw new IllegalStateException("placing the exporter failed");
+            boolean waterlogged = level.getBlockState(p).getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED);
+            ServerPlayer player = survivalPlayer(h, new Vec3(10.5, 1.0, 4.5), true);
+            player.gameMode.destroyBlock(p);
+            return () -> {
+                var drops = level.getEntitiesOfClass(ItemEntity.class, new AABB(p).inflate(2));
+                c.check("the exporter stood waterlogged in stopped land", waterlogged && !Stasis.isRunning(level, p));
+                c.check("breaking it left its water", !level.getFluidState(p).isEmpty(), level.getBlockState(p).toString());
+                c.check("it dropped", drops.size() == 1, drops.toString());
+                if (drops.size() == 1) {
+                    var at = drops.get(0).blockPosition();
+                    c.check("the drop isn't inside the stopped water", level.getFluidState(at).isEmpty()
+                        && level.getBlockState(at).getCollisionShape(level, at).isEmpty(), at + " " + level.getBlockState(at));
+                    c.check("beside where it stood, on the breaker's side", at.distManhattan(p) == 1 && at.getX() < p.getX(), at.toString());
+                }
+                drops.forEach(Entity::discard);
+                remove(h, player);
+            };
+        }));
         CASES.put("stopped_fluids_are_solid", new Spec(5, (h, c) -> {
             h.setBlock(new BlockPos(12, 1, 2), Blocks.WATER);
             h.setBlock(new BlockPos(12, 1, 6), Blocks.LAVA);

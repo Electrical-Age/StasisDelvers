@@ -1,5 +1,6 @@
 package org.erisia.stasis;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.neoforged.neoforge.event.entity.living.MobSpawnEvent;
@@ -219,8 +220,43 @@ public final class StasisEvents {
     private static final java.util.Map<net.minecraft.world.entity.item.ItemEntity, Long> ITEM_BORN = new java.util.WeakHashMap<>();
 
     static void itemJoin(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e) {
-        if (e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item && !e.getLevel().isClientSide())
+        if (e.getEntity() instanceof net.minecraft.world.entity.item.ItemEntity item && !e.getLevel().isClientSide()) {
             ITEM_BORN.put(item, e.getLevel().getGameTime());
+            if (e.getLevel() instanceof ServerLevel level) outOfStoppedLiquid(level, item);
+        }
+    }
+
+    /**
+     * An item appearing inside a stopped liquid (solid in stopped land) moves to the nearest free space beside it, the
+     * side nearest a player first, else up to the surface: frozen in there it could never be reached. Builder's report
+     * (Baughn msg 1567710882534789132): a waterlogged EA exporter broken in stopped time left its water and dropped
+     * into it. A vanilla item would push itself out in its tick, which never comes there.
+     */
+    static void outOfStoppedLiquid(ServerLevel level, net.minecraft.world.entity.item.ItemEntity item) {
+        BlockPos at = item.blockPosition();
+        if (level.getFluidState(at).isEmpty() || Stasis.isRunning(level, at)) return;
+        var near = level.getNearestPlayer(item, 8);
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (var d : net.minecraft.core.Direction.values()) {
+            BlockPos q = at.relative(d);
+            if (!free(level, q)) continue;
+            double dist = near == null ? (d == net.minecraft.core.Direction.UP ? 0 : 1) : near.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(q));
+            if (dist < bestD) {
+                bestD = dist;
+                best = q;
+            }
+        }
+        for (int up = 1; best == null && up <= 32; up++) if (free(level, at.above(up))) best = at.above(up);
+        if (best == null) return;
+        item.setPos(best.getX() + 0.5, best.getY() + 0.1, best.getZ() + 0.5);
+        item.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+    }
+
+    /** Can an item rest at q: no liquid, nothing to collide with? */
+    static boolean free(ServerLevel level, BlockPos q) {
+        var s = level.getBlockState(q);
+        return level.getFluidState(q).isEmpty() && s.getCollisionShape(level, q).isEmpty();
     }
 
     static void pickup(net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent.Pre e) {
