@@ -87,4 +87,6 @@ Fault codes: 1 something in the way, 2 too hot, 3 rail missing or broken, 4 line
    landing, if you want the program to find the floors by itself.
 
 A program on the bus does the rest. It listens for `press`, lights the buttons whose calls it has taken, and writes
-the drive's target. It reads register 3 until the car is in position, then serves the next call.
+the drive's target. It reads register 3 until the car is in position, then serves the next call. A
+[Computer](computer.md) with the **Elevator floppy** is that program, ready made: set the addresses and floor heights
+at the top of its `a:/main.janet`.
