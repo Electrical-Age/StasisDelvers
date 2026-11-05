@@ -44,7 +44,8 @@ The run lamp on the front: bright green while it works, dim green while it waits
   * If someone else saved the file since you opened it, your Save is refused once. Save again to overwrite.
   * The Files tab works through the running Janet, so the computer must be on and running the Janet ROM.
 * **Reset** starts it again from slot 1.
-* **Break** stops what the terminal is running: a loop that never ends, a long sleep.
+* **Break** stops what the terminal is running: a loop that never ends, a long sleep. With nothing running there,
+  it stops every program's tasks (`main.janet`'s too) and the bus handlers they set.
 
 ## At start-up
 
