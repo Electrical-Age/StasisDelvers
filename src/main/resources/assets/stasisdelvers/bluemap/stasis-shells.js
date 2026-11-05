@@ -199,6 +199,132 @@ void main() {
         return mesh;
     }
 
+
+    // ---- stopped land on the terrain (λ-Nero: the flat grey polygons floated at sea level in 16-block steps) ----
+    // BlueMap's hires and lowres terrain shaders get a few lines at the end of main(): where the server's mask (one pixel
+    // per 8 blocks, the marker "mask-land" says where) is set, the terrain is desaturated as in game, smoothly over a few
+    // blocks, with a pale border where the stillness ends; inside a field's ellipsoid (3D, so a mountain poking out of a
+    // field is stopped) it isn't. The flat polygons are then hidden (they stay for browsers where this fails).
+    const MAX_FIELDS = 32;
+    const landUniforms = {
+        stasisMask: {value: null},
+        stasisMaskRect: {value: new T.Vector4(0, 0, 1, 1)},   // x0, z0, width, height (blocks)
+        stasisShift: {value: new T.Vector2(0, 0)},
+        stasisOn: {value: 0},
+        stasisTime: {value: 0},
+        stasisFieldCount: {value: 0},
+        stasisFieldPos: {value: Array.from({length: MAX_FIELDS}, () => new T.Vector4())},     // x, y, z, r
+        stasisFieldStretch: {value: Array.from({length: MAX_FIELDS}, () => new T.Vector4(1, 1, 1, 1))}
+    };
+    const LAND_GLSL = `
+uniform sampler2D stasisMask;
+uniform vec4 stasisMaskRect;
+uniform vec2 stasisShift;
+uniform float stasisOn;
+uniform float stasisTime;
+uniform int stasisFieldCount;
+uniform vec4 stasisFieldPos[${MAX_FIELDS}];
+uniform vec4 stasisFieldStretch[${MAX_FIELDS}];
+vec3 stasisLand(vec3 c, vec3 wp) {
+    if (stasisOn < 0.5) return c;
+    vec3 w = wp + vec3(stasisShift.x, 0.0, stasisShift.y);
+    vec2 uv = (w.xz - stasisMaskRect.xy) / stasisMaskRect.zw;
+    float m = texture(stasisMask, clamp(uv, 0.0, 1.0)).r;
+    for (int i = 0; i < ${MAX_FIELDS}; i++) {
+        if (i >= stasisFieldCount) break;
+        vec4 f = stasisFieldPos[i];
+        vec4 st = stasisFieldStretch[i];
+        vec3 d = w - f.xyz;
+        if (f.w < 0.0) { d.y = 0.0; f.w = -f.w; }
+        d.x /= d.x > 0.0 ? st.x : st.z;
+        d.z /= d.z > 0.0 ? st.y : st.w;
+        if (dot(d, d) < f.w * f.w) return c;   // inside a field: time runs
+    }
+    float stopped = smoothstep(0.3, 0.7, m);
+    float grey = dot(c, vec3(0.299, 0.587, 0.114));
+    vec3 still = mix(c, vec3(grey) * vec3(0.9, 0.93, 1.0), 0.85) * 0.92;
+    c = mix(c, still, stopped);
+    // the border: a pale violet band a few blocks wide where the mask crosses one half, shimmering slowly
+    float edge = 1.0 - smoothstep(0.0, 0.2, abs(m - 0.5));
+    float shimmer = 0.7 + 0.3 * sin(stasisTime * 1.7 + (w.x + w.z) * 0.15);
+    return mix(c, vec3(0.88, 0.8, 1.0), edge * 0.8 * shimmer);
+}
+`;
+    function patchSource(src) {
+        const close = src.lastIndexOf("}");
+        const main = src.indexOf("void main");
+        if (close < 0 || main < 0 || src.indexOf("vWorldPosition") < 0 || src.indexOf("stasisLand") >= 0) return null;
+        src = src.slice(0, close) + "\n    gl_FragColor.rgb = stasisLand(gl_FragColor.rgb, vWorldPosition);\n" + src.slice(close);
+        return src.slice(0, main) + LAND_GLSL + src.slice(main);
+    }
+    function patchMaterial(mat) {
+        if (!mat || !mat.isShaderMaterial || mat.userData.stasisLand) return;
+        const src = patchSource(mat.fragmentShader);
+        mat.userData.stasisLand = true;
+        if (!src) return;
+        mat.fragmentShader = src;
+        Object.assign(mat.uniforms, landUniforms);
+        mat.needsUpdate = true;
+    }
+    // Hires tiles share the map's materials; each lowres tile makes its own from its loader's shader and uniforms, so
+    // the loaders are patched for new tiles and the loaded tiles' materials one by one.
+    function patchMap(map) {
+        if (map.hiresMaterial) map.hiresMaterial.forEach(patchMaterial);
+        patchMaterial(map.lowresMaterial);
+        (map.lowresTileManager || []).forEach(tm => {
+            const l = tm && tm.tileLoader;
+            if (l && !l.stasisLand && typeof l.fragmentShader === "string") {
+                const src = patchSource(l.fragmentShader);
+                if (src) {
+                    l.fragmentShader = src;
+                    Object.assign(l.uniforms, landUniforms);
+                }
+                l.stasisLand = true;
+            }
+            if (tm && tm.scene) tm.scene.traverse(o => { if (o.isMesh) patchMaterial(o.material); });
+        });
+    }
+    let maskUrl = null;
+    function updateLand(set) {
+        const map = app.mapViewer.map;
+        if (map) patchMap(map);
+        const mk = set && set.markers.get("mask-land");
+        const html = mk && (mk.html || (mk.data && mk.data.html)) || "";
+        const m = /data-stasis-mask="([^"]+)"/.exec(html);
+        if (!m) { landUniforms.stasisOn.value = 0; return; }
+        const v = m[1].split(",");
+        const url = v[0];
+        landUniforms.stasisMaskRect.value.set(+v[1], +v[2], +v[3] * +v[4], +v[3] * +v[5]);
+        if (url !== maskUrl) {
+            maskUrl = url;
+            new T.TextureLoader().load(url, tex => {
+                if (maskUrl !== url) { tex.dispose(); return; }
+                tex.magFilter = T.LinearFilter;
+                tex.minFilter = T.LinearMipmapLinearFilter;
+                tex.generateMipmaps = true;
+                tex.flipY = false;
+                tex.wrapS = tex.wrapT = T.ClampToEdgeWrapping;
+                tex.needsUpdate = true;
+                const old = landUniforms.stasisMask.value;
+                landUniforms.stasisMask.value = tex;
+                landUniforms.stasisOn.value = 1;
+                if (old) old.dispose();
+            });
+        }
+        // the flat polygons only where the terrain tint isn't working
+        const on = landUniforms.stasisOn.value > 0.5;
+        set.markers.forEach((marker, id) => { if (id.startsWith("land-")) marker.visible = !on; });
+    }
+    function updateFieldUniforms(fields) {
+        const n = Math.min(MAX_FIELDS, fields.length);
+        landUniforms.stasisFieldCount.value = n;
+        for (let i = 0; i < n; i++) {
+            const f = fields[i];
+            landUniforms.stasisFieldPos.value[i].set(f.x, f.y, f.z, f.column ? -f.r : f.r);   // (negative: a column, no height limit)
+            landUniforms.stasisFieldStretch.value[i].set(f.e, f.s, f.w, f.n);
+        }
+    }
+
     function update() {
         const set = findSet();
         if (!set) return;
@@ -209,11 +335,12 @@ void main() {
             set.add(s.group);
             shells.set(set, s);
         }
-        const seen = new Set();
+        const seen = new Set(), fields = [];
         set.markers.forEach((marker, id) => {
             const f = parse(marker);
             if (!f) return;
             seen.add(id);
+            fields.push(f);
             let mesh = s.meshes.get(id);
             if (mesh && (mesh.geometry === cylGeo) !== !!f.column) {
                 s.group.remove(mesh);
@@ -236,6 +363,8 @@ void main() {
             u.side.value = f.side;
             u.rate.value = f.rate;
         });
+        updateFieldUniforms(fields);
+        updateLand(set);
         s.meshes.forEach((mesh, id) => {
             if (!seen.has(id)) {
                 s.group.remove(mesh);
@@ -247,6 +376,10 @@ void main() {
 
     function tick() {
         const t = (performance.now() - start) / 1000;
+        landUniforms.stasisTime.value = t;
+        // the map's scene is shifted towards 0,0 by multiples of 10000 for precision (MapViewer.render); undo it here
+        const cam = app.mapViewer.camera.position;
+        landUniforms.stasisShift.value.set(Math.round(cam.x / 10000) * 10000, Math.round(cam.z / 10000) * 10000);
         const set = findSet();
         const s = set && shells.get(set);
         if (s) s.meshes.forEach(m => m.material.uniforms.time.value = t);

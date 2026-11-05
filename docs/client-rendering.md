@@ -63,6 +63,13 @@ through hooks set in `StasisClient`.
   each field marker's spheroid (data in a hidden `data-shell` span of the marker's detail) with `hexCell` / `hexColumn` /
   `shieldAt` ported from `stasis.fsh` (keep them in step). BlueMap uses a logarithmic depth buffer, so the shaders need
   three's `logdepthbuf` chunks (and `<common>` in the vertex shader), else the shells hide behind the terrain.
+  Stopped land on the terrain (λ-Nero: the flat polygons floated at sea level in chunk steps): the server also writes
+  a mask PNG (one pixel per 8 blocks, `stasisdelvers-land.png` in each map's assets; an invisible HtmlMarker
+  `mask-land` gives its URL with the grid hash, corner and size). The script patches BlueMap's terrain shaders (the
+  hires materials, and the lowres tile loaders plus their loaded tiles, which each make their own material): the
+  terrain is desaturated where the smoothed mask is set, with a pale border band, except inside a field's ellipsoid
+  (3D). The flat polygons are hidden while that works. The map's scene is shifted by multiples of 10000 blocks for
+  precision, so the script passes the shift as a uniform.
 - Inputs: `minecraft:main` colour and depth, `stasisdelvers:fielddata` (1024x4 float, `textures/effect/fielddata.png`
   registered as a `DynamicTexture`), `stasisdelvers:mistnoise` (`textures/effect/mistnoise.png`), and for the full
   pass only `stasisdelvers:spreadranks` (64x64, `SpreadSampler`, see "Spreading mode" below).
