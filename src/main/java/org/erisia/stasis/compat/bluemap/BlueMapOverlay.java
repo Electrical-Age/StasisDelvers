@@ -83,7 +83,7 @@ public final class BlueMapOverlay {
                 if (fields) drawFields(level, sets);
                 String key = level.dimension().identifier().toString();
                 CompletableFuture<?> job = landJobs.get(key);
-                if (land && (job == null || job.isDone())) landJobs.put(key, sampleLand(e.getServer(), level, sets));
+                if (land && (job == null || job.isDone())) landJobs.put(key, sampleLand(e.getServer(), level, maps, sets));
             }
         } catch (RuntimeException ex) {
             StasisDelvers.LOG.warn("BlueMap overlay: {}", ex.toString());
@@ -160,21 +160,32 @@ public final class BlueMapOverlay {
 
     // --- stopped land ---
 
-    private static CompletableFuture<?> sampleLand(MinecraftServer srv, ServerLevel level, List<MarkerSet> sets) {
+    /** Blocks per pixel of the stopped-land mask the shell script paints onto the terrain. */
+    static final int MASK_CELL = 8;
+    static final String MASK_ASSET = "stasisdelvers-land.png";
+
+    private static CompletableFuture<?> sampleLand(MinecraftServer srv, ServerLevel level, List<BlueMapMap> maps, List<MarkerSet> sets) {
         WorldBorder b = level.getWorldBorder();
         int cx0 = clampChunk(b.getMinX()), cz0 = clampChunk(b.getMinZ());
         int cx1 = clampChunk(b.getMaxX() - 1), cz1 = clampChunk(b.getMaxZ() - 1);
         int w = cx1 - cx0 + 1, h = cz1 - cz0 + 1;
+        int mw = w * 16 / MASK_CELL, mh = h * 16 / MASK_CELL, x0 = cx0 << 4, z0 = cz0 << 4;
         int y = level.getSeaLevel();
         String key = level.dimension().identifier().toString();
         return CompletableFuture.runAsync(() -> {
-            boolean[] g = new boolean[w * h];
-            for (int j = 0; j < h; j++)
-                for (int i = 0; i < w; i++)
-                    g[i + j * w] = Stasis.rateAtLand(level, ((cx0 + i) << 4) + 8, y, ((cz0 + j) << 4) + 8) <= 0;
-            int hash = Arrays.hashCode(g);
+            // the mask: one sample per MASK_CELL blocks (the script smooths it on the terrain); the fallback polygons take
+            // every other sample (one per chunk)
+            boolean[] m = new boolean[mw * mh];
+            for (int j = 0; j < mh; j++)
+                for (int i = 0; i < mw; i++)
+                    m[i + j * mw] = Stasis.rateAtLand(level, x0 + i * MASK_CELL + MASK_CELL / 2, y, z0 + j * MASK_CELL + MASK_CELL / 2) <= 0;
+            int hash = Arrays.hashCode(m);
             Integer was = landHash.get(key);
             if (was != null && was == hash) return;
+            int step = 16 / MASK_CELL;
+            boolean[] g = new boolean[w * h];
+            for (int j = 0; j < h; j++)
+                for (int i = 0; i < w; i++) g[i + j * w] = m[(i * step + step / 2) + (j * step + step / 2) * mw];
             List<GridOutline.Polygon> ps = GridOutline.trace(g, w, h);
             Map<String, Marker> want = new HashMap<>();
             int k = 0;
@@ -191,15 +202,58 @@ public final class BlueMapOverlay {
                     .listed(false)
                     .build());
             }
+            byte[] png = maskPng(m, mw, mh);
+            Map<BlueMapMap, String> urls = new HashMap<>();
+            for (BlueMapMap map : maps) {
+                try (var out = map.getAssetStorage().writeAsset(MASK_ASSET)) {
+                    out.write(png);
+                    urls.put(map, map.getAssetStorage().getAssetUrl(MASK_ASSET));
+                } catch (java.io.IOException ex) {
+                    StasisDelvers.LOG.warn("BlueMap overlay: could not write the land mask for {}: {}", map.getId(), ex.toString());
+                }
+            }
             srv.execute(() -> {   // (marker maps are concurrent, but keep the swap in one place with the fields')
-                for (MarkerSet s : sets) replace(s, "land-", want);
+                for (int n = 0; n < maps.size(); n++) {
+                    replace(sets.get(n), "land-", want);
+                    String url = urls.get(maps.get(n));
+                    if (url != null) sets.get(n).put("mask-land", maskMarker(url, hash, x0, z0, mw, mh, y));
+                }
                 landHash.put(key, hash);
             });
-            StasisDelvers.LOG.info("BlueMap overlay: {} stopped land in {} shapes ({}x{} chunks)", key, ps.size(), w, h);
+            StasisDelvers.LOG.info("BlueMap overlay: {} stopped land in {} shapes ({}x{} chunks), mask {}x{} ({} KB)", key,
+                ps.size(), w, h, mw, mh, png.length / 1024);
         }).exceptionally(ex -> {
             StasisDelvers.LOG.warn("BlueMap overlay: sampling {} failed: {}", key, ex.toString());
             return null;
         });
+    }
+
+    /** The mask as a grey PNG: 255 where time is stopped. */
+    static byte[] maskPng(boolean[] m, int w, int h) {
+        var img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_BYTE_GRAY);
+        byte[] px = ((java.awt.image.DataBufferByte) img.getRaster().getDataBuffer()).getData();
+        for (int k = 0; k < px.length; k++) px[k] = m[k] ? (byte) 255 : 0;
+        var bytes = new java.io.ByteArrayOutputStream();
+        try {
+            javax.imageio.ImageIO.write(img, "png", bytes);
+        } catch (java.io.IOException ex) {
+            throw new java.io.UncheckedIOException(ex);
+        }
+        return bytes.toByteArray();
+    }
+
+    /**
+     * An invisible marker telling the shell script where the mask is: url (with the grid hash, the asset is cached),
+     * its first block corner, blocks per pixel and size, and sea level.
+     */
+    static Marker maskMarker(String url, int hash, int x0, int z0, int w, int h, int y) {
+        String data = url + "?v=" + Integer.toHexString(hash) + "," + x0 + "," + z0 + "," + MASK_CELL + "," + w + "," + h;
+        return de.bluecolored.bluemap.api.markers.HtmlMarker.builder()
+            .label("Stopped land (mask)")
+            .position(x0, y, z0)
+            .html("<div hidden data-stasis-mask=\"" + data + "\"></div>")
+            .listed(false)
+            .build();
     }
 
     private static int clampChunk(double block) {
