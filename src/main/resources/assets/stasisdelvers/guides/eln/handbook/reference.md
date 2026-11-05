@@ -14,5 +14,6 @@ Terse, clean numbers. When the alarm is whooping at two in the morning, don't re
 * [Boilers, Pressure, Condensers and the Regulator](reference/steam.md): the boiling-point table, efficiency, the three-part control rule, pumps, pipes, condensers and safety valves.
 * [The Signal Processor: Complete Manual](reference/signal-processor.md): pins, syntax, precedence traps, redstone costs and a cookbook of formulas.
 * [Peak Loads and the Electrical Anvil](reference/peak-loads.md): the anvil's repair rules and bursts, the Capacitor Bank, Power Capacitors and Inductors.
+* [The RS485 Bus and the Elevator](reference/rs485-elevator.md): channels and packets, the addressed devices, the drive's registers and pins, building the 3 × 3 × 3 elevator.
 
 [Back to the contents](index.md)
