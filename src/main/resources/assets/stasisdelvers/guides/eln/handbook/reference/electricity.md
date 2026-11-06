@@ -51,15 +51,29 @@ The four equations you actually need:
 
 ## Voltage tiers and cables
 
-Every electrical cable can be placed old-style (six-node, paintable with **Brushes**) or packed into a **Cable Kit** (holds up to 64 blocks / 1024 voxels; routes along solid faces via right-click waypoints; cannot be painted; **burnt voxel cables cannot be repaired** and drop nothing when broken).
+Cables are laid with a **Cable Kit** (it holds up to 64 blocks / 1024 voxels; right-click faces to route along solid
+faces via waypoints). **Burnt voxel cables cannot be repaired** and drop nothing when broken.
 
-| Cable Tier | Nominal U | Nominal Power | Nominal I | Burns at Sustained I (1.2×) | Burns at Overvoltage (1.3×) | Resistance (R per block) | Recipe (for 6 coils, or 1 upgrade) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Signal Cable** | **5 V** | 0.5 W | 0.1 A | *No heat fail* | **6.5 V** | 0.1 Ω | 6 Iron Ingots + 6 Rubber (or 1 Iron Cable + 1 Rubber) |
-| **Low Voltage (LV)** | **48 V** | **1 kW** | **20.8 A** | **25 A** (150 °C) | **62.4 V** | **0.023 Ω** | 3 Copper Ingots + 6 Rubber (or 1 Copper Cable + 1 Rubber) |
-| **Medium Voltage (MV)** | **230 V** | **3 kW** | **13 A** | **15.7 A** (150 °C) | **299 V** | **0.088 Ω** | 1 LV Cable + 1 Rubber |
-| **High Voltage (HV)** | **400 V** | **5 kW** | **12.5 A** | **15 A** (150 °C) | **520 V** | **0.05 Ω** | 1 MV Cable + 1 Rubber |
-| **Very High (VHV)** | **11 kV** | **15 kW** | **1.36 A** | **1.64 A** (150 °C) | **14.3 kV** | **1.58 Ω** | 3 Alloy Ingots + 6 Rubber (6) |
+A power cable is a **specification**: its kit's tier is its **insulation** (48 V, 230 V, 400 V or 11 kV), and it has a
+**copper cross-section** and a **colour**. The kit's tooltip says which, e.g. "2.5 mm², 48 V, 21 A, brown". Crafted
+kits are the presets below; other specs will come from the wire-drawing machine. A brush paints a placed cable.
+
+| Kit (preset) | Insulation (burns at 1.3×) | Copper | Rated current (burns at 1.2×) | Power | R per block | Colour |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Signal** | 5 V (6.5 V) | – | 0.1 A | 0.5 W | 0.1 Ω | black |
+| **Low Voltage** | 48 V (62.4 V) | 2.5 mm² | 20.8 A (25 A) | 1 kW | 0.023 Ω | brown |
+| **Medium Voltage** | 230 V (299 V) | 1.5 mm² | 13 A (15.7 A) | 3 kW | 0.038 Ω | black |
+| **High Voltage** | 400 V (520 V) | 1.5 mm² | 13 A (15.7 A) | 5.2 kW | 0.038 Ω | grey |
+| **Very High Voltage** | 11 kV (14.3 kV) | 0.5 mm² | 3 A (3.6 A) | 33 kW | 0.115 Ω | red |
+
+Copper's rating by cross-section: 0.5 mm² 3 A, 0.75 mm² 6 A, 1 mm² 10 A, 1.5 mm² 13 A, 2.5 mm² 21 A, 4 mm² 28 A,
+6 mm² 36 A, 10 mm² 50 A, 16 mm² 66 A, 25 mm² 88 A, 35 mm² 109 A, 50 mm² 133 A, 70 mm² 170 A, 95 mm² 205 A. The
+resistance falls with the cross-section, as in real copper: the same power at a higher voltage loses less a block.
+Thick copper makes a wider cable. A thin cable may branch off a thick one of the same insulation.
+
+Kit recipes (6 coils' worth, or 1 upgrade): Signal 6 Iron Ingots + 6 Rubber (or 1 Iron Cable + 1 Rubber); LV 3 Copper
+Ingots + 6 Rubber (or 1 Copper Cable + 1 Rubber); MV 1 LV Cable + 1 Rubber; HV 1 MV Cable + 1 Rubber; VHV 3 Alloy
+Ingots + 6 Rubber.
 
 * **Bare Crafting Wires (NOT placeable):** **Copper Cable** (3 copper ingots → 3), **Iron Cable** (3 iron ingots → 6), **Tungsten Cable** (3 tungsten ingots → 6).
 * **Copper Coil** (4 copper ingots around a stick → 4): Fine winding wire used in Heating Corps, DC-DC Converters, Resistors, Inductors, and Thermistors. *(Do not confuse with Copper Cable!)*
@@ -97,8 +111,8 @@ Circuit protection and failure rules: when a network is overloaded, **only ONE f
 
 > **Picture to come:** A wall distribution panel. A Low Voltage Cable enters from the left into an Electrical Fuse Holder (holding a Lead Fuse), passes through an Electrical Breaker and an inline Electrical Probe, and branches out via a Hub to workshop machines, with a Ground Cable fixed at the bottom.
 
-* **Electrical Fuse Holder + Lead Fuse:** Blows cleanly at **~1.08× nominal current** (**LV: 22.5 A**, **MV: 14.1 A**, **HV: 13.5 A**, **VHV: 1.47 A**). Right-click with a new Lead Fuse to swap; empty-hand click removes the `Blown Lead Fuse`. The holder never burns.
-* **Electrical Breaker:** Place a cable of the desired tier in its internal slot to set the current trip (**~1.05× nominal**, LV ≈ 21.9 A). Also trips outside its `U_min` / `U_max` voltage window. Its default `U_max` is **48 V**: on a 230 V or 400 V line, open its GUI and raise `U_max` first, or it trips at once.
+* **Electrical Fuse Holder + Lead Fuse:** one fuse for every cable. Right-click the holder with a Lead Fuse to put it in; an empty-hand click opens its screen, where you set its **rating** in amps and take the fuse out (a `Blown Lead Fuse` too). It blows at about **1.08× its rating**; unset, it takes the fuse's own rating (21 A). Set it to your cable's rated current. The holder never burns.
+* **Electrical Breaker:** Place a cable in its slot (it sets the contacts' resistance), and set the **trip current** in amps in its screen; unset, it trips at about 1.05× that cable's nominal current (LV ≈ 21.9 A). It also trips outside its `U_min` / `U_max` voltage window. Its default `U_max` is **48 V**: on a 230 V or 400 V line, open its GUI and raise `U_max` first, or it trips at once.
 * **Ground Cable:** Required 0 V circuit return reference. Cannot burn.
 * **MultiMeter / AllMeter:** Right-click any device or cable to print Voltage (`U`), Current (`I`), and Power (`P`) to your log without opening its GUI. *(Tip: Crafting the Electrical Probe Chip for the MultiMeter requires 1 × **High Voltage Cable**.)*
 
