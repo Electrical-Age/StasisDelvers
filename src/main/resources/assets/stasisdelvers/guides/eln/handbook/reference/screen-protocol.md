@@ -59,7 +59,7 @@ it. Elements are drawn in the order they were first made, so make backgrounds fi
 
 ## Limits
 
-A message is at most 64 KB. A player's message is at most 256 bytes (a save 40 KB), and at most 20 a tick. A
+A message is at most 64 KB. A player's message is at most 256 bytes (a submitted line 8 KB, a save 40 KB), and at most 20 a tick. A
 screen has at most 32 tabs, and a tab 256 elements. The server keeps what the screen shows, so a player who opens it
 later sees it all, and it is saved with the world.
 

@@ -68,17 +68,24 @@ Elements are drawn in the order they were first made. A raw area's keys are the 
 Ctrl and 4 for Alt.
 
 ```clojure
-# a counter with two buttons, in its own tab
-(proc/start "counter" (fn []
+# a counter with two buttons
+(var n 0)
+(defn counter []
   (def t (proc/tab))
-  (var n 0)
-  (defn show [] (ui/text t 2 2 1 :yellow (string "count: " n)))
+  (defn show []
+    (ui/text t 2 2 1 :yellow
+      (string "count: " n)))
   (ui/clear t)
-  (ui/button t 3 2 3 5 "+1" (fn [] (++ n) (show)))
-  (ui/button t 4 8 3 5 "-1" (fn [] (-- n) (show)))
+  (ui/button t 3 2 3 5 "+1"
+    (fn [] (++ n) (show)))
+  (ui/button t 4 8 3 5 "-1"
+    (fn [] (-- n) (show)))
   (show)
-  (forever (sleep 60))))
+  (forever (sleep 60)))
+(proc/start "counter" counter)
 ```
+
+Type each form at the REPL, or save them in a file and Run it.
 
 ## The bus
 
