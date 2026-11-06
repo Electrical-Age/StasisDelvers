@@ -22,7 +22,9 @@ A program is a set of tasks taking turns. While every task waits, the computer s
 | `(spawn f & args)` | runs `(f ;args)` as a task of its own |
 | `(sleep s)` | waits `s` seconds of the computer's time (other tasks run meanwhile) |
 | `(now)`, `(ticks)` | the computer's clock, in seconds or game ticks (20 a second, only while it runs) |
-| `(run-file path)` | runs a file's forms in this task, as at start-up |
+| `(run-file path)` | runs a file's forms in this task, in an environment of their own, as at start-up |
+| `(load path)` | runs a file's forms in this task's environment, so its definitions stay: at the REPL, they are the REPL's |
+| `(getline &opt prompt)` | waits for a line typed on this task's tab: at the REPL, on the REPL's line; a program's tab gets a line at its bottom meanwhile |
 | `(alarm & msg)` | prints `ALARM: …` in red |
 
 Each form typed at the REPL runs as a task too, so `(sleep 10)` doesn't stop the others. Ctrl+C stops it.
@@ -99,17 +101,22 @@ Addresses: 0 everyone, 17 to 255 a device. Colour channels are `:white` … `:bl
 
 | call | does |
 |---|---|
-| `(bus/send target type index value)` | sends from this computer's address. `type` is `:signal`, `:press`, `:power`, `:write`, `:read`, `:reply`, `:fault`, `:arrive` or a number |
+| `(bus/send target type index value)` | sends from this computer's address. `type` is `:signal`, `:press`, `:power`, `:write`, `:read`, `:reply`, `:fault`, `:arrive`, `:data` or a number |
 | `(bus/raw-send target source type index value)` | sends with any source address (it can pretend to be another device) |
 | `(bus/level ch)` | a colour channel's level, 0 to 1 |
 | `(bus/set ch level)` | sets a colour channel. It holds until someone else writes it |
 | `(bus/wait &opt pred timeout)` | waits for a packet that `pred` accepts. `nil` after `timeout` seconds |
-| `(bus/on type f)` | runs `(f packet)` as a task for every packet of that type (or that a function accepts) |
+| `(bus/on type f)` | runs `(f packet)` as a task for every packet of that type (or that a function accepts), until its program stops |
 | `(bus/on-press address f)` | runs `(f index)` whenever the button at that address is pressed |
 | `(bus/handlers-clear)` | forgets every `bus/on` |
 | `(bus/address)` | this computer's address, and whether it is on a bus |
 
 A packet is a struct: `{:target :source :type :index :value}`. At most 16 packets a tick go out from one computer.
+
+Computers talk to each other with `:data` packets: the index is yours to choose, and the value is a string of up to
+64 bytes. `(bus/send 42 :data 1 "hello")` sends one to the computer at 42, and `(bus/send 0 :data 1 "hello")` to
+every computer on the bus. Devices ignore them. The Applications floppy's BBS and Gorillas talk this way: open them
+in the Files tab to see how.
 
 ## Devices
 
@@ -123,8 +130,9 @@ A packet is a struct: `{:target :source :type :index :value}`. At most 16 packet
 
 ## Floppies
 
-`slurp`, `spit`, `file/open` and `import` work on paths like `a:/main.janet` and `b:/lib/util.janet`. The disks are
-FAT12, 1.44 MB.
+`slurp`, `spit`, `file/open` and `import` work on paths like `a:/main.janet` and `b:/lib/util.janet`:
+`(import a:/lib/util)` loads `a:/lib/util.janet` and names its definitions `util/…`. Janet keeps an imported file, so
+after you change it, `(import a:/lib/util :fresh true)` loads it again. The disks are FAT12, 1.44 MB.
 
 | call | does |
 |---|---|

@@ -42,6 +42,7 @@ A run of **Field Bus Cable** and every device whose bus pin touches it form one 
 | 6 | reply | register, value | the answer, sent back to whoever asked |
 | 7 | fault | code | a device reports a fault (sent to everyone) |
 | 8 | arrive | sensor index | a Floor Sensor saw the car stop (sent to everyone) |
+| 9 | data | index, up to 64 bytes | between computers: the index and bytes are the program's own; devices ignore it |
 
 Packets sent in one tick arrive at the next, sorted by sender. A bus carries **64 packets a tick**; more are dropped,
 and Jade on the cable counts them. Jade on the cable also lists the device addresses on the bus. Two devices with

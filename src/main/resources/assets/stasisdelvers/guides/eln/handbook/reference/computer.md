@@ -10,6 +10,7 @@ item_ids:
   - eln:boot_rom_chip
   - eln:floppy_disk
   - eln:elevator_disk
+  - eln:applications_disk
 ---
 
 # The Computer
@@ -62,6 +63,25 @@ program survives a restart: keep it on a floppy as `startup.janet`.
 
 Saving the world keeps a running program where it was. A mod update that changes a ROM restarts every computer that
 uses it, which runs `startup.janet` again.
+
+## The Applications floppy
+
+A menu of small programs, which opens when the floppy is in drive A at start-up (or type
+`(proc/start "menu" run-file "a:/startup.janet")`). Each program is a file you can open in the Files tab, to read
+how it is done, change it, or press **Run**.
+
+* **Calculator:** click its keys, or type digits, `+ - * / %`, Enter and Backspace (C clears). The tape on the right
+  keeps your sums.
+* **BBS:** message boards shared by every computer on the bus that runs it. Pick a board on the left and type a post
+  on the bottom line; `/board NAME` opens or starts a board, and `/name NAME` signs your posts. Each computer keeps
+  every post it has seen on its floppy, so the boards live on while computers come and go. Posts can't be edited or
+  deleted.
+* **Snake:** steer with the arrow keys. The keys go over the network, so it plays best on a computer near you.
+* **Gorillas:** for two players, each at a computer on the same bus with an address set. The two find each other,
+  then take turns throwing a banana at the other's gorilla: type an angle (degrees up from the ground, towards the
+  other gorilla) and a speed. Mind the wind.
+
+Click a game's field before you play, so it gets the keys.
 
 ## The Elevator floppy
 
