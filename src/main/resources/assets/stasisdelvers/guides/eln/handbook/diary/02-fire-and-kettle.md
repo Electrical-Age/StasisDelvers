@@ -20,9 +20,9 @@ If I am going to run a **Macerator** to double my ore yield and a **Plate Machin
 
 So today I built a kettle.
 
-Well. Technically it is a **50V Compact Steam Turbine**, married to a **Stone Heat Furnace**. Back at the Authority we would have called it a packaged cogeneration unit, though if you showed this particular contraption to a boiler inspector he would have a stroke on the spot. It is an all-in-one bootstrap box: tiny boiler, miniature governor, dynamo, and a little air-cooled condenser coil all crammed into one iron casing.
+Well. Technically it is a **48V Compact Steam Turbine**, married to a **Stone Heat Furnace**. Back at the Authority we would have called it a packaged cogeneration unit, though if you showed this particular contraption to a boiler inspector he would have a stroke on the spot. It is an all-in-one bootstrap box: tiny boiler, miniature governor, dynamo, and a little air-cooled condenser coil all crammed into one iron casing.
 
-> **Picture to come:** Early bootstrap setup in a cramped wooden shed. A Stone Heat Furnace sits flush against the LEFT side of a 50V Compact Steam Turbine. Low Voltage Cable runs from the turbine's output to a Ground Cable staked into the floor and up to a wall-mounted Lamp Socket A holding a glowing 50V Carbon Incandescent Light Bulb.
+> **Picture to come:** Early bootstrap setup in a cramped wooden shed. A Stone Heat Furnace sits flush against the LEFT side of a 48V Compact Steam Turbine. Low Voltage Cable runs from the turbine's output to a Ground Cable staked into the floor and up to a wall-mounted Lamp Socket A holding a glowing 48V Carbon Incandescent Light Bulb.
 
 You don't even have to pipe it. You set the **Stone Heat Furnace** flush against the **left flank** of the Compact Turbine, tip a single bucket of water into the turbine, and shove coal into the firebox. Heat conducts straight across the stone-to-iron face. The water boils, spins the little impeller, condenses against the air fins, and drips back down to boil again. One bucket of water lasts for hours. (The step-by-step is in [the reference notes](../reference/early-heat.md#building-the-bootstrap-plant).)
 
@@ -30,13 +30,13 @@ It’s foolproof. Which is why I spent two hours this afternoon wondering why my
 
 Let me explain what went wrong, Kid, because if you don't understand the difference between **temperature** and **heat**, this mod will drive you to drink.
 
-I had wired a **Low Voltage Cable** from the turbine to a **Lamp Socket** on the rafters (after remembering to open the socket's little panel and flip it from wireless *Lamp Supply* mode to *Cable* mode—every socket comes out of the box expecting a wireless transmitter for reasons known only to God), screwed in a **25 W Carbon Incandescent Bulb**, and hooked up my first **50V Electrical Furnace** beside it.
+I had wired a **Low Voltage Cable** from the turbine to a **Lamp Socket** on the rafters (after remembering to open the socket's little panel and flip it from wireless *Lamp Supply* mode to *Cable* mode—every socket comes out of the box expecting a wireless transmitter for reasons known only to God), screwed in a **25 W Carbon Incandescent Bulb**, and hooked up my first **Electrical Furnace** beside it.
 
-I lit the Stone Heat Furnace. I watched the thermometer climb. Three hundred degrees. Four hundred. Five hundred degrees Celsius. The furnace was roaring, glowing cherry-red behind its grate, and through the side of the **50V Compact Steam Turbine** I could see its little spoked flywheel spinning like a sewing machine.
+I lit the Stone Heat Furnace. I watched the thermometer climb. Three hundred degrees. Four hundred. Five hundred degrees Celsius. The furnace was roaring, glowing cherry-red behind its grate, and through the side of the **48V Compact Steam Turbine** I could see its little spoked flywheel spinning like a sewing machine.
 
 Then I switched on the Electric Furnace, and the light bulb immediately dimmed to the colour of cold tea. I tapped the turbine with my **MultiMeter**.
 
-*U = 31.0 V. P = 81 W.*
+*U = 29.8 V. P = 81 W.*
 
 Eighty-one watts! The handbook sketch I’d seen for the Compact Turbine said it topped out at **300 W**—or **~270 W** sustained on a single furnace. My furnace was five hundred degrees! Why was I getting less than a third of the rated power?
 
@@ -56,21 +56,21 @@ Imagine you are trying to fill a bathtub. **Temperature** is how *high* you hold
 
 A bare **Stone Heat Furnace**, straight out of the crafting bench, only has a 1,000-watt fire inside it (1 kW of heat)—and once the stone shell warms up and loses a bit of heat to the room, it pushes roughly **800 W** into the turbine.
 
-Now look at the **50V Compact Steam Turbine**. Why is it so easy to build and so forgiving to run? Because its **thermodynamic efficiency is ten percent (10%)**. Write that phrase down, because we are going to measure every heat engine in this ledger by the same yardstick: *for every ten watts of heat you put into the machine, how many watts of electricity come out the wires?* In the Compact Turbine, one watt in ten comes out the front as 50 V electricity, and the other nine watts are thrown away into the room through its little air-cooled condenser fins.
+Now look at the **48V Compact Steam Turbine**. Why is it so easy to build and so forgiving to run? Because its **thermodynamic efficiency is ten percent (10%)**. Write that phrase down, because we are going to measure every heat engine in this ledger by the same yardstick: *for every ten watts of heat you put into the machine, how many watts of electricity come out the wires?* In the Compact Turbine, one watt in ten comes out the front as 48 V electricity, and the other nine watts are thrown away into the room through its little air-cooled condenser fins.
 
 Do the arithmetic on the back of an envelope:
 
 * A bare Stone Heat Furnace delivers about **800 W** of net heat into the boiler → **~80 W** of electricity.
 * Every **Combustion Chamber** you slide into the furnace's chamber slot adds **500 W** to the fire (up to **4 chambers**, for a 3,000 W fire that delivers **~2.7 kW** of net heat after shell losses).
-* Ten percent of 2.7 kW is **~270 W** of continuous, rock-steady 50 V power (and it will briefly surge to its full **300 W** ceiling using the heat stored in the water before settling back to 270 W).
+* Ten percent of 2.7 kW is **~270 W** of continuous, rock-steady 48 V power (and it will briefly surge to its full **300 W** ceiling using the heat stored in the water before settling back to 270 W).
 
 > **Picture to come:** Close-up of the Stone Heat Furnace GUI showing 4 Combustion Chambers installed in the chamber slot, coal in the fuel slot, and the manual gain slider pushed to 100%.
 
-I cobbled together four more Combustion Chambers before noon, shoved them into the furnace, and waited about three minutes for the coal bed to catch up. By one o’clock the little spoked flywheel was a blur, holding a steady **50 V** at **270 W**. When I switched the loads off, the turbine didn't even blow off steam; it just idled quietly at **155 °C**, recycling its condensate so cleanly that a single bucket of water lasts nearly two and a half hours at no load. (All the furnace and turbine figures are in [the device table](../reference/early-heat.md#device-numbers).)
+I cobbled together four more Combustion Chambers before noon, shoved them into the furnace, and waited about three minutes for the coal bed to catch up. By one o’clock the little spoked flywheel was a blur, holding a steady **48 V** at **270 W**. When I switched the loads off, the turbine didn't even blow off steam; it just idled quietly at **155 °C**, recycling its condensate so cleanly that a single bucket of water lasts nearly two and a half hours at no load. (All the furnace and turbine figures are in [the device table](../reference/early-heat.md#device-numbers).)
 
-Better yet: now that the **Lamp Socket** above the shed door has a steady fifty volts and a lit **Carbon Incandescent Bulb** burning inside it, I can finally sleep through the night. Torchlight never kept the deeper things out of the yard for long, but there is something about real electric light—a lit EA bulb in a powered socket—that the things in the dark cannot stomach. While that lamp is lit, nothing foul can spawn within nine paces of the socket. Tonight a pair of zombies shambled up from the treeline, squinted into the glare of the twenty-five-watt filament, and turned right back into the pines. (It won't stop the Endermen, mind you. Nothing stops the Endermen.)
+Better yet: now that the **Lamp Socket** above the shed door has a steady forty-eight volts and a lit **Carbon Incandescent Bulb** burning inside it, I can finally sleep through the night. Torchlight never kept the deeper things out of the yard for long, but there is something about real electric light—a lit EA bulb in a powered socket—that the things in the dark cannot stomach. While that lamp is lit, nothing foul can spawn within nine paces of the socket. Tonight a pair of zombies shambled up from the treeline, squinted into the glare of the twenty-five-watt filament, and turned right back into the pines. (It won't stop the Endermen, mind you. Nothing stops the Endermen.)
 
-*My tidied-up notes for this chapter: [Early Heat and the 50V Compact Steam Turbine](../reference/early-heat.md).*
+*My tidied-up notes for this chapter: [Early Heat and the 48V Compact Steam Turbine](../reference/early-heat.md).*
 
 ---
 

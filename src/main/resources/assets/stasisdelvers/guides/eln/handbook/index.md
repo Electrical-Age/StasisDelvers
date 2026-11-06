@@ -29,7 +29,7 @@ wherever a number or a rule comes up, and every Reference page links back to the
 ## Reference
 
 * [Electrical Fundamentals, Cables and Protection](reference/electricity.md)
-* [Early Heat and the 50V Compact Steam Turbine](reference/early-heat.md)
+* [Early Heat and the 48V Compact Steam Turbine](reference/early-heat.md)
 * [Boilers, Pressure, Condensers and the Regulator](reference/steam.md)
 * [The Signal Processor: Complete Manual](reference/signal-processor.md)
 * [Peak Loads and the Electrical Anvil](reference/peak-loads.md)
@@ -39,11 +39,11 @@ wherever a number or a rule comes up, and every Reference page links back to the
 *I've left blank leaves for these, Kid. The copper comes first; the writing comes when the lamp oil allows.*
 
 * Cables, tiers and why things burn
-* The workshop: 50 V machines and ores
+* The workshop: 48 V machines and ores
 * Keeping it: batteries and storage
 * Light
 * Sand to thought: silicon, chips, signals and logic (only the Signal Processor is written up so far)
-* Stepping up: 200 V and the DC-DC converter
+* Stepping up: 230 V and the DC-DC converter
 * Iron that turns: shafts, flywheels and big turbines
 * Black gold: oil
 * The grid and the far side of the world

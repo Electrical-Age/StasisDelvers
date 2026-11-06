@@ -21,7 +21,7 @@ One violet cable, any number of devices. It works in voxel blocks only.
 
 A run of **Field Bus Cable** and every device whose bus pin touches it form one bus. The bus carries two things:
 
-* **16 colour channels.** Levels from 0 to 1, a share of 50 V, numbered like the dyes: 0 white to 15 black. A channel
+* **16 colour channels.** Levels from 0 to 1, a share of 5 V, numbered like the dyes: 0 white to 15 black. A channel
   holds its level. When two writers disagree, the **last change wins**, and when a writer stops, the others' levels
   come back. A channel nobody writes falls to 0.
 * **Packets** sent to an address: `[target][source][type][payload]`.
@@ -70,7 +70,7 @@ Fault codes: 1 something in the way, 2 too hot, 3 rail missing or broken, 4 line
 
 ## Building the elevator
 
-1. **The drive** goes at the foot of the shaft, with a **Servo Rail** mast of 2 to 32 blocks on top and **200 V on
+1. **The drive** goes at the foot of the shaft, with a **Servo Rail** mast of 2 to 32 blocks on top and **230 V on
    its back**. The cabin is **3 × 3 × 3**. It rides over the three rows of blocks in front of the drive, open at the
    front, so keep that 3 × 3 shaft clear up to 3 blocks above the top stop.
 2. **The pins** are all on the floor edges of the drive's flanks, three per flank. Left and right are as you face
@@ -78,7 +78,7 @@ Fault codes: 1 something in the way, 2 too hot, 3 rail missing or broken, 4 line
    * **Left flank** (seen from the car side): in-position, **setpoint** (middle), position.
    * **Right flank:** fault, **enable** (middle), and the violet **bus** pin.
    A plain signal cable reaches only the middle pins. Voxel cables can end at any of the three.
-3. **Without a computer:** a signal on the setpoint is a share of the travel (0 V the bottom, 50 V the top), rounded
+3. **Without a computer:** a signal on the setpoint is a share of the travel (0 V the bottom, 5 V the top), rounded
    to the nearest block. A connected setpoint overrides the bus.
 4. **The car's panel** is the board inside the back wall: 12 slots, 3 across and 4 down. Hold an Addressable Button or
    Light and click a slot to put it in. Sneak and click with an empty hand to take it back. In the drive's screen,

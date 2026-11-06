@@ -14,7 +14,7 @@ The drifting clouds are thicker this week. One of them—a low, bruise-coloured 
 
 I spent the afternoon crouched behind the boiler with a soldering iron because my wall of discrete logic chips was turning into a rat's nest.
 
-To keep the steam plant and the battery bank happy while I’m down in the mine, I needed a circuit that would watch the **50 V battery bank**, shed the non-essential workshop loads when the charge dropped below thirty percent, wait until the batteries recovered past sixty percent before reconnecting them, and smoothly throttle the cooling water valve using a proportional-integral loop. Doing that with discrete **Schmitt Triggers**, **RS Latches**, **Amplifiers**, and **PID chips** took half a wall of stone and a dozen lengths of Signal Cable.
+To keep the steam plant and the battery bank happy while I’m down in the mine, I needed a circuit that would watch the **48 V battery bank**, shed the non-essential workshop loads when the charge dropped below thirty percent, wait until the batteries recovered past sixty percent before reconnecting them, and smoothly throttle the cooling water valve using a proportional-integral loop. Doing that with discrete **Schmitt Triggers**, **RS Latches**, **Amplifiers**, and **PID chips** took half a wall of stone and a dozen lengths of Signal Cable.
 
 Then I remembered the **Signal Processor**.
 

@@ -55,11 +55,11 @@ Every electrical cable can be placed old-style (six-node, paintable with **Brush
 
 | Cable Tier | Nominal U | Nominal Power | Nominal I | Burns at Sustained I (1.2×) | Burns at Overvoltage (1.3×) | Resistance (R per block) | Recipe (for 6 coils, or 1 upgrade) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Signal Cable** | **50 V** | 5 W | 0.1 A | *No heat fail* | **65 V** | 10 Ω | 6 Iron Ingots + 6 Rubber (or 1 Iron Cable + 1 Rubber) |
-| **Low Voltage (LV)** | **50 V** | **1 kW** | **20 A** | **24 A** (150 °C) | **65 V** | **0.025 Ω** | 3 Copper Ingots + 6 Rubber (or 1 Copper Cable + 1 Rubber) |
-| **Medium Voltage (MV)** | **200 V** | **2 kW** | **10 A** | **12 A** (150 °C) | **260 V** | **0.1 Ω** | 1 LV Cable + 1 Rubber |
-| **High Voltage (HV)** | **800 V** | **5 kW** | **6.25 A** | **7.5 A** (150 °C) | **1040 V** | **0.2 Ω** | 1 MV Cable + 1 Rubber |
-| **Very High (VHV)** | **3200 V** | **15 kW** | **4.69 A** | **5.6 A** (150 °C) | **4160 V** | **0.133 Ω** | 3 Alloy Ingots + 6 Rubber (6) |
+| **Signal Cable** | **5 V** | 0.5 W | 0.1 A | *No heat fail* | **6.5 V** | 0.1 Ω | 6 Iron Ingots + 6 Rubber (or 1 Iron Cable + 1 Rubber) |
+| **Low Voltage (LV)** | **48 V** | **1 kW** | **20.8 A** | **25 A** (150 °C) | **62.4 V** | **0.023 Ω** | 3 Copper Ingots + 6 Rubber (or 1 Copper Cable + 1 Rubber) |
+| **Medium Voltage (MV)** | **230 V** | **3 kW** | **13 A** | **15.7 A** (150 °C) | **299 V** | **0.088 Ω** | 1 LV Cable + 1 Rubber |
+| **High Voltage (HV)** | **400 V** | **5 kW** | **12.5 A** | **15 A** (150 °C) | **520 V** | **0.05 Ω** | 1 MV Cable + 1 Rubber |
+| **Very High (VHV)** | **11 kV** | **15 kW** | **1.36 A** | **1.64 A** (150 °C) | **14.3 kV** | **1.58 Ω** | 3 Alloy Ingots + 6 Rubber (6) |
 
 * **Bare Crafting Wires (NOT placeable):** **Copper Cable** (3 copper ingots → 3), **Iron Cable** (3 iron ingots → 6), **Tungsten Cable** (3 tungsten ingots → 6).
 * **Copper Coil** (4 copper ingots around a stick → 4): Fine winding wire used in Heating Corps, DC-DC Converters, Resistors, Inductors, and Thermistors. *(Do not confuse with Copper Cable!)*
@@ -71,8 +71,8 @@ Circuit protection and failure rules: when a network is overloaded, **only ONE f
 
 > **Picture to come:** A wall distribution panel. A Low Voltage Cable enters from the left into an Electrical Fuse Holder (holding a Lead Fuse), passes through an Electrical Breaker and an inline Electrical Probe, and branches out via a Hub to workshop machines, with a Ground Cable fixed at the bottom.
 
-* **Electrical Fuse Holder + Lead Fuse:** Blows cleanly at **~1.08× nominal current** (**LV: 21.6 A**, **MV: 10.8 A**, **HV: 6.75 A**, **VHV: 5.06 A**). Right-click with a new Lead Fuse to swap; empty-hand click removes the `Blown Lead Fuse`. The holder never burns.
-* **Electrical Breaker:** Place a cable of the desired tier in its internal slot to set the current trip (**~1.05× nominal**, LV ≈ 21 A). Also trips outside its `U_min` / `U_max` voltage window. **TRAP:** The breaker's default `U_max` is **50 V**! On a 200 V or 800 V line it will trip instantly until you open its GUI and raise `U_max`.
+* **Electrical Fuse Holder + Lead Fuse:** Blows cleanly at **~1.08× nominal current** (**LV: 22.5 A**, **MV: 14.1 A**, **HV: 13.5 A**, **VHV: 1.47 A**). Right-click with a new Lead Fuse to swap; empty-hand click removes the `Blown Lead Fuse`. The holder never burns.
+* **Electrical Breaker:** Place a cable of the desired tier in its internal slot to set the current trip (**~1.05× nominal**, LV ≈ 21.9 A). Also trips outside its `U_min` / `U_max` voltage window. **TRAP:** The breaker's default `U_max` is **5 V**! On any power line it will trip instantly until you open its GUI and raise `U_max`.
 * **Ground Cable:** Required 0 V circuit return reference. Cannot burn.
 * **MultiMeter / AllMeter:** Right-click any device or cable to print Voltage (`U`), Current (`I`), and Power (`P`) to your log without opening its GUI. *(Tip: Crafting the Electrical Probe Chip for the MultiMeter requires 1 × **High Voltage Cable**.)*
 

@@ -26,21 +26,21 @@ Everything in my workshop runs on **DC—Direct Current**. Unlike the municipal 
 
 If you cannot see electricity in your head, picture water in a closed loop of garden hose with a rotary pump in the middle:
 
-* **Voltage (`U`, measured in Volts, V)** is **water pressure**. It is how hard the pump is shoving. Even if you close the nozzle at the end of the hose so nothing is moving, the *pressure* is still sitting there in the hose, pushing against the rubber. My starter workshop runs at a nominal pressure of **50 V**.
-* **Current (`I`, measured in Amperes or Amps, A)** is **flow rate**—how many gallons per second are actually rushing through the hose. If the switch is open, the voltage is 50 V, the current is **0 A**, and nothing happens.
-* **Resistance (`R`, measured in Ohms, Ω)** is a **pinch or a narrow section in the pipe**. Every machine you wire up—a light bulb, a macerator motor, a heater coil—is just a controlled constriction that makes the current do work as it squeezes through. Every block of copper cable also has a tiny bit of friction of its own (**0.025 Ω per block** for [Low Voltage Cable](../reference/electricity.md#voltage-tiers-and-cables)).
+* **Voltage (`U`, measured in Volts, V)** is **water pressure**. It is how hard the pump is shoving. Even if you close the nozzle at the end of the hose so nothing is moving, the *pressure* is still sitting there in the hose, pushing against the rubber. My starter workshop runs at a nominal pressure of **48 V**.
+* **Current (`I`, measured in Amperes or Amps, A)** is **flow rate**—how many gallons per second are actually rushing through the hose. If the switch is open, the voltage is 48 V, the current is **0 A**, and nothing happens.
+* **Resistance (`R`, measured in Ohms, Ω)** is a **pinch or a narrow section in the pipe**. Every machine you wire up—a light bulb, a macerator motor, a heater coil—is just a controlled constriction that makes the current do work as it squeezes through. Every block of copper cable also has a tiny bit of friction of its own (about **0.023 Ω per block** for [Low Voltage Cable](../reference/electricity.md#voltage-tiers-and-cables)).
 * **Power (`P`, measured in Watts, W)** is **how fast work is being done right now**. In a water pipe, if you want to spin a waterwheel hard, you either need high pressure, a massive flow of water, or both. In electricity, it is the cleanest formula in the universe:
 
   `Power (W) = Voltage (V) × Current (A)`
 
-  If a **50V Macerator** needs **200 W** of power to crush iron ore, and the line pressure is **50 V**, it will draw **4 A** of current (`50 V × 4 A = 200 W`).
+  If a **48V Macerator** needs **200 W** of power to crush iron ore, and the line pressure is **48 V**, it will draw about **4.2 A** of current (`48 V × 4.2 A ≈ 200 W`).
 
 ## 2. Where the Water Analogy Lies to You
 
 Every textbook gives you the water pipe, Kid, and then leaves out the three places where the analogy will get you killed—or at least leave you staring at a dead circuit in the dark:
 
 1. **A wire does not start "empty."** When you lay a new garden hose, you have to wait for water from the tap to fill the hose before it squirts out the far end. A copper wire is *already packed full* of movable charge from the day it is mined, like a pipe that comes from the factory pre-filled with water from end to end. The instant the generator pushes at one end, the whole column shifts at once.
-2. **Current is NEVER "used up."** If you pump four amps of current *into* a light bulb, **four amps of current come back out the other side**. The bulb does not eat the water! What gets "used up" across the bulb is the **pressure (Voltage)**. The charge goes into the bulb at 50 V, spends its pressure pushing through the hot tungsten filament, and comes out the back side at **0 V**.
+2. **Current is NEVER "used up."** If you pump four amps of current *into* a light bulb, **four amps of current come back out the other side**. The bulb does not eat the water! What gets "used up" across the bulb is the **pressure (Voltage)**. The charge goes into the bulb at 48 V, spends its pressure pushing through the hot tungsten filament, and comes out the back side at **0 V**.
 3. **You cannot spill electricity on the floor; it demands a return path.** If you cut a garden hose in half, water pours onto your boots. If you cut an electrical wire, the flow stops dead everywhere in the pipe. Because charge cannot pile up in mid-air, **every circuit must be a complete loop** from the source, through the load, and back to zero.
 
 And how do we give our circuits a "back to zero" return path without laying two parallel copper cables everywhere in the workshop? We use the earth under our feet.
@@ -51,38 +51,38 @@ Craft a **[Ground Cable](../reference/electricity.md#circuit-protection)** (five
 
 ## 3. Series vs. Parallel (How to Wire a Room)
 
-Suppose you have two 50 V lamps:
+Suppose you have two 48 V lamps:
 
-* If you wire them **in Series** (one after another in a single chain, so the current goes through Lamp A and then has to go through Lamp B to get to ground), they have to *share* the 50 V pressure. Each lamp only sees **25 V** across it. Since a resistive machine's power drops with the *square* of the voltage (`P = U² / R`), at half voltage each lamp only gets **one quarter** of its rated wattage! They will barely glow.
-* So we wire almost everything **in Parallel**: run one main 50 V trunk line down the wall, and branch each machine off that trunk so every single machine sees the full **50 V** pressure between the trunk and Ground. In parallel, the voltages stay at 50 V, and the **currents add up** along the trunk line.
+* If you wire them **in Series** (one after another in a single chain, so the current goes through Lamp A and then has to go through Lamp B to get to ground), they have to *share* the 48 V pressure. Each lamp only sees **24 V** across it. Since a resistive machine's power drops with the *square* of the voltage (`P = U² / R`), at half voltage each lamp only gets **one quarter** of its rated wattage! They will barely glow.
+* So we wire almost everything **in Parallel**: run one main 48 V trunk line down the wall, and branch each machine off that trunk so every single machine sees the full **48 V** pressure between the trunk and Ground. In parallel, the voltages stay at 48 V, and the **currents add up** along the trunk line.
 
 ## 4. Why Cables Burn (I²R) and Why High Voltage Exists
 
 Here is the catch with adding up currents on a trunk line.
 
-A **Low Voltage Cable** is rated for **50 V** and **20 A** of current (`50 V × 20 A = 1,000 W`, or **1 kW**).
-Why does a 50 V cable care how many amps are flowing through it? Because of friction. As current (`I`) squeezes through the resistance (`R`) of the copper, it generates waste heat equal to:
+A **Low Voltage Cable** is rated for **48 V** and about **21 A** of current (`48 V × 20.8 A = 1,000 W`, or **1 kW**).
+Why does a 48 V cable care how many amps are flowing through it? Because of friction. As current (`I`) squeezes through the resistance (`R`) of the copper, it generates waste heat equal to:
 
 `Heat Lost in the Wire = I² × R`
 
 Notice that little **2** on the current, Kid. It is the tyrant of electrical engineering. **Double the current, and you get FOUR TIMES the heat in the cable.**
 
-At its nominal **20 A**, an LV cable warms up by about 90 degrees over the room air (sitting around 110 °C in a 20 °C room). Push it just twenty percent harder—to **24 A** (`1.2 × I_nominal`)—and its steady temperature hits **150 °C**. After about half a minute at that load, the rubber insulation bursts into flame, sets any nearby wooden walls on fire, and the cable burns out!
+At its nominal **21 A**, an LV cable warms up by about 90 degrees over the room air (sitting around 110 °C in a 20 °C room). Push it just twenty percent harder—to **25 A** (`1.2 × I_nominal`)—and its steady temperature hits **150 °C**. After about half a minute at that load, the rubber insulation bursts into flame, sets any nearby wooden walls on fire, and the cable burns out!
 
-And even before it catches fire, long LV runs suffer from **voltage drop** (`U_drop = I × R`). Run 20 A down a 40-block LV cable (`40 × 0.025 Ω = 1 Ω`), and you lose **20 V** just fighting the wire! Your 50 V macerator at the far end only sees **30 V**, and runs like it's wading through treacle.
+And even before it catches fire, long LV runs suffer from **voltage drop** (`U_drop = I × R`). Run 21 A down a 40-block LV cable (`40 × 0.023 Ω ≈ 0.92 Ω`), and you lose about **19 V** just fighting the wire! Your 48 V macerator at the far end only sees **29 V**, and runs like it's wading through treacle.
 
 How do we send more power—or send it across the valley to a distant Safeguard Tower—without melting the copper or losing half our voltage? **We step up the Voltage.**
 
 Suppose you want to move **2,000 W (2 kW)** of power:
 
-* At **50 V** (Low Voltage), 2,000 W requires **40 A** of current. That will fry an LV cable in seconds.
-* Step the pressure up to **200 V** (Medium Voltage, MV) using a **DC-DC Converter**. Now how much current does 2,000 W take?
+* At **48 V** (Low Voltage), 2,000 W requires about **42 A** of current. That will fry an LV cable in seconds.
+* Step the pressure up to **230 V** (Medium Voltage, MV) using a **DC-DC Converter**. Now how much current does 2,000 W take?
 
-  `2,000 W ÷ 200 V = 10 A`
-* Step it up to **800 V** (High Voltage, HV), and 2,000 W only takes **2.5 A**!
-* Step it up to **3,200 V** (Very High Voltage, VHV), and 2,000 W is a mere **0.625 A**—a trickle of current that loses almost nothing over hundreds of paces!
+  `2,000 W ÷ 230 V ≈ 8.7 A`
+* Step it up to **400 V** (High Voltage, HV), and 2,000 W only takes **5 A**!
+* Step it up to **11,000 V** (Very High Voltage, VHV), and 2,000 W is a mere **0.18 A**—a trickle of current that loses almost nothing over hundreds of paces!
 
-Of course, higher voltage needs thicker rubber insulation so the pressure doesn't punch right through the jacket. Put 200 V onto a 50 V cable (or a 50 V machine) and you violate the **[1.3× Overvoltage Rule](../reference/electricity.md#voltage-tiers-and-cables)**: anything pushed past **130% of its rated voltage** (65 V on a 50 V device) suffers electrical breakdown and burns out within seconds.
+Of course, higher voltage needs thicker rubber insulation so the pressure doesn't punch right through the jacket. Put 230 V onto a 48 V cable (or a 48 V machine) and you violate the **[1.3× Overvoltage Rule](../reference/electricity.md#voltage-tiers-and-cables)**: anything pushed past **130% of its rated voltage** (62.4 V on a 48 V device) suffers electrical breakdown and burns out within seconds.
 
 ## 5. Power vs. Energy (Why Batteries Are Water Towers)
 
@@ -93,7 +93,7 @@ One last distinction before my lamp oil runs out: don't confuse **Power (Watts)*
 
 A **Cost Oriented Battery** holds **60 kJ** (60,000 Joules) of energy, and its standard power rating is **250 W** (250 Joules per second). Divide 60,000 J by 250 J/s, and you see why every battery in the catalog has a standard discharge time of **240 seconds (4 minutes)** at its rated load. Run a single 20 W light bulb off that same 60 kJ battery, and it will burn for fifty minutes (`60,000 ÷ 20 = 3,000 s`).
 
-Tomorrow I’ll craft a **[MultiMeter](../reference/electricity.md#circuit-protection)**—though annoyance of annoyances, the **Electrical Probe Chip** inside a MultiMeter requires a piece of **High Voltage Cable**, which means I have to wrap a Copper Cable in three successive layers of rubber (LV → MV → HV) before I can even build my first voltmeter. Typical Ministry design: you need high-voltage insulation just to read a fifty-volt battery.
+Tomorrow I’ll craft a **[MultiMeter](../reference/electricity.md#circuit-protection)**—though annoyance of annoyances, the **Electrical Probe Chip** inside a MultiMeter requires a piece of **High Voltage Cable**, which means I have to wrap a Copper Cable in three successive layers of rubber (LV → MV → HV) before I can even build my first voltmeter. Typical Ministry design: you need high-voltage insulation just to read a forty-eight-volt battery.
 
 *My tidied-up notes for this chapter: [Electrical Fundamentals, Cables and Protection](../reference/electricity.md), starting with [the four equations you actually need](../reference/electricity.md#the-four-equations).*
 

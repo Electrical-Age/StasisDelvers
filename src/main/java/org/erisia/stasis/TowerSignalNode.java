@@ -23,8 +23,8 @@ import java.util.List;
 /**
  * The tower core's EA signal sides (CONSOLE-PLAN.md D; Baughn: no separate block, the core itself; facing the
  * console, the input is on your left and the output on your right). An EA node of our own at the core's master:
- * signal cables beside those faces connect to it like to any EA machine. Input 0-50 V sets the target radius
- * across the tower's range; the output gives the charge as 0-50 V. Not saved: the tower entity makes it. A bare
+ * signal cables beside those faces connect to it like to any EA machine. Input 0-5 V sets the target radius
+ * across the tower's range; the output gives the charge as 0-5 V. Not saved: the tower entity makes it. A bare
  * NodeBase (EA's SimpleNode, which it used to extend, is gone): its two gate loads and the output's driver go into
  * the simulation while it is connected.
  */

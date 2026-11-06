@@ -39,9 +39,9 @@ Temperature and pressure: in a closed boiler containing both liquid water and st
 | **1 atm (~1 bar)** | **100 °C** | Boiling begins; boiler capability starts offering steam. |
 | **2 bar** | **120 °C** | Minimum safety valve setting; poor turbine efficiency (Jade 29% to air, under 3% thermodynamic). |
 | **5 bar** | **152 °C** | Threshold to clear the *"Under Pressure"* warning (Jade 69% to air / 148% condensing). |
-| **6 bar** | **159 °C** | **50V Submersible Pump shut-off limit!** (Flow drops to 0 mB/s here). |
+| **6 bar** | **159 °C** | **48V Submersible Pump shut-off limit!** (Flow drops to 0 mB/s here). |
 | **10 bar** | **180 °C** | **Rated Turbine Inlet** (Jade 100% to air / 176% condensing; ~10% / ~18% thermodynamic); Iron Pipe working rating. |
-| **15 bar** | **198 °C** | **200V Submersible Pump shut-off limit!** (Jade 119% to air). |
+| **15 bar** | **198 °C** | **230V Submersible Pump shut-off limit!** (Jade 119% to air). |
 | **20 bar** | **212 °C** | High-pressure running (Jade 132% to air / 206% condensing). |
 | **25 bar** | **224 °C** | **Maximum Small Steam Turbine inlet!** Above 25 bar, the turbine casing **EXPLODES**. |
 | **40 bar** | **250 °C** | **Iron Pipe BURST pressure** (at cool temps; derates above 300 °C). |
@@ -54,7 +54,7 @@ Temperature and pressure: in a closed boiler containing both liquid water and st
 True thermodynamic efficiency vs. Jade "pressure efficiency":
 
 * **Thermodynamic Efficiency** (heat in from fuel → electrical watts out):
-  * **50V Compact Steam Turbine:** **10%** (1 furnace with 4 chambers ≈ 2.7 kW net heat → **~270 W** sustained, 300 W peak).
+  * **48V Compact Steam Turbine:** **10%** (1 furnace with 4 chambers ≈ 2.7 kW net heat → **~270 W** sustained, 300 W peak).
   * **Real Steam Plant at 10 bar (venting to air):** **~10%** (requires **3.5 g/s of steam** [= 52 mB/s feedwater] per kW of electrical output).
   * **Real Steam Plant at 10 bar (with Condenser at 0.1 bar / 46 °C):** **~18%** (nearly **2× the electrical power** from the same fuel, plus closed-loop water recovery).
 * **Jade "Pressure Efficiency"** shows how much work the turbine extracts per gram of steam *relative to its 10 bar open-air rating*:
@@ -74,14 +74,14 @@ Why players get stuck:
 
 1. **Sliders Do Nothing Without a Regulator Item:** The **Stone Heat Furnace / Fuel Heat Furnace** (and the Electric Heater) and the **Steam Turbine** all have a slot for a Regulator component (`On/OFF Regulator 1%`, `10%`, or `Analogic Regulator`). If that slot is empty, the furnace ignores its temperature set point and burns according to its manual gain slider (an Electric Heater runs at **100% power**), and the turbine runs on a manual **0–100% throttle**.
 2. **The Furnace Regulator Protects the Boiler (Ceiling):** Put a regulator in the furnace and set it to ~210–280 °C. This stops the fire from cooking the boiler past 10–15 bar when electrical demand is low. **It does NOT force the pressure up if you draw too much steam.**
-3. **The Turbine Regulator Holds the Pressure (Floor):** Put an **Analogic Regulator** in the **50V / 200V Steam Turbine** and set **"Hold the inlet at 10 bar"**. If your machines pull more power than your furnaces can supply, the turbine will automatically throttle back to keep the boiler at 10 bar (180 °C) where expansion is efficient, rather than draining the boiler down to 2 bar. *(Caution: Do not set the turbine's bar target higher than your furnace's temperature can actually boil, or the turbine valve will stay shut forever!)*
+3. **The Turbine Regulator Holds the Pressure (Floor):** Put an **Analogic Regulator** in the **48V / 230V Steam Turbine** and set **"Hold the inlet at 10 bar"**. If your machines pull more power than your furnaces can supply, the turbine will automatically throttle back to keep the boiler at 10 bar (180 °C) where expansion is efficient, rather than draining the boiler down to 2 bar. *(Caution: Do not set the turbine's bar target higher than your furnace's temperature can actually boil, or the turbine valve will stay shut forever!)*
 
 ## Firing the boiler
 
 Furnaces vs. Electric Heaters:
 
 * **Stone Heat Furnace** (up to 3 kW with 4 Combustion Chambers; ~2.7 kW net; see [the early heat notes](early-heat.md#device-numbers)) or **Fuel Heat Furnace** (burns piped gasoline, diesel, or heavy oil; Small **5 kW**, Medium **10 kW**, or Big **25 kW** Fuel Burner; 25 mB internal tank requires continuous piping; 20 s fire lag, 3 s to light; fails at **800 °C**): Place against the boiler's **back or left/right flanks**, or connect via **Copper Thermal Cable**.
-* **50V (1 kW) / 200V (4 kW) Electric Heaters:** Convert electricity 100% into heat. An Electric Heater runs **~25 °C hotter than the water per kW** flowing through it (to hold 180 °C water at 10 bar under load, set a 1 kW heater's regulator to **~205 °C**, or a 4 kW heater to **~280 °C**). **Never use an Electric Heater to generate electricity in a steam loop** (100% electric → heat → 18% electric loses 82% of your power!). Use them only to spend surplus renewable/grid electricity on process heat (e.g., distilling oil or baking), or as a small control trim.
+* **48V (1 kW) / 230V (4 kW) Electric Heaters:** Convert electricity 100% into heat. An Electric Heater runs **~25 °C hotter than the water per kW** flowing through it (to hold 180 °C water at 10 bar under load, set a 1 kW heater's regulator to **~205 °C**, or a 4 kW heater to **~280 °C**). **Never use an Electric Heater to generate electricity in a steam loop** (100% electric → heat → 18% electric loses 82% of your power!). Use them only to spend surplus renewable/grid electricity on process heat (e.g., distilling oil or baking), or as a small control trim.
 
 ## Plumbing and hardware
 
@@ -95,13 +95,13 @@ Rules of thumb for plumbing and ports.
 
 * *Heat In:* Back and both side flanks (direct furnace/heater or Copper Thermal Cable).
 * *Feedwater In:* Right flank flange (built-in check valve).
-* *Steam Out:* Bottom dome port (place the boiler **directly on top of** a 50V/200V Steam Turbine) or Top flange port via **EA Pipes**.
-* *Level Control:* The **front pin** outputs a 50 V logic HIGH signal whenever water is above 50% glass (±3% deadband). Invert this signal with a NOT chip or an inverted Relay to switch your feedwater pump on when water drops below half!
+* *Steam Out:* Bottom dome port (place the boiler **directly on top of** a 48V/230V Steam Turbine) or Top flange port via **EA Pipes**.
+* *Level Control:* The **front pin** outputs the gauge glass level as a signal: **0 V** empty to **5 V** full. A logic input reads it high above half the glass, at 2.5 V. Invert this signal with a NOT chip or an inverted Relay to switch your feedwater pump on when water drops below half!
 * *Overheat:* Boiling completely dry pushes the shell past **420 °C**, burning out the boiler.
 
 ### Steam turbines
 
-The 50V (1 kW) and 200V (4 kW) Steam Turbines:
+The 48V (1 kW) and 230V (4 kW) Steam Turbines:
 
 * *Inlet:* **Top port ONLY**, fed directly by a Boiler on top or an **EA Pipe** (ignore the old tooltip; other mods' fluid pipes cannot connect to small turbines!). Requires **52 mB/s of feedwater per kW** at 10 bar.
 * *Water Hammer / Flooding:* If liquid water in the steam inlet exceeds **10% while spinning above 20% speed**, the turbine suffers water damage and burns out (Repair: 1 × **Electrical Motor**; repairing also drains the water). Let the boiler reach 100 °C before piping steam!
@@ -111,7 +111,7 @@ The 50V (1 kW) and 200V (4 kW) Steam Turbines:
 
 The Small (4.2 kW) and Standard (16.9 kW) Steam Condensers:
 
-* Place flush against the **right flank** of the 50V/200V Steam Turbine.
+* Place flush against the **right flank** of the 48V/230V Steam Turbine.
 * *Cold Start Rule:* The condenser's return pump (front flange, 15 bar max) is driven by the turbine shaft. When the turbine is stopped, the pump is stopped! **Fill the boiler directly on a cold start.**
 * *Makeup Water & Flooding:* Feed makeup water into the condenser's **top port** (its internal float valve opens below 15% and shuts at 25%). Never force water in past **50% fill**, or it will back up and flood the turbine!
 

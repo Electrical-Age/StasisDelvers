@@ -20,7 +20,7 @@ server's main thread, and costs almost nothing while it waits.
 
 ## Setting it up
 
-* **Power:** 50 V on the back. It draws 2 W while it waits and up to 60 W flat out. On a brownout it **pauses**,
+* **Power:** 48 V on the back. It draws 2 W while it waits and up to 60 W flat out. On a brownout it **pauses**,
   keeping everything in its RAM, and carries on when the line comes back.
 * **The bus pin** is on the right flank's floor edge, at its right end (as you face that flank), as on the Linear
   Servo Drive. Give it an address in its screen (17 to 255): that is the source of the packets it sends.

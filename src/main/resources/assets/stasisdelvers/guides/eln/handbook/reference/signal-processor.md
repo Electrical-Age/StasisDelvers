@@ -20,15 +20,15 @@ Hardware, pins and voltage scaling.
   * Top and Bottom rows: `Iron Ingot` – `Signal Cable` – `Iron Ingot`
   * Middle row: `Signal Cable` – `Cheap Chip` – `Signal Cable`
 * **Pin Layout** (coloured dots appear when you stand within 15 blocks):
-  * **Front (Black dot):** **Output** (0–50 V signal driver, 0.1 A class; drives relays, valves, lamp supplies, etc.).
+  * **Front (Black dot):** **Output** (0–5 V signal driver, 0.1 A class; drives relays, valves, lamp supplies, etc.).
   * **Right of front (Red dot):** Input **A**
   * **Back / opposite output (Green dot):** Input **B**
   * **Left of front (Blue dot):** Input **C**
   * *Auto-Connection Rule:* An input pin (A, B, or C) physically connects to adjacent signal cables **only if that capital letter appears in your valid formula**. If your formula is `A*0.5`, only the front (Output) and right (A) pins exist; B and C disconnect.
 * **Internal 0..1 Scale (Crucial!):**
-  * Inside the formula, **50 V equals `1.0`** and **0 V equals `0.0`**.
-  * Every input (`A`, `B`, `C`) is read as `U_in / 50`, clamped to `[0, 1]`. Thus **25 V reads as `0.5`**, **10 V reads as `0.2`**, and **40 V reads as `0.8`**.
-  * The final result of your formula is clamped to `[0, 1]` and multiplied by **50 V** at the output pin (`0.4` → **20 V**). `NaN` (e.g., `0/0`) outputs **0 V**; `+Infinity` (e.g., `1/0`) clamps to `1.0` (**50 V**).
+  * Inside the formula, **5 V equals `1.0`** and **0 V equals `0.0`**.
+  * Every input (`A`, `B`, `C`) is read as `U_in / 5`, clamped to `[0, 1]`. Thus **2.5 V reads as `0.5`**, **1 V reads as `0.2`**, and **4 V reads as `0.8`**.
+  * The final result of your formula is clamped to `[0, 1]` and multiplied by **5 V** at the output pin (`0.4` → **2 V**). `NaN` (e.g., `0/0`) outputs **0 V**; `+Infinity` (e.g., `1/0`) clamps to `1.0` (**5 V**).
 * **Execution Step:** Runs at **20 Hz** (once per tick, `Δt = 0.05 s`). All time constants, integrals, and derivatives are measured in **seconds**.
 
 > **Picture to come:** Close-up of the Signal Processor GUI showing the 64-character "Output voltage formula" text field containing `rs(A>0.8,A<0.6)`, the green status line reading "5 Redstone(s) required", and 5 Redstone Dust in the component slot.
@@ -54,13 +54,13 @@ Operators are evaluated from **Level 1 (tightest)** to **Level 5 (loosest)**, le
 | **1 (Tightest)** | `func(...)`, `( )` | Brackets cost **0 Redstone**—use them freely! |
 | **2** | `-x` (negate), `!x`, `*`, `/` | **`!x` is arithmetic `1 - x`**, NOT boolean NOT! (`!0.3` = `0.7`). |
 | **3** | `+`, `-` | Standard addition and subtraction. |
-| **4** | `>`, `<` | Strict comparison. Returns `1.0` (50 V) if true, `0.0` (0 V) if false. |
+| **4** | `>`, `<` | Strict comparison. Returns `1.0` (5 V) if true, `0.0` (0 V) if false. |
 | **5 (Loosest)** | `=`, `^`, `&`, `\|` | **TRAP: All four share the exact same precedence, evaluated left-to-right!** |
 
 * **Trap 1 (`&` vs `|`):** In this processor, `&` (AND) does **not** bind tighter than `|` (OR)! `A|B&C` is evaluated as `(A|B)&C`. **Always put brackets around `&` terms:** `A|(B&C)`.
 * **Trap 2 (`^` is XOR, NOT Power):** `A^B` means logical Exclusive-OR (true if one input is `> 0.5` and the other is `≤ 0.5`). For exponents (A to the power B), use `pow(A,B)`.
 * **Trap 3 (`=` is Logical XNOR, NOT Numeric Equality):** `A=B` tests whether `(A>0.5)` has the same truth value as `(B>0.5)`. Thus **`0.6=0.9` evaluates to `1` (True)** because both are `> 0.5`!
-* **Logic Threshold:** All logic operators (`&`, `|`, `^`, `=`, `if`) treat an input as **True when `> 0.5`** (`> 25 V`). The sole exception is `rs()`, which triggers at **`> 0.6`** (`> 30 V`).
+* **Logic Threshold:** All logic operators (`&`, `|`, `^`, `=`, `if`) treat an input as **True when `> 0.5`** (`> 2.5 V`). The sole exception is `rs()`, which triggers at **`> 0.6`** (`> 3 V`).
 
 ## Functions and redstone cost
 
@@ -79,7 +79,7 @@ Your slot must contain **at least the sum of the Redstone costs** of every opera
 | `ramp(T)` | **3** | **[Stateful]** Sawtooth wave rising `0` → `1` over `T` seconds, then dropping to `0`. |
 | `derivate(x)` | **3** | **[Stateful]** Rate of change `dx/dt` in **units per second**. Spikes by `20 × Δx` on sudden jumps; filter noisy inputs with `rc()` first! |
 | `rc(tau,x)` | **3** | **[Stateful]** Low-pass smoothing filter. **Order: time constant `tau` (seconds) FIRST, signal `x` SECOND!** Reaches ~63% of a step change after `tau` seconds. |
-| `rs(reset,set)` | **3** | **[Stateful]** SR Latch. **TRAP: `reset` is the FIRST argument, `set` is SECOND!** Triggers when inputs exceed **`0.6`** (30 V). If both `> 0.6`, **reset wins** (outputs `0`). *Warning:* Must be evaluated every tick to see its inputs—do not bury `rs()` inside an unchosen `if()` branch or the right side of a short-circuited `&`/`\|`! |
+| `rs(reset,set)` | **3** | **[Stateful]** SR Latch. **TRAP: `reset` is the FIRST argument, `set` is SECOND!** Triggers when inputs exceed **`0.6`** (3 V). If both `> 0.6`, **reset wins** (outputs `0`). *Warning:* Must be evaluated every tick to see its inputs—do not bury `rs()` inside an unchosen `if()` branch or the right side of a short-circuited `&`/`\|`! |
 | `integrate(x,r)` | **4** | **[Stateful]** Running integral of `x dt` (adds `x × 0.05` each tick). Held at `0` while reset `r > 0.5`. Unbounded. |
 | `integrate(x,min,max)` | **4** | **[Stateful]** Running integral of `x dt` clamped between `min` and `max` (prevents wind-up; no reset pin). |
 | `scale(x,in0,in1,out0,out1)` | **5** | Linearly maps `x` from `[in0, in1]` onto `[out0, out1]`. Not clamped internally. |
@@ -98,14 +98,14 @@ Ten verified cookbook formulas. Every formula below has been tested against the 
 
 1. **Heater Temperature Hysteresis (Thermostat Latch)**
    * **Formula:** `rs(A>0.8,A<0.6)` *(Cost: **5 Redstone**)*
-   * **How it works:** Wire a **Thermal Probe** into **A**, and Output to your heater/furnace control. Because `reset` comes first, when temperature **A** climbs above `0.8` (40 V), the latch **resets to 0 V** (heat OFF). It stays off until **A** cools below `0.6` (30 V), which **sets it to 50 V** (heat ON).
+   * **How it works:** Wire a **Thermal Probe** into **A**, and Output to your heater/furnace control. Because `reset` comes first, when temperature **A** climbs above `0.8` (4 V), the latch **resets to 0 V** (heat OFF). It stays off until **A** cools below `0.6` (3 V), which **sets it to 5 V** (heat ON).
 2. **Automatic Night-Time Yard Lamp Switch**
    * **Formula:** `daytime>0.5` *(Cost: **1 Redstone**)*
-   * **How it works:** Outputs **50 V** from sunset to sunrise every day, and **0 V** during daylight. (Use `daytime>0.48` to switch the lamps on a little before dusk, or an **Electrical Daylight Sensor** to follow the actual sky light.)
+   * **How it works:** Outputs **5 V** from sunset to sunrise every day, and **0 V** during daylight. (Use `daytime>0.48` to switch the lamps on a little before dusk, or an **Electrical Daylight Sensor** to follow the actual sky light.)
 
 3. **Proportional-Integral (PI) Temperature / Flow Controller**
    * **Formula:** `pid(0.7,A,4,0.5,0,0,1)` *(Cost: **14 Redstone**)*
-   * **How it works:** Holds sensor **A** at `0.7` (35 V) using proportional gain `P=4`, integral gain `I=0.5/s`, `D=0`, clamped `0..1`. Ideal for driving a **Pipe Control Valve** or **Submersible Pump** speed input.
+   * **How it works:** Holds sensor **A** at `0.7` (3.5 V) using proportional gain `P=4`, integral gain `I=0.5/s`, `D=0`, clamped `0..1`. Ideal for driving a **Pipe Control Valve** or **Submersible Pump** speed input.
 4. **Sensor Averaging and Noise Smoothing**
    * **Mean of 3 sensors:** `(A+B+C)/3` *(Cost: **3 Redstone**)*
    * **2-Second Low-Pass Filter:** `rc(2,A)` *(Cost: **3 Redstone** — note `2` seconds comes first, `A` second!)*
@@ -114,18 +114,18 @@ Ten verified cookbook formulas. Every formula below has been tested against the 
    * **Analog inputs with custom threshold:** `(A>0.5)+(B>0.5)+(C>0.5)>1.5` *(Cost: **6 Redstone**)*
 6. **Battery-Charge Load Shedding (Drop below 30%, Reconnect above 60%)**
    * **Formula:** `rs(batteryCharge(0.8+0.4*A)<0.3,batteryCharge(0.8+0.4*A)>0.6)` *(Cost: **25 Redstone**)*
-   * **Wiring:** Place an **Electrical Probe** (voltage mode) on a **50 V battery bank** with its probe range set tightly to **40 V – 60 V** (or **160 V – 240 V** on a 200 V bank) and wire it to **A**. The expression `0.8+0.4*A` converts that 40–60 V probe signal into the `U / U_nom` ratio that `batteryCharge()` expects. Output drives the relay for non-essential workshop machines.
+   * **Wiring:** Place an **Electrical Probe** (voltage mode) on a **48 V battery bank** with its probe range set tightly to **38.4 V – 57.6 V** (or **184 V – 276 V** on a 230 V bank) and wire it to **A**. The expression `0.8+0.4*A` converts that 38.4–57.6 V probe signal into the `U / U_nom` ratio that `batteryCharge()` expects. Output drives the relay for non-essential workshop machines.
 7. **Differential Gain Amplifier**
    * **Formula:** `(A-B)*3` *(Cost: **2 Redstone**; or `min(1,max(0,(A-B)*3))` at Cost **6** if feeding another calculation inside the same formula.)*
 8. **Sensor Window Stretcher (Re-Ranging)**
    * **Formula:** `scale(A,0.2,0.8,0,1)` *(Cost: **5 Redstone**)*
-   * **How it works:** Stretches the 10 V – 40 V (`0.2` – `0.8`) band of input **A** across the full 0 V – 50 V (`0` – `1`) output range.
+   * **How it works:** Stretches the 1 V – 4 V (`0.2` – `0.8`) band of input **A** across the full 0 V – 5 V (`0` – `1`) output range.
 9. **10-Second Off-Delay / Run-On Timer**
    * **Formula:** `rs(A>0.5,integrate(1,A>0.5)>10)` *(Cost: **10 Redstone**)*
-   * **How it works:** While **A** is high (`> 25 V`), the latch is held reset (`0 V`) and the integrator is held at `0`. When **A** drops low, `integrate(1, ...)` counts up at 1.0 per second; after **10 seconds** of continuous low input, the latch sets and outputs **50 V**. (For a simple square-wave flasher with period `T` seconds, use `ramp(T)<0.5`, Cost **4**.)
+   * **How it works:** While **A** is high (`> 2.5 V`), the latch is held reset (`0 V`) and the integrator is held at `0`. When **A** drops low, `integrate(1, ...)` counts up at 1.0 per second; after **10 seconds** of continuous low input, the latch sets and outputs **5 V**. (For a simple square-wave flasher with period `T` seconds, use `ramp(T)<0.5`, Cost **4**.)
 10. **Sudden Rate-of-Change Alarm**
     * **Formula:** `abs(derivate(rc(1,A)))>0.05` *(Cost: **8 Redstone**)*
-    * **How it works:** Smooths **A** with a 1-second filter (`rc(1,A)`) so step-ticks don't cause false spikes, then trips high (**50 V**) whenever **A** rises or falls faster than `0.05` (2.5 V) per second.
+    * **How it works:** Smooths **A** with a 1-second filter (`rc(1,A)`) so step-ticks don't cause false spikes, then trips high (**5 V**) whenever **A** rises or falls faster than `0.05` (0.25 V) per second.
 
 ---
 
