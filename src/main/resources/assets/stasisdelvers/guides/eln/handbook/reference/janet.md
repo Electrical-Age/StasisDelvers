@@ -74,10 +74,16 @@ Ctrl and 4 for Alt.
   (ui/text t 2 2 1
    :yellow (string
     "count: " n)))
+```
+
+```clojure
 (defn up [t]
   (++ n) (show t))
 (defn down [t]
   (-- n) (show t))
+```
+
+```clojure
 (defn counter []
   (def t (proc/tab))
   (ui/clear t)
@@ -88,6 +94,9 @@ Ctrl and 4 for Alt.
   (show t)
   (forever
    (sleep 60)))
+```
+
+```clojure
 (proc/start "counter"
   counter)
 ```
@@ -142,12 +151,18 @@ FAT12, 1.44 MB.
 # toggles the lamp
 # at 31
 (var on false)
+```
+
+```clojure
 (defn toggle [_]
   (set on (not on))
   (light/set 31
     (if on 1 0)))
 (bus/on-press 30
   toggle)
+```
+
+```clojure
 # keep its task alive
 (forever (sleep 60))
 ```
