@@ -93,8 +93,9 @@ A **DC-DC Converter** joins two tiers. Each **cable in a winding slot is one tur
 ratio is the ratio of the turns: 5 turns of LV in and 24 of MV out make 230 V from 48 V.
 
 A slot also takes one **Winding** from a Wire Drawing Machine instead. Its turns count as turns (up to 1000), and its
-wire sets the rating and insulation. A converter with a winding must fit its core's **window**: turns × mm², added up
-over both sides, at most 150 for a Cheap core, 300 for an Average one and 800 for an Optimal one (Jade shows it).
+wire sets the rating and insulation. Every converter must fit its core's **window**: turns × mm², added up over both
+sides, at most 150 for a Cheap core, 300 for an Average one and 800 for an Optimal one (Jade shows it). A cable counts
+as its kit's preset cross-section. A converter that overfills its core disconnects until you correct it.
 48 V to 230 V fits a cheap core: 12 turns of 2.5 mm² and 58 of 1.5 mm² make 117. 400 V to 11 kV needs an optimal core:
 25 turns of 10 mm² and 688 of 0.5 mm² make 594.
 
