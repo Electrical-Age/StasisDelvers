@@ -67,37 +67,29 @@ Elements are drawn in the order they were first made. A raw area's keys are the 
 `"pagedown"`, `"insert"` and `"f1"` to `"f12"`, or a letter with Ctrl or Alt held. `mods` adds 1 for Shift, 2 for
 Ctrl and 4 for Alt.
 
-```clojure
-# a counter
-(var n 0)
-(defn show [t]
-  (ui/text t 2 2 1
-   :yellow (string
-    "count: " n)))
-```
+`# a counter`\
+`(var n 0)`\
+`(defn show [t]`\
+`  (ui/text t 2 2 1`\
+`   :yellow (string`\
+`    "count: " n)))`
 
-```clojure
-(defn up [t]
-  (++ n) (show t))
-(defn down [t]
-  (-- n) (show t))
-```
+`(defn up [t]`\
+`  (++ n) (show t))`\
+`(defn down [t]`\
+`  (-- n) (show t))`
 
-```clojure
-(defn counter []
-  (def t (proc/tab))
-  (ui/clear t)
-  (ui/button t 3 2 3
-   5 "+1" |(up t))
-  (ui/button t 4 8 3
-   5 "-1" |(down t))
-  (show t))
-```
+`(defn counter []`\
+`  (def t (proc/tab))`\
+`  (ui/clear t)`\
+`  (ui/button t 3 2 3`\
+`   5 "+1" |(up t))`\
+`  (ui/button t 4 8 3`\
+`   5 "-1" |(down t))`\
+`  (show t))`
 
-```clojure
-(proc/start "counter"
-  counter)
-```
+`(proc/start "counter"`\
+`  counter)`
 
 Type each form at the REPL, or save them in a file and Run it.
 
@@ -143,27 +135,21 @@ FAT12, 1.44 MB.
 
 ## A small program
 
-```clojure
-# a:/startup.janet:
-# the button at 30
-# toggles the lamp
-# at 31
-(var on false)
-```
+`# a:/startup.janet:`\
+`# the button at 30`\
+`# toggles the lamp`\
+`# at 31`\
+`(var on false)`
 
-```clojure
-(defn toggle [_]
-  (set on (not on))
-  (light/set 31
-    (if on 1 0)))
-(bus/on-press 30
-  toggle)
-```
+`(defn toggle [_]`\
+`  (set on (not on))`\
+`  (light/set 31`\
+`    (if on 1 0)))`\
+`(bus/on-press 30`\
+`  toggle)`
 
-```clojure
-# keep its task alive
-(forever (sleep 60))
-```
+`# keep its task alive`\
+`(forever (sleep 60))`
 
 ## Your own system
 
