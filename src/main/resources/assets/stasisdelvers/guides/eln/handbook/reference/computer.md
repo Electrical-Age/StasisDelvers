@@ -14,7 +14,7 @@ item_ids:
 
 # The Computer
 
-A RISC-V machine in a cabinet: eight chip slots, two floppy drives, a terminal, and the violet bus pin. It runs off the
+A RISC-V machine in a cabinet: eight chip slots, two floppy drives, a screen, and the violet bus pin. It runs off the
 server's main thread, and costs almost nothing while it waits.
 
 ## Setting it up
@@ -35,37 +35,46 @@ The run lamp on the front: bright green while it works, dim green while it waits
 
 ## The screen
 
-* **Terminal tab:** what the computer prints, and an input line. Enter sends the line. Up and down arrows recall
-  earlier lines, and the mouse wheel scrolls back.
-* **Files tab:** a path (such as `a:/main.janet`) and an editor with Janet's colours and bracket checks.
-  * **Open** loads the file, **Save** writes it, **Run** starts it as a task (its output shows on the Terminal tab),
-    and **List** shows the files beside it.
-  * If someone else saved the file since you opened it, your Save is refused once. Save again to overwrite.
-  * The Files tab works through the running Janet, so the computer must be on and running the Janet ROM.
-* **Reset** starts it again from slot 1.
-* **Break** stops what the terminal is running: a loop that never ends, a long sleep. With nothing running there,
-  it stops every program's tasks (`main.janet`'s too) and the bus handlers they set.
+The screen is drawn by your own client, so typing never waits for the server. The computer sends what to show (see
+[The Screen Protocol](screen-protocol.md)), and with the Janet ROM that is a set of tabs:
+
+* **REPL:** type a Janet form and press Enter. Your line shows grey until the computer takes it. Up and down recall
+  earlier lines, Tab completes a name (press it again to see the choices), and the mouse wheel scrolls back.
+  Ctrl+A and Ctrl+E jump to the start and end of the line, and Ctrl+Shift+C copies it.
+* **Console:** what the machine itself prints (start-up, crashes). It appears when there is something to show.
+* **A tab per program** (a process): what it prints. Right-click a program's tab to end it.
+* **Editors:** `(edit "a:/main.janet")` opens a file with Janet's colours. Ctrl+S saves it, and if the file changed
+  on the disk since you opened it, the save is refused once: press Ctrl+S again to overwrite. **Run** runs the
+  saved file as a process. `(files)` lists a floppy's files: click one to edit it.
+* **Inspector:** `(inspect)` lists the processes and their tasks. Click down into a task's stack, a frame's local
+  values and what is inside them. **Back** goes up, and **REPL here** opens a REPL inside that program, to look
+  around and change it while it runs.
+
+**Ctrl+C** on a tab stops what runs there: the REPL's current form, or every task of that tab's program.
+**Reset** starts the computer again from slot 1, and the power button turns it off (its RAM is lost) or on.
+Your half-typed lines and unsaved edits stay with you when you close the screen.
 
 ## At start-up
 
-With the Janet ROM, the computer runs `a:/main.janet` if drive A has one (else `b:/main.janet`) as a task of its
-own, then opens the terminal. That is how a program survives a restart: keep it on a floppy as `main.janet`.
+With the Janet ROM, the computer looks for `startup.janet` on drive A, then on drive B, and runs the first it finds
+as a process with its own tab. Then the REPL opens. (A floppy with `main.janet` instead still works.) That is how a
+program survives a restart: keep it on a floppy as `startup.janet`.
 
 Saving the world keeps a running program where it was. A mod update that changes a ROM restarts every computer that
-uses it, which runs `main.janet` again.
+uses it, which runs `startup.janet` again.
 
 ## The Elevator floppy
 
 A ready-made controller for the elevator of the [RS485 page](rs485-elevator.md). Put it in drive A, then:
 
-1. Open `a:/main.janet` in the Files tab and edit `settings` at the top:
+1. Type `(edit "a:/main.janet")` and change `settings` at the top:
    * the drive's address,
    * the floors' heights in blocks above the drive's foot, lowest first,
    * each floor's landing button address, and its car panel button (`nil` where there is none),
    * how long the car waits at a floor.
-2. Save, and press Reset.
+2. Press Ctrl+S, then Reset.
 
 Each pressed button lights up until the car arrives. The car carries on in its direction while there are calls
-ahead, and turns round when there are none. A fault or stall shows on the terminal, and the car tries again.
+ahead, and turns round when there are none. A fault or stall shows in its tab, and the car tries again.
 
-[The Janet library](janet.md) · [Back to the reference](../reference.md)
+[The Janet library](janet.md) · [The Screen Protocol](screen-protocol.md) · [Back to the reference](../reference.md)

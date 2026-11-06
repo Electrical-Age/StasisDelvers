@@ -23,10 +23,62 @@ A program is a set of tasks taking turns. While every task waits, the computer s
 | `(sleep s)` | waits `s` seconds of the computer's time (other tasks run meanwhile) |
 | `(now)`, `(ticks)` | the computer's clock, in seconds or game ticks (20 a second, only while it runs) |
 | `(run-file path)` | runs a file's forms in this task, as at start-up |
-| `(read-line)` | waits for a line typed on the terminal |
-| `(alarm & msg)` | prints `ALARM: …` on the terminal |
+| `(alarm & msg)` | prints `ALARM: …` in red |
 
-Each form typed at the terminal runs as a task too, so `(sleep 10)` doesn't stop the others. Break stops it.
+Each form typed at the REPL runs as a task too, so `(sleep 10)` doesn't stop the others. Ctrl+C stops it.
+
+## Processes
+
+A process is a program with its own tab, its own definitions, and its own tasks. `startup.janet` runs as one.
+
+| call | does |
+|---|---|
+| `(proc/start name f & args)` | starts `(f ;args)` as a new process, in a tab of its own where what it prints goes; returns the tab |
+| `(proc/list)` | the processes: `[tab name tasks]` each |
+| `(proc/stop t)` | stops every task of the process in tab `t` (as Ctrl+C on its tab) |
+| `(proc/close t)` | ends it and removes its tab (as right-clicking the tab) |
+| `(proc/tab)` | the tab of the process this task belongs to |
+| `(proc/env t)` | its environment: `((proc/env t) 'x)` is its `x` |
+| `(proc/new-tab name)` | an empty tab with a process of its own, for a program that draws its own screen |
+| `(spawn-in env f & args)` | a task in another environment |
+| `(edit path)`, `(files &opt dir)`, `(inspect)` | the editor, file list and inspector tabs |
+
+## Drawing your own screen
+
+A process can fill its tab with text, boxes, buttons, lists, lines to type in, and areas that take the keyboard.
+Positions and sizes are in character cells: the screen is 52 by 17. `t` is the tab, `id` a number you choose for
+each element (draw it again with the same `id` to change it), and colours are dye names such as `:lime`.
+
+| call | does |
+|---|---|
+| `(ui/text t id x y colour s &opt bg)` | a line of text |
+| `(ui/box t id x y w h colour)` | a filled rectangle |
+| `(ui/log t id x y w h)`, `(ui/append t id colour s)` | a scrolling log, and text added to it |
+| `(ui/output env t id)` | what tasks in `env` print goes into log `id` |
+| `(ui/button t id x y w label f)` | a button: a click runs `(f)` as a task |
+| `(ui/list t id x y w h items f)` | rows of text: a click runs `(f index)` |
+| `(ui/line t id x y w prompt f)` | a line the player types in: Enter runs `(f text seq)` |
+| `(ui/raw t id x y w h on-key &opt on-click)` | an area that takes the keyboard once clicked: `(on-key key mods)` for each key, `(on-click x y)` |
+| `(ui/remove t id)`, `(ui/clear t)` | removes one element, or all of the tab's |
+| `(ui/tab t title)`, `(ui/focus t)` | renames a tab, or brings it forward |
+
+Elements are drawn in the order they were first made. A raw area's keys are the characters typed, or `"enter"`,
+`"backspace"`, `"tab"`, `"delete"`, `"left"`, `"right"`, `"up"`, `"down"`, `"home"`, `"end"`, `"pageup"`,
+`"pagedown"`, `"insert"` and `"f1"` to `"f12"`, or a letter with Ctrl or Alt held. `mods` adds 1 for Shift, 2 for
+Ctrl and 4 for Alt.
+
+```clojure
+# a counter with two buttons, in its own tab
+(proc/start "counter" (fn []
+  (def t (proc/tab))
+  (var n 0)
+  (defn show [] (ui/text t 2 2 1 :yellow (string "count: " n)))
+  (ui/clear t)
+  (ui/button t 3 2 3 5 "+1" (fn [] (++ n) (show)))
+  (ui/button t 4 8 3 5 "-1" (fn [] (-- n) (show)))
+  (show)
+  (forever (sleep 60))))
+```
 
 ## The bus
 
@@ -91,11 +143,12 @@ mode, with the timer, external and software (Break) interrupts.
 | slot *n* (1 to 8) | from (*n* − 1) × 0x100000, its chip |
 | 0x10000000 | info: `+0x10` + 4·k slot kind (0 none, 1 RAM, 2 ROM), `+0x30` + 4·k size, `+0x50` ticks |
 | 0x10001000 | timer: a 64-bit compare at `+0`, interrupt while ticks ≥ compare |
-| 0x10002000 | terminal: `+0` send a byte, `+4` read one (−1: none), `+8` status (1 input, 2 room), `+0xC` interrupt enables |
+| 0x10002000 | console: `+0` send a byte, `+4` read one (−1: none), `+8` status (1 input, 2 room), `+0xC` interrupt enables |
 | 0x10003000 | bus: packet registers; `+0x14` send, `+0x24` take the next received; channel levels from `+0x80` |
 | 0x10004000 | floppies: drive, sector, RAM address, count, command (1 read, 2 write), status, interrupt, error |
 | 0x10005000 | power: `+0` write 1 to halt, 2 to reset; `+4` Break pending |
+| 0x10007000 | the screen's channel ([The Screen Protocol](screen-protocol.md)): registers as the console's |
 
 All device registers are 32-bit words.
 
-[The Computer](computer.md) · [Back to the reference](../reference.md)
+[The Computer](computer.md) · [The Screen Protocol](screen-protocol.md) · [Back to the reference](../reference.md)

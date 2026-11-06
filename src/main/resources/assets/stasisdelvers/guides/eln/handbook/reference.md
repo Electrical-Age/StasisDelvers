@@ -15,7 +15,8 @@ Terse, clean numbers. When the alarm is whooping at two in the morning, don't re
 * [The Signal Processor: Complete Manual](reference/signal-processor.md): pins, syntax, precedence traps, redstone costs and a cookbook of formulas.
 * [Peak Loads and the Electrical Anvil](reference/peak-loads.md): the anvil's repair rules and bursts, the Capacitor Bank, Power Capacitors and Inductors.
 * [The RS485 Bus and the Elevator](reference/rs485-elevator.md): channels and packets, the addressed devices, the drive's registers and pins, building the 3 × 3 × 3 elevator.
-* [The Computer](reference/computer.md): chips, floppies, the terminal and the Files tab, start-up, the Elevator floppy.
-* [Janet on the Computer](reference/janet.md): tasks, the bus, devices and drives, floppies, and booting your own system.
+* [The Computer](reference/computer.md): chips, floppies, the screen (REPL, editors, inspector), start-up, the Elevator floppy.
+* [Janet on the Computer](reference/janet.md): tasks, processes, drawing your own screen, the bus, devices and drives, floppies, and booting your own system.
+* [The Screen Protocol](reference/screen-protocol.md): the messages behind the computer's screen, for programs that draw it themselves.
 
 [Back to the contents](index.md)
