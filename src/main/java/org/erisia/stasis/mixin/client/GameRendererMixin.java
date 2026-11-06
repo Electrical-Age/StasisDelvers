@@ -38,7 +38,7 @@ import java.util.List;
  * <p>
  * Also hands the post chains the projection the level is really drawn with: renderLevel multiplies the view bob, the
  * hurt tilt and the nausea warp into it, and CameraRenderState.projectionMatrix has none of them, so the stasis and
- * flashlight shaders rebuilt world positions from depth with the wrong matrix and the fields swayed as the camera
+ * bolt shaders rebuilt world positions from depth with the wrong matrix and the fields swayed as the camera
  * bobbed (Baughn: "view bobbing moves fields").
  */
 @Mixin(GameRenderer.class)

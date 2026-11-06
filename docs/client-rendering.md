@@ -15,9 +15,8 @@ through hooks set in `StasisClient`.
 - `StrataMask.java`: a 64³-cell strata mask (4-block cells, 256 blocks) built on a background thread when the
   camera enters another 32-block cell. It is a 512x512 texture (`stasisdelvers:stratamask`) with its corner in
   data slots 184-187.
-- `FlashlightPost.java`: a second chain (`post_effect/flashlight.json`, `shaders/post/flashlight.fsh`).
-  - Up to `MAX` = 5 beams, 9 slots each from 24, in its own data texture.
-  - Inserted at index 0, *before* stasis, so the Grey stays grey in the beam.
+- EA's lamp beams are EA's own post chain now (`mods.eln.client.LampBeam`, `eln:lamp_beam`; Baughn 2026-11-06,
+  moved from here). EA inserts it at index 0, *before* stasis, so the Grey stays grey in the beam.
   - Off when an Iris shaderpack is active.
 - `BoltRenderer.java`: tower lightning. The server sends from, to and seed (`StasisNet.Bolt`); every client
   builds the same branched bolt, and the post shader draws it (slots 256-259 + 260 + 5i, at most 150 points).
@@ -143,14 +142,14 @@ through hooks set in `StasisClient`.
 - Not seen by eye yet (lab).
 
 ## Invariants
-- Reversed-Z depth: the shaders reconstruct world positions accordingly (`stasis.fsh`, `flashlight.fsh`).
+- Reversed-Z depth: the shaders reconstruct world positions accordingly (`stasis.fsh`; EA's `lamp_beam.fsh` too).
 - Slots 0-15 are inverse(projection x view rotation) with the projection the level was drawn with: vanilla multiplies
   the view bob, the hurt tilt and the nausea warp into it, and `CameraRenderState.projectionMatrix` has none of them
-  (`GameRendererMixin` captures it; `StasisPost.viewProjection`, used by the flashlight and the bolts too). Without it
+  (`GameRendererMixin` captures it; `StasisPost.viewProjection`, used by the bolts too; EA captures its own for the lamp beam). Without it
   the fields swayed as the camera bobbed (Baughn, 2026-10-30).
 - Shell fragments past the render distance are cut only over the sky (no terrain there); in front of drawn terrain,
   Distant Horizons' included, they stay (Baughn: a big field's shell had holes that moved with the camera).
-- Order: flashlight, then stasis, then the suited hand. `GameRendererMixin` skips the hand pass in
+- Order: EA's lamp beam, then stasis, then the suited hand. `GameRendererMixin` skips the hand pass in
   `render3dHud` and redraws it after `applyPostEffects`, but only once its late hook has proven it runs
   (otherwise the hand would vanish).
 - The shader mirrors Java: `Noise` (hash32/vnoise32/fbm32), `Field.collapseScore`, `Pockets` periods, the

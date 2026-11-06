@@ -23,8 +23,8 @@ locally at `/var/lib/mclab/agent/eln/develop` (EA `develop`).
   `Stasis.speedAt` at the node, so EA's processing machines (`ElectricalMachineElement`) in an acceleration field draw
   that much more power and finish that much sooner (λ-Nero). EA's block entities are never multi-ticked
   (`Stasis.multiTickExempt`). Test: `ea_time_scale_hook` (and EA's own macerator test).
-- `mods.eln.item.electricalitem.LampItem.clientBeam`: set in `StasisDelvers` so that EA lights only the
-  holder's block. `client/FlashlightPost.java` draws the beam as a post effect, turned off under Iris.
+- Lamp beams (flashlights, headlamp, bike lamp): EA draws them itself (`mods.eln.client.LampBeam`, off under Iris)
+  and lights only the holder's block. `StasisReport` reads its beam count and `shaderPackInUse()`.
 
 ## NodeFreezer (`NodeFreezer.java`)
 - Every 10 server ticks (`ServerTickEvent.Post`), `pass()` walks `NodeManager.instance.getNodes()`:

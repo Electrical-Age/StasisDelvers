@@ -46,7 +46,7 @@ public final class StasisReport {
     }
 
     public static boolean shaderPackInUse() {
-        return FlashlightPost.shaderPackInUse();
+        return mods.eln.client.LampBeam.shaderPackInUse();
     }
 
     static void part(JsonObject o, String name, Supplier<JsonElement> s) {
@@ -361,9 +361,8 @@ public final class StasisReport {
         }
         o.add("tower_renderer", tr);
         JsonObject fl = new JsonObject();
-        fl.addProperty("holders", FlashlightPost.holders.size());
-        fl.addProperty("lights", FlashlightPost.lights.size());
-        fl.addProperty("shaderpack", FlashlightPost.shaderPackInUse());
+        fl.addProperty("beams", mods.eln.client.LampBeam.beams());   // (EA draws them: client/LampBeam)
+        fl.addProperty("shaderpack", mods.eln.client.LampBeam.shaderPackInUse());
         o.add("flashlight", fl);
         return o;
     }

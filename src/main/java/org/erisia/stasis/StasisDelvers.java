@@ -145,8 +145,6 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(Crystals::chunkUnload);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class, Crystals::tick);
         NeoForge.EVENT_BUS.addListener(Flames::watch);
-        // clients draw flashlight beams (client/FlashlightPost): EA lights only the holder's block, not a trail
-        mods.eln.item.electricalitem.LampItem.clientBeam = e -> true;
         NodeFreezer.install();
         // an EA macerator grinds riftstone to dust: three sand to one make riftstone glass (Baughn 2026-10-23)
         mods.eln.registry.ElnMachineRecipes.EXTRA.add(() -> mods.eln.Eln.maceratorRecipes.addRecipe(new mods.eln.misc.Recipe(
