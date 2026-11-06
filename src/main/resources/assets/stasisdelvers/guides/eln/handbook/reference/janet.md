@@ -91,9 +91,7 @@ Ctrl and 4 for Alt.
    5 "+1" |(up t))
   (ui/button t 4 8 3
    5 "-1" |(down t))
-  (show t)
-  (forever
-   (sleep 60)))
+  (show t))
 ```
 
 ```clojure
