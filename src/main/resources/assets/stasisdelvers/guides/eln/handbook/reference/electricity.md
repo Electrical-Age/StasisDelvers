@@ -72,6 +72,15 @@ ratio is the ratio of the turns: 5 turns of LV in and 24 of MV out make 230 V fr
 
 * **The core sets how many volts a turn may carry:** Cheap **4 V**, Average **8 V**, Optimal **16 V** per turn. 230 V
   needs 58 turns on a cheap core, 29 on an average one, 15 on an optimal one. 48 V needs 12 turns on a cheap core.
+* **Making the cores:**
+  * **Cheap** (solid iron): seven iron ingots.
+  * **Average** (laminated silicon steel): craft **Silicon Steel Laminations** (6 Iron Plates, 2 Silicon Plates, 1
+    Dielectric), then anneal them in an **Electrical Furnace** between **550 and 700 °C**. They make no progress below
+    550 °C and spoil to Iron Dust above 750 °C. A 230V Tungsten Heating Corp with Thermal Insulation and a regulator
+    set to about 650 °C does it.
+  * **Optimal** (nanocrystalline): craft a **Nanocrystalline Core Blank** (4 Iron Dust, 2 Silicon Dust, 1 Copper Dust,
+    1 Tungsten Dust, 1 Alloy Plate), then give it a long pass through a **Magnetizer** (200 kJ): it is annealed in a
+    magnetic field.
 * **Too few turns and the core saturates:** Jade says **SATURATED**, the converter pulls a heavy extra current from its
   primary, heats up, and burns within seconds. Add turns, or fit a better core.
 * **The windings heat with their current:** run a winding over about 1.3 × its cable's rated current and the converter
