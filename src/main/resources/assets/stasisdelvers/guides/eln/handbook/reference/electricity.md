@@ -56,7 +56,7 @@ faces via waypoints). **Burnt voxel cables cannot be repaired** and drop nothing
 
 A power cable is a **specification**: its kit's tier is its **insulation** (48 V, 230 V, 400 V or 11 kV), and it has a
 **copper cross-section** and a **colour**. The kit's tooltip says which, e.g. "2.5 mm², 48 V, 21 A, brown". Crafted
-kits are the presets below; other specs will come from the wire-drawing machine. A brush paints a placed cable.
+kits are the presets below; a **Wire Drawing Machine** makes any other spec. A brush paints a placed cable.
 
 | Kit (preset) | Insulation (burns at 1.3×) | Copper | Rated current (burns at 1.2×) | Power | R per block | Colour |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -77,12 +77,26 @@ Ingots + 6 Rubber.
 
 * **Bare Crafting Wires (NOT placeable):** **Copper Cable** (3 copper ingots → 3), **Iron Cable** (3 iron ingots → 6), **Tungsten Cable** (3 tungsten ingots → 6).
 * **Copper Coil** (4 copper ingots around a stick → 4): Fine winding wire used in Heating Corps, DC-DC Converters, Resistors, Inductors, and Thermistors. *(Do not confuse with Copper Cable!)*
+* **Wire Drawing Machines** (48V and 230V): copper (ingots or dust) and rubber in, a cable kit or a **Winding** out.
+  On the screen, choose a kit or a winding, the cross-section, the insulation, the colour, and the length in blocks
+  (up to 64) or the number of turns (up to 1000). Then press **Start**. The screen shows what it will take.
+  * The 48V machine (400 W) makes up to 6 mm² with up to 230 V insulation. The 230V machine (1.6 kW) makes everything.
+  * It takes about two thirds of the copper and rubber a hand-made kit takes. Thicker copper and insulation for higher
+    voltages cost more. A turn of a winding is 1/8 block of wire.
+  * It takes copper and rubber a whole item at a time and keeps the leftover fractions. It pauses when it runs out, or
+    while the finished item is still in its output slot. Changing what to make scraps the wire drawn so far.
 * **Chisel** (2 iron ingots + 1 stick; press **C** to open radial menu for 1/2/4/8 voxel cube, flat, or **tunnel**): Carves a "cable hole" through solid walls that imitates the original block while letting voxel cables and pipes pass through.
 
 ## DC-DC converters
 
 A **DC-DC Converter** joins two tiers. Each **cable in a winding slot is one turn**, up to 64 a side, and the voltage
 ratio is the ratio of the turns: 5 turns of LV in and 24 of MV out make 230 V from 48 V.
+
+A slot also takes one **Winding** from a Wire Drawing Machine instead. Its turns count as turns (up to 1000), and its
+wire sets the rating and insulation. A converter with a winding must fit its core's **window**: turns × mm², added up
+over both sides, at most 150 for a Cheap core, 300 for an Average one and 800 for an Optimal one (Jade shows it).
+48 V to 230 V fits a cheap core: 12 turns of 2.5 mm² and 58 of 1.5 mm² make 117. 400 V to 11 kV needs an optimal core:
+25 turns of 10 mm² and 688 of 0.5 mm² make 594.
 
 * **The core sets how many volts a turn may carry:** Cheap **4 V**, Average **8 V**, Optimal **16 V** per turn. 230 V
   needs 58 turns on a cheap core, 29 on an average one, 15 on an optimal one. 48 V needs 12 turns on a cheap core.
