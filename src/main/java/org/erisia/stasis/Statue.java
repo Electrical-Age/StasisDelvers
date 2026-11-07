@@ -173,6 +173,17 @@ public class Statue extends Entity {
         return pos.immutable();
     }
 
+    /**
+     * The top of the first solid block under it, wherever it is (hanging in stopped land too), or its own place if
+     * there's none above the world's floor. Loads nothing: call it only while its chunk is loaded.
+     */
+    public net.minecraft.core.BlockPos groundBelow() {
+        var pos = blockPosition().mutable();
+        while (pos.getY() > level().getMinY() + 1 && level().getBlockState(pos.below()).getCollisionShape(level(), pos.below()).isEmpty())
+            pos.move(net.minecraft.core.Direction.DOWN);
+        return pos.getY() <= level().getMinY() + 1 ? blockPosition() : pos.immutable();
+    }
+
     @Override
     protected void onBelowWorld() {
         keepInWorld();

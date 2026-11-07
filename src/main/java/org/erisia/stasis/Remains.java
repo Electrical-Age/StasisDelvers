@@ -111,6 +111,20 @@ public final class Remains {
             var at = s.restingPlace();   // (still sinking through the sea: where it will lie)
             p.sendSystemMessage(Component.literal(String.format("Your remains lie at %d %d %d (%s).", at.getX(), at.getY(), at.getZ(),
                 s.level().dimension().identifier())));
+            reachable(p, s);
+        }
+    }
+
+    /**
+     * Remains hanging in mid-air (frozen mid-fall in stopped land) are a death point nothing can land on: Occultism's
+     * wormhole set with a recovery compass found no floor there and wouldn't go (λ-Nero 2026-11-07). The player's last
+     * death point becomes the ground under them, the same column, so the compass still points the same way.
+     */
+    public static void reachable(ServerPlayer p, Statue s) {
+        if (s.isRemoved() || !(s.level() instanceof ServerLevel level) || !level.isLoaded(s.blockPosition())) return;
+        var ground = s.groundBelow();
+        if (ground.getY() < s.blockPosition().getY() - 2) {
+            p.setLastDeathLocation(java.util.Optional.of(net.minecraft.core.GlobalPos.of(level.dimension(), ground)));
         }
     }
 }

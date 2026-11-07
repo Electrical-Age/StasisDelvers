@@ -563,6 +563,29 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        CASES.put("remains_mid_air_death_point_on_the_ground", new Spec(5, (h, c) -> {
+            // λ-Nero 2026-11-07: a wormhole set with a recovery compass found no floor at remains frozen in mid-air
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 4.0, 4.5), true);
+            ServerPlayer q = survivalPlayer(h, new Vec3(14.5, 1.0, 4.5), true);
+            return () -> {
+                p.getInventory().add(new ItemStack(Items.DIAMOND));
+                q.getInventory().add(new ItemStack(Items.DIAMOND));
+                org.erisia.stasis.Statue hung = org.erisia.stasis.Statue.of(h.getLevel(), p), low = org.erisia.stasis.Statue.of(h.getLevel(), q);
+                var was = net.minecraft.core.GlobalPos.of(h.getLevel().dimension(), low.blockPosition());
+                q.setLastDeathLocation(java.util.Optional.of(was));
+                org.erisia.stasis.Remains.reachable(p, hung);
+                org.erisia.stasis.Remains.reachable(q, low);
+                var at = p.getLastDeathLocation().map(net.minecraft.core.GlobalPos::pos).orElse(null);
+                BlockPos floorTop = h.absolutePos(new BlockPos(12, 1, 4));
+                c.check("remains 3 blocks up: the death point is the ground under them", at != null && at.getX() == floorTop.getX()
+                    && at.getZ() == floorTop.getZ() && at.getY() == floorTop.getY(), "at " + at + ", floor " + floorTop + ", remains " + hung.blockPosition());
+                c.check("remains on the floor: the death point stays", q.getLastDeathLocation().orElse(null) == was, "" + q.getLastDeathLocation());
+                hung.discard();
+                low.discard();
+                remove(h, p);
+                remove(h, q);
+            };
+        }));
         CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {

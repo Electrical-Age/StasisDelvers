@@ -33,7 +33,9 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   4 km; the note after the respawn says which. Tests: `respawn_into_a_field`, `lull_runs_time`.
 - `Statue.java`: an entity holding the inventory and XP. Unhurtable, never despawns. The owner (or a creative
   player) right-clicks to get everything back; what doesn't fit stays in it and its chest window opens (Baughn
-  2026-11-07: the overflow used to drop, into lava; `statue_keeps_what_doesnt_fit`). Rendered by `client/StatueRenderer.java`.
+  2026-11-07: the overflow used to drop, into lava; `statue_keeps_what_doesnt_fit`).
+  Remains hanging in mid-air (stopped land) move the owner's last death point to the ground under them at respawn
+  (`Remains.reachable`; λ-Nero 2026-11-07: Occultism's wormhole found no floor there; `remains_mid_air_death_point_on_the_ground`). Rendered by `client/StatueRenderer.java`.
 - `Remains.java`: every player death leaves a `Statue` (Baughn: he died in running land and turned into items).
   `LivingDropsEvent` at LOWEST puts the drops (Curios and other mods' additions too) into it and clears them;
   `LivingExperienceDropEvent` drops no orbs; the statue takes what vanilla would drop (`Statue.points`: level x 7, at
