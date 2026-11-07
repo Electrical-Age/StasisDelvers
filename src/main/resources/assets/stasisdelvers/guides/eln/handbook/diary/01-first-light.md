@@ -93,7 +93,7 @@ One last distinction before my lamp oil runs out: don't confuse **Power (Watts)*
 
 A **Cost Oriented Battery** holds **60 kJ** (60,000 Joules) of energy, and its standard power rating is **250 W** (250 Joules per second). Divide 60,000 J by 250 J/s, and you see why every battery in the catalog has a standard discharge time of **240 seconds (4 minutes)** at its rated load. Run a single 20 W light bulb off that same 60 kJ battery, and it will burn for fifty minutes (`60,000 ÷ 20 = 3,000 s`).
 
-Tomorrow I’ll craft a **[MultiMeter](../reference/electricity.md#circuit-protection)**—though annoyance of annoyances, the **Electrical Probe Chip** inside a MultiMeter requires a piece of **High Voltage Cable**, which means I have to wrap a Copper Cable in three successive layers of rubber (LV → MV → HV) before I can even build my first voltmeter. Typical Ministry design: you need high-voltage insulation just to read a forty-eight-volt battery.
+Tomorrow I’ll craft a **[MultiMeter](../reference/electricity.md#circuit-protection)**—though annoyance of annoyances, the **Electrical Probe Chip** inside a MultiMeter wants a length of bare **Copper Cable**, like nearly everything else on the Ministry's parts list. One spool of wire for every recipe; insulation only goes on what I actually lay. For once, somebody in an office was thinking.
 
 *My tidied-up notes for this chapter: [Electrical Fundamentals, Cables and Protection](../reference/electricity.md), starting with [the four equations you actually need](../reference/electricity.md#the-four-equations).*
 

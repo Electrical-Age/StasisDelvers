@@ -71,14 +71,19 @@ Copper's rating by cross-section: 0.5 mm² 3 A, 0.75 mm² 6 A, 1 mm² 10 A, 1.5 
 resistance falls with the cross-section, as in real copper: the same power at a higher voltage loses less a block.
 Thick copper makes a wider cable. A thin cable may branch off a thick one of the same insulation.
 
-Kit recipes (6 coils' worth, or 1 upgrade): Signal 6 Iron Ingots + 6 Rubber (or 1 Iron Cable + 1 Rubber); LV 3 Copper
-Ingots + 6 Rubber (or 1 Copper Cable + 1 Rubber); MV 1 LV Cable + 1 Rubber; HV 1 MV Cable + 1 Rubber; VHV 3 Alloy
-Ingots + 6 Rubber.
+Hand-made kits, a rubber for each layer of insulation (a block of cable each): LV 1 Copper Cable + 1 Rubber, MV
+1 Copper Cable + 2 Rubber, HV 1 Copper Cable + 3 Rubber; or 6 blocks: LV 3 Copper Ingots + 6 Rubber, VHV 3 Alloy
+Ingots + 6 Rubber. Signal Cable is still an item: 6 Iron Ingots + 6 Rubber (or 1 Iron Cable + 1 Rubber). The old
+insulated cable items are no longer made; any you have still work where they are, and craft into kits.
 
-* **Bare Crafting Wires (NOT placeable):** **Copper Cable** (3 copper ingots → 3), **Iron Cable** (3 iron ingots → 6), **Tungsten Cable** (3 tungsten ingots → 6).
+Recipes take bare **Copper Cable** where they took an insulated power cable. Where two devices differ only in voltage,
+the higher one takes a rubber more per step (the 230V bulb two, the 48V one), and the very high voltage relay and
+switch take alloy.
+
+* **Bare Crafting Wires (NOT placeable):** **Copper Cable** (3 copper ingots → 3; the drawing machines' **Bare wire** mode makes 3 from 2 ingots), **Iron Cable** (3 iron ingots → 6), **Tungsten Cable** (3 tungsten ingots → 6).
 * **Copper Coil** (4 copper ingots around a stick → 4): Fine winding wire used in Heating Corps, DC-DC Converters, Resistors, Inductors, and Thermistors. *(Do not confuse with Copper Cable!)*
-* **Wire Drawing Machines** (48V and 230V): copper (ingots or dust) and rubber in, a cable kit or a **Winding** out.
-  On the screen, choose a kit or a winding, the cross-section, the insulation, the colour, and the length in blocks
+* **Wire Drawing Machines** (48V and 230V): copper (ingots or dust) and rubber in, a cable kit, a **Winding**, or bare
+  **Copper Cable** (no rubber) out. On the screen, choose a kit, a winding or bare wire, the cross-section, the insulation, the colour, and the length in blocks
   (up to 64) or the number of turns (up to 1000). Then press **Start**. The screen shows what it will take.
   * The 48V machine (400 W) makes up to 6 mm² with up to 230 V insulation. The 230V machine (1.6 kW) makes everything.
   * It takes about two thirds of the copper and rubber a hand-made kit takes. Thicker copper and insulation for higher
@@ -89,8 +94,8 @@ Ingots + 6 Rubber.
 
 ## DC-DC converters
 
-A **DC-DC Converter** joins two tiers. Each **cable in a winding slot is one turn**, up to 64 a side, and the voltage
-ratio is the ratio of the turns: 5 turns of LV in and 24 of MV out make 230 V from 48 V.
+A **DC-DC Converter** joins two tiers. A **cable kit in a winding slot is a turn a block**, up to 64 a side, and the
+voltage ratio is the ratio of the turns: 5 blocks of LV in and 24 of MV out make 230 V from 48 V.
 
 A slot also takes one **Winding** from a Wire Drawing Machine instead. Its turns count as turns (up to 1000), and its
 wire sets the rating and insulation. Every converter must fit its core's **window**: turns × mm², added up over both
@@ -127,9 +132,9 @@ Circuit protection and failure rules: when a network is overloaded, **only ONE f
 > **Picture to come:** A wall distribution panel. A Low Voltage Cable enters from the left into an Electrical Fuse Holder (holding a Lead Fuse), passes through an Electrical Breaker and an inline Electrical Probe, and branches out via a Hub to workshop machines, with a Ground Cable fixed at the bottom.
 
 * **Electrical Fuse Holder + Lead Fuse:** one fuse for every cable. Right-click the holder with a Lead Fuse to put it in; an empty-hand click opens its screen, where you set its **rating** in amps and take the fuse out (a `Blown Lead Fuse` too). It blows at about **1.08× its rating**; unset, it takes the fuse's own rating (21 A). Set it to your cable's rated current. The holder never burns.
-* **Electrical Breaker:** Place a cable in its slot (it sets the contacts' resistance), and set the **trip current** in amps in its screen; unset, it trips at about 1.05× that cable's nominal current (LV ≈ 21.9 A). It also trips outside its `U_min` / `U_max` voltage window. Its default `U_max` is **48 V**: on a 230 V or 400 V line, open its GUI and raise `U_max` first, or it trips at once.
+* **Electrical Breaker:** Put a cable kit in its slot: it takes one block of it, and that cable's spec sets the contacts' resistance and ratings, and set the **trip current** in amps in its screen; unset, it trips at about 1.05× that cable's nominal current (LV ≈ 21.9 A). It also trips outside its `U_min` / `U_max` voltage window. Its default `U_max` is **48 V**: on a 230 V or 400 V line, open its GUI and raise `U_max` first, or it trips at once.
 * **Ground Cable:** Required 0 V circuit return reference. Cannot burn.
-* **MultiMeter / AllMeter:** Right-click any device or cable to print Voltage (`U`), Current (`I`), and Power (`P`) to your log without opening its GUI. *(Tip: Crafting the Electrical Probe Chip for the MultiMeter requires 1 × **High Voltage Cable**.)*
+* **MultiMeter / AllMeter:** Right-click any device or cable to print Voltage (`U`), Current (`I`), and Power (`P`) to your log without opening its GUI. *(The Electrical Probe Chip takes a Copper Cable.)*
 
 ---
 

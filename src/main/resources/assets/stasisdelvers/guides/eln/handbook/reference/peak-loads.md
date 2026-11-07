@@ -50,7 +50,7 @@ The workshop answer: one bank carries one 20 kJ burst.
 * **Inrush:** an empty bank on a stiff 400 V line pulls a huge current and **burns the cable**. It takes and gives any current; nothing inside limits it. See [charging the bank](peak-loads.md#charging-the-bank).
 * **Leaks** through about 1.25 kΩ: about 128 W at 400 V, and only 2% left after an hour. It's for bursts, not for keeping a night's power. Keep the plant connected.
 * Jade shows its voltage, energy and capacitance.
-* **Recipe:** six **Capacitor Cells** (each: 6 Dielectrics, 2 copper plates, a redstone block) over 2 iron plates and a High Voltage Cable. The compressor makes **4 Dielectrics** from a sand.
+* **Recipe:** six **Capacitor Cells** (each: 6 Dielectrics, 2 copper plates, a redstone block) over 2 iron plates and a Copper Cable. The compressor makes **4 Dielectrics** from a sand.
 
 ## Charging the bank
 
