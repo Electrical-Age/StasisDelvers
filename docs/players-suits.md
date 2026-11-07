@@ -32,7 +32,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   nearest its centre), else any field with room to stand, else the nearest lull's core (Lulls, rifts-storms.md) within
   4 km; the note after the respawn says which. Tests: `respawn_into_a_field`, `lull_runs_time`.
 - `Statue.java`: an entity holding the inventory and XP. Unhurtable, never despawns. The owner (or a creative
-  player) right-clicks to get everything back. Rendered by `client/StatueRenderer.java`.
+  player) right-clicks to get everything back; what doesn't fit stays in it and its chest window opens (Baughn
+  2026-11-07: the overflow used to drop, into lava; `statue_keeps_what_doesnt_fit`). Rendered by `client/StatueRenderer.java`.
 - `Remains.java`: every player death leaves a `Statue` (Baughn: he died in running land and turned into items).
   `LivingDropsEvent` at LOWEST puts the drops (Curios and other mods' additions too) into it and clears them;
   `LivingExperienceDropEvent` drops no orbs; the statue takes what vanilla would drop (`Statue.points`: level x 7, at

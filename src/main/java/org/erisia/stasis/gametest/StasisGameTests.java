@@ -538,6 +538,31 @@ public final class StasisGameTests {
                 remove(h, p);
             };
         }));
+        CASES.put("statue_keeps_what_doesnt_fit", new Spec(20, (h, c) -> {
+            // Baughn 2026-11-07: a right click on his remains with a full inventory dropped the rest into lava
+            ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), true);
+            return () -> {
+                var inv = p.getInventory();
+                inv.setItem(3, new ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE));
+                inv.setItem(20, new ItemStack(net.minecraft.world.item.Items.BREAD, 7));
+                org.erisia.stasis.Statue st = org.erisia.stasis.Statue.of(h.getLevel(), p);
+                for (int i = 0; i < 36; i++) inv.setItem(i, new ItemStack(net.minecraft.world.item.Items.COBBLESTONE, 64));   // full since
+                var near = new AABB(h.absolutePos(new BlockPos(12, 1, 4))).inflate(6);
+                int before = h.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, near).size();
+                boolean all = st.crumble(h.getLevel(), p);
+                int dropped = h.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, near).size() - before;
+                c.check("a full inventory: nothing given back, nothing dropped, the statue stays with both", !all && dropped == 0
+                    && !st.isRemoved() && st.items().size() == 2, "all " + all + ", dropped " + dropped + ", left " + st.items().size());
+                inv.setItem(3, ItemStack.EMPTY);
+                all = st.crumble(h.getLevel(), p);
+                c.check("one slot free (the pickaxe's): the pickaxe comes back to it, the bread stays", !all && inv.getItem(3).is(net.minecraft.world.item.Items.DIAMOND_PICKAXE)
+                    && st.items().size() == 1 && st.items().get(0).is(net.minecraft.world.item.Items.BREAD), st.items().toString());
+                inv.setItem(20, ItemStack.EMPTY);
+                all = st.crumble(h.getLevel(), p);
+                c.check("room for the bread: all back, the statue gone", all && st.isRemoved() && inv.getItem(20).is(net.minecraft.world.item.Items.BREAD), inv.getItem(20).toString());
+                remove(h, p);
+            };
+        }));
         CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {

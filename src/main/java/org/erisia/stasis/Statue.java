@@ -289,31 +289,48 @@ public class Statue extends Entity {
             open(sp);
             return InteractionResult.SUCCESS_SERVER;
         }
-        crumble(level, player);
+        // what doesn't fit stays in it, and its chest opens to sort that out
+        if (!crumble(level, player) && player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            player.sendOverlayMessage(Component.literal("Your inventory is full: the rest is still here."));
+            open(sp);
+        }
         return InteractionResult.SUCCESS_SERVER;
     }
 
     /**
      * Give everything back to the player who broke the statue, each item into the slot it came from when that slot is
-     * free (armour onto them, the hotbar as it was; Baughn: like the Corpse mod), the rest anywhere (what doesn't fit
-     * drops), and remove it.
+     * free (armour onto them, the hotbar as it was; Baughn: like the Corpse mod), the rest anywhere it fits. What
+     * doesn't fit stays in the statue, which is removed only once it's empty (Baughn 2026-11-07: the overflow used to
+     * drop at the player's feet, into lava). True if it gave everything back.
      */
-    public void crumble(ServerLevel level, Player player) {
+    public boolean crumble(ServerLevel level, Player player) {
         var inv = player.getInventory();
-        List<ItemStack> rest = new java.util.ArrayList<>();
-        for (int i = 0; i < items.size(); i++) {
-            ItemStack st = items.get(i);
-            int slot = slotOf(i);
-            if (slot >= 0 && slot < inv.getContainerSize() && inv.getItem(slot).isEmpty()) inv.setItem(slot, st.copy());
-            else if (!CuriosCompat.put(player, curioOf(i), st.copy())) rest.add(st);
+        List<ItemStack> was = new java.util.ArrayList<>(items);
+        List<Integer> wasSlots = new java.util.ArrayList<>();
+        List<String> wasCurios = new java.util.ArrayList<>();
+        for (int i = 0; i < was.size(); i++) {
+            wasSlots.add(slotOf(i));
+            wasCurios.add(curioOf(i));
         }
-        for (ItemStack st : rest) inv.placeItemBackInInventory(st.copy(), net.minecraft.util.Prediction.SERVER_ONLY);
         items.clear();
         slots.clear();
         curios.clear();
+        List<Integer> rest = new java.util.ArrayList<>();
+        for (int i = 0; i < was.size(); i++) {
+            ItemStack st = was.get(i);
+            int slot = wasSlots.get(i);
+            if (slot >= 0 && slot < inv.getContainerSize() && inv.getItem(slot).isEmpty()) inv.setItem(slot, st.copy());
+            else if (!CuriosCompat.put(player, wasCurios.get(i), st.copy())) rest.add(i);
+        }
+        for (int i : rest) {
+            ItemStack left = was.get(i).copy();
+            inv.add(left);   // (what it takes comes off left)
+            if (!left.isEmpty()) add(left, wasSlots.get(i), wasCurios.get(i));
+        }
         if (xp > 0) player.giveExperiencePoints(xp);
         xp = 0;
-        discard();
+        if (items.isEmpty()) discard();
+        return items.isEmpty();
     }
 
     /** The statue's things in a chest window (54 slots): take what you like; what's left stays in the statue, which
