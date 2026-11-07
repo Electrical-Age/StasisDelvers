@@ -32,8 +32,9 @@ public final class StasisRegistry {
 
     /** Delver suit: copper coils on leather armour, so leather's protection (Baughn 2026-10-13); repaired with copper
      *  coils (tag repairs_delver_suit). */
+    // (enchantable as leather, 15; Baughn 2026-11-07; it was 1)
     static final net.minecraft.world.item.equipment.ArmorMaterial DELVER = new net.minecraft.world.item.equipment.ArmorMaterial(
-        12, defense(1, 2, 3, 1), 1, net.minecraft.sounds.SoundEvents.ARMOR_EQUIP_LEATHER, 0f, 0f,
+        12, defense(1, 2, 3, 1), 15, net.minecraft.sounds.SoundEvents.ARMOR_EQUIP_LEATHER, 0f, 0f,
         net.minecraft.tags.TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "repairs_delver_suit")), asset("delver"));
     /** The combined suit: E-Coal (energy instead of armour points) plus time protection. */
     static final net.minecraft.world.item.equipment.ArmorMaterial STASIS_ARMOR = new net.minecraft.world.item.equipment.ArmorMaterial(
@@ -48,7 +49,8 @@ public final class StasisRegistry {
     // Stasis armour: E-Coal's damage absorption (1.7.10 points {2, 6, 5, 2} as ratios) on a 60 kJ store per piece
     static net.neoforged.neoforge.registries.DeferredItem<StasisArmorItem> stasisArmor(String name, net.minecraft.world.item.equipment.ArmorType type, int armor) {
         return ITEMS.registerItem(name, p -> new StasisArmorItem(p, 60000, 1000, armor / 20.0, armor * 500.0, 500, 10),
-            p -> p.durability(type.getDurability(STASIS_ARMOR.durability())).attributes(STASIS_ARMOR.createAttributes(type))
+            // (enchantable as diamond, 10, as E-Coal: Baughn, Nero 2026-11-07; with the armour enchantable tags in data/minecraft/tags/item/enchantable)
+            p -> p.durability(type.getDurability(STASIS_ARMOR.durability())).attributes(STASIS_ARMOR.createAttributes(type)).enchantable(10)
                 .component(net.minecraft.core.component.DataComponents.EQUIPPABLE, net.minecraft.world.item.equipment.Equippable
                     .builder(type.getSlot()).setEquipSound(STASIS_ARMOR.equipSound()).setAsset(STASIS_ARMOR.assetId()).build()));
     }

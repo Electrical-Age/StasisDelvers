@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "stasisdelvers:delver_helmet",
+    "stasisdelvers:stasis_helmet",
+    "stasisdelvers:delver_chestplate",
+    "stasisdelvers:stasis_chestplate",
+    "stasisdelvers:delver_leggings",
+    "stasisdelvers:stasis_leggings",
+    "stasisdelvers:delver_boots",
+    "stasisdelvers:stasis_boots"
+  ]
+}

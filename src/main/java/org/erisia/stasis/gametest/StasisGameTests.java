@@ -586,6 +586,19 @@ public final class StasisGameTests {
                 remove(h, q);
             };
         }));
+        CASES.put("suits_enchantable", new Spec(2, (h, c) -> () -> {
+            // Baughn 2026-11-07: the Delver suit and the stasis armour take armour enchantments
+            var reg = h.getLevel().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT);
+            var prot = reg.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.PROTECTION).value();
+            var mending = reg.getOrThrow(net.minecraft.world.item.enchantment.Enchantments.MENDING).value();
+            for (var item : new net.minecraft.world.item.Item[]{org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get(),
+                org.erisia.stasis.StasisRegistry.STASIS_CHEST.get(), org.erisia.stasis.StasisRegistry.STASIS_LEGS.get()}) {
+                ItemStack st = new ItemStack(item);
+                var e = st.get(net.minecraft.core.component.DataComponents.ENCHANTABLE);
+                c.check(item + ": enchantable at a table, Protection and Mending apply", e != null && e.value() >= 9 && prot.canEnchant(st) && mending.canEnchant(st),
+                    "enchantable " + e);
+            }
+        }));
         CASES.put("player_grace_after_login", new Spec(130, (h, c) -> {
             ServerPlayer p = survivalPlayer(h, new Vec3(12.5, 1.0, 4.5), false);
             return () -> {
