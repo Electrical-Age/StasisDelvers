@@ -4,6 +4,8 @@
     "minecraft:ender_dragon",
     "minecraft:warden",
     "minecraft:phantom",
+    "minecraft:wither",
+    "minecraft:wither_skull",
     "#stasisdelvers:rift_fauna"
   ]
 }

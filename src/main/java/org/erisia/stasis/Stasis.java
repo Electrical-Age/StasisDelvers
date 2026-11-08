@@ -29,7 +29,8 @@ public final class Stasis {
     private Stasis() {
     }
 
-    /** Entity types time doesn't stop (endermen, the dragon, the warden): data/stasisdelvers/tags/entity_type/unbound. */
+    /** Entity types time doesn't stop (endermen, the dragon, the warden, the wither and its skulls: Baughn 2026-11-08):
+     *  data/stasisdelvers/tags/entity_type/unbound. */
     public static final TagKey<EntityType<?>> UNBOUND =
         TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "unbound"));
 

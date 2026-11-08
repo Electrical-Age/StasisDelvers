@@ -208,6 +208,19 @@ public final class StasisGameTests {
                 c.check("the server marks it frozen for the client", cart.getData(org.erisia.stasis.StasisRegistry.FROZEN.get()), "");
             };
         }));
+        // Baughn 2026-11-08: the wither isn't stopped by stasis, nor are its skulls
+        CASES.put("wither_unbound", new Spec(10, (h, c) -> {
+            var w = h.spawn(EntityTypes.WITHER, new Vec3(12.5, 2.0, 4.5));
+            var skull = h.spawn(EntityTypes.WITHER_SKULL, new Vec3(6.5, 3.0, 4.5));
+            skull.setDeltaMovement(0.2, 0, 0);
+            int t0 = w.tickCount, s0 = skull.tickCount;
+            return () -> {
+                c.check("the wither runs in stopped land", !Stasis.isFrozen(w) && w.tickCount > t0, "frozen " + Stasis.isFrozen(w) + ", ticks " + (w.tickCount - t0));
+                c.check("so do its skulls", !Stasis.isFrozen(skull) && skull.tickCount > s0, "frozen " + Stasis.isFrozen(skull) + ", ticks " + (skull.tickCount - s0));
+                w.discard();
+                skull.discard();
+            };
+        }));
         // Baughn 2026-10-29: bumping a stilled pillager let it walk and shoot. A push slides a frozen mob; its AI stays off
         CASES.put("pushed_frozen_mob_runs_no_ai", new Spec(60, (h, c) -> {
             ServerLevel level = h.getLevel();

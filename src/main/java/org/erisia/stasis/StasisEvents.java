@@ -185,11 +185,13 @@ public final class StasisEvents {
 
     /**
      * Unbound mobs (endermen) move in stopped land but don't take or place blocks there: they'd strip towers and ruins
-     * near force-loaded chunks for as long as nobody watches (Argon; Baughn's default until he says otherwise).
+     * near force-loaded chunks for as long as nobody watches (Argon; Baughn's default until he says otherwise). The
+     * bosses (the dragon, the wither and its skulls) keep their full behaviour.
      */
     static void griefing(net.neoforged.neoforge.event.entity.EntityMobGriefingEvent e) {
         var en = e.getEntity();
         if (en.typeHolder().is(Stasis.UNBOUND) && !(en instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon)
+            && !(en instanceof net.minecraft.world.entity.boss.wither.WitherBoss) && !(en instanceof net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull)
             && en.level() instanceof ServerLevel level && Stasis.stops(level) && !Stasis.isRunning(level, en.blockPosition()))
             e.setCanGrief(false);
     }
