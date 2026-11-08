@@ -215,6 +215,19 @@ public final class Strata {
         return c;
     }
 
+    /** Where each of a splash crown's 11 spires stands at its foot: {x, z} world, the axis at t = 0 (as crown()). */
+    public static double[][] spireFeet(StaticDeeps.Deep d) {
+        double a = Noise.hash32(d.id(), 78, 0, 0x57A7A) * 2 * Math.PI, ca = Math.cos(a), sa = Math.sin(a), RB = 1.7 * d.radius();
+        int N = 11;
+        double step = 2 * Math.PI / N;
+        double[][] out = new double[N][];
+        for (int i = 0; i < N; i++) {
+            double ang = i * step - 0.3, lx = RB * Math.cos(ang), lz = RB * Math.sin(ang);
+            out[i] = new double[]{d.x() + lx * ca - lz * sa, d.z() + lx * sa + lz * ca};
+        }
+        return out;
+    }
+
     /** The world y of a splash crown spire's foot (the same for all its spires). */
     public static double spireFoot(StaticDeeps.Deep d) {
         double R = d.radius();

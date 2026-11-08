@@ -291,6 +291,16 @@ final class StasisCommands {
                     src.sendFailure(Component.literal("No plan: " + e.getMessage()));
                     return 0;
                 }
+            })).then(Commands.literal("survey").executes(c -> {   // (splash rifts with spires over air or water, and their chunks: λ-Nero)
+                var src = c.getSource();
+                try {
+                    String msg = RegenRifts.survey(src.getServer().overworld());
+                    src.sendSuccess(() -> Component.literal(msg), true);
+                    return 1;
+                } catch (java.io.IOException e) {
+                    src.sendFailure(Component.literal("No survey: " + e.getMessage()));
+                    return 0;
+                }
             })))
             // lulls (Lulls: running-time weather) within ~3 km, nearest first, and the time rate here
             .then(Commands.literal("lulls").executes(c -> {
