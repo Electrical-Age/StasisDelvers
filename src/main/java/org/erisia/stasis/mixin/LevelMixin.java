@@ -3,6 +3,7 @@ package org.erisia.stasis.mixin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import org.erisia.stasis.FieldDaylight;
 import org.erisia.stasis.Stasis;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,6 +15,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * kelp at a field's edge grew their new top into the stopped block above, vines and grass spread out, lava lit fires
  * (Baughn: "bamboo grows slightly inside stopped land"). Every setBlock overload ends here; ServerLevel doesn't
  * override it.
+ * <p>
+ * Also overrides LevelReader.getMaxLocalRawBrightness(pos) (an interface default Level doesn't override) so that
+ * monster spawn darkness and undead burning follow a wild field's clock (FieldDaylight).
  */
 @Mixin(Level.class)
 public abstract class LevelMixin {
@@ -21,5 +25,11 @@ public abstract class LevelMixin {
         at = @At("HEAD"), cancellable = true)
     private void stasis$noGrowthIntoStoppedLand(BlockPos pos, BlockState state, int flags, int limit, CallbackInfoReturnable<Boolean> cir) {
         if (Stasis.refusesWrite((Level) (Object) this, pos)) cir.setReturnValue(false);
+    }
+
+    /** Vanilla: getMaxLocalRawBrightness(pos, getSkyDarken()); the darkening comes from FieldDaylight instead. */
+    public int getMaxLocalRawBrightness(BlockPos pos) {
+        Level self = (Level) (Object) this;
+        return self.getMaxLocalRawBrightness(pos, FieldDaylight.skyDarken(self, pos));
     }
 }

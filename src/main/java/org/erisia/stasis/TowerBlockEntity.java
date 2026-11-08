@@ -508,7 +508,9 @@ public class TowerBlockEntity extends BlockEntity {
     void serverTick() {
         if (!(level instanceof ServerLevel sl)) return;
         ticks++;
-        TowerSpawns.report(sl, fieldId, state != State.OFF);   // (no mob spawns in its field: Baughn)
+        // no mob spawns in its field (Baughn), unless a wild resonator is against the core
+        TowerSpawns.report(sl, fieldId, state == State.OFF ? TowerSpawns.Mode.NONE
+            : WildResonatorBlock.against(sl, worldPosition) ? TowerSpawns.Mode.WILD : TowerSpawns.Mode.BLOCK);
         if (!ruined && structure.tick(sl, worldPosition, ticks)) {
             setChanged();
             sl.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
@@ -782,7 +784,7 @@ public class TowerBlockEntity extends BlockEntity {
 
     @Override
     public void setRemoved() {
-        if (level instanceof ServerLevel sl) TowerSpawns.report(sl, fieldId, false);
+        if (level instanceof ServerLevel sl) TowerSpawns.report(sl, fieldId, TowerSpawns.Mode.NONE);
         if (level instanceof ServerLevel sl && state != State.OFF && !removedByUnload) stop(sl);
         if (!removedByUnload && node != null) {
             try {

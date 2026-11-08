@@ -83,6 +83,16 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
 - Console readout values 20-22: accelerator step (-1: none), the rate it asks for, the rate running.
 - Tests: `tower_temporal_accelerator`, `tower_accelerator_1x_and_console`.
 
+## Spawns and the wild resonator (`TowerSpawns`, `WildResonatorBlock`, `FieldDaylight`; Baughn 2026-11-08)
+- A running tower's field blocks natural, patrol, event, reinforcement and jockey spawns (`StasisEvents.spawnCheck`,
+  `finalizeSpawn`); spawners, eggs, breeding, commands and worldgen still work. Each tower reports its field every tick
+  (memory only).
+- A wild resonator against the core (either cell, any side, like the accelerator) makes the field spawn again by
+  vanilla's rules, by the field's own clock: `LevelMixin` overrides `getMaxLocalRawBrightness(pos)` so monster spawn
+  darkness and undead burning use `FieldDaylight.skyDarken` (the field clock's sky darkening plus what the weather adds;
+  #300, λ-Nero: day/night as the field shows it). Villager and bee schedules stay on world time.
+- Tests: `tower_field_blocks_spawns`, `wild_resonator_spawns_by_field_clock`, `wild_resonator_removed_blocks_again`.
+
 ## Chunk tickets (`Tickets.java`)
 - `update(level, tower)` forces the rectangle of chunks covering max(radius, target)·stretch per side, while the
   state is not OFF. It releases chunks no longer needed.

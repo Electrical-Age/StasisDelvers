@@ -41,7 +41,7 @@ public final class LocalTime {
     }
 
     /** Sets a field's clock (absolute) and tells the clients at once. */
-    static void setFieldClock(ServerLevel level, Field f, double c) {
+    public static void setFieldClock(ServerLevel level, Field f, double c) {
         FieldData fd = FieldData.get(level);
         fd.clocks.put(f.id(), c);
         fd.setDirty();

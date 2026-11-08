@@ -164,6 +164,11 @@ public final class StasisRegistry {
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> TEMPORAL_ACCELERATOR = ITEMS.registerSimpleBlockItem(TEMPORAL_ACCELERATOR_BLOCK);
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<TemporalAcceleratorBlockEntity>> TEMPORAL_ACCELERATOR_ENTITY =
         BLOCK_ENTITIES.register("temporal_accelerator", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(TemporalAcceleratorBlockEntity::new, TEMPORAL_ACCELERATOR_BLOCK.get()));
+    /** The wild resonator: against a tower's core, it lets mobs spawn in the field again (Baughn; WildResonatorBlock). */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<WildResonatorBlock> WILD_RESONATOR_BLOCK = BLOCKS.registerBlock("wild_resonator",
+        WildResonatorBlock::new, p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_GREEN).strength(3f, 9f)
+            .requiresCorrectToolForDrops().sound(net.minecraft.world.level.block.SoundType.AMETHYST).lightLevel(st -> 4));
+    public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> WILD_RESONATOR = ITEMS.registerSimpleBlockItem(WILD_RESONATOR_BLOCK);
     /** Refined riftstone (λ-Nero): chronal casing that lets a riftstone room grow bigger and cost less (ChronalAcceleratorBlockEntity). */
     public static final net.neoforged.neoforge.registries.DeferredBlock<net.minecraft.world.level.block.Block> REFINED_RIFTSTONE = BLOCKS.registerSimpleBlock("refined_riftstone",
         p -> p.mapColor(net.minecraft.world.level.material.MapColor.COLOR_PURPLE).strength(3f, 12f).requiresCorrectToolForDrops()

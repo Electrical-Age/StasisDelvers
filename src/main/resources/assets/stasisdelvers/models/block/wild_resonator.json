@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "stasisdelvers:block/wild_resonator_end",
+    "side": "stasisdelvers:block/wild_resonator_side"
+  }
+}

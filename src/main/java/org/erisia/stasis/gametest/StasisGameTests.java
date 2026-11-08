@@ -1135,6 +1135,55 @@ public final class StasisGameTests {
                 c.check("tower gone: spawns no longer blocked there", !org.erisia.stasis.TowerSpawns.blocks(level, in));
             };
         }, false, true));
+        // a wild resonator against the core lets the field spawn again, by the field's own clock (Baughn 2026-11-08, #300)
+        CASES.put("wild_resonator_spawns_by_field_clock", new Spec(10, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 3);
+            h.setBlock(new BlockPos(4, 2, 4), org.erisia.stasis.StasisRegistry.WILD_RESONATOR_BLOCK.get().defaultBlockState());
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.8 * 4 / 3), tx);
+                tx.commit();
+            }
+            return () -> {
+                ServerLevel level = h.getLevel();
+                c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                BlockPos in = h.absolutePos(new BlockPos(6, 1, 4)), out = h.absolutePos(new BlockPos(6 + 40, 1, 4));
+                c.check("the field doesn't block spawns", !org.erisia.stasis.TowerSpawns.blocks(level, in));
+                var f = org.erisia.stasis.TowerSpawns.wildAt(level, in);
+                c.check("it is a wild field", f != null && f.id() == t.fieldId());
+                c.check("outside isn't", org.erisia.stasis.TowerSpawns.wildAt(level, out) == null);
+                c.check("clock curve: noon is bright, midnight dark", org.erisia.stasis.FieldDaylight.darkenAt(6000) == 0
+                    && org.erisia.stasis.FieldDaylight.darkenAt(18000) == 11 && org.erisia.stasis.FieldDaylight.darkenAt(24000 + 18000) == 11,
+                    org.erisia.stasis.FieldDaylight.darkenAt(6000) + " / " + org.erisia.stasis.FieldDaylight.darkenAt(18000));
+                if (f != null) {
+                    int weather = Math.max(0, level.getSkyDarken() - org.erisia.stasis.FieldDaylight.darkenAt(level.getDefaultClockTime()));
+                    org.erisia.stasis.LocalTime.setFieldClock(level, f, 18000);
+                    int night = level.getMaxLocalRawBrightness(in.above(4)) , dn = org.erisia.stasis.FieldDaylight.skyDarken(level, in);
+                    c.check("field midnight: dark (spawns, no burning)", dn == Math.min(15, 11 + weather), "darken " + dn + ", weather " + weather);
+                    org.erisia.stasis.LocalTime.setFieldClock(level, f, 6000);
+                    int dd = org.erisia.stasis.FieldDaylight.skyDarken(level, in), day = level.getMaxLocalRawBrightness(in.above(4));
+                    c.check("field noon: light", dd == weather, "darken " + dd);
+                    c.check("brightness follows (mixin)", day >= night && level.getMaxLocalRawBrightness(in.above(4))
+                        == level.getMaxLocalRawBrightness(in.above(4), dd), night + " -> " + day);
+                    c.check("outside: the level's darkening", org.erisia.stasis.FieldDaylight.skyDarken(level, out) == level.getSkyDarken());
+                }
+                h.setBlock(new BlockPos(4, 2, 4), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+            };
+        }, false, true));
+        // the resonator removed: the field blocks again (checked a tick later, after the tower reports)
+        CASES.put("wild_resonator_removed_blocks_again", new Spec(10, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 3);
+            h.setBlock(new BlockPos(2, 1, 4), org.erisia.stasis.StasisRegistry.WILD_RESONATOR_BLOCK.get().defaultBlockState());
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.8 * 4 / 3), tx);
+                tx.commit();
+            }
+            h.setBlock(new BlockPos(2, 1, 4), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+            return () -> {
+                BlockPos in = h.absolutePos(new BlockPos(6, 1, 4));
+                c.check("blocks again", org.erisia.stasis.TowerSpawns.blocks(h.getLevel(), in));
+                c.check("no longer wild", org.erisia.stasis.TowerSpawns.wildAt(h.getLevel(), in) == null);
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();
