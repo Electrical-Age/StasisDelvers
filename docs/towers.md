@@ -91,7 +91,7 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. For the generator behi
   vanilla's rules, by the field's own clock: `LevelMixin` overrides `getMaxLocalRawBrightness(pos)` so monster spawn
   darkness and undead burning use `FieldDaylight.skyDarken` (the field clock's sky darkening plus what the weather adds;
   #300, λ-Nero: day/night as the field shows it). Villager and bee schedules stay on world time.
-- Tests: `tower_field_blocks_spawns`, `wild_resonator_spawns_by_field_clock`, `wild_resonator_removed_blocks_again`.
+- Tests: `tower_field_blocks_spawns`, `wild_resonator_spawns_by_field_clock`, `wild_resonator_lower_cell`.
 
 ## Chunk tickets (`Tickets.java`)
 - `update(level, tower)` forces the rectangle of chunks covering max(radius, target)·stretch per side, while the

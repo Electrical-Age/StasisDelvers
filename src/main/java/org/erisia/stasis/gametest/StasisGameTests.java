@@ -1151,6 +1151,13 @@ public final class StasisGameTests {
                 var f = org.erisia.stasis.TowerSpawns.wildAt(level, in);
                 c.check("it is a wild field", f != null && f.id() == t.fieldId());
                 c.check("outside isn't", org.erisia.stasis.TowerSpawns.wildAt(level, out) == null);
+                var zombie = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+                zombie.snapTo(in.getX() + 0.5, in.getY(), in.getZ() + 0.5, 0, 0);
+                var ev = new net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck(zombie, level,
+                    net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+                net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(ev);
+                zombie.discard();
+                c.check("a natural zombie spawn there goes to vanilla's rules", ev.getResult() == net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck.Result.DEFAULT, "" + ev.getResult());
                 c.check("clock curve: noon is bright, midnight dark", org.erisia.stasis.FieldDaylight.darkenAt(6000) == 0
                     && org.erisia.stasis.FieldDaylight.darkenAt(18000) == 11 && org.erisia.stasis.FieldDaylight.darkenAt(24000 + 18000) == 11,
                     org.erisia.stasis.FieldDaylight.darkenAt(6000) + " / " + org.erisia.stasis.FieldDaylight.darkenAt(18000));
@@ -1167,21 +1174,22 @@ public final class StasisGameTests {
                     c.check("outside: the level's darkening", org.erisia.stasis.FieldDaylight.skyDarken(level, out) == level.getSkyDarken());
                 }
                 h.setBlock(new BlockPos(4, 2, 4), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                t.setRemoved();   // (its field goes: tower_runs_a_field looks for none left)
             };
         }, false, true));
-        // the resonator removed: the field blocks again (checked a tick later, after the tower reports)
-        CASES.put("wild_resonator_removed_blocks_again", new Spec(10, (h, c) -> {
+        // against the lower core cell works as well; a plain tower beside it still blocks (Baughn 2026-11-08)
+        CASES.put("wild_resonator_lower_cell", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             h.setBlock(new BlockPos(2, 1, 4), org.erisia.stasis.StasisRegistry.WILD_RESONATOR_BLOCK.get().defaultBlockState());
             try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
                 t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.8 * 4 / 3), tx);
                 tx.commit();
             }
-            h.setBlock(new BlockPos(2, 1, 4), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
             return () -> {
                 BlockPos in = h.absolutePos(new BlockPos(6, 1, 4));
-                c.check("blocks again", org.erisia.stasis.TowerSpawns.blocks(h.getLevel(), in));
-                c.check("no longer wild", org.erisia.stasis.TowerSpawns.wildAt(h.getLevel(), in) == null);
+                c.check("wild", org.erisia.stasis.TowerSpawns.wildAt(h.getLevel(), in) != null && !org.erisia.stasis.TowerSpawns.blocks(h.getLevel(), in));
+                h.setBlock(new BlockPos(2, 1, 4), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                t.setRemoved();
             };
         }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
