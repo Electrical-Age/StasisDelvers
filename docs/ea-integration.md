@@ -32,7 +32,11 @@ locally at `/var/lib/mclab/agent/eln/develop` (EA `develop`).
     *look* connected.
   - When `runs(n)` is true and the node is not added: `connect()`.
   - It works from EA's own `isAdded()`, not from a list of its own, because EA reconnects nodes from many places.
-- `runs(n)` is `Stasis.isRunningSteady(pos) || (Stasis.nearTower(pos) && infrastructure(n))`.
+- `runs(n)` is `Stasis.isRunningSteady(pos) || n.timeExempt() || (Stasis.nearTower(pos) && infrastructure(n))`.
+- `NodeBase.timeExempt()` is EA's: true for a utility pole with a Pole Stasis Anchor fitted (Baughn 2026-11-08), so a
+  line can cross stopped land. The anchor item is EA's; its recipe (rift shards) is ours, in
+  `data/stasisdelvers/recipe/pole_stasis_anchor.json`. A span from an anchored pole to a frozen one carries nothing
+  (EA's `GridLink.connect` only joins two simulated poles).
   - It uses the steady rate: eddies never make networks flicker.
 - `infrastructure(n)` defines the **yard**: within `Stasis.TOWER_YARD` = 6 blocks per axis of a lance core, or of a
   formed tower core while config `towerYard` is on (default off since 2026-10-21, Baughn: nothing pointed to it and it
@@ -75,6 +79,7 @@ locally at `/var/lib/mclab/agent/eln/develop` (EA `develop`).
 - Frozen cables keep their visual connections: `ea_frozen_cables_look_connected`.
 - An EA lamp lights inside a field: `ea_lamp_lights_in_a_field`.
 - The tower yard keeps cables and batteries running with the field down: `ea_tower_yard_keeps_cables`.
+- An anchored utility pole runs in stopped land, a bare one beside it doesn't: `ea_anchored_pole_runs_in_stopped_land`.
 - The GameTest server runs only `stasisdelvers:*` tests (`--tests` in `build.gradle`). EA's own GameTests
   are registered too, but can't run in stopped time.
 

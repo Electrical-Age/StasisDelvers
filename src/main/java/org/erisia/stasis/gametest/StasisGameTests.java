@@ -2708,6 +2708,26 @@ public final class StasisGameTests {
             return () -> c.check("a field arrived: the source runs again", !org.erisia.stasis.NodeFreezer.isFrozen(outSrc.sixNode)
                 && outSrc.electricalLoadList.get(0).getSubSystem() != null);
         }, true, true));
+        // Baughn 2026-11-08: a utility pole with a stasis anchor (EA's NodeBase.timeExempt) runs in stopped land; a bare one
+        // beside it doesn't, and the span between them carries nothing
+        CASES.put("ea_anchored_pole_runs_in_stopped_land", new Spec(20, (h, c) -> {
+            var anchored = eaPole(h, new BlockPos(4, 1, 4));
+            var bare = eaPole(h, new BlockPos(10, 1, 4));
+            anchored.getInventory().setItem(mods.eln.gridnode.electricalpole.ElectricalPoleElement.ANCHOR,
+                new net.minecraft.world.item.ItemStack(mods.eln.registry.ElnRegistry.POLE_ANCHOR.get()));
+            anchored.getInventory().setChanged();
+            var spec = new mods.eln.node.voxel.CableSpec(6, mods.eln.node.voxel.CableSpec.preset(4).colour());
+            mods.eln.gridnode.GridLink.addLink(anchored, bare, mods.eln.misc.Direction.XP, mods.eln.misc.Direction.XN,
+                mods.eln.node.voxel.CableKitItem.kit(4, spec, 6 * 16), 6 * spec.descriptor(4).electricalRs);
+            h.runAfterDelay(10, () -> org.erisia.stasis.NodeFreezer.pass());
+            return () -> {
+                c.check("stopped land: the anchored pole runs", anchored.timeExempt() && !org.erisia.stasis.NodeFreezer.isFrozen(anchored.node)
+                    && anchored.node.isAdded());
+                c.check("... the bare one doesn't", org.erisia.stasis.NodeFreezer.isFrozen(bare.node) && !bare.node.isAdded());
+                var link = anchored.gridLinkList.stream().findFirst();
+                c.check("... and their span is kept but carries nothing", link.isPresent() && !link.get().isConnected(), String.valueOf(link));
+            };
+        }, false, true));
         // acceleration fields: EA's time-scale hook (NodeBase.timeScale) reads Stasis.speedAt at the node
         CASES.put("ea_time_scale_hook", new Spec(1, (h, c) -> {
             halfField(h, c, 3.0);
@@ -5345,6 +5365,17 @@ public final class StasisGameTests {
     }
 
     /** Place an EA six-node device (1.12 id) on the floor at a local position, as a player would. */
+    /** An EA Utility Pole at local. */
+    static mods.eln.gridnode.electricalpole.ElectricalPoleElement eaPole(GameTestHelper h, BlockPos local) {
+        var d = mods.eln.Eln.transparentNodeItem.getDescriptor(4 + (123 << 6));
+        ServerLevel level = h.getLevel();
+        BlockPos p = h.absolutePos(local);
+        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        var node = ((mods.eln.node.transparent.TransparentNodeItem) d.parentItem).placeAt(d.newItemStack(), player, level, p, mods.eln.misc.Direction.YN);
+        if (node == null) throw new IllegalStateException("placing a utility pole failed");
+        return (mods.eln.gridnode.electricalpole.ElectricalPoleElement) node.element;
+    }
+
     static mods.eln.node.six.SixNodeElement eaSix(GameTestHelper h, BlockPos local, int damage) {
         mods.eln.node.six.SixNodeDescriptor d = mods.eln.Eln.sixNodeItem.getDescriptor(damage);
         ServerLevel level = h.getLevel();

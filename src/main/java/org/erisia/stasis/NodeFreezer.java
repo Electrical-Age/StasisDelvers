@@ -24,7 +24,8 @@ import java.util.Set;
  * stopped land is cut there, so a field needs its power from inside it.
  * <p>
  * Within 6 blocks of a tower core, cables, batteries and exporters keep running even with the field down (Baughn: no machinery,
- * not even a heat turbine), so a battery can start the tower.
+ * not even a heat turbine), so a battery can start the tower. A node that says it is time-exempt (NodeBase.timeExempt: a
+ * utility pole with a stasis anchor, whose recipe is ours, Baughn 2026-11-08) runs anywhere, so a line can cross stopped land.
  */
 public final class NodeFreezer {
     private NodeFreezer() {
@@ -65,7 +66,8 @@ public final class NodeFreezer {
         if (!(n.coordonate.world() instanceof ServerLevel level)) return true;
         BlockPos pos = n.coordonate.pos();
         // eddies don't touch EA (Baughn): no networks connecting and disconnecting as pockets drift past
-        return Stasis.isRunningSteady(level, pos) || (Stasis.nearTower(level, pos) && infrastructure(n));
+        // a node that asks to (a utility pole with a stasis anchor, Baughn 2026-11-08) runs in stopped land too
+        return Stasis.isRunningSteady(level, pos) || n.timeExempt() || (Stasis.nearTower(level, pos) && infrastructure(n));
     }
 
     /** EA asks before it puts a node into the simulation, so a frozen node never slips back in (Baughn). */

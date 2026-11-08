@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "S": "stasisdelvers:rift_shard",
+    "I": "minecraft:iron_ingot",
+    "C": "eln:copper_coil"
+  },
+  "pattern": [
+    " S ",
+    "SIS",
+    " C "
+  ],
+  "result": {
+    "count": 1,
+    "id": "eln:pole_stasis_anchor"
+  }
+}
