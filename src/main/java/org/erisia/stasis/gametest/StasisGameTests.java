@@ -2452,7 +2452,7 @@ public final class StasisGameTests {
                     java.util.Collections.shuffle(chunks, new java.util.Random(i));
                     for (int[] ch : chunks)
                         org.erisia.stasis.DeepFeature.apply(level, w, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, d, ch[0] << 4, ch[1] << 4, true);
-                    int spire = 0, fatFoot = 0, footCols = 0, gaps = 0;
+                    int spire = 0, fatFoot = 0, footCols = 0, gaps = 0, wetRoots = 0, shortRoots = 0;
                     StringBuilder bad = new StringBuilder();
                     for (BlockPos p : written) {
                         if (!level.getBlockState(p).is(rock) && !level.getBlockState(p).is(org.erisia.stasis.StasisRegistry.RIFTSTONE_VEIN.get())) continue;
@@ -2468,7 +2468,11 @@ public final class StasisGameTests {
                             int g = surface.getOrDefault(BlockPos.asLong(p.getX(), 0, p.getZ()), footY);
                             if (footY - g <= 0 || footY - g > org.erisia.stasis.DeepFeature.SPIRE_ROOT + (wetCase ? 5 : 0)) continue;
                             footCols++;
-                            for (int y = g; y < footY; y++)
+                            if (wetCase) {   // under the water the root may narrow and stop (Baughn): count how far it goes
+                                if (level.getBlockState(new BlockPos(p.getX(), g + 4, p.getZ())).is(rock)) wetRoots++;
+                                if (!level.getBlockState(new BlockPos(p.getX(), g, p.getZ())).is(rock)) shortRoots++;
+                            }
+                            for (int y = wetCase ? g + 5 : g; y < footY; y++)
                                 if (level.getBlockState(new BlockPos(p.getX(), y, p.getZ())).isAir()
                                     || !level.getBlockState(new BlockPos(p.getX(), y, p.getZ())).getFluidState().isEmpty()) {
                                     gaps++;
@@ -2485,7 +2489,9 @@ public final class StasisGameTests {
                         c.check("its spires are rooted in the ground", gaps == 0, gaps + " columns with air under the foot: " + bad);
                     } else {
                         c.check("a low splash rift's spire feet over water", footCols > 10, footCols + " columns");
-                        c.check("its spires stand through the water into the floor (λ-Nero)", gaps == 0, gaps + " columns with water or air under the foot: " + bad);
+                        c.check("its spires are rooted down to the water (λ-Nero)", gaps == 0, gaps + " columns with air between the water and the foot: " + bad);
+                        c.check("... and go on down into it, narrowing: some roots in the water, some stopping short of the floor (Baughn)",
+                            wetRoots > 0 && shortRoots > 0 && shortRoots < footCols, wetRoots + " in the water, " + shortRoots + " short of the floor, of " + footCols);
                     }
                     written.clear();
                     before.forEach((p, st) -> level.setBlock(p, st, 2 | 16));

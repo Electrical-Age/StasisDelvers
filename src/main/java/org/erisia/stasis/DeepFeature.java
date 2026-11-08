@@ -304,6 +304,45 @@ public record DeepFeature() implements Feature {
         return 0.15 + 0.85 * Math.pow(Math.min(1, t / 0.4), 0.8);
     }
 
+    /** How far over the water a rift's rubble may float and still hang down into it (blocks). */
+    static final int DRIP_REACH = 20;
+
+    /**
+     * Over water, the rift's rock that floats low over the sea hangs down into it (Baughn 2026-11-08: the central rubble
+     * island floated 8 blocks over the sea with a flat underside; "the spires continue down into the water, narrowing as
+     * they go ... allowed to stop before hitting rock"): from the underside of the lowest rift rock within DRIP_REACH of
+     * the surface, a column goes down as far as the rock above it is thick (times 1.1-2.2, by column), through air and
+     * water, so the thick middle reaches deepest and the edges stop short: points that narrow downward.
+     */
+    static boolean drip(WorldGenLevel level, Writer w, StaticDeeps.Deep d, int x, int z, int surface, int yHi, BlockState rock) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos(x, surface, z);
+        int yb = Integer.MIN_VALUE;
+        for (int y = surface + 1; y <= Math.min(yHi, surface + DRIP_REACH); y++) {
+            p.setY(y);
+            BlockState st = level.getBlockState(p);
+            if (st.isAir()) continue;
+            if (st.is(StasisRegistry.RIFTSTONE.get()) || st.is(StasisRegistry.RIFTSTONE_VEIN.get()) || st.is(StasisRegistry.BUDDING_RIFT_CRYSTAL.get())) yb = y;
+            break;
+        }
+        if (yb == Integer.MIN_VALUE) return false;
+        int t = 0;
+        for (int y = yb; y <= yHi && t < 24; y++, t++) {
+            p.setY(y);
+            if (level.getBlockState(p).isAir()) break;
+        }
+        int len = (int) Math.round(t * (1.1 + 1.1 * Noise.hash32(x, z, d.id(), 0xD21)));
+        boolean changed = false;
+        for (int y = yb - 1; y >= yb - len && y > level.getMinY(); y--) {
+            p.setY(y);
+            BlockState st = level.getBlockState(p);
+            boolean water = st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && (st.canBeReplaced() || st.is(Blocks.WATER));
+            if (!st.isAir() && !water) break;   // (it stops at the floor, or anything solid)
+            w.set(p, rock);
+            changed = true;
+        }
+        return changed;
+    }
+
     private static boolean strata(WorldGenLevel level, Writer w, Heightmap.Types surfaceType, StaticDeeps.Deep d, int x0, int z0, int minY, int maxY) {
         Strata.Bounds b = Strata.bounds(d);
         int yLo = Math.max(minY + 1, b.minY()), yHi = Math.min(maxY - 1, b.maxY());
@@ -332,8 +371,18 @@ public record DeepFeature() implements Feature {
                     rooted = under && gap <= SPIRE_ROOT;
                     hanging = gap > SPIRE_ROOT;
                 }
+                // over water the root narrows as it goes down and may end short of the floor (Baughn 2026-11-08: "the spires
+                // continue down into the water, narrowing as they go ... allowed to stop before hitting rock"): a column
+                // of the spire at q (its distance from the axis over the radius) goes (1 - q) of rootDepth under the surface
+                double rootQ = 1;
+                if (rooted) {
+                    double[] f = Strata.spire(d, x, footY, z);
+                    rootQ = f == null ? 1 : f[1];
+                }
+                double rootDepth = 6 + 0.3 * d.radius() + 6 * Noise.hash32(x >> 2, z >> 2, id, 0x0D0);
                 if (rooted)
                     for (int y = Math.max(minY + 1, floor - 3); y < footY && y <= yHi; y++) {   // (down to the sea floor, under the strata's bounds)
+                        if (floor < surface && y < surface && surface - y > rootDepth * (1 - rootQ)) continue;
                         p.set(x, y, z);
                         BlockState st = level.getBlockState(p);
                         boolean water = st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && (st.canBeReplaced() || st.is(net.minecraft.world.level.block.Blocks.WATER));
@@ -401,6 +450,7 @@ public record DeepFeature() implements Feature {
                         }
                     }
                 }
+                if (floor < surface && StasisConfig.skyIslands) changed |= drip(level, w, d, x, z, surface, yHi, rock);
             }
         // crystal buds in the cavities, on faces of budding walls that are there. budding() only says where a budding
         // block belongs; the columns above wrote one only where rock may go: not into open sky off the islands (ErisiAgent:
