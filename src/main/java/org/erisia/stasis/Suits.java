@@ -233,6 +233,18 @@ final class Suits {
         return out;
     }
 
+    /** The worn suit pieces' charge and store, J, and carried batteries that discharge (the tower console, λ-Nero: how
+     *  much the suit has left while it feeds a tower): {suit J, suit max J, batteries J}. */
+    static double[] charge(ServerPlayer p) {
+        double e = 0, max = 0, bat = 0;
+        for (Cell c : worn(p)) {
+            e += Math.max(0, c.energy());
+            max += c.max();
+        }
+        for (Cell c : carried(p)) if (c.discharge() > 0) bat += Math.max(0, c.energy());
+        return new double[]{e, max, bat};
+    }
+
     /** What a player could feed a tower: carried batteries and the worn suit pieces, J. */
     static double available(ServerPlayer p) {
         return available(carried(p), worn(p));

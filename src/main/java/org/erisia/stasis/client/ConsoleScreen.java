@@ -175,9 +175,10 @@ public final class ConsoleScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float a) {
         int x = width / 2 - 150, y = height / 2 - 92;
         // the panel first, then the buttons on it (drawn after, it greyed them out: AdventurAgent's stills)
-        g.fill(x - 8, y - 8, x + 308, height / 2 + 150, 0xD0101018);
+        g.fill(x - 8, y - 8, x + 308, height / 2 + 166, 0xD0101018);   // (room for the suit's bar under the slider)
         super.extractRenderState(g, mouseX, mouseY, a);
         g.text(font, "STASIS TOWER", x, y, 0xFFB8A8E8);
+        if (st != null) suitBar(g, x, height / 2 + 146);
         if (st == null) {
             g.text(font, "...", x, y + 14, 0xFFA0A0A0);
             return;
@@ -234,6 +235,25 @@ public final class ConsoleScreen extends Screen {
             g.text(font, line, x, ly + 2, bad ? 0xFFFF5050 : 0xFF909098);
             ly += 10;
         }
+    }
+
+    /** Your suit's charge (λ-Nero 2026-11-08: you couldn't tell how much the suit had left while it fed the tower): a bar,
+     *  with the quarter a feed leaves in each piece of a running tower's feeder marked, and the kJ. */
+    void suitBar(GuiGraphicsExtractor g, int x, int by) {
+        if (st.v().size() <= 26) return;
+        double e = v(23), max = v(24), bat = v(25), keep = v(26);
+        boolean feeding = st.v().size() > 18 && v(18) > 0;
+        if (max <= 0 && bat <= 0) {
+            g.text(font, "Your suit: none worn", x, by + 1, 0xFF808088);
+            return;
+        }
+        double share = max > 0 ? e / max : 0;
+        g.fill(x, by, x + 300, by + 10, 0xFF202028);
+        g.fill(x, by, x + (int) (300 * Math.max(0, Math.min(1, share))), by + 10, feeding ? 0xFF70C0F0 : share < 0.25 ? 0xFFD05030 : 0xFF5080B0);
+        if (keep > 0) g.fill(x + (int) (300 * keep), by - 2, x + (int) (300 * keep) + 1, by + 12, 0xFFFFFFFF);
+        String t = String.format("Your suit %.0f%%: %.1f of %.1f kJ%s", 100 * share, e / 1000, max / 1000,
+            bat >= 1 ? String.format(", batteries %.1f kJ", bat / 1000) : "");
+        g.text(font, t, x + 3, by + 1, 0xFFFFFFFF);
     }
 
     static String time(double s) {

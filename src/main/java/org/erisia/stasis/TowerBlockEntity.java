@@ -939,7 +939,9 @@ public class TowerBlockEntity extends BlockEntity {
     }
 
     /** ... plus, for the player asking: locked (17), feeding from them (18), kJ fed so far (19); then the accelerators'
-     *  setting (20: step, -1 without one), the rate it asks for (21) and the rate the field runs at (22). */
+     *  setting (20: step, -1 without one), the rate it asks for (21) and the rate the field runs at (22); then the asker's
+     *  worn suit charge and store (23, 24, J), their carried batteries (25, J) and the share a feed leaves in each piece
+     *  (26: 0.25 on a running tower, 0 on a dead one; λ-Nero: show the suit's charge while it feeds the tower). */
     public StasisNet.ConsoleState consoleState(@org.jspecify.annotations.Nullable ServerPlayer asker) {
         double r = radius();
         java.util.List<Double> v = java.util.List.of((double) state.ordinal(), storedJ(), storeMaxJ(), inAvgW,
@@ -951,6 +953,11 @@ public class TowerBlockEntity extends BlockEntity {
         v.add((double) step);
         v.add(step < 0 ? StasisConfig.towerFieldRate() : TemporalAcceleratorBlock.rate(step));
         v.add(state == State.RUNNING ? accelRate : 0.0);
+        double[] suit = asker == null ? new double[3] : Suits.charge(asker);
+        v.add(suit[0]);
+        v.add(suit[1]);
+        v.add(suit[2]);
+        v.add(asker != null && asker.getUUID().equals(feeder) ? (feedingDead ? 0 : FEED_RESERVE) : state == State.OFF ? 0 : FEED_RESERVE);
         return new StasisNet.ConsoleState(worldPosition, v, structureLine());
     }
 

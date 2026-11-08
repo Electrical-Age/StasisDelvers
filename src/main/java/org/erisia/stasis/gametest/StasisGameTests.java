@@ -1638,10 +1638,20 @@ public final class StasisGameTests {
             t.testCharge(0.45);   // (a dead tower a few kJ short of starting)
             t.toggleFeed(p);
             c.check("a suit that can start it may feed it", t.consoleState(p).v().get(18) == 1.0, String.format("store %.0f of %.0f J", t.storedJ(), t.storeMaxJ()));
+            {   // the console shows the feeder's suit (λ-Nero): full, and a dead tower's feed keeps nothing back
+                var v = t.consoleState(p).v();
+                var hd = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
+                double max = 4 * ((org.erisia.stasis.DelverSuitItem) hd.getItem()).getEnergyMax(hd);
+                c.check("console: the suit's charge and store", v.size() > 26 && Math.abs(v.get(24) - max) < 1 && Math.abs(v.get(23) - max) < 1
+                    && v.get(26) == 0.0, v.size() > 26 ? v.subList(23, 27).toString() : "size " + v.size());
+            }
             return () -> {
                 var head = p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD);
                 var d = (org.erisia.stasis.DelverSuitItem) head.getItem();
                 double given = 4 * (d.getEnergyMax(head) - d.getEnergy(head));
+                var v = t.consoleState(p).v();
+                c.check("console: the suit's charge after feeding", Math.abs(v.get(23) - (4 * d.getEnergyMax(head) - given)) < 1,
+                    v.get(23) + " vs " + (4 * d.getEnergyMax(head) - given));
                 c.check("the feed stopped as the tower started: the suit kept the rest", given > 4000 && given < 0.5 * 4 * d.getEnergyMax(head),
                     String.format("suit gave %.0f J", given));
                 c.check("feeding: the suit gave its charge and the tower started", given > 4000
