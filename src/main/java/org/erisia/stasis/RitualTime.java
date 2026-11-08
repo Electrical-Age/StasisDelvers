@@ -12,24 +12,47 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
  * djinni works the world's clock round to the next dawn (or dusk) and then dies out of the world; when it does, every
  * field holding it moves its own clock (LocalTime) forward to that time of day too, at once (it would only have skewed
  * slowly towards the world's). Read from the djinni's saved job (Occultism's ChangeTimeJob: factoryId occultism:day_time
- * or night_time, newTime, and its tick counts, so a djinni killed before it finished, or a ritual that config disables,
- * changes nothing), so Stasis needs no Occultism classes.
+ * or night_time, newTime, and its tick counts, read every 5 ticks while it works, since the spirit drops its job before
+ * it dies; a djinni killed before it finished, or a ritual that config disables, changes nothing), so Stasis needs no
+ * Occultism classes.
  */
 public final class RitualTime {
     private RitualTime() {
     }
 
+    /** The last job seen on each working djinni (the spirit drops its job before it dies, so it's read while it works). */
+    static final java.util.Map<java.util.UUID, CompoundTag> JOBS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    static boolean djinni(net.minecraft.world.entity.Entity e) {
+        return BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString().equals("occultism:djinni");
+    }
+
+    /** Every 5 ticks, a djinni's job if it's a time one. */
+    static void tick(net.neoforged.neoforge.event.tick.EntityTickEvent.Post e) {
+        var en = e.getEntity();
+        if (en.tickCount % 5 != 0 || !(en.level() instanceof ServerLevel level) || !djinni(en) || !Stasis.stops(level)) return;
+        CompoundTag job = job(en, level);
+        String f = job == null ? "" : job.getStringOr("factoryId", "");
+        if (f.equals("occultism:day_time") || f.equals("occultism:night_time")) JOBS.put(en.getUUID(), job);
+    }
+
+    static void left(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent e) {
+        if (djinni(e.getEntity())) JOBS.remove(e.getEntity().getUUID());
+    }
+
     static void died(LivingDeathEvent e) {
-        if (!(e.getEntity().level() instanceof ServerLevel level) || !Stasis.stops(level)) return;
-        var id = BuiltInRegistries.ENTITY_TYPE.getKey(e.getEntity().getType());
-        if (!id.getNamespace().equals("occultism")) return;
-        CompoundTag job = job(e.getEntity(), level);
+        if (!(e.getEntity().level() instanceof ServerLevel level) || !Stasis.stops(level) || !djinni(e.getEntity())) return;
+        CompoundTag job = JOBS.remove(e.getEntity().getUUID());
+        if (Boolean.getBoolean("stasis.debugRitual")) StasisDelvers.LOG.info("RitualTime: djinni died ({}), job {}", e.getSource().getMsgId(), job);
         if (job == null) return;
         String f = job.getStringOr("factoryId", "");
-        if (!f.equals("occultism:day_time") && !f.equals("occultism:night_time")) return;
+        // the job ends with the djinni dying "out of the world"; killed any other way, or long before its end (a disabled
+        // ritual ends at once), the world's time didn't get there either
         int done = job.getIntOr("currentChangeTicks", 0), need = job.getIntOr("requiredChangeTicks", Integer.MAX_VALUE);
-        if (done < need) return;   // (killed early, or disabled: the world's time didn't get there either)
-        apply(level, e.getEntity().getX(), e.getEntity().getY(), e.getEntity().getZ(), job.getLongOr("newTime", 0));
+        if (!e.getSource().getMsgId().equals("outOfWorld") || done < need - 6) return;
+        int n = apply(level, e.getEntity().getX(), e.getEntity().getY(), e.getEntity().getZ(), job.getLongOr("newTime", 0));
+        if (n > 0) StasisDelvers.LOG.info("Occultism {} ritual at {}: moved {} field clock(s) to time of day {}", f, e.getEntity().blockPosition().toShortString(), n,
+            (long) LocalTime.wrap(job.getLongOr("newTime", 0)));
     }
 
     /** Every field holding (x, y, z) moves its clock forward to newTime's time of day. Returns how many. Public for tests. */
