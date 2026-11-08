@@ -380,6 +380,7 @@ public record DeepFeature() implements Feature {
                     rootQ = f == null ? 1 : f[1];
                 }
                 double rootDepth = 6 + 0.3 * d.radius() + 6 * Noise.hash32(x >> 2, z >> 2, id, 0x0D0);
+                double sinkDepth = 10 + 0.3 * d.radius();
                 if (rooted)
                     for (int y = Math.max(minY + 1, floor - 3); y < footY && y <= yHi; y++) {   // (down to the sea floor, under the strata's bounds)
                         if (floor < surface && y < surface && surface - y > rootDepth * (1 - rootQ)) continue;
@@ -397,6 +398,13 @@ public record DeepFeature() implements Feature {
                     if (k == Strata.SPIRE && hanging) {
                         double[] sp = Strata.spire(d, x, y, z);
                         if (sp == null || sp[1] >= hangingTaper(sp[0])) continue;
+                    }
+                    // under the sea a spire narrows as it goes down, to a point at sinkDepth under the surface, whatever its
+                    // own foot (Baughn 2026-11-08: they continue down into the water, narrowing; AdventurAgent: they grew
+                    // wider under the water and ended flat at their foot)
+                    if (k == Strata.SPIRE && floor < surface && y < surface) {
+                        double[] sp = Strata.spire(d, x, y, z);
+                        if (sp == null || sp[1] >= 1 - (surface - y) / sinkDepth) continue;
                     }
                     p.set(x, y, z);
                     BlockState st = level.getBlockState(p);
