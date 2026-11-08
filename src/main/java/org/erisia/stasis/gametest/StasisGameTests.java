@@ -2411,8 +2411,9 @@ public final class StasisGameTests {
             };
             var rock = org.erisia.stasis.StasisRegistry.RIFTSTONE.get();
             try {
-                for (int i = 0; i < 2; i++) {
-                    boolean high = i == 0;
+                // (i 2: the low rift over 5 blocks of water: its spires stand through the water into the floor, λ-Nero 2026-11-08)
+                for (int i = 0; i < 3; i++) {
+                    boolean high = i == 0, wetCase = i == 2;
                     int bx = 60000 + 600 * i, bz = 60000;
                     level.getChunk(bx >> 4, bz >> 4);
                     int ground = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, bx, bz);
@@ -2425,7 +2426,7 @@ public final class StasisGameTests {
                     }
                     // the foot at ~100 above the ground (the live case), or ~10 above it
                     double foot0 = org.erisia.stasis.Strata.spireFoot(d) - d.y();
-                    d = new org.erisia.stasis.StaticDeeps.Deep(d.x(), (float) (ground + (high ? 100 : 10) - foot0), d.z(), r, d.id());
+                    d = new org.erisia.stasis.StaticDeeps.Deep(d.x(), (float) (ground + (high ? 100 : wetCase ? 11 : 10) - foot0), d.z(), r, d.id());
                     int footY = (int) Math.ceil(org.erisia.stasis.Strata.spireFoot(d) - 0.5);
                     double reach = org.erisia.stasis.Strata.bounds(d).radius() + 2;
                     java.util.Map<Long, Integer> surface = new java.util.HashMap<>();
@@ -2438,6 +2439,15 @@ public final class StasisGameTests {
                         for (int x = ch[0] << 4; x < (ch[0] << 4) + 16; x++)
                             for (int z = ch[1] << 4; z < (ch[1] << 4) + 16; z++)
                                 surface.put(BlockPos.asLong(x, 0, z), level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z));
+                    }
+                    if (wetCase) {   // a 5-deep sea over the ground under the crown's rim
+                        double rb = 1.7 * r;
+                        for (var e : surface.entrySet()) {
+                            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
+                            if (Math.abs(Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) - rb) > 8) continue;
+                            for (int y = e.getValue(); y < e.getValue() + 5; y++) w.set(new BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.WATER.defaultBlockState());
+                        }
+                        written.clear();
                     }
                     java.util.Collections.shuffle(chunks, new java.util.Random(i));
                     for (int[] ch : chunks)
@@ -2456,10 +2466,11 @@ public final class StasisGameTests {
                         }
                         if (!high && p.getY() == footY) {
                             int g = surface.getOrDefault(BlockPos.asLong(p.getX(), 0, p.getZ()), footY);
-                            if (footY - g <= 0 || footY - g > org.erisia.stasis.DeepFeature.SPIRE_ROOT) continue;
+                            if (footY - g <= 0 || footY - g > org.erisia.stasis.DeepFeature.SPIRE_ROOT + (wetCase ? 5 : 0)) continue;
                             footCols++;
                             for (int y = g; y < footY; y++)
-                                if (level.getBlockState(new BlockPos(p.getX(), y, p.getZ())).isAir()) {
+                                if (level.getBlockState(new BlockPos(p.getX(), y, p.getZ())).isAir()
+                                    || !level.getBlockState(new BlockPos(p.getX(), y, p.getZ())).getFluidState().isEmpty()) {
                                     gaps++;
                                     if (bad.length() < 200) bad.append(p.getX()).append(' ').append(y).append(' ').append(p.getZ()).append("; ");
                                     break;
@@ -2469,9 +2480,12 @@ public final class StasisGameTests {
                     if (high) {
                         c.check("a hanging splash rift has spires", spire > 100, spire + " spire blocks");
                         c.check("hanging spires are thin at the foot", fatFoot == 0, fatFoot + " wide foot blocks: " + bad);
-                    } else {
+                    } else if (!wetCase) {
                         c.check("a low splash rift's spire feet over the ground", footCols > 10, footCols + " columns");
                         c.check("its spires are rooted in the ground", gaps == 0, gaps + " columns with air under the foot: " + bad);
+                    } else {
+                        c.check("a low splash rift's spire feet over water", footCols > 10, footCols + " columns");
+                        c.check("its spires stand through the water into the floor (λ-Nero)", gaps == 0, gaps + " columns with water or air under the foot: " + bad);
                     }
                     written.clear();
                     before.forEach((p, st) -> level.setBlock(p, st, 2 | 16));

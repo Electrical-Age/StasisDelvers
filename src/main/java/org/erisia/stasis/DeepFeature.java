@@ -317,22 +317,27 @@ public record DeepFeature() implements Feature {
             for (int z = z0; z < z0 + 16; z++) {
                 if (Math.hypot(x + 0.5 - d.x(), z + 0.5 - d.z()) > b.radius()) continue;
                 int surface = level.getHeight(surfaceType, x, z);
+                // the solid ground under any water (the sea floor)
+                int floor = Math.min(surface, level.getHeight(surfaceType == Heightmap.Types.WORLD_SURFACE_WG ? Heightmap.Types.OCEAN_FLOOR_WG
+                    : Heightmap.Types.OCEAN_FLOOR, x, z));
                 // a splash crown whose foot is above this column's ground (λ-Nero: a sky rift's spires stood on the
-                // saucer's rim, 140 blocks over the land): just above it, the spire is rooted down into the ground;
-                // higher up, it hangs in the air thin at both ends
+                // saucer's rim, 140 blocks over the land): just above it (or the water), the spire is rooted down into the
+                // ground, through any water to the sea floor (λ-Nero 2026-11-08: an ocean rift's spires stopped at the
+                // water); higher up, it hangs in the air thin at both ends
                 int footY = (int) Math.ceil(Strata.spireFoot(d) - 0.5), gap = footY - surface;
                 boolean rooted = false, hanging = false;
-                if (gap > 0) {
+                if (footY > floor) {
                     double[] f = Strata.spire(d, x, footY, z);
                     boolean under = f != null && f[1] < 1;
                     rooted = under && gap <= SPIRE_ROOT;
                     hanging = gap > SPIRE_ROOT;
                 }
                 if (rooted)
-                    for (int y = Math.max(yLo, surface - 3); y < footY && y <= yHi; y++) {
+                    for (int y = Math.max(minY + 1, floor - 3); y < footY && y <= yHi; y++) {   // (down to the sea floor, under the strata's bounds)
                         p.set(x, y, z);
                         BlockState st = level.getBlockState(p);
-                        if ((st.isAir() || st.canBeReplaced() || replaceable(st)) && st.getFluidState().isEmpty()) {
+                        boolean water = st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && (st.canBeReplaced() || st.is(net.minecraft.world.level.block.Blocks.WATER));
+                        if ((st.isAir() || st.canBeReplaced() || replaceable(st)) && st.getFluidState().isEmpty() || water) {
                             w.set(p, rock);
                             changed = true;
                         }
@@ -354,7 +359,9 @@ public record DeepFeature() implements Feature {
                             // layers, AdventurAgent; the islands cluster round the core)
                             boolean island = StasisConfig.skyIslands && y > surface + (messiness(d) > 0.5f ? 2 : 6) && st.isAir()
                                 && island(d, x, y, z, y - surface);
-                            boolean ok = island || replaceable(st) || k == Strata.SPIRE && (st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty();
+                            // (a rooted spire stands up through water too: an ocean rift's stopped at it, λ-Nero)
+                            boolean wet = st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && (st.canBeReplaced() || st.is(net.minecraft.world.level.block.Blocks.WATER));
+                            boolean ok = island || replaceable(st) || k == Strata.SPIRE && ((st.isAir() || st.canBeReplaced()) && st.getFluidState().isEmpty() || rooted && wet);
                             if (!ok) continue;
                             BlockState put = budding(d, x, y, z) ? bud : k == Strata.VEIN ? vein : rock;
                             // islands' tops grow crystals (cavities above ground are open sky: budding() rarely fires)
