@@ -67,6 +67,7 @@ public final class StasisDelvers {
         NeoForge.EVENT_BUS.addListener(FieldSleep::canSleep);
         NeoForge.EVENT_BUS.addListener(FieldSleep::canContinue);
         NeoForge.EVENT_BUS.addListener(FieldSleep::tick);
+        NeoForge.EVENT_BUS.addListener(RitualTime::died);   // (Occultism dawn/dusk rituals move the field's clock: λ-Nero)
         NeoForge.EVENT_BUS.addListener(FieldSleep::noWorldSkip);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelLoad);
         NeoForge.EVENT_BUS.addListener(StasisEvents::levelUnload);

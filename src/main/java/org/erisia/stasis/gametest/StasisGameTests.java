@@ -1088,6 +1088,29 @@ public final class StasisGameTests {
                 c.check("when it goes, its clock goes (the land shows the grey's time again)", Double.isNaN(org.erisia.stasis.LocalTime.clockOf(level, f.id())));
             };
         }, false, true));
+        // Occultism's dawn ritual inside a field moves that field's clock to the next dawn, forward, keeping its day count;
+        // a field elsewhere keeps its own (λ-Nero 2026-11-08)
+        CASES.put("ritual_moves_the_fields_clock", new Spec(1, (h, c) -> () -> {
+            ServerLevel level = h.getLevel();
+            Vec3 a = h.absoluteVec(new Vec3(3.5, 1, 4.5));
+            Field f = FieldData.get(level).add(level, a.x, a.y, a.z, 12), far = FieldData.get(level).add(level, a.x + 400, a.y, a.z, 12);
+            try {
+                double before = org.erisia.stasis.LocalTime.clockOf(level, f.id());
+                if (Double.isNaN(before)) before = org.erisia.stasis.LocalTime.DEFAULT_TOD;
+                double farBefore = org.erisia.stasis.LocalTime.clockOf(level, far.id());
+                int n = org.erisia.stasis.RitualTime.apply(level, a.x, a.y, a.z, 5L * 24000);   // (a dawn: time of day 0)
+                double after = org.erisia.stasis.LocalTime.clockOf(level, f.id());
+                c.check("the ritual moves the field it's in (and only that one)", n == 1, "fields moved " + n);
+                c.check("... to dawn", Math.abs(org.erisia.stasis.LocalTime.wrapDiff(0, org.erisia.stasis.LocalTime.wrap(after))) < 1e-6, "clock " + after);
+                c.check("... forward, by less than a day", after > before && after - before <= 24000, before + " -> " + after);
+                double farAfter = org.erisia.stasis.LocalTime.clockOf(level, far.id());
+                c.check("a field elsewhere keeps its clock", Double.isNaN(farBefore) ? Double.isNaN(farAfter) || farAfter == org.erisia.stasis.LocalTime.DEFAULT_TOD
+                    : farAfter == farBefore, farBefore + " -> " + farAfter);
+            } finally {
+                FieldData.get(level).remove(level, f.id());
+                FieldData.get(level).remove(level, far.id());
+            }
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();
