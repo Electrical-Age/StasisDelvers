@@ -1192,6 +1192,22 @@ public final class StasisGameTests {
                 t.setRemoved();
             };
         }, false, true));
+        // the bound rift pendant (Baughn 2026-11-08, option A): rechargeable, ~20% dearer than the Delver suit, never crumbles
+        CASES.put("bound_rift_pendant", new Spec(1, (h, c) -> () -> {
+            var st = new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.BOUND_RIFT_PENDANT.get());
+            var b = org.erisia.stasis.StasisRegistry.BOUND_RIFT_PENDANT.get();
+            var chest = new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.DELVER_CHEST.get());
+            var d = org.erisia.stasis.StasisRegistry.DELVER_CHEST.get();
+            c.check("made empty", b.getEnergy(st) == 0, "" + b.getEnergy(st));
+            c.check("charges in EA chargers (charge power)", b.getChargePower(st) > 0, "" + b.getChargePower(st));
+            b.setEnergy(st, 1e9);
+            c.check("holds 15 min worn alone", Math.abs(b.getEnergy(st) / (4 * b.stasisDraw(st)) - 15 * 60) < 1, b.getEnergy(st) + " J");
+            double ratio = b.stasisDraw(st) / d.stasisDraw(chest);
+            c.check("about 20% less efficient than the suit", Math.abs(ratio - 1.2) < 1e-9, "" + ratio);
+            c.check("doesn't crumble", !b.crumbles() && org.erisia.stasis.StasisRegistry.RIFT_PENDANT.get().crumbles());
+            b.setEnergy(st, -5);
+            c.check("empties to zero", b.getEnergy(st) == 0);
+        }));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

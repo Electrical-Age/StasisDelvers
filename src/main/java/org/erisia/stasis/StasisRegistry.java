@@ -233,6 +233,9 @@ public final class StasisRegistry {
         p -> new RiftPendantItem(p, 10), p -> p.stacksTo(1));
     public static final net.neoforged.neoforge.registries.DeferredItem<RiftPendantItem> CHARGED_RIFT_PENDANT = ITEMS.registerItem("charged_rift_pendant",
         p -> new RiftPendantItem(p, 30), p -> p.stacksTo(1));
+    /** The bound rift pendant (Baughn 2026-11-08, option A): rechargeable in EA's chargers, ~20% dearer than the suit. */
+    public static final net.neoforged.neoforge.registries.DeferredItem<BoundRiftPendantItem> BOUND_RIFT_PENDANT = ITEMS.registerItem("bound_rift_pendant",
+        BoundRiftPendantItem::new, p -> p.stacksTo(1));
     /** The crystal grades (Crystals): dust from small and medium buds, charged shards from a cluster broken in violet. */
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> RIFT_DUST = ITEMS.registerSimpleItem("rift_dust");
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.Item> CHARGED_RIFT_SHARD = ITEMS.registerSimpleItem("charged_rift_shard",

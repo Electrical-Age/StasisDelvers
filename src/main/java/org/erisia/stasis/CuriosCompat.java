@@ -68,6 +68,7 @@ public final class CuriosCompat {
             };
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHARGED_RIFT_PENDANT.get(), curio);
+            top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.BOUND_RIFT_PENDANT.get(), curio);
             top.theillusivec4.curios.api.CuriosApi.registerCurio(StasisRegistry.CHRONAL_ANCHOR.get(), curio);
         }
 
@@ -111,7 +112,7 @@ public final class CuriosCompat {
 
         static void crumble(ServerPlayer p) {
             top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(p).ifPresent(h -> {
-                for (var r : h.findCurios(s -> s.getItem() instanceof RiftPendantItem pi && pi.getEnergy(s) <= 0)) {
+                for (var r : h.findCurios(s -> s.getItem() instanceof RiftPendantItem pi && pi.crumbles() && pi.getEnergy(s) <= 0)) {
                     var ctx = r.slotContext();
                     // The string goes to the inventory, not into the slot: string isn't valid there, and at the next login
                     // Curios beta.3 hands invalid stacks back through a transaction it never closes, which crashed Incognito

@@ -33,6 +33,7 @@ public final class WornCurios {
             Body pendant = new Body(0, 4, 0.5f);
             top.theillusivec4.curios.api.client.ICurioRenderer.register(StasisRegistry.RIFT_PENDANT.get(), () -> pendant);
             top.theillusivec4.curios.api.client.ICurioRenderer.register(StasisRegistry.CHARGED_RIFT_PENDANT.get(), () -> pendant);
+            top.theillusivec4.curios.api.client.ICurioRenderer.register(StasisRegistry.BOUND_RIFT_PENDANT.get(), () -> pendant);
             // the anchor: a 5 px disc on the wearer's left breast (+x; the right arm is at -x), clear of the pendant's cord
             top.theillusivec4.curios.api.client.ICurioRenderer.register(StasisRegistry.CHRONAL_ANCHOR.get(), () -> new Body(3.2f, 6, 0.3f));
         }

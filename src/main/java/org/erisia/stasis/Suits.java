@@ -329,7 +329,7 @@ final class Suits {
             ItemStack s = piece(p, slot);
             IItemEnergyBattery b = (IItemEnergyBattery) s.getItem();
             b.setEnergy(s, b.getEnergy(s) - factor * ((TimeSuit) s.getItem()).stasisDraw(s) / 20.0);
-            if (s.getItem() instanceof RiftPendantItem && b.getEnergy(s) <= 0) CuriosCompat.crumble(p);
+            if (s.getItem() instanceof RiftPendantItem rp && rp.crumbles() && b.getEnergy(s) <= 0) CuriosCompat.crumble(p);
         }
         return true;
     }

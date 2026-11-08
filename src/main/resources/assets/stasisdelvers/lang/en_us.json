@@ -128,6 +128,8 @@
   "advancements.stasisdelvers.deaths.were_then.description": "It wears what you were, not what you are.",
   "item.stasisdelvers.rift_pendant": "Rift Pendant",
   "item.stasisdelvers.charged_rift_pendant": "Charged Rift Pendant",
+  "item.stasisdelvers.bound_rift_pendant": "Bound Rift Pendant",
+  "item.stasisdelvers.bound_rift_pendant.tooltip": "Recharges in an EA battery charger. About 20% less efficient than a Delver suit.",
   "item.stasisdelvers.rift_pendant.tooltip": "Holds off the stillness: %s:%s left",
   "message.stasisdelvers.pendant_crumbled": "The crystal on your pendant crumbles to dust",
   "tooltip.stasisdelvers.flame.0": "Flames gutter now and then, dimming and smoking.",

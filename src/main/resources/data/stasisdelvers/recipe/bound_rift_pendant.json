@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "S": "minecraft:string",
+    "G": "minecraft:gold_ingot",
+    "C": "stasisdelvers:charged_rift_shard",
+    "B": "eln:portable_battery"
+  },
+  "pattern": [
+    " S ",
+    "GCG",
+    " B "
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:bound_rift_pendant"
+  }
+}

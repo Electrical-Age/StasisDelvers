@@ -40,6 +40,11 @@ public class RiftPendantItem extends Item implements IItemEnergyBattery, TimeSui
         return DRAW;
     }
 
+    /** Spent, it crumbles to its string (Suits.protect, CuriosCompat.crumble); the bound pendant doesn't. */
+    public boolean crumbles() {
+        return true;
+    }
+
     @Override
     public double getEnergy(ItemStack stack) {
         return Math.max(0, storage() - used(stack));
@@ -93,7 +98,7 @@ public class RiftPendantItem extends Item implements IItemEnergyBattery, TimeSui
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display,
                                 java.util.function.Consumer<net.minecraft.network.chat.Component> out, net.minecraft.world.item.TooltipFlag flag) {
-        int left = (int) Math.ceil(getEnergy(stack) / (4 * DRAW));   // (seconds, worn alone)
+        int left = (int) Math.ceil(getEnergy(stack) / (4 * stasisDraw(stack)));   // (seconds, worn alone)
         out.accept(net.minecraft.network.chat.Component.translatable("item.stasisdelvers.rift_pendant.tooltip", left / 60, String.format("%02d", left % 60))
             .withStyle(net.minecraft.ChatFormatting.GRAY));
     }
