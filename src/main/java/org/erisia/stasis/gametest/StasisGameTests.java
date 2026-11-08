@@ -1111,6 +1111,30 @@ public final class StasisGameTests {
                 FieldData.get(level).remove(level, far.id());
             }
         }, false, true));
+        // no mob spawns inside a tower's field (Baughn 2026-11-08); outside it, and with no tower, the usual rules
+        CASES.put("tower_field_blocks_spawns", new Spec(10, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 3);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.8 * 4 / 3), tx);
+                tx.commit();
+            }
+            return () -> {
+                ServerLevel level = h.getLevel();
+                c.check("running", t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                BlockPos in = h.absolutePos(new BlockPos(6, 1, 4)), out = h.absolutePos(new BlockPos(6 + 40, 1, 4));
+                c.check("a block in its field blocks spawns", org.erisia.stasis.TowerSpawns.blocks(level, in));
+                c.check("a block far outside doesn't", !org.erisia.stasis.TowerSpawns.blocks(level, out));
+                var zombie = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+                zombie.snapTo(in.getX() + 0.5, in.getY(), in.getZ() + 0.5, 0, 0);
+                var ev = new net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck(zombie, level,
+                    net.minecraft.world.entity.EntitySpawnReason.NATURAL, null);
+                net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(ev);
+                zombie.discard();
+                c.check("a natural zombie spawn in the field fails", ev.getResult() == net.neoforged.neoforge.event.entity.living.MobSpawnEvent.PositionCheck.Result.FAIL, "" + ev.getResult());
+                t.setRemoved();
+                c.check("tower gone: spawns no longer blocked there", !org.erisia.stasis.TowerSpawns.blocks(level, in));
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

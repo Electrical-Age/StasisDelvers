@@ -92,6 +92,12 @@ public final class StasisEvents {
      */
     static void spawnCheck(MobSpawnEvent.PositionCheck e) {
         if (e.getSpawnType() == EntitySpawnReason.CHUNK_GENERATION) return;
+        // none inside a tower's field (Baughn 2026-11-08), whatever the time there
+        if (e.getSpawnType() == EntitySpawnReason.NATURAL && e.getLevel().getLevel() instanceof ServerLevel tl
+            && TowerSpawns.blocks(tl, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ()))) {
+            e.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
+            return;
+        }
         if (e.getEntity().typeHolder().is(Stasis.UNBOUND)) {
             var pos = net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ());
             if (e.getLevel().getLevel() instanceof ServerLevel level && !Stasis.spawnsHere(level, pos)) {
@@ -119,6 +125,12 @@ public final class StasisEvents {
         if (why != EntitySpawnReason.NATURAL && why != EntitySpawnReason.PATROL && why != EntitySpawnReason.EVENT
             && why != EntitySpawnReason.REINFORCEMENT && why != EntitySpawnReason.JOCKEY && why != EntitySpawnReason.SPAWNER
             && why != EntitySpawnReason.TRIAL_SPAWNER) return;
+        // none inside a tower's field (Baughn 2026-11-08: tower fields block mob spawns entirely); spawners still work
+        if (why != EntitySpawnReason.SPAWNER && why != EntitySpawnReason.TRIAL_SPAWNER && e.getLevel().getLevel() instanceof ServerLevel tl
+            && TowerSpawns.blocks(tl, net.minecraft.core.BlockPos.containing(e.getX(), e.getY(), e.getZ()))) {
+            e.setSpawnCancelled(true);
+            return;
+        }
         // phantoms only in stopped land (Phantoms; Baughn)
         if (e.getEntity() instanceof net.minecraft.world.entity.monster.Phantom && e.getLevel().getLevel() instanceof ServerLevel pl
             && Phantoms.refused(pl, e.getX(), e.getY(), e.getZ())) {
