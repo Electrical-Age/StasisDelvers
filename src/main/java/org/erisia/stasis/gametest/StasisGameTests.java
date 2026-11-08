@@ -1426,12 +1426,21 @@ public final class StasisGameTests {
             ServerPlayer bare = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true), suited = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true);
             wear(suited, true, org.erisia.stasis.StasisRegistry.DELVER_HELMET.get(), org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(),
                 org.erisia.stasis.StasisRegistry.DELVER_LEGS.get(), org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
+            // (Nero 2026-11-08: one charged chest piece is enough, as in stopped land; a flat one, or boots alone, isn't)
+            ServerPlayer chest = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true), flat = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true),
+                boots = survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), true);
+            wear(chest, true, null, org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(), null, null);
+            wear(flat, false, null, org.erisia.stasis.StasisRegistry.DELVER_CHEST.get(), null, null);
+            wear(boots, true, null, null, null, org.erisia.stasis.StasisRegistry.DELVER_BOOTS.get());
             return () -> {
                 c.check("unsuited in the 0.5 field: half speed", org.erisia.stasis.PlayerRates.rate(bare) == 0.5, "" + org.erisia.stasis.PlayerRates.rate(bare));
                 c.check("suited: full speed", org.erisia.stasis.PlayerRates.rate(suited) == 1.0, "" + org.erisia.stasis.PlayerRates.rate(suited));
+                c.check("a charged chest piece alone: full speed (Nero)", org.erisia.stasis.PlayerRates.rate(chest) == 1.0, "" + org.erisia.stasis.PlayerRates.rate(chest));
+                c.check("a flat chest piece: half speed", org.erisia.stasis.PlayerRates.rate(flat) == 0.5, "" + org.erisia.stasis.PlayerRates.rate(flat));
+                c.check("boots alone: half speed (no chest piece: no suit, as in stopped land)", org.erisia.stasis.PlayerRates.rate(boots) == 0.5,
+                    "" + org.erisia.stasis.PlayerRates.rate(boots));
                 org.erisia.stasis.FieldData.get(level).remove(level, f.id());
-                remove(h, bare);
-                remove(h, suited);
+                for (ServerPlayer q : new ServerPlayer[]{bare, suited, chest, flat, boots}) remove(h, q);
             };
         }, false, true));
         // a ruined cottage's tower comes dead and never drops as a core (the template processor)

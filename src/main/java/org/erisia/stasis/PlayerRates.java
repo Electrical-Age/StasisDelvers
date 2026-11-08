@@ -44,7 +44,8 @@ public final class PlayerRates {
     /**
      * The player's tick rate: their field's rate (0, 1] in a slow field, up to FAST_CAP in an acceleration field
      * (Stasis.speedAt), 1 elsewhere (stopped land too). A whole time suit or a chronal anchor keeps its wearer at 1x in
-     * an acceleration field (λ-Nero); a thawing player stays at their freeze's rate until it's gone (Argon).
+     * an acceleration field (λ-Nero); in a slow field, so does any suit that works in stopped land (Nero 2026-11-08: one
+     * charged chest piece); a thawing player stays at their freeze's rate until it's gone (Argon).
      */
     public static double rate(ServerPlayer p) {
         if (!(p.level() instanceof ServerLevel level)) return 1.0;
@@ -57,6 +58,10 @@ public final class PlayerRates {
             double s = Stasis.speedAt(level, p.blockPosition());
             if (s > 1.0) return Math.min(FAST_CAP, s);
         }
+        // a suit that would keep its wearer going in stopped land (a charged chest piece, or a rift pendant, every worn
+        // piece charged) keeps them at full speed in a slow field too, drawing nothing there (Nero 2026-11-08: the chest
+        // piece was enough in stopped land but a slow field wanted the whole suit)
+        if (r < 1.0 && Suits.protectsWithoutDraw(p)) return freeze;
         return Math.min(freeze, r <= 0.0 || r >= 1.0 ? 1.0 : r);
     }
 
