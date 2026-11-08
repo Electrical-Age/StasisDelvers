@@ -132,7 +132,8 @@ final class RegenRifts {
      * chunk this reads the ground under each spire's foot (WORLD_SURFACE and OCEAN_FLOOR heightmaps; loads those chunks)
      * and classes the rift: sky (a foot over open air, more than SPIRE_ROOT up), water (a foot over water), or ground.
      * Writes SURVEY (a line per splash deep) and SKYWATER_PLAN: the plan's lines for chunks a sky or water rift reaches,
-     * for tools/regen-rift-chunks.py --plan.
+     * for tools/regen-rift-chunks.py --plan. It loads a chunk for each spire foot on the main thread: minutes on a large world
+     * (a lab clone with max-tick-time -1; the watchdog stops a server that hangs 60 s).
      */
     static String survey(ServerLevel level) throws IOException {
         if (level.dimension() != Level.OVERWORLD) throw new IOException("the survey is for the overworld only");
@@ -152,11 +153,11 @@ final class RegenRifts {
             }
         List<String> lines = new ArrayList<>();
         Set<Integer> bad = new HashSet<>();
-        int nSky = 0, nWater = 0, nGround = 0, nSplash = 0;
+        int nSky = 0, nWater = 0, nLow = 0, nGround = 0, nSplash = 0;
         for (StaticDeeps.Deep d : deeps.values()) {
             if (Strata.shapeOf(d) != Strata.Shape.SPLASH) continue;
             nSplash++;
-            int footY = (int) Math.ceil(Strata.spireFoot(d) - 0.5), sky = 0, water = 0, unknown = 0;
+            int footY = (int) Math.ceil(Strata.spireFoot(d) - 0.5), sky = 0, water = 0, low = 0, unknown = 0;
             StringBuilder gaps = new StringBuilder();
             for (double[] f : Strata.spireFeet(d)) {
                 int x = (int) Math.floor(f[0]), z = (int) Math.floor(f[1]);
@@ -166,25 +167,43 @@ final class RegenRifts {
                     continue;
                 }
                 var chunk = level.getChunk(x >> 4, z >> 4);
-                int surface = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x & 15, z & 15) + 1;
-                int floor = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR, x & 15, z & 15) + 1;
-                boolean wet = surface > floor && !level.getFluidState(new net.minecraft.core.BlockPos(x, surface - 1, z)).isEmpty();
-                int gap = footY - surface;
-                if (gap > DeepFeature.SPIRE_ROOT) sky++;
-                else if (wet && footY > floor) water++;
+                // what is under the spire's foot: open air down to the ground (the old crowns stood on the saucer's rim
+                // wherever that was), or water; the heightmaps see the spire itself, so look down the column
+                var p = new net.minecraft.core.BlockPos.MutableBlockPos(x, footY - 1, z);
+                int gap = 0;
+                boolean wet = false;
+                for (; p.getY() > minY; p.move(0, -1, 0), gap++) {
+                    var st = chunk.getBlockState(p);
+                    if (!st.getFluidState().isEmpty()) {
+                        wet = true;
+                        break;
+                    }
+                    if (!st.isAir()) break;
+                }
+                // the old kind is full width at its foot; a hanging spire made since 10-26 comes to a point there
+                int fat = 0;
+                for (int dx = -2; dx <= 2; dx++)
+                    for (int dz = -2; dz <= 2; dz++)
+                        if (dx * dx + dz * dz <= 4 && !level.getBlockState(new net.minecraft.core.BlockPos(x + dx, footY + 1, z + dz)).isAir()) fat++;
+                boolean old = fat >= 9;
+                if (!old && gap > 0) gaps.append(" t");   // (tapered: made since the fix)
+                else if (gap > DeepFeature.SPIRE_ROOT) sky++;
+                else if (wet) water++;
+                else if (gap > 0) low++;
                 gaps.append(' ').append(gap).append(wet ? "w" : "");
             }
-            String cls = sky > 0 ? "sky" : water > 0 ? "water" : "ground";
+            String cls = sky > 0 ? "sky" : water > 0 ? "water" : low > 0 ? "low" : "ground";
             if (sky > 0) nSky++;
             else if (water > 0) nWater++;
+            else if (low > 0) nLow++;
             else nGround++;
-            if (sky > 0 || water > 0) bad.add(d.id());
-            lines.add(String.format(java.util.Locale.ROOT, "deep %06x at %.0f %.0f %.0f r %.0f foot %d %s (sky %d, water %d, unknown %d) chunks %d; gaps%s",
-                d.id(), d.x(), d.y(), d.z(), d.radius(), footY, cls, sky, water, unknown, reach.get(d.id()).size(), gaps));
+            if (sky > 0 || water > 0 || low > 0) bad.add(d.id());
+            lines.add(String.format(java.util.Locale.ROOT, "deep %06x at %.0f %.0f %.0f r %.0f foot %d %s (sky %d, water %d, low %d, unknown %d) chunks %d; gaps%s",
+                d.id(), d.x(), d.y(), d.z(), d.radius(), footY, cls, sky, water, low, unknown, reach.get(d.id()).size(), gaps));
         }
         // the plan's lines for the chunks a sky or water rift reaches
         Path planFile = root.resolve(PLAN);
-        if (!Files.exists(planFile)) plan(level);
+        plan(level);   // (fresh: an old plan from an earlier regeneration may lie there)
         List<String> plan = new ArrayList<>();
         int planned = 0;
         for (String l : Files.readAllLines(planFile)) {
@@ -204,11 +223,13 @@ final class RegenRifts {
         Files.write(root.resolve(SKYWATER_PLAN), plan);
         List<String> out = new ArrayList<>();
         out.add("# Stasis Delvers splash rifts over air or water (/stasis regenrifts survey), " + java.time.Instant.now());
-        out.add("# " + nSplash + " splash rifts reach generated chunks: " + nSky + " sky, " + nWater + " water, " + nGround + " ground");
-        out.add("# gap: spire foot y - ground (WORLD_SURFACE) under each of its 11 spires; w: water there; ?: chunk not generated");
+        out.add("# " + nSplash + " splash rifts reach generated chunks: " + nSky + " sky, " + nWater + " water, " + nLow + " low (feet over a short air gap), "
+            + nGround + " ground");
+        out.add("# gap: air blocks under each of its 11 spires' feet (sky: over " + DeepFeature.SPIRE_ROOT + "); w: then water; t: a tapered foot (made since"
+            + " the 10-26 fix: not counted); ?: chunk not generated");
         out.addAll(lines);
         Files.write(root.resolve(SURVEY), out);
-        return nSplash + " splash rifts: " + nSky + " sky, " + nWater + " water, " + nGround + " ground; " + planned + " chunks in " + SKYWATER_PLAN
+        return nSplash + " splash rifts: " + nSky + " sky, " + nWater + " water, " + nLow + " low, " + nGround + " ground; " + planned + " chunks in " + SKYWATER_PLAN
             + "; details in " + SURVEY;
     }
 
