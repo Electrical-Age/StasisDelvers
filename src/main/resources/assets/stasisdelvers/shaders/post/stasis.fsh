@@ -185,6 +185,7 @@ bool insideOther(vec3 p, int self, int n) {
         if (j == self) continue;
         int k = FIELD_BASE + FIELD_STRIDE * j;
         if (data(k + 6) > 1.5 || data(k + 4) > 0.0) continue;   // (remnants and collapsing fields don't hide others)
+        if (data(k + 6) < -0.5) continue;   // (nor do lulls: a drifting lull over a tower field cut its shell away, Baughn 2026-11-09)
         vec3 dv = p - vec3(data(k), data(k + 1), data(k + 2));
         if (abs(data(k + 6)) > 0.5) dv.y = 0.0;   // (a column; -1 a lull)
         if (length(unstretch(dv, stretchOf(j))) < data(k + 3) - 0.05) return true;
