@@ -5,7 +5,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 (`RegisterPayloadHandlersEvent`).
 
 ## Protocol version
-- `e.registrar(BuildInfo.channelVersion("17"))`: "17+<build commit>" (the commit baked in by build.gradle: a client jar built from another commit is refused at login instead of joining with shifted block states; Baughn 2026-10-25) (17: `rooms`; 16: `field_speeds`; 15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
+- `e.registrar(BuildInfo.channelVersion("19"))`: "19+<build commit>" (the commit baked in by build.gradle: a client jar built from another commit is refused at login instead of joining with shifted block states; Baughn 2026-10-25) (19: `fields` carries the fields bound to entities; 18: `console_rate`; 17: `rooms`; 16: `field_speeds`; 15: `gate_rifts` carries the lanced rifts' breach steps; 14: the lance's return rifts). Bump it whenever a payload is added, removed or changes its codec. Mismatched peers
   are then refused at login instead of failing mid-game.
   - 9 added `dig_stilled`.
   - 10 removed the unused `chunk_clocks`.
@@ -19,7 +19,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 ## Server → client
 | Payload | Id | Sent by | Client handler |
 |---|---|---|---|
-| `Fields(fields, deepSeed)` | `fields` | `sendFields(level)` from `FieldData.changed`; `sendFields(player)` on login, respawn and dimension change (`Freezing.grace`) | `ClientFields.deepSeed` + `ClientFields.set` |
+| `Fields(fields, deepSeed, boundFields, boundEntities)` | `fields` | `sendFields(level)` from `FieldData.changed` and every 20 ticks while a bound field moves (`FieldData.tickMoves`); `sendFields(player)` on login, respawn and dimension change (`Freezing.grace`) | `ClientFields.deepSeed` + `ClientFields.bind` + `ClientFields.set` |
 | `GateRifts(seed, centres, returns, steps)` | `gate_rifts` | `sendGates` (with every per-player `sendFields`), `Gates` when a gate is added, `Lance.publishAndSend` when a return rift is made, wakes or sleeps, or a breach step changes (`steps`: `id << 4 \| step` for gates past step 0) | `StaticDeeps.setGates`, `setReturns`, `setStrengths`; `riftStrengths` (client: `FrozenSprites` re-meshes the changed rifts) |
 | `StormOverride(active, start, end, folded)` | `storm_override` | `sendStorm` (`Storms.start/stop`), `sendGates` | `Storms.clientOverride` |
 | `Freeze(progress)` | `freeze` | `Freezing.tick` on a change ≥ 0.01 | `StasisNet.clientFreeze` (shader slot 23) |
@@ -62,7 +62,7 @@ All payloads are in `src/main/java/org/erisia/stasis/StasisNet.java`: records wi
 
 ## Tests
 - `src/test/java/org/erisia/stasis/NetCodecTest.java`: a round trip for every payload codec
-  (`fieldsRoundTrip`, `gateRiftsRoundTrip`, `stormOverrideRoundTrips`, `consolePayloadsRoundTrip`,
+  (`fieldsRoundTrip`, `boundFieldsRoundTrip`, `gateRiftsRoundTrip`, `stormOverrideRoundTrips`, `consolePayloadsRoundTrip`,
   `digStilledRoundTrips`, `reportPayloadsRoundTrip`, `reportStateOverTheCapThrows`, `freezeRoundTrips`,
   `clockMapsRoundTrip`, `boltRoundTrips`, `spreadStateRoundTrips`, `spreadTileRoundTrips`, `spreadTileIsSmall`,
   `spreadTileRefusesAWrongSize`, `spreadForgetRoundTrips`).

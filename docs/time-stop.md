@@ -43,6 +43,12 @@ Paths are relative to `src/main/java/org/erisia/stasis/`.
   - Mutations: `add`, `update(id, UnaryOperator)`, `remove`, `clear`. Each ends in `changed()`.
   - `LOADED` + `peek` / `peekDeepSeed` serve off-thread readers (light engine, worldgen).
   - `get` is main-thread only.
+- **Bound fields** (quern vehicles, quern.md): `FieldData.bind(id, entity)` ties a field to an entity (by network id; not
+  saved, the owner binds it again after a load). `FieldData.move(id, x, y, z)` moves it: a new snapshot and
+  `Stasis.invalidate`, with the freezing-grace bracket `update` has, but no packet and no flame relight. `tickMoves`
+  (LevelTickEvent.Post) catches up: flames every 5 ticks, a full `sendFields` every 20 (for players who don't see the
+  entity). `Fields` carries the bindings; each client tick `ClientFields.follow` moves every bound field to its entity's
+  position on that client (one list swap; the client index is rebuilt) and re-meshes what moved every 4 ticks.
 - `ClientFields.java`: the client copy. `set` invalidates, relights flames and fires `onChange`, which re-meshes
   through `FrozenSprites`. `underShield` is a looser test, for weather.
 - `NewChunkGrace.java`: a newly generated chunk runs for `TICKS` = 70.
