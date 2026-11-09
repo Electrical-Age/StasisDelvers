@@ -48,6 +48,10 @@ stopped land now that the tower yard is off (config `towerYard`, ea-integration.
   time-stop.md. So a boat's own client sees the water ahead thawed where its boat is now.
 - **Starting in stopped land:** a vehicle with no field yet is frozen, so `StasisEvents.entityTick` runs its quern
   (`QuernVehicles.serverTick`) whether or not it is frozen.
+- **Trains:** a minecart within 8 blocks of a quern vehicle's field centre isn't frozen (`QuernVehicles.carried`), and the
+  quern cart's top speed is a furnace cart's (half a minecart's), so a furnace cart pushing a minecart and a quern cart
+  keeps up and pushes the whole line (AdventurAgent: at a minecart's speed the front two ran off and the furnace cart
+  froze behind them).
 - A quern vehicle's rider runs at full speed in its field (`PlayerRates.rate`; Nero), as with a suit.
 - Gone (destroyed, unloaded, through a portal), its field goes; destroyed, the queue drops. Its saved field id records
   its level, so after a portal it doesn't take over another level's field with that id.
@@ -55,4 +59,4 @@ stopped land now that the tower yard is off (config `towerYard`, ea-integration.
 ## Tests
 `quern_grinds_a_field`, `quern_idle_in_a_field`, `quern_hopper_and_break`, `tower_yard_off_lance_yard_on`;
 vehicles: `quern_cart_field_follows`, `quern_cart_waits_in_a_field`, `quern_cart_move_grace`, `quern_boat_thaws_water`,
-`quern_boat_every_wood`.
+`quern_boat_every_wood`, `quern_cart_carries_its_train`, `quern_train_furnace_pushes`.

@@ -28,8 +28,8 @@ public final class QuernVehicles {
         if (e instanceof QuernVehicle v && e.level() instanceof ServerLevel sl) v.quernTick(sl);
     }
 
-    /** How near a quern vehicle's field centre a minecart rides along unfrozen (blocks). */
-    public static final double CARRY = QuernCore.RADIUS + 2;
+    /** How near a quern vehicle's field centre a minecart rides along unfrozen (blocks; 8: carts placed touching push apart when the field starts, and a furnace cart ended 6.5 off: AdventurAgent). */
+    public static final double CARRY = QuernCore.RADIUS + 4;
 
     /**
      * Is minecart e part of a quern cart's train: within CARRY of a bound field's centre? Then it isn't frozen even where
