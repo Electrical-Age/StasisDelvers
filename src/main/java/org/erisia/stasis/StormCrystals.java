@@ -113,9 +113,14 @@ public final class StormCrystals {
      * clusters form where the storm's rift is, patchy (half the spots), and go with the others when the storm ends.
      */
     static void edges(ServerLevel level, Data d, int seed) {
+        edges(level, d, seed, -1);
+    }
+
+    /** ... round one field only (id), or all (-1). */
+    static void edges(ServerLevel level, Data d, int seed, int only) {
         Block cluster = StasisRegistry.RIFT_CRYSTAL_CLUSTER.get();
         for (Field f : FieldData.get(level).fields()) {
-            if (f.collapse() > 0) continue;
+            if (f.collapse() > 0 || only >= 0 && f.id() != only) continue;
             boolean near = false;
             for (var p : level.players())
                 if (Math.abs(p.getX() - f.x()) < REACH + f.reach() && Math.abs(p.getZ() - f.z()) < REACH + f.reach()) near = true;
@@ -171,10 +176,10 @@ public final class StormCrystals {
         if (Storms.intensity(level) <= 0) evaporate(level, Data.get(level));
     }
 
-    /** Tests: one edge pass with this deep seed; the crystals placed so far. */
-    public static java.util.Set<Long> testEdges(ServerLevel level, int seed) {
+    /** Tests: one edge pass round one field with this deep seed (others' test areas stay untouched); the crystals placed so far. */
+    public static java.util.Set<Long> testEdges(ServerLevel level, int seed, int field) {
         Data d = Data.get(level);
-        edges(level, d, seed);
+        edges(level, d, seed, field);
         return d.placed;
     }
 

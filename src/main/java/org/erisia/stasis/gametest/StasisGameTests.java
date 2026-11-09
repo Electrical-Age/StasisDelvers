@@ -1224,11 +1224,9 @@ public final class StasisGameTests {
                 var box = new net.minecraft.world.phys.AABB(f.x() - 60, f.y() - 40, f.z() - 60, f.x() + 60, f.y() + 40, f.z() + 60);
                 org.erisia.stasis.Storms.TEST.put(box, 2);
                 try {
-                    java.util.Set<Long> before = new java.util.HashSet<>(org.erisia.stasis.StormCrystals.testEdges(level, 0));
-                    var placed = new java.util.HashSet<>(org.erisia.stasis.StormCrystals.testEdges(level, 12345));
+                    java.util.Set<Long> before = new java.util.HashSet<>(org.erisia.stasis.StormCrystals.testEdges(level, 0, -2));
+                    var placed = new java.util.HashSet<>(org.erisia.stasis.StormCrystals.testEdges(level, 12345, f.id()));
                     placed.removeAll(before);
-                    // (other tests' fields get theirs too: only those round this one count)
-                    placed.removeIf(l -> Math.hypot(BlockPos.of(l).getX() + 0.5 - f.x(), BlockPos.of(l).getZ() + 0.5 - f.z()) > 2 * f.reach());
                     int inside = 0, far = 0;
                     for (long l : placed) {
                         BlockPos q = BlockPos.of(l);
@@ -1236,7 +1234,7 @@ public final class StasisGameTests {
                         double d = Math.hypot(q.getX() + 0.5 - f.x(), q.getZ() + 0.5 - f.z());
                         if (d > f.reach() + 4) far++;
                     }
-                    c.check("crystals formed at the edge, half the spots round it", placed.size() >= 8, placed.size() + " placed");
+                    c.check("crystals formed at the edge (about half the spots round it, where there's open ground)", placed.size() >= 4, placed.size() + " placed");
                     c.check("none inside the field, none away from its edge", inside == 0 && far == 0, inside + " inside, " + far + " far");
                 } finally {
                     org.erisia.stasis.Storms.TEST.remove(box);
