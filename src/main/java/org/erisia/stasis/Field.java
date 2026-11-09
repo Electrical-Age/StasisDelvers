@@ -100,6 +100,11 @@ public record Field(int id, double x, double y, double z, double radius, double 
         return withFailing(0).withRate(1.0).withShield(0, 0, side);
     }
 
+    /** The same field centred at (x, y, z): one bound to a vehicle, moving with it (FieldData.move). */
+    public Field withCentre(double x, double y, double z) {
+        return new Field(id, x, y, z, radius, failing, collapse, column, rate, seed, formedAt, amber, dropout, side, stretch);
+    }
+
     public Field withRadius(double r) {
         return new Field(id, x, y, z, r, failing, collapse, column, rate, seed, formedAt, amber, dropout, side, stretch);
     }

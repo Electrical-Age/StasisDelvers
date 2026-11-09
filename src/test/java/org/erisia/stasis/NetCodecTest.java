@@ -76,6 +76,13 @@ class NetCodecTest {
     }
 
     @Property(tries = 200)
+    void boundFieldsRoundTrip(@ForAll @Size(max = 8) List<Integer> fieldIds, @ForAll @Size(max = 8) List<Integer> entityIds) {
+        int n = Math.min(fieldIds.size(), entityIds.size());
+        var p = new StasisNet.Fields(List.of(), 7, fieldIds.subList(0, n), entityIds.subList(0, n));
+        assertEquals(p, trip(StasisNet.Fields.CODEC, p));
+    }
+
+    @Property(tries = 200)
     void gateRiftsRoundTrip(@ForAll int seed, @ForAll @Size(max = 20) List<Long> centres, @ForAll @Size(max = 20) List<Long> returns,
                             @ForAll @Size(max = 20) List<Integer> steps) {
         var p = new StasisNet.GateRifts(seed, centres, returns, steps);

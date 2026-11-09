@@ -44,10 +44,21 @@ public final class StasisNet {
             buf.readDouble(), buf.readBoolean(), buf.readDouble(), buf.readInt(), buf.readLong(), buf.readFloat(), buf.readFloat(), buf.readFloat(),
             new Field.Stretch(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat())));
 
-    public record Fields(List<Field> fields, int deepSeed) implements CustomPacketPayload {
+    /** The level's fields, its deep seed, and the fields bound to an entity (FieldData.bound: field ids and entity ids, pairwise). */
+    public record Fields(List<Field> fields, int deepSeed, List<Integer> boundFields, List<Integer> boundEntities) implements CustomPacketPayload {
         public static final Type<Fields> TYPE = new Type<>(Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "fields"));
         public static final StreamCodec<RegistryFriendlyByteBuf, Fields> CODEC = StreamCodec.composite(
-            FIELD.apply(ByteBufCodecs.list()), Fields::fields, ByteBufCodecs.INT, Fields::deepSeed, Fields::new);
+            FIELD.apply(ByteBufCodecs.list()), Fields::fields, ByteBufCodecs.INT, Fields::deepSeed,
+            ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()), Fields::boundFields, ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()),
+            Fields::boundEntities, Fields::new);
+
+        public Fields(List<Field> fields, int deepSeed) {
+            this(fields, deepSeed, List.of(), List.of());
+        }
+
+        static Fields of(FieldData d) {
+            return new Fields(d.fields(), d.deepSeed(), List.copyOf(d.bound().keySet()), List.copyOf(d.bound().values()));
+        }
 
         @Override
         public Type<Fields> type() {
@@ -459,7 +470,7 @@ public final class StasisNet {
 
     static void register(IEventBus modBus) {
         modBus.addListener(RegisterPayloadHandlersEvent.class, e -> {
-            var r = e.registrar(BuildInfo.channelVersion("18"));   // (+ the build commit: a mismatched pack is refused at login)  18: console_rate (the accelerator slider); 17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
+            var r = e.registrar(BuildInfo.channelVersion("19"));   // (+ the build commit: a mismatched pack is refused at login)  19: fields carry the fields bound to entities (quern vehicles); 18: console_rate (the accelerator slider); 17: rooms (riftstone rooms); 16: field_speeds (acceleration fields' achieved rates); 15: gate_rifts carries the lanced rifts' breach steps; 14: gate_rifts carries the lance's return rifts; 13: spread_state carries the End event (fog); 12: the End's stillness and the storms' origin
             r.playToServer(DigStilled.TYPE, DigStilled.CODEC, (p, ctx) -> {
                 if (ctx.player() instanceof ServerPlayer sp) StilledLiquids.dig(sp);
             });
@@ -498,6 +509,7 @@ public final class StasisNet {
             r.playToClient(ConsoleState.TYPE, ConsoleState.CODEC, (p, ctx) -> consoleSink.accept(p));
             r.playToClient(Fields.TYPE, Fields.CODEC, (p, ctx) -> {
                 ClientFields.deepSeed(p.deepSeed());
+                ClientFields.bind(p.boundFields(), p.boundEntities());
                 ClientFields.set(p.fields(), ctx.player().level());
             });
             r.playToClient(Freeze.TYPE, Freeze.CODEC, (p, ctx) -> clientFreeze = p.progress());
@@ -538,7 +550,7 @@ public final class StasisNet {
 
     public static void sendFields(ServerPlayer player) {
         FieldData d = FieldData.get(player.level());
-        send(player, new Fields(d.fields(), d.deepSeed()));
+        send(player, Fields.of(d));
         send(player, new RoomsSync(Rooms.all(player.level())));
         sendGates(player);
     }
@@ -561,7 +573,7 @@ public final class StasisNet {
 
     public static void sendFields(ServerLevel level) {
         FieldData d = FieldData.get(level);
-        Fields f = new Fields(d.fields(), d.deepSeed());
+        Fields f = Fields.of(d);
         for (ServerPlayer p : level.players()) send(p, f);
     }
 

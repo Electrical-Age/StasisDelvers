@@ -31,24 +31,15 @@ import org.jspecify.annotations.Nullable;
  *   <li>It counts down only while its chunk is loaded (it loads no chunks), and pistons can't move it.</li>
  * </ul>
  */
-public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
-    public static final double RADIUS = 4;
-    /** Baughn: 0.4, "plenty of reason to avoid it" (towers run at 0.6). */
-    public static final double RATE = 0.4;
-    public static final int QUEUE = 4;
-    /** Baughn: ten minutes for charged shards, five for plain ones. */
-    public static final int CHARGED_TICKS = 20 * 60 * 10, PLAIN_TICKS = 20 * 60 * 5;
-    static final int WARN_TICKS = 20 * 30;
+public class QuernBlockEntity extends BlockEntity implements WorldlyContainer, QuernCore.Host {
+    public static final double RADIUS = QuernCore.RADIUS;
+    public static final double RATE = QuernCore.RATE;
+    public static final int QUEUE = QuernCore.QUEUE;
+    public static final int CHARGED_TICKS = QuernCore.CHARGED_TICKS, PLAIN_TICKS = QuernCore.PLAIN_TICKS;
     static final int[] SLOTS = {0, 1, 2, 3};
 
-    /** The shard being ground (shown hovering; spent), and the queue (shown in the table's corners). */
-    ItemStack burning = ItemStack.EMPTY;
-    final ItemStack[] queue = {ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY};
-    /** Ticks left of the shard being ground, of its total. */
-    int burnLeft, burnTotal;
-    /** Synced: grinding now (the field up). */
-    boolean grinding;
-    int fieldId = Stasis.NO_FIELD;
+    /** Its workings (QuernCore: shared with the quern vehicles). */
+    final QuernCore core = new QuernCore(this);
 
     /** Client: the querns loaded (dust particles). */
     public static final java.util.Map<BlockPos, QuernBlockEntity> CLIENT = new java.util.concurrent.ConcurrentHashMap<>();
@@ -58,44 +49,71 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
     }
 
     public static boolean isFuel(ItemStack s) {
-        return s.is(StasisRegistry.RIFT_SHARD.get()) || s.is(StasisRegistry.CHARGED_RIFT_SHARD.get());
+        return QuernCore.isFuel(s);
     }
 
     public static int ticksFor(ItemStack s) {
-        return s.is(StasisRegistry.CHARGED_RIFT_SHARD.get()) ? CHARGED_TICKS : s.is(StasisRegistry.RIFT_SHARD.get()) ? PLAIN_TICKS : 0;
+        return QuernCore.ticksFor(s);
     }
 
     public ItemStack burning() {
-        return burning;
+        return core.burning();
     }
 
     public ItemStack queued(int i) {
-        return queue[i];
+        return core.queued(i);
     }
 
     public boolean grinding() {
-        return grinding;
+        return core.grinding();
     }
 
     /** 0..1 of the current shard left (the client shrinks it). */
     public float left() {
-        return burnTotal <= 0 ? 0 : Math.max(0, Math.min(1, burnLeft / (float) burnTotal));
+        return core.left();
     }
 
     public int fieldId() {
-        return fieldId;
+        return core.fieldId();
     }
 
     /** Tests: jump the clock of the shard being ground. */
     public void setBurnLeftForTests(int ticks) {
-        burnLeft = ticks;
+        core.setBurnLeftForTests(ticks);
+    }
+
+    // ---- QuernCore.Host
+
+    @Override
+    public double cx() {
+        return worldPosition.getX() + 0.5;
+    }
+
+    @Override
+    public double cy() {
+        return worldPosition.getY() + 0.5;
+    }
+
+    @Override
+    public double cz() {
+        return worldPosition.getZ() + 0.5;
+    }
+
+    @Override
+    public void dirty() {
+        setChanged();
+    }
+
+    @Override
+    public void sync() {
+        if (level instanceof ServerLevel sl) sync(sl);
     }
 
     /** Client: sparkling dust dripping off the crystal while it grinds (Baughn): fine specks, white and violet, falling
      *  into the bowl; now and then a spark where a laser meets it. (Falling amethyst dust piled into a solid purple blob
      *  that hid the bowl and the crystal: AdventurAgent.) */
     void clientTick() {
-        if (!grinding || burning.isEmpty() || level == null) return;
+        if (!core.grinding || core.burning.isEmpty() || level == null) return;
         var r = level.getRandom();
         double x = worldPosition.getX() + 0.5, y = worldPosition.getY() + 1.08, z = worldPosition.getZ() + 0.5;
         if (r.nextInt(2) == 0)
@@ -106,102 +124,35 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
                 x + (r.nextDouble() - 0.5) * 0.2, y + 0.04 + (r.nextDouble() - 0.5) * 0.15, z + (r.nextDouble() - 0.5) * 0.2, 0, 0, 0);
     }
 
-    /** Would time run here at the quern's rate or faster without its own field? Then it doesn't grind. */
-    boolean wanted(ServerLevel sl) {
-        return Stasis.rateAtSteadyWithout(sl, worldPosition.getX(), worldPosition.getY(), worldPosition.getZ(), fieldId) < RATE;
-    }
-
     void serverTick(ServerLevel sl) {
-        boolean want = wanted(sl);
-        boolean was = grinding;
-        ItemStack wasBurning = burning;
-        if (burnLeft <= 0 && want) {
-            burning = ItemStack.EMPTY;
-            for (int i = 0; i < QUEUE; i++)
-                if (!queue[i].isEmpty()) {
-                    burning = queue[i];
-                    System.arraycopy(queue, i + 1, queue, i, QUEUE - 1 - i);
-                    queue[QUEUE - 1] = ItemStack.EMPTY;
-                    burnTotal = burnLeft = ticksFor(burning);
-                    sl.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.BLOCKS, 0.8f, 0.7f);
-                    break;
-                }
-        }
-        grinding = want && burnLeft > 0;
-        if (grinding) {
-            burnLeft--;
-            if (burnLeft == 0) burning = ItemStack.EMPTY;   // (spent; the next one starts next tick)
-        }
-        field(sl, grinding);
-        if (grinding != was || burning != wasBurning || sl.getGameTime() % 100 == 0) sync(sl);
+        core.tick(sl);
     }
 
-    /** The field while grinding, its hexes dropping out over its last WARN_TICKS; none otherwise. */
     void field(ServerLevel sl, boolean on) {
-        FieldData fd = FieldData.get(sl);
-        if (on) {
-            double dropout = burnLeft < WARN_TICKS && queueEmpty() ? Math.round(12 * (1 - burnLeft / (double) WARN_TICKS)) / 15.0 : 0;
-            if (fieldId == Stasis.NO_FIELD || fd.get(fieldId).isEmpty()) {
-                fieldId = fd.add(sl, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5, RADIUS, false, RATE).id();
-                // orange all over (Baughn: a much weaker field than a tower's)
-                fd.update(sl, fieldId, x -> x.withShield(1, 0, 0));
-                setChanged();
-            }
-            var f = fd.get(fieldId);
-            if (f.isPresent() && f.get().dropout() != dropout) fd.update(sl, fieldId, x -> x.withShield(1, dropout, 0));
-        } else if (fieldId != Stasis.NO_FIELD) {
-            fd.remove(sl, fieldId);
-            fieldId = Stasis.NO_FIELD;
-            setChanged();
-        }
+        core.field(sl, on);
     }
 
     public boolean queueEmpty() {
-        for (ItemStack s : queue) if (!s.isEmpty()) return false;
-        return true;
+        return core.queueEmpty();
     }
 
     /** A player puts one shard in the queue; false if it's full or not fuel. */
     public boolean offer(ItemStack s) {
-        if (!isFuel(s)) return false;
-        for (int i = 0; i < QUEUE; i++)
-            if (queue[i].isEmpty()) {
-                queue[i] = s.copyWithCount(1);
-                changed();
-                return true;
-            }
-        return false;
+        return core.offer(s);
     }
 
     /** The last queued shard back out (sneak-use), or empty. */
     public ItemStack takeLast() {
-        for (int i = QUEUE - 1; i >= 0; i--)
-            if (!queue[i].isEmpty()) {
-                ItemStack s = queue[i];
-                queue[i] = ItemStack.EMPTY;
-                changed();
-                return s;
-            }
-        return ItemStack.EMPTY;
+        return core.takeLast();
     }
 
     /** Field time left in all its shards, the one grinding and the queue (Baughn: one total, not "x of y queued"). */
     public int ticksLeft() {
-        int t = Math.max(0, burnLeft);
-        for (ItemStack s : queue) t += ticksFor(s);
-        return t;
+        return core.ticksLeft();
     }
 
     public Component statusText() {
-        int t = ticksLeft();
-        if (t == 0) return Component.literal("Rift quern: empty.");
-        String why = !grinding ? " (waiting: time runs here without it)" : "";
-        return Component.literal(String.format("Rift quern: %d:%02d of field left%s.", t / 1200, t / 20 % 60, why));
-    }
-
-    void changed() {
-        setChanged();
-        if (level instanceof ServerLevel sl) sync(sl);
+        return core.statusText("Rift quern");
     }
 
     void sync(ServerLevel sl) {
@@ -228,7 +179,7 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        return slot >= 0 && slot < QUEUE && queue[slot].isEmpty() && isFuel(stack);
+        return slot >= 0 && slot < QUEUE && core.queue[slot].isEmpty() && isFuel(stack);
     }
 
     @Override
@@ -248,7 +199,7 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
 
     @Override
     public ItemStack getItem(int slot) {
-        return slot >= 0 && slot < QUEUE ? queue[slot] : ItemStack.EMPTY;
+        return slot >= 0 && slot < QUEUE ? core.queue[slot] : ItemStack.EMPTY;
     }
 
     @Override
@@ -263,18 +214,7 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
 
     @Override
     public void setItem(int slot, ItemStack stack) {
-        if (slot < 0 || slot >= QUEUE) return;
-        queue[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1);
-        // (a hopper fills the slot it was given: keep the queue packed so the corners fill in order)
-        for (int i = 0; i < QUEUE - 1; i++)
-            if (queue[i].isEmpty())
-                for (int j = i + 1; j < QUEUE; j++)
-                    if (!queue[j].isEmpty()) {
-                        queue[i] = queue[j];
-                        queue[j] = ItemStack.EMPTY;
-                        break;
-                    }
-        changed();
+        core.setQueued(slot, stack);
     }
 
     @Override
@@ -284,7 +224,7 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
 
     @Override
     public void clearContent() {
-        java.util.Arrays.fill(queue, ItemStack.EMPTY);
+        java.util.Arrays.fill(core.queue, ItemStack.EMPTY);
     }
 
     // ---- life cycle
@@ -308,8 +248,7 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
     @Override
     public void preRemoveSideEffects(BlockPos pos, BlockState state) {
         if (level != null)
-            for (ItemStack s : queue) if (!s.isEmpty()) Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, s);
-        clearContent();
+            for (ItemStack s : core.takeQueue()) Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, s);
         super.preRemoveSideEffects(pos, state);
     }
 
@@ -326,22 +265,12 @@ public class QuernBlockEntity extends BlockEntity implements WorldlyContainer {
     @Override
     protected void saveAdditional(ValueOutput out) {
         super.saveAdditional(out);
-        if (!burning.isEmpty()) out.store("burning", ItemStack.CODEC, burning);
-        for (int i = 0; i < QUEUE; i++) if (!queue[i].isEmpty()) out.store("q" + i, ItemStack.CODEC, queue[i]);
-        out.putInt("left", burnLeft);
-        out.putInt("total", burnTotal);
-        out.putBoolean("grinding", grinding);
-        out.putInt("field", fieldId);
+        core.save(out);
     }
 
     @Override
     protected void loadAdditional(ValueInput in) {
         super.loadAdditional(in);
-        burning = in.read("burning", ItemStack.CODEC).orElse(ItemStack.EMPTY);
-        for (int i = 0; i < QUEUE; i++) queue[i] = in.read("q" + i, ItemStack.CODEC).orElse(ItemStack.EMPTY);
-        burnLeft = in.getIntOr("left", 0);
-        burnTotal = in.getIntOr("total", 0);
-        grinding = in.getBooleanOr("grinding", false);
-        fieldId = in.getIntOr("field", Stasis.NO_FIELD);
+        core.load(in);
     }
 }

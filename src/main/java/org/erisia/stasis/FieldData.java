@@ -152,6 +152,70 @@ public final class FieldData extends SavedData {
         }
     }
 
+    /**
+     * Fields bound to an entity (field id -> its network id): a quern vehicle's (λ-Nero 2026-11-09, notes/quern-vehicles).
+     * Not saved: the vehicle binds its field again on its first tick after a load. Clients get the map with the fields
+     * and move a bound field with the entity themselves every tick (ClientFields.follow), so a moving field costs no
+     * packets: a boat's own client sees the water ahead thawed where its boat is now, not where the server last said.
+     */
+    private final java.util.Map<Integer, Integer> bound = new java.util.LinkedHashMap<>();
+    /** Bound fields moved since the last full send / flame relight (tickMoves). */
+    private boolean movedSinceSend, movedSinceFlames;
+    /** The snapshot the flames were last relit for. */
+    private List<Field> flamesSaw = List.of();
+
+    public java.util.Map<Integer, Integer> bound() {
+        return java.util.Collections.unmodifiableMap(bound);
+    }
+
+    /** Bind field id to entity (its owner moves it with move()); sends the fields. */
+    public void bind(ServerLevel level, int id, net.minecraft.world.entity.Entity entity) {
+        if (get(id).isEmpty()) return;
+        Integer was = bound.put(id, entity.getId());
+        if (was == null || was != entity.getId()) changed(level);
+    }
+
+    /**
+     * Move field id to (x, y, z) (a vehicle's, each tick it moves): the snapshot and the rule's cache, but no packet (the
+     * clients follow the entity), no flame relight (tickMoves catches up, throttled). A player safe in it before and
+     * stopped after gets the usual grace, as when a field shrinks (a cart driving away from someone beside it).
+     */
+    public void move(ServerLevel level, int id, double x, double y, double z) {
+        for (int i = 0; i < fields.size(); i++) {
+            Field old = fields.get(i);
+            if (old.id() != id) continue;
+            if (old.x() == x && old.y() == y && old.z() == z) return;
+            var safe = Freezing.running(level);
+            fields.set(i, old.withCentre(x, y, z));
+            snapshot = List.copyOf(fields);
+            setDirty();
+            Stasis.invalidate(level);
+            movedSinceSend = movedSinceFlames = true;
+            Freezing.graceIfStopped(level, safe);
+            return;
+        }
+    }
+
+    /** Ticks between catching up on moved fields: flames relit, and a full send (for players not tracking the vehicle). */
+    static final int FLAMES_EVERY = 5, SEND_EVERY = 20;
+
+    /** LevelTickEvent.Post (server): catch up on bound fields that moved. */
+    static void tickMoves(net.neoforged.neoforge.event.tick.LevelTickEvent.Post e) {
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
+        FieldData d = LOADED.get(level);
+        if (d == null || d.bound.isEmpty() && !d.movedSinceSend && !d.movedSinceFlames) return;
+        long t = level.getGameTime();
+        if (d.movedSinceFlames && t % FLAMES_EVERY == 0) {
+            d.movedSinceFlames = false;
+            Flames.fieldsChanged(level, d.flamesSaw, d.snapshot);
+            d.flamesSaw = d.snapshot;
+        }
+        if (d.movedSinceSend && t % SEND_EVERY == 0) {
+            d.movedSinceSend = false;
+            StasisNet.sendFields(level);
+        }
+    }
+
     public java.util.Optional<Field> get(int id) {
         return fields.stream().filter(f -> f.id() == id).findFirst();
     }
@@ -160,6 +224,7 @@ public final class FieldData extends SavedData {
         var safe = Freezing.running(level);
         for (Field f : fields) if (f.id() == id) LocalTime.fieldGone(level, f);
         boolean removed = fields.removeIf(f -> f.id() == id);
+        bound.remove(id);
         if (removed) {
             changed(level);
             Freezing.graceIfStopped(level, safe);
@@ -172,6 +237,7 @@ public final class FieldData extends SavedData {
         for (Field f : fields) LocalTime.fieldGone(level, f);
         int n = fields.size();
         fields.clear();
+        bound.clear();
         changed(level);
         Freezing.graceIfStopped(level, safe);
         return n;
@@ -182,7 +248,11 @@ public final class FieldData extends SavedData {
         snapshot = List.copyOf(fields);
         setDirty();
         Stasis.invalidate(level);
+        bound.keySet().removeIf(id -> get(id).isEmpty());
+        movedSinceSend = false;
         StasisNet.sendFields(level);
-        Flames.fieldsChanged(level, old, snapshot);
+        Flames.fieldsChanged(level, flamesSaw.isEmpty() || !movedSinceFlames ? old : flamesSaw, snapshot);
+        movedSinceFlames = false;
+        flamesSaw = snapshot;
     }
 }
