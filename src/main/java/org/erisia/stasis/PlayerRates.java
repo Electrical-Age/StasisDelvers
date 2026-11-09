@@ -53,6 +53,7 @@ public final class PlayerRates {
         // freezing is a slow field of the player's own (λ-Nero), the slower of the two wins
         double freeze = Freezing.rate(p);
         if (fullSuit(p)) return freeze;   // (Baughn: the suit keeps its wearer at full speed in a slow field)
+        if (p.getVehicle() instanceof QuernVehicle) return freeze;   // (λ-Nero 2026-11-09: a quern boat's rider sails at full speed in its field)
         double r = Stasis.rateAt(level, p.blockPosition());
         if (r >= 1.0 && freeze >= 1.0 && !anchored(p)) {
             double s = Stasis.speedAt(level, p.blockPosition());

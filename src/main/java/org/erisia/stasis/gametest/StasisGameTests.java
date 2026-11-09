@@ -3045,6 +3045,61 @@ public final class StasisGameTests {
                 c.check("broken: its field goes", FieldData.get(level).get(q.fieldId()).isEmpty() && q.fieldId() == Stasis.NO_FIELD, "field " + q.fieldId());
             };
         }, false, true));
+        // the Quern Minecart (λ-Nero 2026-11-09): in stopped land it starts its own field, which moves with it (bound,
+        // no resend), and goes when the cart does; the queue drops
+        CASES.put("quern_cart_field_follows", new Spec(30, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            for (int x = 6; x <= 22; x++) h.setBlock(new BlockPos(x, 1, 4), Blocks.RAIL);
+            BlockPos at = h.absolutePos(new BlockPos(8, 1, 4));
+            var cart = org.erisia.stasis.StasisRegistry.QUERN_MINECART_ENTITY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            cart.setPos(at.getX() + 0.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(cart);
+            boolean took = cart.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()))
+                && cart.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            String[] mid = new String[2];
+            int[] fid = new int[1];
+            h.runAtTickTime(5, () -> {
+                var fd = FieldData.get(level);
+                fid[0] = cart.quern().fieldId();
+                mid[0] = "grinding " + cart.quern().grinding() + ", bound " + (fd.bound().get(fid[0]) != null && fd.bound().get(fid[0]) == cart.getId())
+                    + ", here " + Stasis.rateAt(level, at) + ", 10 east " + Stasis.rateAt(level, at.east(10));
+                cart.setPos(cart.getX() + 10, cart.getY(), cart.getZ());
+            });
+            h.runAtTickTime(8, () -> {
+                var f = FieldData.get(level).get(fid[0]).orElse(null);
+                mid[1] = "field x " + (f == null ? "none" : String.format("%.1f", f.x() - at.getX())) + ", here " + Stasis.rateAt(level, at)
+                    + ", 10 east " + Stasis.rateAt(level, at.east(10));
+                cart.kill(level);
+            });
+            return () -> {
+                c.check("the cart takes shards", took);
+                c.check("in stopped land it starts its field, bound to it: 0.4 round it, stopped 10 off",
+                    "grinding true, bound true, here 0.4, 10 east 0.0".equals(mid[0]), mid[0]);
+                c.check("moved 10 blocks, its field moved with it", "field x 10.5, here 0.0, 10 east 0.4".equals(mid[1]), mid[1]);
+                int dropped = 0;
+                for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(at).inflate(14))) {
+                    if (e.getItem().is(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get())) dropped += e.getItem().getCount();
+                    e.discard();
+                }
+                c.check("destroyed: its field and binding go, the queued shard drops", FieldData.get(level).get(fid[0]).isEmpty()
+                    && !FieldData.get(level).bound().containsKey(fid[0]) && dropped == 1, "dropped " + dropped);
+            };
+        }, false, true));
+        // a quern cart with no shard in stopped land is a frozen cart; in running land (a tower's field) it waits
+        CASES.put("quern_cart_waits_in_a_field", new Spec(10, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));   // (in the test's field)
+            h.setBlock(new BlockPos(3, 1, 4), Blocks.RAIL);
+            var cart = org.erisia.stasis.StasisRegistry.QUERN_MINECART_ENTITY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            cart.setPos(at.getX() + 0.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(cart);
+            cart.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            return () -> {
+                c.check("in a running field it waits: no field, nothing spent", !cart.quern().grinding() && cart.quern().fieldId() == Stasis.NO_FIELD
+                    && !cart.quern().queueEmpty(), cart.quern().statusText("Quern minecart").getString());
+                cart.discard();
+            };
+        }));
         // inside a faster field (a base) it doesn't spend shards; a hopper fills the queue (4, plus the one ground)
         CASES.put("quern_idle_in_a_field", new Spec(12, (h, c) -> {
             ServerLevel level = h.getLevel();

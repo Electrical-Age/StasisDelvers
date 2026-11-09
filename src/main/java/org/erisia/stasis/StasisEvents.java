@@ -29,6 +29,8 @@ public final class StasisEvents {
     static void entityTick(EntityTickEvent.Pre e) {
         // a mob killed in stopped land still finishes dying (else it lies there forever at 0 health: Baughn's pigs)
         if (e.getEntity() instanceof net.minecraft.world.entity.LivingEntity le && le.isDeadOrDying()) return;
+        // (a quern vehicle's quern grinds even while the vehicle is frozen: else one in stopped land never starts its field)
+        QuernVehicles.serverTick(e.getEntity());
         boolean frozen = Stasis.isFrozen(e.getEntity());
         if (frozen) {
             e.setCanceled(true);

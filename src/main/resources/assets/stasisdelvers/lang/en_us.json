@@ -144,5 +144,7 @@
   "book.stasisdelvers.pamphlet.page6": "A government-issue delver suit will keep you safe for up to thirty minutes, more with batteries.\n\n§o5. If your child wanders into a Deep and is frozen,§0 then you can extract them with a leash.",
   "book.stasisdelvers.pamphlet.page7": "§o6. Stasis is not a wall.§0 Endermen and phantoms are not held by it: they cross stopped land freely and hunt in it. Do not rely on stilled ground to keep them away.",
   "book.stasisdelvers.pamphlet.page8": "There have been reports of citizens utilising rift crystals to create bootleg, unstable stasis fields and pendants. The government disavows this practice.",
-  "book.stasisdelvers.pamphlet.page9": "Such bootleg equipment lasts barely half an hour at most, and cannot be used to speed up work.\n\nExclusion Zone STRHLD has been established at the Bypass site. Do not approach without a permit and the prescribed defensive measures."
+  "book.stasisdelvers.pamphlet.page9": "Such bootleg equipment lasts barely half an hour at most, and cannot be used to speed up work.\n\nExclusion Zone STRHLD has been established at the Bypass site. Do not approach without a permit and the prescribed defensive measures.",
+  "item.stasisdelvers.quern_minecart": "Quern Minecart",
+  "entity.stasisdelvers.quern_minecart": "Quern Minecart"
 }

@@ -98,6 +98,9 @@ public final class StasisRegistry {
             .sound(net.minecraft.world.level.block.SoundType.WOOD).noOcclusion()
             .pushReaction(net.minecraft.world.level.material.PushReaction.IMMOVEABLE).lightLevel(st -> 5));
     public static final net.neoforged.neoforge.registries.DeferredItem<net.minecraft.world.item.BlockItem> QUERN_ITEM = ITEMS.registerSimpleBlockItem(QUERN);
+    /** A minecart carrying a rift quern (λ-Nero 2026-11-09). */
+    public static final net.neoforged.neoforge.registries.DeferredItem<QuernVehicles.CartItem> QUERN_MINECART = ITEMS.registerItem("quern_minecart",
+        p -> new QuernVehicles.CartItem(() -> StasisRegistry.QUERN_MINECART_ENTITY.get(), p), p -> p.stacksTo(1));
     public static final DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>, net.minecraft.world.level.block.entity.BlockEntityType<QuernBlockEntity>> QUERN_ENTITY =
         BLOCK_ENTITIES.register("rift_quern", () -> new net.minecraft.world.level.block.entity.BlockEntityType<>(QuernBlockEntity::new, QUERN.get()));
 
@@ -285,6 +288,12 @@ public final class StasisRegistry {
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "statue"))));
 
     /** Static, the suit drainer (rift fauna; notes/fauna/PLAN.md). */
+    /** The Quern Minecart (λ-Nero 2026-11-09): a furnace cart's size. */
+    public static final DeferredHolder<EntityType<?>, EntityType<QuernMinecart>> QUERN_MINECART_ENTITY = ENTITY_TYPES.register("quern_minecart",
+        () -> EntityType.Builder.<QuernMinecart>of(QuernMinecart::new, MobCategory.MISC).noLootTable().sized(0.98f, 0.7f)
+            .passengerAttachments(0.1875f).clientTrackingRange(8)
+            .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "quern_minecart"))));
+
     public static final DeferredHolder<EntityType<?>, EntityType<RiftStatic>> RIFT_STATIC = ENTITY_TYPES.register("static",
         () -> EntityType.Builder.<RiftStatic>of(RiftStatic::new, MobCategory.MONSTER).sized(0.8f, 0.8f).clientTrackingRange(8)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "static"))));

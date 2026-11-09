@@ -28,6 +28,8 @@ public final class StasisClient {
         mods.eln.item.belt.BatteryBeltItem.hudAbove = SuitGauge::showing;
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.STATUE.get(), StatueRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerBlockEntityRenderer(StasisRegistry.QUERN_ENTITY.get(), QuernRenderer::new));
+        modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.QUERN_MINECART_ENTITY.get(),
+            c -> new net.minecraft.client.renderer.entity.MinecartRenderer(c, net.minecraft.client.model.geom.ModelLayers.FURNACE_MINECART)));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> {
             e.registerBlockEntityRenderer(StasisRegistry.TEMPORAL_ACCELERATOR_ENTITY.get(), AcceleratorLeverRenderer::new);
             e.registerBlockEntityRenderer(StasisRegistry.CHRONAL_ACCELERATOR_ENTITY.get(), AcceleratorLeverRenderer::new);
@@ -49,6 +51,7 @@ public final class StasisClient {
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StasisPost::tick);
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.tick.EntityTickEvent.Pre.class, FrozenEntities::tick);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, RiftHum::tick);
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> org.erisia.stasis.ClientFields.follow(net.minecraft.client.Minecraft.getInstance().level));   // (quern vehicles' fields move with them)
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, DeepWarning::tick);   // (deeps seen and heard from outside)
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent.class, DeepWarning::wall);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, StillEdge::tick);   // (the stilled land's edge, Baughn)
