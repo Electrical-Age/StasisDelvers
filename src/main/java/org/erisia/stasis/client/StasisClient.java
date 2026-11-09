@@ -30,6 +30,8 @@ public final class StasisClient {
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerBlockEntityRenderer(StasisRegistry.QUERN_ENTITY.get(), QuernRenderer::new));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> e.registerEntityRenderer(StasisRegistry.QUERN_MINECART_ENTITY.get(),
             c -> new net.minecraft.client.renderer.entity.MinecartRenderer(c, net.minecraft.client.model.geom.ModelLayers.FURNACE_MINECART)));
+        modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> StasisRegistry.QUERN_BOAT_ENTITIES.forEach((wood, type) ->
+            e.registerEntityRenderer(type.get(), c -> new QuernBoatRenderer(c, wood))));
         modBus.addListener(EntityRenderersEvent.RegisterRenderers.class, e -> {
             e.registerBlockEntityRenderer(StasisRegistry.TEMPORAL_ACCELERATOR_ENTITY.get(), AcceleratorLeverRenderer::new);
             e.registerBlockEntityRenderer(StasisRegistry.CHRONAL_ACCELERATOR_ENTITY.get(), AcceleratorLeverRenderer::new);

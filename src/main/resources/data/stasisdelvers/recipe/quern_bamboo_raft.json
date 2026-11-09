@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:bamboo_chest_raft",
+    "stasisdelvers:rift_quern"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:quern_bamboo_raft"
+  }
+}

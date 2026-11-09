@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:poplar_chest_boat",
+    "stasisdelvers:rift_quern"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:quern_poplar_boat"
+  }
+}

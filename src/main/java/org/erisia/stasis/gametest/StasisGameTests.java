@@ -3049,8 +3049,8 @@ public final class StasisGameTests {
         // no resend), and goes when the cart does; the queue drops
         CASES.put("quern_cart_field_follows", new Spec(30, (h, c) -> {
             ServerLevel level = h.getLevel();
-            for (int x = 6; x <= 22; x++) h.setBlock(new BlockPos(x, 1, 4), Blocks.RAIL);
-            BlockPos at = h.absolutePos(new BlockPos(8, 1, 4));
+            for (int x = 1; x <= 14; x++) h.setBlock(new BlockPos(x, 1, 4), Blocks.RAIL);   // (in the 16-wide test area: past it chunks may not tick)
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
             var cart = org.erisia.stasis.StasisRegistry.QUERN_MINECART_ENTITY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
             cart.setPos(at.getX() + 0.5, at.getY() + 0.0625, at.getZ() + 0.5);
             level.addFreshEntity(cart);
@@ -3085,6 +3085,73 @@ public final class StasisGameTests {
                     && !FieldData.get(level).bound().containsKey(fid[0]) && dropped == 1, "dropped " + dropped);
             };
         }, false, true));
+        // a player safe beside a quern cart that drives off gets the usual grace, not an instant statue (FieldData.move)
+        CASES.put("quern_cart_move_grace", new Spec(12, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            var cart = org.erisia.stasis.StasisRegistry.QUERN_MINECART_ENTITY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            cart.setPos(at.getX() + 0.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(cart);
+            cart.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            ServerPlayer[] p = {survivalPlayer(h, new Vec3(4.5, 1.0, 4.5), false)};   // (made here: survivalPlayer schedules ticks itself)
+            c.cleanup.add(() -> remove(h, p[0]));
+            String[] mid = new String[1];
+            h.runAtTickTime(6, () -> {
+                mid[0] = "safe " + Stasis.isRunning(level, p[0].blockPosition()) + ", grace " + org.erisia.stasis.Freezing.inGrace(p[0]);
+                cart.setPos(cart.getX() + 8, cart.getY(), cart.getZ());   // (in the 16-wide test area: past it chunks may not tick)
+            });
+            return () -> {
+                c.check("beside the grinding cart the player is where time runs", mid[0] != null && mid[0].startsWith("safe true"), mid[0]);
+                c.check("the cart gone 8 blocks on: stopped there, with grace", !Stasis.isRunning(level, p[0].blockPosition())
+                    && org.erisia.stasis.Freezing.inGrace(p[0]), "running " + Stasis.isRunning(level, p[0].blockPosition()) + " at " + p[0].blockPosition().subtract(at).toShortString()
+                    + ", cart " + String.format("%.1f", cart.getX() - at.getX()) + ", field " + FieldData.get(level).get(cart.quern().fieldId()).map(f -> String.format("%.1f", f.x() - at.getX())).orElse("none")
+                    + ", fields " + FieldData.get(level).fields().size());
+                cart.discard();
+            };
+        }, false, true));
+        // the Quern Boat (λ-Nero 2026-11-09): on stopped water it thaws the water round it and sails, its field going along
+        CASES.put("quern_boat_thaws_water", new Spec(60, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            for (int x = 0; x <= 15; x++)   // (the 16-wide test area: past it chunks may not tick)
+                for (int z = 1; z <= 7; z++) {
+                    h.setBlock(new BlockPos(x, 1, z), Blocks.WATER);
+                    h.setBlock(new BlockPos(x, 2, z), Blocks.AIR);
+                }
+            BlockPos at = h.absolutePos(new BlockPos(2, 1, 4));
+            var boat = org.erisia.stasis.StasisRegistry.QUERN_BOAT_ENTITIES.get("oak").get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            boat.setPos(at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5);
+            level.addFreshEntity(boat);
+            boat.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.CHARGED_RIFT_SHARD.get()));
+            String[] mid = new String[1];
+            double[] x0 = new double[1];
+            h.runAtTickTime(10, () -> {
+                x0[0] = boat.getX();
+                mid[0] = "grinding " + boat.quern().grinding() + ", water 2 ahead " + Stasis.rateAt(level, at.east(2)) + ", 10 ahead " + Stasis.rateAt(level, at.east(10));
+            });
+            for (int t = 11; t < 40; t++) h.runAtTickTime(t, () -> boat.setDeltaMovement(0.35, boat.getDeltaMovement().y, 0));
+            return () -> {
+                double went = boat.getX() - x0[0];
+                BlockPos now = boat.blockPosition();
+                c.check("on stopped water it grinds, the water round it runs and farther off it's still",
+                    "grinding true, water 2 ahead 0.4, 10 ahead 0.0".equals(mid[0]), mid[0]);
+                c.check("pushed along, it sails (not stuck on stilled water) and floats", went > 8 && Math.abs(boat.getY() - (at.getY() + 0.9)) < 0.5,
+                    String.format("went %.1f, y %.2f over the water's floor %d", went, boat.getY(), at.getY()));
+                c.check("its field went with it: the water ahead of it runs, where it started is still", Stasis.rateAt(level, now.east(2)) > 0
+                    && Stasis.rateAt(level, at) == 0, "ahead " + Stasis.rateAt(level, now.east(2)) + ", start " + Stasis.rateAt(level, at));
+                boat.discard();
+            };
+        }, false, true));
+        // every vanilla chest boat and raft has a Quern Boat (a new wood in an update would otherwise be left out)
+        CASES.put("quern_boat_every_wood", new Spec(1, (h, c) -> {
+            List<String> missing = new java.util.ArrayList<>();
+            for (var key : net.minecraft.core.registries.BuiltInRegistries.ITEM.keySet()) {
+                String p = key.getPath();
+                if (!key.getNamespace().equals("minecraft") || !(p.endsWith("_chest_boat") || p.endsWith("_chest_raft"))) continue;
+                String wood = p.replaceAll("_chest_(boat|raft)$", "");
+                if (!org.erisia.stasis.StasisRegistry.QUERN_BOATS.containsKey(wood)) missing.add(p);
+            }
+            return () -> c.check("every vanilla chest boat has a Quern Boat", missing.isEmpty(), missing.toString());
+        }));
         // a quern cart with no shard in stopped land is a frozen cart; in running land (a tower's field) it waits
         CASES.put("quern_cart_waits_in_a_field", new Spec(10, (h, c) -> {
             ServerLevel level = h.getLevel();

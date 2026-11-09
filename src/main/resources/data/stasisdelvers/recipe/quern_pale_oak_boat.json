@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:pale_oak_chest_boat",
+    "stasisdelvers:rift_quern"
+  ],
+  "result": {
+    "count": 1,
+    "id": "stasisdelvers:quern_pale_oak_boat"
+  }
+}

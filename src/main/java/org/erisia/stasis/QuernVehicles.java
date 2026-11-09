@@ -70,4 +70,55 @@ public final class QuernVehicles {
             return InteractionResult.SUCCESS;
         }
     }
+
+    /** The Quern Boat items: placed as a boat is (BoatItem, with the type looked up late). */
+    public static final class BoatItem extends Item {
+        final java.util.function.Supplier<? extends EntityType<? extends net.minecraft.world.entity.vehicle.boat.AbstractBoat>> type;
+
+        public BoatItem(java.util.function.Supplier<? extends EntityType<? extends net.minecraft.world.entity.vehicle.boat.AbstractBoat>> type, Properties p) {
+            super(p);
+            this.type = type;
+        }
+
+        @Override
+        public InteractionResult use(Level level, net.minecraft.world.entity.player.Player player, net.minecraft.world.InteractionHand hand) {
+            ItemStack stack = player.getItemInHand(hand);
+            var hit = getPlayerPOVHitResult(level, player, net.minecraft.world.level.ClipContext.Fluid.ANY);
+            if (hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) return InteractionResult.PASS;
+            var view = player.getViewVector(1.0f);
+            var from = player.getEyePosition();
+            for (Entity e : level.getEntities(player, player.getBoundingBox().expandTowards(view.scale(5.0)).inflate(1.0), net.minecraft.world.entity.EntitySelector.CAN_BE_PICKED))
+                if (e.getBoundingBox().inflate(e.getPickRadius()).contains(from)) return InteractionResult.PASS;
+            var boat = type.get().create(level, EntitySpawnReason.SPAWN_ITEM_USE);
+            if (boat == null) return InteractionResult.FAIL;
+            var at = hit.getLocation();
+            boat.setInitialPos(at.x, at.y, at.z);
+            if (level instanceof ServerLevel sl) EntityType.<net.minecraft.world.entity.vehicle.boat.AbstractBoat>createDefaultStackConfig(sl, stack, player).apply(boat);
+            boat.setYRot(player.getYRot());
+            if (!level.noCollision(boat, boat.getBoundingBox())) return InteractionResult.FAIL;
+            if (!level.isClientSide()) {
+                level.addFreshEntity(boat);
+                level.gameEvent(player, GameEvent.ENTITY_PLACE, at);
+                stack.consume(1, player);
+            }
+            return InteractionResult.SUCCESS;
+        }
+    }
+
+    /** The vanilla woods with a chest boat (26.3), and whether it's a raft: a Quern Boat each (quern_WOOD_boat / quern_bamboo_raft). */
+    public static final String[] WOODS = {"oak", "spruce", "birch", "jungle", "acacia", "cherry", "dark_oak", "pale_oak", "mangrove", "poplar", "bamboo"};
+
+    public static boolean raft(String wood) {
+        return wood.equals("bamboo");
+    }
+
+    /** quern_oak_boat, quern_bamboo_raft. */
+    public static String boatId(String wood) {
+        return "quern_" + wood + (raft(wood) ? "_raft" : "_boat");
+    }
+
+    /** minecraft:oak_chest_boat, minecraft:bamboo_chest_raft. */
+    public static String chestBoatId(String wood) {
+        return wood + (raft(wood) ? "_chest_raft" : "_chest_boat");
+    }
 }

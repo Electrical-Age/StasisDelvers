@@ -294,6 +294,23 @@ public final class StasisRegistry {
             .passengerAttachments(0.1875f).clientTrackingRange(8)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "quern_minecart"))));
 
+    /** The Quern Boats (λ-Nero 2026-11-09): one per vanilla wood (QuernVehicles.WOODS), a chest boat's size. */
+    public static final java.util.Map<String, DeferredHolder<EntityType<?>, EntityType<QuernBoat>>> QUERN_BOAT_ENTITIES = new java.util.LinkedHashMap<>();
+    public static final java.util.Map<String, net.neoforged.neoforge.registries.DeferredItem<QuernVehicles.BoatItem>> QUERN_BOATS = new java.util.LinkedHashMap<>();
+
+    static {
+        for (String wood : QuernVehicles.WOODS) {
+            String id = QuernVehicles.boatId(wood);
+            boolean raft = QuernVehicles.raft(wood);
+            var item = ITEMS.registerItem(id, p -> new QuernVehicles.BoatItem(() -> QUERN_BOAT_ENTITIES.get(wood).get(), p), p -> p.stacksTo(1));
+            QUERN_BOATS.put(wood, item);
+            QUERN_BOAT_ENTITIES.put(wood, ENTITY_TYPES.register(id, () -> EntityType.Builder.<QuernBoat>of(
+                    (type, level) -> new QuernBoat(type, level, () -> item.get(), raft), MobCategory.MISC)
+                .noLootTable().sized(1.375f, 0.5625f).eyeHeight(0.5625f).clientTrackingRange(10)
+                .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, id)))));
+        }
+    }
+
     public static final DeferredHolder<EntityType<?>, EntityType<RiftStatic>> RIFT_STATIC = ENTITY_TYPES.register("static",
         () -> EntityType.Builder.<RiftStatic>of(RiftStatic::new, MobCategory.MONSTER).sized(0.8f, 0.8f).clientTrackingRange(8)
             .build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(StasisDelvers.MODID, "static"))));
