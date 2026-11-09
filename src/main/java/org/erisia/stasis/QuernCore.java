@@ -98,8 +98,12 @@ public final class QuernCore {
     }
 
     /** One tick: start the next shard if one is due and wanted, grind, and keep the field up (or take it down). */
+    /** Wanted at its last tick (true before its first: a status asked right after the first shard says nothing of waiting). */
+    boolean lastWanted = true;
+
     public void tick(ServerLevel sl) {
         boolean want = wanted(sl);
+        lastWanted = want;
         boolean was = grinding;
         ItemStack wasBurning = burning;
         if (burnLeft <= 0 && want) {
@@ -193,7 +197,7 @@ public final class QuernCore {
     public Component statusText(String name) {
         int t = ticksLeft();
         if (t == 0) return Component.literal(name + ": empty.");
-        String why = !grinding ? " (waiting: time runs here without it)" : "";
+        String why = !grinding && !lastWanted ? " (waiting: time runs here without it)" : "";
         return Component.literal(String.format("%s: %d:%02d of field left%s.", name, t / 1200, t / 20 % 60, why));
     }
 

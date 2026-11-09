@@ -544,6 +544,7 @@ public final class Stasis {
     public static boolean isFrozen(Entity e) {
         if (!(e.level() instanceof ServerLevel level) || e instanceof net.minecraft.world.entity.player.Player) return false;
         if (!stops(level) || e.typeHolder().is(UNBOUND) || Possession.running(e) || PossessedStatue.running(e)) return false;   // (a Puppeteer's host: its bursts)
-        return !isRunning(level, e.blockPosition());
+        if (isRunning(level, e.blockPosition())) return false;
+        return !QuernVehicles.carried(level, e);
     }
 }

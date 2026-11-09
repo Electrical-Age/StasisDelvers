@@ -64,9 +64,10 @@ public class QuernBoatRenderer extends AbstractBoatRenderer {
     protected void submitTypeAdditions(BoatRenderState state, PoseStack pose, SubmitNodeCollector out, int light) {
         if (!(state instanceof State s) || s.quern.isEmpty()) return;
         pose.pushPose();
-        // (undo the model's flip, so the block stands upright; the stern is +x in the model's frame)
+        // (undo the model's flip, so the block stands upright; at the stern, behind the rider: at the bow it blocked the
+        // rider's view, AdventurAgent)
         pose.scale(-1.0f, -1.0f, 1.0f);
-        pose.translate(-0.55f, -0.1f, 0.0f);
+        pose.translate(0.55f, -0.1f, 0.0f);
         pose.scale(0.6f, 0.6f, 0.6f);
         pose.translate(-0.5f, 0.0f, -0.5f);
         s.quern.submit(pose, out, light, OverlayTexture.NO_OVERLAY, state.outlineColor);

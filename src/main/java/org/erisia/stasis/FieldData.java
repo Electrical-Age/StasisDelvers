@@ -164,6 +164,19 @@ public final class FieldData extends SavedData {
     /** The snapshot the flames were last relit for. */
     private List<Field> flamesSaw = List.of();
 
+    /** The fields bound to an entity now (main thread). */
+    public List<Field> boundFields() {
+        if (bound.isEmpty()) return List.of();
+        List<Field> out = new ArrayList<>();
+        for (Field f : snapshot) if (bound.containsKey(f.id())) out.add(f);
+        return out;
+    }
+
+    /** Main thread: the level's data if loaded, else null (no creation; for per-entity checks). */
+    static FieldData loaded(ServerLevel level) {
+        return LOADED.get(level);
+    }
+
     public java.util.Map<Integer, Integer> bound() {
         return java.util.Collections.unmodifiableMap(bound);
     }

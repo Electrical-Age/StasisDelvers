@@ -28,6 +28,25 @@ public final class QuernVehicles {
         if (e instanceof QuernVehicle v && e.level() instanceof ServerLevel sl) v.quernTick(sl);
     }
 
+    /** How near a quern vehicle's field centre a minecart rides along unfrozen (blocks). */
+    public static final double CARRY = QuernCore.RADIUS + 2;
+
+    /**
+     * Is minecart e part of a quern cart's train: within CARRY of a bound field's centre? Then it isn't frozen even where
+     * the field doesn't hold its block (AdventurAgent 2026-11-09: a furnace cart pushing a minecart and a quern cart fell
+     * out of the field's back as the quern cart sped off, and froze there with its fuel left: the train only coasted).
+     */
+    static boolean carried(ServerLevel level, Entity e) {
+        if (!(e instanceof AbstractMinecart)) return false;
+        FieldData d = FieldData.loaded(level);
+        if (d == null) return false;
+        for (Field f : d.boundFields()) {
+            double dx = e.getX() - f.x(), dy = e.getY() - f.y(), dz = e.getZ() - f.z();
+            if (dx * dx + dy * dy + dz * dz <= CARRY * CARRY) return true;
+        }
+        return false;
+    }
+
     /** Client: the quern's dust and sparks while it grinds (as QuernBlockEntity.clientTick), at height dy over the entity. */
     static void clientDust(Entity e, boolean grinding, double dy) {
         if (!grinding) return;
@@ -92,6 +111,11 @@ public final class QuernVehicles {
             var boat = type.get().create(level, EntitySpawnReason.SPAWN_ITEM_USE);
             if (boat == null) return InteractionResult.FAIL;
             var at = hit.getLocation();
+            // (on stilled water, which is solid, the hit is its surface: stand it on top, as on ice; vanilla boats failed
+            // there, inside the block's collision: AdventurAgent)
+            if (hit instanceof net.minecraft.world.phys.BlockHitResult bh && level.getFluidState(bh.getBlockPos()).is(net.minecraft.tags.FluidTags.WATER)
+                && !Stasis.isRunning(level, bh.getBlockPos()))
+                at = new net.minecraft.world.phys.Vec3(at.x, bh.getBlockPos().getY() + 1.0, at.z);
             boat.setInitialPos(at.x, at.y, at.z);
             if (level instanceof ServerLevel sl) EntityType.<net.minecraft.world.entity.vehicle.boat.AbstractBoat>createDefaultStackConfig(sl, stack, player).apply(boat);
             boat.setYRot(player.getYRot());

@@ -3109,6 +3109,31 @@ public final class StasisGameTests {
                 cart.discard();
             };
         }, false, true));
+        // a quern cart's train rides along: minecarts near its field's centre aren't frozen even past the field (a furnace
+        // cart pushing from behind fell out of its back and froze: AdventurAgent)
+        CASES.put("quern_cart_carries_its_train", new Spec(8, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            for (int x = 1; x <= 14; x++) h.setBlock(new BlockPos(x, 1, 4), Blocks.RAIL);
+            BlockPos at = h.absolutePos(new BlockPos(3, 1, 4));
+            var cart = org.erisia.stasis.StasisRegistry.QUERN_MINECART_ENTITY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            cart.setPos(at.getX() + 0.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(cart);
+            cart.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            var near = net.minecraft.world.entity.EntityTypes.FURNACE_MINECART.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            near.setPos(at.getX() + 5.0, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(near);
+            var far = net.minecraft.world.entity.EntityTypes.MINECART.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            far.setPos(at.getX() + 10.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(far);
+            return () -> {
+                c.check("4.5 blocks behind, outside the field, the furnace cart rides along unfrozen", !Stasis.isRunning(level, near.blockPosition())
+                    && !Stasis.isFrozen(near), "running " + Stasis.isRunning(level, near.blockPosition()));
+                c.check("10 blocks off a minecart stays frozen", Stasis.isFrozen(far));
+                cart.discard();
+                near.discard();
+                far.discard();
+            };
+        }, false, true));
         // the Quern Boat (λ-Nero 2026-11-09): on stopped water it thaws the water round it and sails, its field going along
         CASES.put("quern_boat_thaws_water", new Spec(60, (h, c) -> {
             ServerLevel level = h.getLevel();
