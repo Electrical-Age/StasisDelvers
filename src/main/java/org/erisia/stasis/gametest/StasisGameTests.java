@@ -3134,6 +3134,37 @@ public final class StasisGameTests {
                 far.discard();
             };
         }, false, true));
+        // Nero's train in stopped land: a furnace cart pushing a minecart and a quern cart keeps up with them and pushes the
+        // whole way (the quern cart is as slow as a furnace cart; the furnace cart rides along unfrozen)
+        CASES.put("quern_train_furnace_pushes", new Spec(80, (h, c) -> {
+            ServerLevel level = h.getLevel();
+            for (int x = 0; x <= 15; x++) h.setBlock(new BlockPos(x, 1, 4), Blocks.RAIL);
+            BlockPos at = h.absolutePos(new BlockPos(0, 1, 4));
+            var q = org.erisia.stasis.StasisRegistry.QUERN_MINECART_ENTITY.get().create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            q.setPos(at.getX() + 4.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(q);
+            var m = net.minecraft.world.entity.EntityTypes.MINECART.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            m.setPos(at.getX() + 3.0, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(m);
+            var f = net.minecraft.world.entity.EntityTypes.FURNACE_MINECART.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            f.setPos(at.getX() + 1.5, at.getY() + 0.0625, at.getZ() + 0.5);
+            level.addFreshEntity(f);
+            q.quern().offer(new net.minecraft.world.item.ItemStack(org.erisia.stasis.StasisRegistry.RIFT_SHARD.get()));
+            StringBuilder tr = new StringBuilder();
+            boolean[] froze = new boolean[1];
+            h.runAtTickTime(20, () -> f.addFuel(new net.minecraft.world.phys.Vec3(f.getX() - 1, f.getY(), f.getZ()), new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COAL)));
+            for (int t = 2; t < 78; t += 4) {
+                int tt = t;
+                h.runAtTickTime(t, () -> froze[0] |= tt > 22 && Stasis.isFrozen(f));
+                h.runAtTickTime(t, () -> tr.append(String.format(" t%d q%.2f(%.2f) m%.2f(%.2f) f%.2f(%.2f%s)", tt, q.getX() - at.getX(), q.getDeltaMovement().x,
+                    m.getX() - at.getX(), m.getDeltaMovement().x, f.getX() - at.getX(), f.getDeltaMovement().x, Stasis.isFrozen(f) ? " FROZEN" : "")));
+            }
+            return () -> {
+                c.check("the furnace cart pushes the whole way: never frozen, the train 7+ blocks on, the carts still together",
+                    !froze[0] && q.getX() - at.getX() > 11.5 && q.getX() - f.getX() < 3.5, tr.toString());
+                q.discard(); m.discard(); f.discard();
+            };
+        }, false, true));
         // the Quern Boat (λ-Nero 2026-11-09): on stopped water it thaws the water round it and sails, its field going along
         CASES.put("quern_boat_thaws_water", new Spec(60, (h, c) -> {
             ServerLevel level = h.getLevel();

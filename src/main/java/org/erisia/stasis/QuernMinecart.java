@@ -66,6 +66,16 @@ public class QuernMinecart extends AbstractMinecart implements QuernVehicle, Que
         if (level().isClientSide()) QuernVehicles.clientDust(this, grindingClient(), 0.75);
     }
 
+    /**
+     * As slow as a furnace cart (half a minecart's top speed): pushed by one, the cart and a minecart between them ran at
+     * a minecart's top speed, touching carts keeping each other going, and left the furnace cart behind, frozen once out
+     * of reach (AdventurAgent 2026-11-09).
+     */
+    @Override
+    protected double getMaxSpeed(net.minecraft.server.level.ServerLevel level) {
+        return super.getMaxSpeed(level) * 0.5;
+    }
+
     // ---- QuernCore.Host
 
     @Override
