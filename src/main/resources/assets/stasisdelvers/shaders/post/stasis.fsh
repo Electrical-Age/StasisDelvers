@@ -193,6 +193,22 @@ bool insideOther(vec3 p, int self, int n) {
     return false;
 }
 
+// Is p (camera-fraction space) inside a running field (not a lull, a remnant or a collapsing one)? Drifting-deep mist
+// and storms aren't drawn there: weather stops at the shell, whose hexes light up where it touches (λ-Nero 2026-11-09:
+// a storm showed inside Baughn's tower field).
+bool inRunningField(vec3 p) {
+    int n = int(data(24));
+    for (int j = 0; j < n && j < MAX_FIELDS; j++) {
+        int k = FIELD_BASE + FIELD_STRIDE * j;
+        float kind = data(k + 6);
+        if (kind < -0.5 || kind > 1.5 || data(k + 4) > 0.0) continue;
+        vec3 dv = p - vec3(data(k), data(k + 1), data(k + 2));
+        if (kind > 0.5) dv.y = 0.0;
+        if (length(unstretch(dv, stretchOf(j))) < data(k + 3)) return true;
+    }
+    return false;
+}
+
 // The view ray's span through a stretched field (oc = ray origin - centre): each quarter (by the signs of x and z) is
 // the sphere of radius r scaled, so the ray is cut at x = 0 and z = 0 and each piece solved as a sphere; the shape is
 // convex, so the pieces' spans join into one (t1 the entry, t2 the exit).
@@ -550,7 +566,8 @@ vec2 deepMist(vec3 o, vec3 dir, float tEnd, float rd) {
                 vec3 q = o + dir * t;
                 float dn = 0.0;
                 puffDark = 0.0;
-                for (int j = k; j < k2; j++) dn = max(dn, mistDensity(q, ord[j], t < 80.0));
+                bool inF = inRunningField(q);
+                for (int j = k; j < k2; j++) if (!inF || hits[ord[j]].kind != 0) dn = max(dn, mistDensity(q, ord[j], t < 80.0));
                 if (dn > 0.0) {
                     float alpha = 1.0 - exp(-MIST_SIGMA * dn * viewFade(dir * t, rd) * dt);
                     // (a young puff weighs more than its share: (x - y) THIN + y DENSE turns sooty-violet past y = x)
@@ -670,6 +687,28 @@ float mistDepthCode(float tScene, float rd) {
     return tScene < 0.0 ? 1.0 : clamp(tScene / (rd * 1.5), 0.0, 1.0);
 }
 
+// The storm's ground from the camera's 16 x 16 grid (Storms.java; rift stage 3).
+float stormGround(vec2 q) {
+    vec2 l = clamp((q - vec2(data(1576), data(1577))) / 16.0, 0.0, 14.999);
+    vec2 f0 = floor(l), f = l - f0;
+    int o = 1320 + int(f0.y) * 16 + int(f0.x);
+    return mix(mix(data(o), data(o + 1), f.x), mix(data(o + 16), data(o + 17), f.x), f.y);
+}
+
+// How much storm is at q (camera-fraction space): 0 none, its mist up to 0.6 (by the intensity and the height band),
+// 1 storm rift (up to its ragged tops). For the shields, which brighten where a storm presses on them.
+float stormAt(vec3 q) {
+    float si = data(1312);
+    if (si <= 0.0) return 0.0;
+    float h = q.y - stormGround(q.xz);
+    if (h < -6.0 || h > 64.0) return 0.0;
+    float nz = fbm32(vec3(vec2(data(1315), data(1316)) + q.xz / 90.0, 0.5).xzy, int(data(1319)));
+    float thM = data(1317), thR = data(1318);
+    if (nz < thM) return 0.0;
+    if (nz >= thR) return 1.0 - smoothstep(30.0, 46.0, h);
+    return 0.6 * smoothstep(thM, thM + 0.04, nz) * si * smoothstep(-6.0, -3.0, h) * exp(-max(0.0, h - 4.0) / 22.0);
+}
+
 #ifdef STRATA_PASS
 // ---- strata weather (Pockets.java; rift stage 2): the same epochs, from the same hashes
 
@@ -718,14 +757,8 @@ vec2 pocketWeather(int id, ivec3 p) {
 }
 
 // ---- storms (Storms.java; rift stage 3): the storm field over the surface band, on the warped wind: lit grey mist
-// where it's over the mist threshold, black rift (with a violet edge) over the rift threshold. The ground from the
-// camera's 16 x 16 grid.
-float stormGround(vec2 q) {
-    vec2 l = clamp((q - vec2(data(1576), data(1577))) / 16.0, 0.0, 14.999);
-    vec2 f0 = floor(l), f = l - f0;
-    int o = 1320 + int(f0.y) * 16 + int(f0.x);
-    return mix(mix(data(o), data(o + 1), f.x), mix(data(o + 16), data(o + 17), f.x), f.y);
-}
+// where it's over the mist threshold, black rift (with a violet edge) over the rift threshold (stormGround and
+// stormAt are above, shared with the shields).
 
 vec3 camIntS;
 
@@ -743,6 +776,7 @@ void stormMarch(vec3 o, vec3 dir, float tEnd, float jit, inout float T, inout fl
         vec3 q = o + dir * ((float(m) + jit) * dt);
         float h = q.y - stormGround(q.xz);
         if (h < -6.0 || h > 64.0) continue;
+        if (inRunningField(q)) continue;   // (it stops at the shell, λ-Nero)
         float nz = fbm32(vec3(no + q.xz / 90.0, 0.5).xzy, seed);
         if (nz < thM) continue;
         float band = smoothstep(-6.0, -3.0, h) * exp(-max(0.0, h - 4.0) / 22.0);
@@ -1463,6 +1497,13 @@ void main() {
                     float dp = deepAt(fc + hp, vec3(data(16), data(17), data(18)));
                     if (dp > 0.05) sh = vec4(mix(sh.rgb, vec3(0.92, 0.96, 1.0), 0.6 * dp),
                         min(0.9, sh.a * (1.0 + 1.5 * dp * (0.75 + 0.25 * sin(ftime * 3.0 + cell.y * 6.0)))));
+                }
+                if (data(1312) > 0.0) {
+                    // a storm pressing on the shell (λ-Nero 2026-11-09: it blooms against the edge, the hexes showing its
+                    // path): brighter where its mist touches, violet where its rift does, pulsing
+                    float sp = stormAt(fc + hp);
+                    if (sp > 0.02) sh = vec4(mix(sh.rgb, sp > 0.95 ? vec3(0.8, 0.6, 1.0) : vec3(0.92, 0.96, 1.0), 0.6 * min(sp, 1.0)),
+                        min(0.9, sh.a * (1.0 + 1.5 * sp * (0.75 + 0.25 * sin(ftime * 3.0 + cell.y * 6.0)))));
                 }
                 if (pop < 0.25) sh = vec4(mix(sh.rgb, vec3(1.0), 0.8 * (1.0 - pop / 0.25)), min(0.9, sh.a + 0.6 * (1.0 - pop / 0.25)));
                 c = mix(c, sh.rgb, sh.a);

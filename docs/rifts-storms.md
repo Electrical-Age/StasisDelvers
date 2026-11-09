@@ -45,7 +45,8 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
     budding block (gone: the bud is forgotten; never a crystal on air).
   - SavedData `rift_crystals` (`buds[pos, dir, t, e, stage]`, `swept`).
 - `StormCrystals.java`: while a storm runs, clusters form on open ground under storm rift, one per 32x32 cell,
-  checked every 5 s within 128 blocks of a player. They are removed after the storm, in chunks loaded later too.
+  checked every 5 s within 128 blocks of a player, never in running land; round each running field they gather on the
+  ground just outside its edge where storm rift presses on it (`edges`; λ-Nero: like snow at a closed door). They are removed after the storm, in chunks loaded later too.
   SavedData `storm_crystals`.
 - `Eddies.java`: drifting stopped pockets in weak fields (see time-stop.md). It has its own float clock
   `Eddies.time`, which wraps.
@@ -71,7 +72,10 @@ Paths are relative to `src/main/java/org/erisia/stasis/`. Design notes: `/var/li
   the player's height): the water it passed stayed meshed as running (AdventurAgent).
 
 ## Effects on gameplay
-- Rift (`StaticDeeps.inRift`, pocket `RIFT`, storm rift): `Stasis.rateAt` returns 0 even inside a field.
+- Rift (`StaticDeeps.inRift`, pocket `RIFT`): `Stasis.rateAt` returns 0 even inside a field. A storm rift freezes
+  players only in stopped land (`Freezing`); inside a running field it does nothing to them, and it isn't drawn there:
+  drifting-deep mist and storms stop at the shell, whose hexes brighten where they touch (`inRunningField`, `stormAt` in
+  `stasis.fsh`; λ-Nero 2026-11-09).
   An unprotected player becomes a statue in about 3 s; touching the eye is instant. Nothing protects. (Open lance
   gates and return rifts are doors: lance.md. A lance's breach shrinks a rift and its outer zone round the eye to a
   quarter: `StaticDeeps.strength`, applied in `zone`.)

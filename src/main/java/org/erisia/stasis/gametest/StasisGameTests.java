@@ -1208,6 +1208,44 @@ public final class StasisGameTests {
             b.setEnergy(st, -5);
             c.check("empties to zero", b.getEnergy(st) == 0);
         }));
+        // storm crystals pile up just outside a field's edge where storm rift presses on it, never inside (λ-Nero 2026-11-09)
+        CASES.put("storm_crystals_at_the_shell", new Spec(10, (h, c) -> {
+            var t = tower(h, new BlockPos(3, 1, 4), 0);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                t.energy().insert((int) (org.erisia.stasis.TowerBlockEntity.storeJ() * 0.8 * 4 / 3), tx);
+                tx.commit();
+            }
+            ServerPlayer p = survivalPlayer(h, new Vec3(5.5, 1.0, 4.5), true);
+            return () -> {
+                ServerLevel level = h.getLevel();
+                var f = FieldData.get(level).get(t.fieldId()).orElse(null);
+                c.check("running", f != null && t.state() == org.erisia.stasis.TowerBlockEntity.State.RUNNING, t.state().name());
+                if (f == null) return;
+                var box = new net.minecraft.world.phys.AABB(f.x() - 60, f.y() - 40, f.z() - 60, f.x() + 60, f.y() + 40, f.z() + 60);
+                org.erisia.stasis.Storms.TEST.put(box, 2);
+                try {
+                    java.util.Set<Long> before = new java.util.HashSet<>(org.erisia.stasis.StormCrystals.testEdges(level, 0));
+                    var placed = new java.util.HashSet<>(org.erisia.stasis.StormCrystals.testEdges(level, 12345));
+                    placed.removeAll(before);
+                    // (other tests' fields get theirs too: only those round this one count)
+                    placed.removeIf(l -> Math.hypot(BlockPos.of(l).getX() + 0.5 - f.x(), BlockPos.of(l).getZ() + 0.5 - f.z()) > 2 * f.reach());
+                    int inside = 0, far = 0;
+                    for (long l : placed) {
+                        BlockPos q = BlockPos.of(l);
+                        if (f.containsBlock(q.getX(), q.getY(), q.getZ())) inside++;
+                        double d = Math.hypot(q.getX() + 0.5 - f.x(), q.getZ() + 0.5 - f.z());
+                        if (d > f.reach() + 4) far++;
+                    }
+                    c.check("crystals formed at the edge, half the spots round it", placed.size() >= 8, placed.size() + " placed");
+                    c.check("none inside the field, none away from its edge", inside == 0 && far == 0, inside + " inside, " + far + " far");
+                } finally {
+                    org.erisia.stasis.Storms.TEST.remove(box);
+                    org.erisia.stasis.StormCrystals.testSweep(level);
+                    remove(h, p);
+                    t.setRemoved();
+                }
+            };
+        }, false, true));
         CASES.put("tower_runs_a_field", new Spec(10, (h, c) -> {
             var t = tower(h, new BlockPos(3, 1, 4), 3);
             var store = t.energy();

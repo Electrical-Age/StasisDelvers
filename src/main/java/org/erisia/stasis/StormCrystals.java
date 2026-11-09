@@ -20,7 +20,8 @@ import java.util.Set;
 
 /**
  * Storm crystals (Baughn, rift stage 3 D): while a storm runs, rift crystal clusters form on open ground under its
- * rifts, at most one per 32 x 32 cell, and evaporate when it ends. A high-risk harvest: out there a storm rift freezes
+ * rifts, at most one per 32 x 32 cell, never in running land, and gather just outside a field's edge where the storm
+ * presses on it (edges); all evaporate when it ends. A high-risk harvest: out there a storm rift freezes
  * anyone who isn't inside a field. Every 5 s, around each player (128 blocks), cells whose spot lies in storm rift get
  * their cluster; all of them are recorded (saved) and removed once the storm is over, also in chunks loaded later.
  */
@@ -68,6 +69,7 @@ public final class StormCrystals {
                 if (!d.placed.isEmpty()) evaporate(level, d);
                 continue;
             }
+            edges(level, d, seed);
             Block cluster = StasisRegistry.RIFT_CRYSTAL_CLUSTER.get();
             for (var p : level.players()) {
                 int pcx = Math.floorDiv(p.getBlockX(), CELL), pcz = Math.floorDiv(p.getBlockZ(), CELL);
@@ -80,6 +82,7 @@ public final class StormCrystals {
                         if (d.placed.contains(at.asLong()) || !level.getBlockState(at).isAir()
                             || !level.getBlockState(at.below()).isFaceSturdy(level, at.below(), Direction.UP)) continue;
                         if (Storms.at(level, at.getX(), at.getY(), at.getZ()) != 2) continue;
+                        if (Stasis.isRunning(level, at)) continue;   // (none inside a field: they pile up at its edge, edges())
                         // a little formation, not a lone cluster (one was hard to see from more than ~4 blocks:
                         // AdventurAgent): 3-6 clusters and big buds within 2 blocks
                         int n = 3 + (int) (Noise.hash32(cx, cz, 94, seed) * 4);
@@ -100,6 +103,56 @@ public final class StormCrystals {
         }
     }
 
+    /** Edge points tried per field: one every ARC blocks round it, at most MAX_EDGE. */
+    static final double ARC = 3;
+    static final int MAX_EDGE = 128;
+
+    /**
+     * A storm presses on a field's shell (λ-Nero 2026-11-09: "rift crystals can appear on the edge of the shell, like snow
+     * building up at a closed door"): round each running field near a player, on the ground just outside its edge,
+     * clusters form where the storm's rift is, patchy (half the spots), and go with the others when the storm ends.
+     */
+    static void edges(ServerLevel level, Data d, int seed) {
+        Block cluster = StasisRegistry.RIFT_CRYSTAL_CLUSTER.get();
+        for (Field f : FieldData.get(level).fields()) {
+            if (f.collapse() > 0) continue;
+            boolean near = false;
+            for (var p : level.players())
+                if (Math.abs(p.getX() - f.x()) < REACH + f.reach() && Math.abs(p.getZ() - f.z()) < REACH + f.reach()) near = true;
+            if (!near) continue;
+            int n = (int) Math.min(MAX_EDGE, Math.max(8, Math.ceil(2 * Math.PI * f.reach() / ARC)));
+            for (int i = 0; i < n; i++) {
+                double a = 2 * Math.PI * i / n, cx = Math.cos(a), cz = Math.sin(a);
+                if (!inside(level, f, f.x(), f.z())) break;   // (a field off the ground: no edge on it)
+                double lo = 0, hi = f.reach() + 2;
+                if (inside(level, f, f.x() + cx * hi, f.z() + cz * hi)) continue;
+                for (int k = 0; k < 8; k++) {
+                    double mid = (lo + hi) / 2;
+                    if (inside(level, f, f.x() + cx * mid, f.z() + cz * mid)) lo = mid;
+                    else hi = mid;
+                }
+                int x = (int) Math.floor(f.x() + cx * (hi + 0.5)), z = (int) Math.floor(f.z() + cz * (hi + 0.5));
+                if (Noise.hash32(x, z, 97, seed) >= 0.5 || !level.hasChunkAt(new BlockPos(x, 0, z))) continue;
+                BlockPos q = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+                if (d.placed.contains(q.asLong()) || Stasis.isRunning(level, q) || !level.getBlockState(q).isAir()
+                    || !level.getBlockState(q.below()).isFaceSturdy(level, q.below(), Direction.UP)) continue;
+                if (Storms.at(level, q.getX(), q.getY(), q.getZ()) != 2) continue;
+                Block b = Noise.hash32(x, z, 98, seed) < 0.3 ? StasisRegistry.RIFT_CRYSTAL_LARGE.get() : cluster;
+                level.setBlock(q, b.defaultBlockState().setValue(AmethystClusterBlock.FACING, Direction.UP), Block.UPDATE_CLIENTS);
+                d.placed.add(q.asLong());
+                d.setDirty();
+            }
+        }
+    }
+
+    /** Is the ground at (x, z) inside the field (its top block, as the crystals would stand on it)? */
+    static boolean inside(ServerLevel level, Field f, double x, double z) {
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
+        if (!level.hasChunkAt(new BlockPos(bx, 0, bz))) return false;
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
+        return f.containsBlock(bx, y, bz);
+    }
+
     /** The storm is over: every recorded crystal still there in a loaded chunk goes (the rest when they load). */
     static void evaporate(ServerLevel level, Data d) {
         var it = d.placed.iterator();
@@ -116,6 +169,13 @@ public final class StormCrystals {
     /** Public for tests: evaporate now if no storm runs. */
     public static void testSweep(ServerLevel level) {
         if (Storms.intensity(level) <= 0) evaporate(level, Data.get(level));
+    }
+
+    /** Tests: one edge pass with this deep seed; the crystals placed so far. */
+    public static java.util.Set<Long> testEdges(ServerLevel level, int seed) {
+        Data d = Data.get(level);
+        edges(level, d, seed);
+        return d.placed;
     }
 
     public static int testCount(ServerLevel level) {
